@@ -1,11 +1,14 @@
 /**
  * static/js/presupuesto.js - Organizador de Presupuesto por Tarjetas y Porcentajes
- * Permite dividir el ingreso fijo (semanal, quincenal, mensual) en tarjetas con sincronización $ ⇄ %.
+ * Permite dividir el ingreso fijo (semanal, quincenal, mensual) en tarjetas con sincronización $ ⇄ %,
+ * y sub-dividir el presupuesto en 2 quincenas, 4 semanas o de manera personalizada.
  */
 
-import { apiFetch, escapeHTML, estado, fmt, toast } from './core.js';
+import { apiFetch, escapeHTML, fmt, toast } from './core.js';
 
 let cachePresupuesto = null;
+let subperiodoActivoId = 'total';
+let editorSubperiodosTemp = [];
 
 const ICONOS_SVG = {
     'home': `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -37,17 +40,58 @@ export async function cargarPresupuesto() {
     }
 }
 
+function actualizarOpcionesSubdivisionSelect(frecuencia, subTipoActual) {
+    const sel = document.getElementById('pres-subdivision-tipo');
+    const wrap = document.getElementById('wrap-pres-subdivision');
+    const btnGear = document.getElementById('btn-custom-subdivision');
+    if (!sel) return;
+
+    if (frecuencia === 'semanal') {
+        if (wrap) wrap.classList.add('hidden');
+        sel.innerHTML = `<option value="ninguna" selected>Sin división (Semanal)</option>`;
+        if (btnGear) btnGear.classList.add('hidden');
+        return;
+    }
+
+    if (wrap) wrap.classList.remove('hidden');
+
+    let optionsHtml = `<option value="ninguna">Sin división (Periodo completo)</option>`;
+    if (frecuencia === 'mensual') {
+        optionsHtml += `
+            <option value="quincenas">2 Quincenas</option>
+            <option value="semanas">4 Semanas</option>
+            <option value="personalizada">Personalizada ⚙️</option>
+        `;
+    } else if (frecuencia === 'quincenal') {
+        optionsHtml += `
+            <option value="semanas">2 Semanas</option>
+            <option value="personalizada">Personalizada ⚙️</option>
+        `;
+    }
+
+    sel.innerHTML = optionsHtml;
+    // Si el tipo actual existe en las opciones, seleccionarlo; de lo contrario 'ninguna'
+    const existe = Array.from(sel.options).some(o => o.value === subTipoActual);
+    sel.value = existe ? subTipoActual : 'ninguna';
+
+    if (btnGear) {
+        btnGear.classList.toggle('hidden', sel.value === 'ninguna');
+    }
+}
+
 function renderizarVistaPresupuesto(data) {
     const cfg = data.config;
     const res = data.resumen;
     const tarjetas = data.tarjetas || [];
     const fijos = data.fijos_detectados || {};
 
-    // 1. Inputs de configuración de ingreso base
+    // 1. Inputs de configuración de ingreso base y sub-división
     const inpIngreso = document.getElementById('pres-ingreso-base');
     const selFrecuencia = document.getElementById('pres-frecuencia');
     if (inpIngreso && document.activeElement !== inpIngreso) inpIngreso.value = cfg.ingreso_base || '';
     if (selFrecuencia && document.activeElement !== selFrecuencia) selFrecuencia.value = cfg.frecuencia || 'mensual';
+
+    actualizarOpcionesSubdivisionSelect(cfg.frecuencia || 'mensual', cfg.subdivision_tipo || 'ninguna');
 
     // Equivalencias de ingreso en el subtítulo
     const lblEq = document.getElementById('pres-ingreso-equivalentes');
@@ -56,7 +100,7 @@ function renderizarVistaPresupuesto(data) {
         lblEq.textContent = `Equivalente: ${fmt(eq.mensual)} mensual · ${fmt(eq.quincenal)} quincenal · ${fmt(eq.semanal)} semanal`;
     }
 
-    // Alerta o botón para importar desde Fijos y MSI
+    // Alerta contextual de datos detectados en Fijos y MSI
     const boxFijos = document.getElementById('pres-fijos-alert');
     if (boxFijos) {
         const hayFijos = (fijos.ingreso_fijo_periodo > 0 || fijos.gasto_fijo_periodo > 0 || fijos.cuota_msi_periodo > 0);
@@ -69,21 +113,106 @@ function renderizarVistaPresupuesto(data) {
         }
     }
 
-    // 2. Tarjetas KPI de Resumen
+    // 2. Barra de Navegación por Sub-periodos
+    renderBarraSubperiodos(cfg);
+
+    // 3. Tarjetas KPI de Resumen (adaptativas al sub-periodo activo)
+    renderKPIs(cfg, res, tarjetas);
+
+    // 4. Barra visual segmentada de asignación (100% allocation track)
+    renderBarraDistribucion(tarjetas, res, cfg);
+
+    // 5. Grid de Tarjetas de Presupuesto
+    renderGridTarjetas(tarjetas, cfg);
+}
+
+function renderBarraSubperiodos(cfg) {
+    const navBar = document.getElementById('pres-subperiodos-bar');
+    const pillsWrap = document.getElementById('pres-subperiodos-pills');
+    const badgeDesc = document.getElementById('pres-subperiodo-active-badge');
+    if (!navBar || !pillsWrap) return;
+
+    const subperiodos = cfg.subdivision_config || [];
+    const activo = (cfg.subdivision_tipo !== 'ninguna' && subperiodos.length > 0);
+
+    if (!activo) {
+        navBar.classList.add('hidden');
+        subperiodoActivoId = 'total';
+        return;
+    }
+
+    navBar.classList.remove('hidden');
+
+    // Validar que el subperiodoActivoId siga existiendo en la lista
+    if (subperiodoActivoId !== 'total' && !subperiodos.some(sp => sp.id === subperiodoActivoId)) {
+        subperiodoActivoId = 'total';
+    }
+
+    pillsWrap.innerHTML = '';
+
+    // Pill: Periodo Completo
+    const pillTotal = document.createElement('button');
+    pillTotal.type = 'button';
+    pillTotal.className = `pres-subperiodo-pill ${subperiodoActivoId === 'total' ? 'active' : ''}`;
+    pillTotal.innerHTML = `<span>🌐 Periodo Completo (${fmt(cfg.ingreso_base)})</span>`;
+    pillTotal.onclick = () => {
+        subperiodoActivoId = 'total';
+        renderizarVistaPresupuesto(cachePresupuesto);
+    };
+    pillsWrap.appendChild(pillTotal);
+
+    // Pills de cada sub-periodo
+    subperiodos.forEach(sp => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = `pres-subperiodo-pill ${subperiodoActivoId === sp.id ? 'active' : ''}`;
+        pill.innerHTML = `<span>📅 ${escapeHTML(sp.nombre)} (${sp.porcentaje}% · ${fmt(sp.monto)})</span>`;
+        pill.onclick = () => {
+            subperiodoActivoId = sp.id;
+            renderizarVistaPresupuesto(cachePresupuesto);
+        };
+        pillsWrap.appendChild(pill);
+    });
+
+    if (badgeDesc) {
+        if (subperiodoActivoId === 'total') {
+            badgeDesc.textContent = `Mostrando asignación general (${cfg.frecuencia})`;
+        } else {
+            const spActual = subperiodos.find(sp => sp.id === subperiodoActivoId);
+            badgeDesc.innerHTML = spActual ? `Mostrando flujo de <strong>${escapeHTML(spActual.nombre)}</strong>` : '';
+        }
+    }
+}
+
+function renderKPIs(cfg, res, tarjetas) {
     const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    const frecTxt = FRECUENCIA_LABEL[cfg.frecuencia] || 'por periodo';
+    const subperiodos = cfg.subdivision_config || [];
+    const spActivo = (subperiodoActivoId !== 'total') ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
 
-    setEl('lbl-pres-kpi-ingreso', fmt(cfg.ingreso_base));
-    setEl('lbl-pres-kpi-ingreso-sub', `${cfg.frecuencia.toUpperCase()} · 100.0%`);
+    let ingresoMostrar = cfg.ingreso_base;
+    let asignadoMostrar = res.total_asignado_monto;
+    let disponibleMostrar = res.disponible_monto;
+    let tagSub = `${cfg.frecuencia.toUpperCase()} · 100.0%`;
 
-    setEl('lbl-pres-kpi-asignado', fmt(res.total_asignado_monto));
+    if (spActivo) {
+        const factor = (spActivo.porcentaje / 100.0);
+        ingresoMostrar = spActivo.monto;
+        asignadoMostrar = Math.round(res.total_asignado_monto * factor * 100) / 100;
+        disponibleMostrar = Math.max(0, Math.round((ingresoMostrar - asignadoMostrar) * 100) / 100);
+        tagSub = `${spActivo.nombre.toUpperCase()} · ${spActivo.porcentaje}%`;
+    }
+
+    setEl('lbl-pres-kpi-ingreso', fmt(ingresoMostrar));
+    setEl('lbl-pres-kpi-ingreso-sub', tagSub);
+
+    setEl('lbl-pres-kpi-asignado', fmt(asignadoMostrar));
     const badgeAsig = document.getElementById('badge-pres-asignado');
     if (badgeAsig) {
         badgeAsig.textContent = `${res.total_asignado_pct.toFixed(1)}% del total`;
         badgeAsig.className = `pnl-badge ${res.excedido ? 'badge-danger' : 'badge-gold'}`;
     }
 
-    setEl('lbl-pres-kpi-disponible', fmt(res.disponible_monto));
+    setEl('lbl-pres-kpi-disponible', fmt(disponibleMostrar));
     const badgeDisp = document.getElementById('badge-pres-disponible');
     if (badgeDisp) {
         if (res.excedido) {
@@ -101,7 +230,8 @@ function renderizarVistaPresupuesto(data) {
     tarjetas.forEach(t => {
         const n = t.nombre.toLowerCase();
         if (n.includes('inversión') || n.includes('inversion') || n.includes('etf') || n.includes('ahorro') || n.includes('cetes') || n.includes('fondo') || n.includes('renta fija')) {
-            ahorroInvMonto += t.monto;
+            const montoT = spActivo ? (t.monto * (spActivo.porcentaje / 100.0)) : t.monto;
+            ahorroInvMonto += montoT;
             ahorroInvPct += t.porcentaje;
         }
     });
@@ -111,12 +241,6 @@ function renderizarVistaPresupuesto(data) {
         badgeInv.textContent = `${ahorroInvPct.toFixed(1)}% tasa ahorro/inv.`;
         badgeInv.className = 'pnl-badge badge-success';
     }
-
-    // 3. Barra visual segmentada de asignación (100% allocation track)
-    renderBarraDistribucion(tarjetas, res, cfg);
-
-    // 4. Grid de Tarjetas de Presupuesto
-    renderGridTarjetas(tarjetas, cfg);
 }
 
 function renderBarraDistribucion(tarjetas, res, cfg) {
@@ -149,7 +273,6 @@ function renderBarraDistribucion(tarjetas, res, cfg) {
         }
     });
 
-    // Porción restante sin asignar (o aviso de sobreasignación)
     if (res.disponible_pct > 0 && !res.excedido) {
         const sliceDisp = document.createElement('div');
         sliceDisp.className = 'pres-alloc-slice pres-slice-libre';
@@ -187,12 +310,43 @@ function renderGridTarjetas(tarjetas, cfg) {
         return;
     }
 
+    const subperiodos = cfg.subdivision_config || [];
+    const esSubperiodo = (subperiodoActivoId !== 'total');
+    const spActivo = esSubperiodo ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
+
     grid.innerHTML = '';
     tarjetas.forEach(t => {
         const card = document.createElement('div');
         card.className = `card pres-card pres-card-accent-${t.color}`;
         const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
         const eq = t.equivalentes || {};
+
+        let montoMostrar = t.monto;
+        let tagFreq = FRECUENCIA_LABEL[cfg.frecuencia] || '';
+        let badgePctTxt = `${t.porcentaje.toFixed(1)}%`;
+
+        if (spActivo) {
+            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
+            montoMostrar = spItem ? spItem.monto : Math.round(t.monto * (spActivo.porcentaje / 100.0) * 100) / 100;
+            tagFreq = `en ${spActivo.nombre}`;
+            badgePctTxt = `${t.porcentaje.toFixed(1)}% (${spActivo.porcentaje}% de periodo)`;
+        }
+
+        // Mini fila de desglose de sub-periodos si está en vista 'total' y hay subdivisión activa
+        let miniDesgloseHtml = '';
+        if (!esSubperiodo && t.subdivision && t.subdivision.length > 0) {
+            miniDesgloseHtml = `
+                <div class="pres-card-subperiodo-breakdown">
+                    <div class="pres-card-sub-pills-row">
+                        ${t.subdivision.map(sp => `
+                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%">
+                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         card.innerHTML = `
             <div class="pres-card-header">
@@ -214,14 +368,16 @@ function renderGridTarjetas(tarjetas, cfg) {
             </div>
 
             <div class="pres-card-metric-block">
-                <div class="pres-card-pct-badge pres-badge-${t.color}">${t.porcentaje.toFixed(1)}%</div>
-                <div class="pres-card-amount">${fmt(t.monto)}</div>
-                <div class="pres-card-freq-tag">${FRECUENCIA_LABEL[cfg.frecuencia] || ''}</div>
+                <div class="pres-card-pct-badge pres-badge-${t.color}">${badgePctTxt}</div>
+                <div class="pres-card-amount">${fmt(montoMostrar)}</div>
+                <div class="pres-card-freq-tag">${tagFreq}</div>
             </div>
 
             <div class="pres-card-progress-bar">
                 <div class="pres-card-progress-fill pres-color-${t.color}" style="width: ${Math.min(100, t.porcentaje)}%"></div>
             </div>
+
+            ${miniDesgloseHtml}
 
             <div class="pres-card-equivalences">
                 <span>Mensual: <strong>${fmt(eq.mensual)}</strong></span>
@@ -237,32 +393,60 @@ function renderGridTarjetas(tarjetas, cfg) {
 }
 
 // -----------------------------------------------------------------------------
-// Sincronización de Ingreso Base y Frecuencia
+// Sincronización de Ingreso Base, Frecuencia y Subdivisión
 // -----------------------------------------------------------------------------
 
 export async function guardarConfigPresupuesto(e) {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const inp = document.getElementById('pres-ingreso-base');
-    const sel = document.getElementById('pres-frecuencia');
-    if (!inp || !sel) return;
+    const selFrec = document.getElementById('pres-frecuencia');
+    const selSub = document.getElementById('pres-subdivision-tipo');
+    if (!inp || !selFrec) return;
 
     const ingreso_base = parseFloat(inp.value) || 0;
-    const frecuencia = sel.value;
+    const frecuencia = selFrec.value;
+    const subdivision_tipo = selSub ? selSub.value : 'ninguna';
+
+    // Si seleccionó personalizada pero aún no tiene periodos, abrir el modal
+    if (subdivision_tipo === 'personalizada' && (!cachePresupuesto?.config?.subdivision_config?.length || cachePresupuesto.config.subdivision_tipo !== 'personalizada')) {
+        abrirModalSubdivisionPersonalizada();
+        return;
+    }
 
     try {
         const res = await apiFetch('/api/presupuesto/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingreso_base, frecuencia })
+            body: JSON.stringify({ ingreso_base, frecuencia, subdivision_tipo })
         });
         if (!res.ok) {
-            toast('No se pudo guardar la configuración.', 'error');
+            const err = await res.json().catch(() => ({}));
+            toast(err.detail || 'No se pudo guardar la configuración.', 'error');
             return;
         }
-        toast('Ingreso y frecuencia actualizados.', 'ok');
+        toast('Presupuesto y periodicidad actualizados.', 'ok');
         cargarPresupuesto();
     } catch (err) {
         toast('Error de conexión al guardar configuración.', 'error');
+    }
+}
+
+// Manejador del cambio de frecuencia en el selector
+export function alCambiarFrecuenciaPresupuesto() {
+    const selFrec = document.getElementById('pres-frecuencia');
+    if (!selFrec) return;
+    actualizarOpcionesSubdivisionSelect(selFrec.value, 'ninguna');
+    guardarConfigPresupuesto();
+}
+
+// Manejador del cambio de subdivisión en el selector
+export function alCambiarSubdivisionSelect() {
+    const selSub = document.getElementById('pres-subdivision-tipo');
+    if (!selSub) return;
+    if (selSub.value === 'personalizada') {
+        abrirModalSubdivisionPersonalizada();
+    } else {
+        guardarConfigPresupuesto();
     }
 }
 
@@ -347,7 +531,6 @@ export function cerrarModalTarjetaPresupuesto() {
     idTarjetaEditando = null;
 }
 
-// Sincronización bidireccional en el formulario del modal
 function sincronizarInputsModal(origen) {
     if (!cachePresupuesto) return;
     const ingreso = Number(cachePresupuesto.config?.ingreso_base) || 0;
@@ -372,7 +555,6 @@ function sincronizarInputsModal(origen) {
     }
 }
 
-// Chips sugeridos de categorías rápidas
 export function aplicarPresetChip(nombre, icono, color, notasSugeridas, pctSugerido) {
     document.getElementById('tarjeta-pres-nombre').value = nombre;
     document.getElementById('tarjeta-pres-icono').value = icono;
@@ -445,6 +627,170 @@ export async function eliminarTarjetaPresupuesto(id, nombre) {
 }
 
 // -----------------------------------------------------------------------------
+// Modal: Editor de Sub-periodos Personalizados
+// -----------------------------------------------------------------------------
+
+export function abrirModalSubdivisionPersonalizada() {
+    const modal = document.getElementById('modal-subdivision-personalizada');
+    if (!modal) return;
+
+    const cfg = cachePresupuesto?.config || {};
+    const subperiodos = cfg.subdivision_config || [];
+
+    if (subperiodos.length > 0) {
+        editorSubperiodosTemp = subperiodos.map(sp => ({
+            id: sp.id || ('sp_' + Math.random().toString(36).substr(2, 6)),
+            nombre: sp.nombre,
+            porcentaje: sp.porcentaje
+        }));
+    } else {
+        // Pre-cargar por defecto según la frecuencia
+        if (cfg.frecuencia === 'quincenal') {
+            editorSubperiodosTemp = [
+                { id: 's1', nombre: 'Semana 1', porcentaje: 50.0 },
+                { id: 's2', nombre: 'Semana 2', porcentaje: 50.0 }
+            ];
+        } else {
+            editorSubperiodosTemp = [
+                { id: 'q1', nombre: 'Quincena 1', porcentaje: 50.0 },
+                { id: 'q2', nombre: 'Quincena 2', porcentaje: 50.0 }
+            ];
+        }
+    }
+
+    renderFilasEditorSubperiodos();
+    modal.classList.remove('hidden');
+}
+
+export function cerrarModalSubdivisionPersonalizada() {
+    const modal = document.getElementById('modal-subdivision-personalizada');
+    if (modal) modal.classList.add('hidden');
+}
+
+function renderFilasEditorSubperiodos() {
+    const contenedor = document.getElementById('lista-subperiodos-editor');
+    const badgeSuma = document.getElementById('subperiodos-suma-badge');
+    if (!contenedor) return;
+
+    contenedor.innerHTML = '';
+    let suma = 0;
+
+    editorSubperiodosTemp.forEach((sp, idx) => {
+        suma += Number(sp.porcentaje) || 0;
+        const row = document.createElement('div');
+        row.className = 'subperiodo-editor-row';
+        row.innerHTML = `
+            <input type="text" class="subperiodo-editor-input-name" value="${escapeHTML(sp.nombre)}" placeholder="Nombre del periodo" data-idx="${idx}">
+            <div class="calc-input-adornment" style="width: 100px;">
+                <input type="number" min="0" max="100" step="any" class="subperiodo-editor-input-pct" value="${sp.porcentaje}" data-idx="${idx}">
+                <span class="calc-adornment-suffix">%</span>
+            </div>
+            ${editorSubperiodosTemp.length > 2 ? `
+                <button type="button" class="btn-remove-subperiodo" data-idx="${idx}" title="Eliminar periodo">&times;</button>
+            ` : '<div style="width: 32px;"></div>'}
+        `;
+
+        row.querySelector('.subperiodo-editor-input-name').addEventListener('input', (e) => {
+            editorSubperiodosTemp[idx].nombre = e.target.value.trim() || `Periodo ${idx + 1}`;
+        });
+
+        row.querySelector('.subperiodo-editor-input-pct').addEventListener('input', (e) => {
+            editorSubperiodosTemp[idx].porcentaje = parseFloat(e.target.value) || 0;
+            actualizarSumaBadgeEditor();
+        });
+
+        const btnDel = row.querySelector('.btn-remove-subperiodo');
+        if (btnDel) {
+            btnDel.addEventListener('click', () => {
+                editorSubperiodosTemp.splice(idx, 1);
+                renderFilasEditorSubperiodos();
+            });
+        }
+
+        contenedor.appendChild(row);
+    });
+
+    actualizarSumaBadgeEditor();
+}
+
+function actualizarSumaBadgeEditor() {
+    const badgeSuma = document.getElementById('subperiodos-suma-badge');
+    if (!badgeSuma) return;
+
+    const suma = editorSubperiodosTemp.reduce((acc, cur) => acc + (Number(cur.porcentaje) || 0), 0);
+    const sumaRed = Math.round(suma * 10) / 10;
+    const esValido = Math.abs(sumaRed - 100.0) <= 0.1;
+
+    badgeSuma.textContent = `Suma: ${sumaRed}% ${esValido ? '✓' : '(Debe ser 100%)'}`;
+    badgeSuma.className = `pnl-badge ${esValido ? 'badge-success' : 'badge-danger'}`;
+}
+
+export function agregarPeriodoEditor() {
+    if (editorSubperiodosTemp.length >= 8) {
+        toast('Máximo 8 sub-periodos permitidos.', 'error');
+        return;
+    }
+    const n = editorSubperiodosTemp.length + 1;
+    editorSubperiodosTemp.push({
+        id: 'sp_' + Date.now() + '_' + n,
+        nombre: `Periodo ${n}`,
+        porcentaje: 0.0
+    });
+    renderFilasEditorSubperiodos();
+}
+
+export function equilibrarPeriodosEditor() {
+    const count = editorSubperiodosTemp.length;
+    if (count <= 0) return;
+
+    const basePct = Math.floor((100.0 / count) * 10) / 10;
+    let sumaAcum = 0;
+    editorSubperiodosTemp.forEach((sp, i) => {
+        if (i === count - 1) {
+            sp.porcentaje = Math.round((100.0 - sumaAcum) * 10) / 10;
+        } else {
+            sp.porcentaje = basePct;
+            sumaAcum += basePct;
+        }
+    });
+    renderFilasEditorSubperiodos();
+}
+
+export async function guardarSubdivisionPersonalizada() {
+    const suma = editorSubperiodosTemp.reduce((acc, cur) => acc + (Number(cur.porcentaje) || 0), 0);
+    if (Math.abs(suma - 100.0) > 0.2) {
+        toast(`La suma de los periodos debe ser exactamente 100% (suma actual: ${Math.round(suma * 10) / 10}%).`, 'error');
+        return;
+    }
+
+    const cfg = cachePresupuesto?.config || {};
+    try {
+        const res = await apiFetch('/api/presupuesto/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ingreso_base: cfg.ingreso_base,
+                frecuencia: cfg.frecuencia,
+                subdivision_tipo: 'personalizada',
+                subdivision_config: editorSubperiodosTemp
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            toast(err.detail || 'Error al guardar la subdivisión.', 'error');
+            return;
+        }
+
+        toast('Sub-división personalizada aplicada.', 'ok');
+        cerrarModalSubdivisionPersonalizada();
+        cargarPresupuesto();
+    } catch (e) {
+        toast('Error de conexión al guardar subdivisión.', 'error');
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Inicialización de Listeners y Window Exports
 // -----------------------------------------------------------------------------
 
@@ -453,7 +799,10 @@ export function inicializarPresupuesto() {
     if (formConfig) formConfig.addEventListener('submit', guardarConfigPresupuesto);
 
     const selFrec = document.getElementById('pres-frecuencia');
-    if (selFrec) selFrec.addEventListener('change', guardarConfigPresupuesto);
+    if (selFrec) selFrec.addEventListener('change', alCambiarFrecuenciaPresupuesto);
+
+    const selSub = document.getElementById('pres-subdivision-tipo');
+    if (selSub) selSub.addEventListener('change', alCambiarSubdivisionSelect);
 
     const btnImportar = document.getElementById('btn-importar-fijos-pres');
     if (btnImportar) btnImportar.addEventListener('click', importarFijosPresupuesto);
@@ -470,6 +819,11 @@ export function inicializarPresupuesto() {
 Object.assign(window, {
     abrirModalCrearTarjeta,
     cerrarModalTarjetaPresupuesto,
+    abrirModalSubdivisionPersonalizada,
+    cerrarModalSubdivisionPersonalizada,
+    agregarPeriodoEditor,
+    equilibrarPeriodosEditor,
+    guardarSubdivisionPersonalizada,
     aplicarPresetChip,
     aplicarPlantillaPresupuesto,
     importarFijosPresupuesto,

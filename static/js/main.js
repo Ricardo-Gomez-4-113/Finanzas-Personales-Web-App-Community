@@ -12,7 +12,7 @@ import { cargarRecurrentes } from './recurrentes.js';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
@@ -136,6 +136,7 @@ window.addEventListener('keydown', (e) => {
         cerrarModalRecuperarPassword();
         cerrarModalLegal();
         cerrarModalTarjetaPresupuesto();
+        cerrarModalSubdivisionPersonalizada();
     }
 });
 

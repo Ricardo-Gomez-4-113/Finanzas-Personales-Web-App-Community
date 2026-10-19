@@ -2490,9 +2490,35 @@
 
 .pres-config-row {
     display: grid;
-    grid-template-columns: 2fr 1.5fr auto;
+    grid-template-columns: 1.8fr 1.3fr 1.6fr auto;
     gap: 16px;
     align-items: flex-end;
+}
+
+.pres-subdiv-input-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.btn-subdiv-gear {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--gold-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-subdiv-gear:hover {
+    background: rgba(197, 160, 89, 0.15);
+    border-color: var(--gold-color);
 }
 
 .pres-ingreso-eq {
@@ -2959,4 +2985,181 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Barra de Navegación por Sub-periodos (Quincenas / Semanas) */
+.pres-subperiodos-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--card-shadow);
+    flex-wrap: wrap;
+}
+
+.pres-subperiodos-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pres-subperiodos-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.pres-subperiodos-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pres-subperiodo-pill {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pres-subperiodo-pill:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(197, 160, 89, 0.4);
+    color: var(--gold-color);
+}
+
+.pres-subperiodo-pill.active {
+    background: var(--gold-color);
+    color: #080c14;
+    font-weight: 700;
+    border-color: var(--gold-color);
+    box-shadow: 0 2px 10px rgba(197, 160, 89, 0.35);
+}
+
+.pres-subperiodo-info-badge {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Desglose de Sub-periodos en Tarjeta */
+.pres-card-subperiodo-breakdown {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pres-card-sub-pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pres-card-sub-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.pres-card-sub-pill strong {
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Editor de Subperiodos en Modal */
+.modal-subdiv-card {
+    max-width: 520px;
+    width: 95%;
+}
+
+.subperiodos-editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.subperiodo-editor-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.subperiodo-editor-input-name {
+    flex: 2;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--input-bg, #0f172a);
+    border: 1px solid var(--border-color, #334155);
+    color: var(--text-color, #f8fafc);
+    font-size: 0.88rem;
+}
+
+.subperiodo-editor-input-pct {
+    width: 90px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--input-bg, #0f172a);
+    border: 1px solid var(--border-color, #334155);
+    color: var(--text-color, #f8fafc);
+    font-size: 0.88rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.btn-remove-subperiodo {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #334155);
+    background: transparent;
+    color: #ef4444;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.15s;
+}
+
+.btn-remove-subperiodo:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+}
+
+.subperiodos-editor-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #334155);
+}
+
 

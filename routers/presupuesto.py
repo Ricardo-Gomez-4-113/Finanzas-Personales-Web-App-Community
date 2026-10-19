@@ -1,7 +1,6 @@
-"""routers/presupuesto.py - Organizador de Presupuesto por Tarjetas y Porcentajes."""
-
+import json
 import sqlite3
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -9,6 +8,8 @@ from finanzas_core import (
     mensualizar,
     convertir_frecuencias,
     convertir_de_mensual,
+    generar_subperiodos_default,
+    calcular_distribucion_subperiodos,
 )
 from security import get_tenant_db
 
@@ -19,9 +20,18 @@ router = APIRouter()
 # Modelos Pydantic
 # -----------------------------------------------------------------------------
 
+class SubperiodoItem(BaseModel):
+    id: str = Field(..., max_length=50)
+    nombre: str = Field(..., min_length=1, max_length=60)
+    porcentaje: float = Field(..., ge=0, le=100)
+
+
 class ConfigPresupuestoUpdate(BaseModel):
     ingreso_base: float = Field(..., ge=0, le=1e12, description="Monto del ingreso fijo por periodo")
     frecuencia: Literal['semanal', 'quincenal', 'mensual'] = Field(..., description="Frecuencia del ingreso")
+    subdivision_tipo: Optional[Literal['ninguna', 'quincenas', 'semanas', 'personalizada']] = 'ninguna'
+    subdivision_config: Optional[List[SubperiodoItem]] = None
+
 
 
 class TarjetaPresupuestoCreate(BaseModel):
@@ -55,14 +65,42 @@ class PlantillaRequest(BaseModel):
 
 def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
     """Obtiene o inicializa la fila de configuración única id=1."""
-    row = cursor.execute("SELECT ingreso_base, frecuencia, actualizado_en FROM presupuesto_config WHERE id = 1").fetchone()
+    row = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     if not row:
-        cursor.execute("INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia) VALUES (1, 0.0, 'mensual')")
-        return {"ingreso_base": 0.0, "frecuencia": "mensual"}
+        cursor.execute("""
+            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, subdivision_tipo, subdivision_config)
+            VALUES (1, 0.0, 'mensual', 'ninguna', '[]')
+        """)
+        return {
+            "ingreso_base": 0.0,
+            "frecuencia": "mensual",
+            "subdivision_tipo": "ninguna",
+            "subdivision_config": [],
+            "actualizado_en": None
+        }
+
+    d = dict(row)
+    sub_tipo = d.get("subdivision_tipo") or "ninguna"
+    raw_config = d.get("subdivision_config") or "[]"
+    try:
+        parsed_config = json.loads(raw_config) if isinstance(raw_config, str) else (raw_config or [])
+    except Exception:
+        parsed_config = []
+
+    frecuencia = d.get("frecuencia") or "mensual"
+    ingreso_base = float(d.get("ingreso_base", 0.0))
+
+    if sub_tipo in ('quincenas', 'semanas') and not parsed_config:
+        parsed_config = generar_subperiodos_default(frecuencia, sub_tipo)
+
+    subperiodos_con_monto = calcular_distribucion_subperiodos(ingreso_base, parsed_config) if sub_tipo != 'ninguna' else []
+
     return {
-        "ingreso_base": float(row["ingreso_base"]),
-        "frecuencia": row["frecuencia"],
-        "actualizado_en": row["actualizado_en"]
+        "ingreso_base": ingreso_base,
+        "frecuencia": frecuencia,
+        "subdivision_tipo": sub_tipo,
+        "subdivision_config": subperiodos_con_monto,
+        "actualizado_en": d.get("actualizado_en")
     }
 
 
@@ -94,7 +132,7 @@ def detectar_fijos_recurrentes(cursor: sqlite3.Cursor, frecuencia_destino: str) 
     }
 
 
-def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str) -> dict:
+def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str, subperiodos_config: list = None) -> dict:
     d = dict(t)
     monto = float(d["monto"])
     pct = float(d["porcentaje"])
@@ -102,6 +140,10 @@ def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str) -> 
     d["monto"] = round(monto, 2)
     d["porcentaje"] = round(pct, 2)
     d["equivalentes"] = eq
+    if subperiodos_config:
+        d["subdivision"] = calcular_distribucion_subperiodos(monto, subperiodos_config)
+    else:
+        d["subdivision"] = []
     return d
 
 
@@ -119,8 +161,9 @@ def get_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
 
     fijos = detectar_fijos_recurrentes(cursor, frecuencia)
 
+    subperiodos = cfg["subdivision_config"] if cfg["subdivision_tipo"] != 'ninguna' else []
     filas_tarjetas = cursor.execute("SELECT * FROM presupuesto_tarjetas ORDER BY orden ASC, id ASC").fetchall()
-    tarjetas = [serializar_tarjeta(t, ingreso_base, frecuencia) for t in filas_tarjetas]
+    tarjetas = [serializar_tarjeta(t, ingreso_base, frecuencia, subperiodos) for t in filas_tarjetas]
 
     total_monto = sum(t["monto"] for t in tarjetas)
     total_pct = sum(t["porcentaje"] for t in tarjetas)
@@ -141,17 +184,33 @@ def get_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
     }
 
 
-@router.put("/api/presupuesto/config", summary="Actualizar ingreso fijo base y frecuencia")
+@router.put("/api/presupuesto/config", summary="Actualizar ingreso fijo base, frecuencia y sub-división")
 def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     ingreso_nuevo = round(float(req.ingreso_base), 2)
     frecuencia_nueva = req.frecuencia
+    sub_tipo = req.subdivision_tipo or 'ninguna'
+
+    if frecuencia_nueva == 'semanal':
+        sub_tipo = 'ninguna'
+    elif frecuencia_nueva == 'quincenal' and sub_tipo == 'quincenas':
+        sub_tipo = 'semanas'
+
+    if sub_tipo == 'ninguna':
+        config_list = []
+    elif req.subdivision_config:
+        suma_pct = sum(float(item.porcentaje) for item in req.subdivision_config)
+        if abs(suma_pct - 100.0) > 0.2:
+            raise HTTPException(status_code=400, detail=f"La suma de porcentajes de los sub-periodos debe ser exactamente 100% (suma actual: {round(suma_pct, 1)}%)")
+        config_list = [item.dict() for item in req.subdivision_config]
+    else:
+        config_list = generar_subperiodos_default(frecuencia_nueva, sub_tipo)
 
     cursor.execute("""
         UPDATE presupuesto_config
-        SET ingreso_base = ?, frecuencia = ?, actualizado_en = CURRENT_TIMESTAMP
+        SET ingreso_base = ?, frecuencia = ?, subdivision_tipo = ?, subdivision_config = ?, actualizado_en = CURRENT_TIMESTAMP
         WHERE id = 1
-    """, (ingreso_nuevo, frecuencia_nueva))
+    """, (ingreso_nuevo, frecuencia_nueva, sub_tipo, json.dumps(config_list)))
 
     # Recalcular los montos de las tarjetas según sus porcentajes
     filas = cursor.execute("SELECT id, porcentaje FROM presupuesto_tarjetas").fetchall()
@@ -163,6 +222,7 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
 
     conn.commit()
     return get_presupuesto(conn)
+
 
 
 @router.post("/api/presupuesto/importar-fijos", summary="Importar nómina y gastos de Fijos y MSI")
@@ -284,8 +344,9 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     tarjeta_id = cursor.lastrowid
     conn.commit()
 
+    subperiodos = cfg["subdivision_config"] if cfg.get("subdivision_tipo") != 'ninguna' else []
     fila = cursor.execute("SELECT * FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,)).fetchone()
-    return serializar_tarjeta(fila, ingreso, cfg["frecuencia"])
+    return serializar_tarjeta(fila, ingreso, cfg["frecuencia"], subperiodos)
 
 
 @router.patch("/api/presupuesto/tarjetas/{tarjeta_id}", summary="Actualizar tarjeta de presupuesto")
@@ -327,8 +388,10 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         cursor.execute(f"UPDATE presupuesto_tarjetas SET {', '.join(campos)} WHERE id = ?", valores)
         conn.commit()
 
+    subperiodos = cfg["subdivision_config"] if cfg.get("subdivision_tipo") != 'ninguna' else []
     fila_actualizada = cursor.execute("SELECT * FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,)).fetchone()
-    return serializar_tarjeta(fila_actualizada, ingreso, cfg["frecuencia"])
+    return serializar_tarjeta(fila_actualizada, ingreso, cfg["frecuencia"], subperiodos)
+
 
 
 @router.delete("/api/presupuesto/tarjetas/{tarjeta_id}", summary="Eliminar tarjeta de presupuesto")

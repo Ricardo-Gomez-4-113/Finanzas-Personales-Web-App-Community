@@ -212,6 +212,45 @@ def convertir_de_mensual(monto_mensual: float, frecuencia_destino: str) -> float
     return round(m * 12 / 52, 2)
 
 
+def generar_subperiodos_default(frecuencia: str, subdivision_tipo: str) -> list:
+    """Genera la lista por defecto de sub-periodos según el tipo y frecuencia base."""
+    if subdivision_tipo == 'quincenas':
+        return [
+            {"id": "q1", "nombre": "Quincena 1", "porcentaje": 50.0},
+            {"id": "q2", "nombre": "Quincena 2", "porcentaje": 50.0}
+        ]
+    if subdivision_tipo == 'semanas':
+        if frecuencia == 'quincenal':
+            return [
+                {"id": "s1", "nombre": "Semana 1", "porcentaje": 50.0},
+                {"id": "s2", "nombre": "Semana 2", "porcentaje": 50.0}
+            ]
+        return [
+            {"id": "s1", "nombre": "Semana 1", "porcentaje": 25.0},
+            {"id": "s2", "nombre": "Semana 2", "porcentaje": 25.0},
+            {"id": "s3", "nombre": "Semana 3", "porcentaje": 25.0},
+            {"id": "s4", "nombre": "Semana 4", "porcentaje": 25.0}
+        ]
+    return []
+
+
+def calcular_distribucion_subperiodos(monto_total: float, subperiodos: list) -> list:
+    """Calcula el monto asignado a cada sub-periodo en base a su porcentaje."""
+    res = []
+    total = float(monto_total)
+    for sp in subperiodos:
+        pct = float(sp.get("porcentaje", 0.0))
+        monto_sp = round(total * (pct / 100.0), 2)
+        res.append({
+            "id": sp.get("id"),
+            "nombre": sp.get("nombre"),
+            "porcentaje": pct,
+            "monto": monto_sp
+        })
+    return res
+
+
+
 
 def valor_rendimiento(capital: float, tasa_anual: float, fecha_base: date, hoy: date) -> float:
     """Valor de una cuenta con interés diario compuesto desde fecha_base."""

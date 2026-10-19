@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 5
+CURRENT_TENANT_SCHEMA_VERSION = 6
 
 
 # =============================================================================
@@ -280,12 +280,14 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 ingreso_base REAL NOT NULL DEFAULT 0.0,
                 frecuencia TEXT NOT NULL CHECK(frecuencia IN ('semanal','quincenal','mensual')) DEFAULT 'mensual',
+                subdivision_tipo TEXT NOT NULL DEFAULT 'ninguna',
+                subdivision_config TEXT NOT NULL DEFAULT '[]',
                 actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         cursor.execute("""
-            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia)
-            VALUES (1, 0.0, 'mensual');
+            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, subdivision_tipo, subdivision_config)
+            VALUES (1, 0.0, 'mensual', 'ninguna', '[]');
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS presupuesto_tarjetas (
@@ -303,6 +305,22 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_presupuesto_orden ON presupuesto_tarjetas(orden);")
         cursor.execute("PRAGMA user_version = 5;")
         current_version = 5
+
+    # -------------------------------------------------------------
+    # Versión 6: Sub-división de Presupuesto (quincenas, semanas, personalizada)
+    # -------------------------------------------------------------
+    if current_version < 6 and CURRENT_TENANT_SCHEMA_VERSION >= 6:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN subdivision_tipo TEXT NOT NULL DEFAULT 'ninguna';")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN subdivision_config TEXT NOT NULL DEFAULT '[]';")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("PRAGMA user_version = 6;")
+        current_version = 6
+
 
 
     conn.commit()

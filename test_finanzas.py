@@ -137,11 +137,12 @@ def test_migracion_v5_presupuesto():
     conn.row_factory = sqlite3.Row
     configure_sqlite_pragmas(conn)
     apply_lazy_migrations(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
-    cfg = conn.execute("SELECT id, ingreso_base, frecuencia FROM presupuesto_config WHERE id = 1").fetchone()
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+    cfg = conn.execute("SELECT id, ingreso_base, frecuencia, subdivision_tipo, subdivision_config FROM presupuesto_config WHERE id = 1").fetchone()
     assert cfg is not None
     assert cfg["ingreso_base"] == 0.0
     assert cfg["frecuencia"] == "mensual"
+    assert cfg["subdivision_tipo"] == "ninguna"
 
     conn.execute(
         "INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden) VALUES (?, ?, ?, ?, ?, ?)",
@@ -168,6 +169,28 @@ def test_presupuesto_conversiones():
     assert convertir_de_mensual(10000.0, "mensual") == 10000.0
 
 
+def test_subperiodos_calculo():
+    from finanzas_core import generar_subperiodos_default, calcular_distribucion_subperiodos
+
+    q = generar_subperiodos_default("mensual", "quincenas")
+    assert len(q) == 2
+    assert q[0]["porcentaje"] == 50.0
+    assert q[1]["porcentaje"] == 50.0
+
+    s_m = generar_subperiodos_default("mensual", "semanas")
+    assert len(s_m) == 4
+    assert s_m[0]["porcentaje"] == 25.0
+
+    s_q = generar_subperiodos_default("quincenal", "semanas")
+    assert len(s_q) == 2
+    assert s_q[0]["porcentaje"] == 50.0
+
+    dist = calcular_distribucion_subperiodos(20000.0, q)
+    assert len(dist) == 2
+    assert dist[0]["monto"] == 10000.0
+    assert dist[1]["monto"] == 10000.0
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -180,5 +203,7 @@ if __name__ == '__main__':
     test_migracion_v4_enlaza_apartados()
     test_migracion_v5_presupuesto()
     test_presupuesto_conversiones()
+    test_subperiodos_calculo()
     print('OK')
+
 
