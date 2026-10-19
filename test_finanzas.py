@@ -132,6 +132,42 @@ def test_migracion_v4_enlaza_apartados():
     assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
 
 
+def test_migracion_v5_presupuesto():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    configure_sqlite_pragmas(conn)
+    apply_lazy_migrations(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+    cfg = conn.execute("SELECT id, ingreso_base, frecuencia FROM presupuesto_config WHERE id = 1").fetchone()
+    assert cfg is not None
+    assert cfg["ingreso_base"] == 0.0
+    assert cfg["frecuencia"] == "mensual"
+
+    conn.execute(
+        "INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden) VALUES (?, ?, ?, ?, ?, ?)",
+        ("Gastos Fijos", "building-columns", "gold", 50.0, 5000.0, 0)
+    )
+    conn.commit()
+    t = conn.execute("SELECT nombre, porcentaje, monto FROM presupuesto_tarjetas WHERE nombre='Gastos Fijos'").fetchone()
+    assert t["nombre"] == "Gastos Fijos"
+    assert t["porcentaje"] == 50.0
+    assert t["monto"] == 5000.0
+
+
+def test_presupuesto_conversiones():
+    from finanzas_core import convertir_frecuencias, convertir_de_mensual
+    res_m = convertir_frecuencias(10000.0, "mensual")
+    assert res_m["mensual"] == 10000.0
+    assert res_m["quincenal"] == 5000.0
+
+    res_q = convertir_frecuencias(5000.0, "quincenal")
+    assert res_q["mensual"] == 10000.0
+    assert res_q["quincenal"] == 5000.0
+
+    assert convertir_de_mensual(10000.0, "quincenal") == 5000.0
+    assert convertir_de_mensual(10000.0, "mensual") == 10000.0
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -142,4 +178,7 @@ if __name__ == '__main__':
     test_msi_completo_suma_exacta_y_termina()
     test_valor_rendimiento_un_anio()
     test_migracion_v4_enlaza_apartados()
+    test_migracion_v5_presupuesto()
+    test_presupuesto_conversiones()
     print('OK')
+

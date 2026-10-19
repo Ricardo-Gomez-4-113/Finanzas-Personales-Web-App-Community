@@ -12,6 +12,7 @@ import { cargarRecurrentes } from './recurrentes.js';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
@@ -116,6 +117,7 @@ export async function cargarDatos() {
             cargarGraficaCategorias(),
             cargarApartados(),
             cargarInversiones(),
+            cargarPresupuesto(),
         ]);
 
     } catch (error) {
@@ -133,6 +135,7 @@ window.addEventListener('keydown', (e) => {
         cerrarModalCrearApartado();
         cerrarModalRecuperarPassword();
         cerrarModalLegal();
+        cerrarModalTarjetaPresupuesto();
     }
 });
 
@@ -181,6 +184,7 @@ inicializarEstadoSidebar();
 
 inicializarBuscadorTickers();
 inicializarCalculadoraRF();
+inicializarPresupuesto();
 
 verificarSesionInicial();
 

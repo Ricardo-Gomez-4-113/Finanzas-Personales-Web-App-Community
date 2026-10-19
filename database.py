@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 4
+CURRENT_TENANT_SCHEMA_VERSION = 5
 
 
 # =============================================================================
@@ -270,6 +270,39 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             )
         cursor.execute("PRAGMA user_version = 4;")
         current_version = 4
+
+    # -------------------------------------------------------------
+    # Versión 5: Organizador de Presupuesto (presupuesto_config y presupuesto_tarjetas)
+    # -------------------------------------------------------------
+    if current_version < 5 and CURRENT_TENANT_SCHEMA_VERSION >= 5:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS presupuesto_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                ingreso_base REAL NOT NULL DEFAULT 0.0,
+                frecuencia TEXT NOT NULL CHECK(frecuencia IN ('semanal','quincenal','mensual')) DEFAULT 'mensual',
+                actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cursor.execute("""
+            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia)
+            VALUES (1, 0.0, 'mensual');
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS presupuesto_tarjetas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                icono TEXT NOT NULL DEFAULT 'wallet',
+                color TEXT NOT NULL DEFAULT 'gold',
+                porcentaje REAL NOT NULL DEFAULT 0.0,
+                monto REAL NOT NULL DEFAULT 0.0,
+                notas TEXT DEFAULT '',
+                orden INTEGER NOT NULL DEFAULT 0,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_presupuesto_orden ON presupuesto_tarjetas(orden);")
+        cursor.execute("PRAGMA user_version = 5;")
+        current_version = 5
 
 
     conn.commit()

@@ -5,6 +5,7 @@
 import { cargarDatosAdmin } from './admin.js';
 import { estado } from './core.js';
 import { cargarRecurrentes } from './recurrentes.js';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto } from './presupuesto.js';
 
 
 // =============================================================================
@@ -185,6 +186,7 @@ export function cambiarPestana(tabId) {
         'tab-movimientos': 'Movimientos',
         'tab-recurrentes': 'Fijos y MSI',
         'tab-apartados': 'Metas de Ahorro',
+        'tab-presupuesto': 'Organizador de Presupuesto',
         'tab-inversiones': 'Inversiones',
         'tab-calculadora-rf': 'Calculadora Renta Fija',
         'tab-admin': 'Administración'
@@ -207,6 +209,9 @@ export function cambiarPestana(tabId) {
     }
     if (tabId === 'tab-recurrentes') {
         cargarRecurrentes();
+    }
+    if (tabId === 'tab-presupuesto') {
+        cargarPresupuesto();
     }
 
     setTimeout(() => {

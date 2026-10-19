@@ -143,6 +143,15 @@
                     </span>
                     <span class="nav-label">Fijos y MSI</span>
                 </button>
+                <button type="button" class="tab-btn" data-tab="tab-presupuesto" title="Organizador de Presupuesto por Tarjetas">
+                    <span class="nav-icon">
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                            <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-label">Presupuesto</span>
+                </button>
                 <button type="button" class="tab-btn" data-tab="tab-apartados" title="Metas de Ahorro y Sobres">
                     <span class="nav-icon">
                         <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
@@ -621,6 +630,146 @@
                     <h2 class="panel-heading"><span>Ingresos y gastos fijos</span></h2>
                     <div id="lista-fijos"></div>
                 </div>
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- PESTAÑA: ORGANIZADOR DE PRESUPUESTO POR TARJETAS -->
+        <!-- ============================================== -->
+        <section id="tab-presupuesto" class="tab-content">
+            <div class="panel pres-panel">
+                <div class="panel-header pres-header">
+                    <div>
+                        <h2 class="panel-heading s-margin-0">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                            </svg>
+                            <span>Organizador de Presupuesto</span>
+                        </h2>
+                        <p class="panel-subtitle">Define la frecuencia de tus ingresos y divídelos en tarjetas por porcentaje ($ ⇄ %) para saber exactamente a dónde va tu dinero.</p>
+                    </div>
+                    <div class="pres-header-actions">
+                        <button type="button" class="btn-primary" onclick="abrirModalCrearTarjeta()">
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span>+ Nueva Tarjeta</span>
+                        </button>
+                        <button type="button" id="btn-importar-fijos-pres" class="btn-secondary" title="Sincronizar nómina y gastos fijos desde la pestaña Fijos y MSI">
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            <span>Importar de Fijos y MSI</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Alerta contextual cuando hay datos en Fijos y MSI -->
+                <div id="pres-fijos-alert" class="pres-fijos-banner hidden">
+                    <div class="pres-fijos-banner-info">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span id="pres-fijos-alert-text">Detectamos ingresos o gastos fijos en tu cuenta.</span>
+                    </div>
+                    <button type="button" class="btn-sm btn-primary" onclick="importarFijosPresupuesto()">Sincronizar ahora</button>
+                </div>
+
+                <!-- Tarjeta de Configuración de Ingreso Base y Frecuencia -->
+                <div class="pres-config-card">
+                    <form id="form-presupuesto-config">
+                        <div class="pres-config-row">
+                            <div class="form-group pres-fg-monto">
+                                <label for="pres-ingreso-base">Ingreso Fijo Base:</label>
+                                <div class="calc-input-adornment">
+                                    <span class="calc-adornment-prefix">$</span>
+                                    <input type="number" id="pres-ingreso-base" min="0" step="any" placeholder="Ej. 15,000" class="input-calc calc-has-prefix calc-has-suffix" required>
+                                    <span class="calc-adornment-suffix">MXN</span>
+                                </div>
+                            </div>
+                            <div class="form-group pres-fg-frec">
+                                <label for="pres-frecuencia">Frecuencia de Pago:</label>
+                                <select id="pres-frecuencia" class="select-calc">
+                                    <option value="quincenal">Quincenal (Cada 15 días)</option>
+                                    <option value="mensual" selected>Mensual (Cada mes)</option>
+                                    <option value="semanal">Semanal (Cada semana)</option>
+                                </select>
+                            </div>
+                            <div class="form-group pres-fg-btn">
+                                <button type="submit" class="btn-primary btn-calc-action">
+                                    <span>Guardar Ingreso</span>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="pres-ingreso-eq" id="pres-ingreso-equivalentes"></p>
+                    </form>
+                </div>
+
+                <!-- 4 Tarjetas KPI de Resumen -->
+                <div class="cards pres-cards-kpi">
+                    <div class="card pres-kpi-card">
+                        <div class="pres-kpi-header">
+                            <span class="pres-kpi-title">Ingreso del Periodo</span>
+                            <span class="pres-kpi-tag" id="lbl-pres-kpi-ingreso-sub">MENSUAL</span>
+                        </div>
+                        <p class="pres-kpi-val" id="lbl-pres-kpi-ingreso">$0.00</p>
+                    </div>
+
+                    <div class="card pres-kpi-card">
+                        <div class="pres-kpi-header">
+                            <span class="pres-kpi-title">Total Asignado</span>
+                            <span id="badge-pres-asignado" class="pnl-badge badge-gold">0.0% del total</span>
+                        </div>
+                        <p class="pres-kpi-val pres-val-gold" id="lbl-pres-kpi-asignado">$0.00</p>
+                    </div>
+
+                    <div class="card pres-kpi-card">
+                        <div class="pres-kpi-header">
+                            <span class="pres-kpi-title">Disponible por Asignar</span>
+                            <span id="badge-pres-disponible" class="pnl-badge badge-success">100.0% libre</span>
+                        </div>
+                        <p class="pres-kpi-val pres-val-success" id="lbl-pres-kpi-disponible">$0.00</p>
+                    </div>
+
+                    <div class="card pres-kpi-card">
+                        <div class="pres-kpi-header">
+                            <span class="pres-kpi-title">Inversión / Ahorro</span>
+                            <span id="badge-pres-inv" class="pnl-badge badge-success">0.0%</span>
+                        </div>
+                        <p class="pres-kpi-val pres-val-inv" id="lbl-pres-kpi-inv">$0.00</p>
+                    </div>
+                </div>
+
+                <!-- Barra Visual de Distribución 100% -->
+                <div class="pres-alloc-section">
+                    <div class="pres-alloc-header">
+                        <h3 class="panel-subheading s-margin-0">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                            <span>Distribución del Ingreso (100%)</span>
+                        </h3>
+                        <div class="pres-templates-wrap">
+                            <span class="pres-templates-label">Plantillas:</span>
+                            <button type="button" class="btn-chip-tpl" onclick="aplicarPlantillaPresupuesto('50-30-20')">Regla 50 / 30 / 20</button>
+                            <button type="button" class="btn-chip-tpl" onclick="aplicarPlantillaPresupuesto('inversionista')">Perfil Inversionista</button>
+                        </div>
+                    </div>
+                    <div class="pres-alloc-track-wrap">
+                        <div class="pres-alloc-track" id="presupuesto-alloc-track"></div>
+                    </div>
+                    <div class="pres-alloc-legend" id="presupuesto-alloc-legend"></div>
+                </div>
+
+                <!-- Barra de Opciones Sugeridas Rápidas -->
+                <div class="pres-suggested-bar">
+                    <span class="pres-suggested-label">Opciones sugeridas para agregar:</span>
+                    <div class="pres-chips-wrap">
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Gastos Fijos', 'home', 'blue', 'Renta, despensa y servicios esenciales', 50)">+ Gastos Fijos</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Inversión en ETFs', 'trending-up', 'emerald', 'VOO, QQQ, Fibras y bolsa', 20)">+ Inversión en ETFs</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Fondo Renta Fija / CETES', 'shield', 'gold', 'CETES, Nu, pagarés y fondo de emergencia', 10)">+ Renta Fija / CETES</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Compras a Meses (MSI)', 'credit-card', 'amber', 'Tarjetas de crédito y mensualidades', 10)">+ Pagos MSI</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Ocio y Estilo de Vida', 'smile', 'purple', 'Salidas, entretenimiento y gustos', 10)">+ Ocio y Gustos</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Educación y Cursos', 'book', 'cyan', 'Libros, cursos y desarrollo profesional', 5)">+ Educación</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta()">+ Personalizada</button>
+                    </div>
+                </div>
+
+                <!-- Grid de Tarjetas de Presupuesto -->
+                <div id="grid-tarjetas-presupuesto" class="grid-presupuesto"></div>
             </div>
         </section>
 
@@ -1316,6 +1465,86 @@
                     <button type="submit" class="btn-primary">
                         <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                         <span>Crear Apartado</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL: CREAR / EDITAR TARJETA DE PRESUPUESTO    -->
+    <!-- ============================================== -->
+    <div id="modal-tarjeta-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-tarjeta-pres-title" onclick="if(event.target === this) cerrarModalTarjetaPresupuesto()">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-tarjeta-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                    <span>Nueva Tarjeta de Presupuesto</span>
+                </h3>
+                <button type="button" class="btn-modal-close" onclick="cerrarModalTarjetaPresupuesto()">&times;</button>
+            </div>
+            <form id="form-tarjeta-presupuesto">
+                <div class="form-group">
+                    <label for="tarjeta-pres-nombre">Nombre de la Tarjeta:</label>
+                    <input type="text" id="tarjeta-pres-nombre" placeholder="Ej. Gastos Fijos, Inversión en ETFs, Ocio" required autocomplete="off">
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="form-group">
+                        <label for="tarjeta-pres-monto">Monto Asignado ($):</label>
+                        <div class="calc-input-adornment">
+                            <span class="calc-adornment-prefix">$</span>
+                            <input type="number" id="tarjeta-pres-monto" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="tarjeta-pres-pct">Porcentaje (% del ingreso):</label>
+                        <div class="calc-input-adornment">
+                            <input type="number" id="tarjeta-pres-pct" step="0.1" min="0" max="100" placeholder="0.0" class="input-calc calc-has-suffix">
+                            <span class="calc-adornment-suffix">%</span>
+                        </div>
+                    </div>
+                </div>
+                <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-margin-bottom-12px s-display-block">Escribe el monto en dinero ($) o el porcentaje (%); el otro campo se calcula automáticamente.</small>
+
+                <div class="form-row-2col">
+                    <div class="form-group">
+                        <label for="tarjeta-pres-icono">Icono:</label>
+                        <select id="tarjeta-pres-icono">
+                            <option value="wallet">Billetera / General</option>
+                            <option value="home">Casa / Gastos Fijos</option>
+                            <option value="trending-up">Gráfica / Inversión ETFs</option>
+                            <option value="shield">Escudo / Renta Fija & Fondo</option>
+                            <option value="credit-card">Tarjeta / MSI & Deudas</option>
+                            <option value="smile">Sonrisa / Ocio & Gustos</option>
+                            <option value="book">Libro / Educación</option>
+                            <option value="heart">Salud / Bienestar</option>
+                            <option value="shopping-bag">Bolsa / Compras</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tarjeta-pres-color">Color de Énfasis:</label>
+                        <select id="tarjeta-pres-color">
+                            <option value="gold">Dorado (Finanzas)</option>
+                            <option value="blue">Azul (Esencial / Fijo)</option>
+                            <option value="emerald">Verde Esmeralda (Inversión)</option>
+                            <option value="purple">Morado (Ocio & Estilo)</option>
+                            <option value="amber">Ámbar (Deuda / Advertencia)</option>
+                            <option value="cyan">Cian (Educación & Metas)</option>
+                            <option value="rose">Rosa (Personal)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tarjeta-pres-notas">Notas o descripción (opcional):</label>
+                    <input type="text" id="tarjeta-pres-notas" placeholder="Ej. VOO, QQQ, Renta, Luz..." autocomplete="off">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="cerrarModalTarjetaPresupuesto()">Cancelar</button>
+                    <button type="submit" class="btn-primary">
+                        <span>Guardar Tarjeta</span>
                     </button>
                 </div>
             </form>

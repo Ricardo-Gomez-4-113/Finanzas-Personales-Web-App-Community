@@ -192,6 +192,27 @@ def mensualizar(monto: float, frecuencia: str) -> float:
     return float(monto)
 
 
+def convertir_frecuencias(monto: float, frecuencia_origen: str) -> Dict[str, float]:
+    """Calcula el equivalente mensual, quincenal y semanal de un monto dado."""
+    mensual = mensualizar(monto, frecuencia_origen)
+    return {
+        "mensual": round(mensual, 2),
+        "quincenal": round(mensual / 2, 2),
+        "semanal": round(mensual * 12 / 52, 2)
+    }
+
+
+def convertir_de_mensual(monto_mensual: float, frecuencia_destino: str) -> float:
+    """Convierte un monto mensualizado a la frecuencia solicitada."""
+    m = float(monto_mensual)
+    if frecuencia_destino == 'mensual':
+        return round(m, 2)
+    if frecuencia_destino == 'quincenal':
+        return round(m / 2, 2)
+    return round(m * 12 / 52, 2)
+
+
+
 def valor_rendimiento(capital: float, tasa_anual: float, fecha_base: date, hoy: date) -> float:
     """Valor de una cuenta con interés diario compuesto desde fecha_base."""
     dias = max(0, (hoy - fecha_base).days)

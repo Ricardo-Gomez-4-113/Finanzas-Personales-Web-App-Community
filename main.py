@@ -22,7 +22,7 @@ import master_db
 from security import (
     hash_password
 )
-from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes
+from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -75,6 +75,7 @@ app.include_router(apartados.router)
 app.include_router(inversiones.router)
 app.include_router(respaldo.router)
 app.include_router(recurrentes.router)
+app.include_router(presupuesto.router)
 
 @app.middleware("http")
 async def add_security_and_cache_headers(request: Request, call_next):
