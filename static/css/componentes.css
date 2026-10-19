@@ -99,7 +99,7 @@ body {
     font-weight: bold;
 }
 
-.card.balance p { color: var(--primary-color); }
+.card.balance p { color: var(--success-color); }
 
 .card.ingresos p { color: var(--success-color); }
 

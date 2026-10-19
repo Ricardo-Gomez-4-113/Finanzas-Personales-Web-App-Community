@@ -39,24 +39,20 @@ export async function cargarDatos() {
 
         if (document.getElementById('lbl-dash-patrimonio')) {
             setTxt('lbl-dash-patrimonio', `${fmt(dataResumen.patrimonio_neto)} ${estado.monedaGlobal}`);
-            setTxt('lbl-dash-patrimonio-sin', `${fmt(dataResumen.patrimonio_sin_rendimiento)} ${estado.monedaGlobal}`);
             setTxt('lbl-dash-balance', `${fmt(dataResumen.balance)}`);
             setTxt('lbl-dash-apartados', `${fmt(dataResumen.apartados)}`);
             setTxt('lbl-dash-inversiones', `${fmt(dataResumen.inversiones)} ${estado.monedaGlobal}`);
-            setTxt('lbl-dash-rendimiento', `${fmt(dataResumen.rendimiento_fijo)}`);
             setTxt('lbl-dash-deuda', `${fmt(dataResumen.deuda_msi)}`);
 
             // Tira de Distribución de Activos (positivos; la deuda no es un activo)
             const vBal = Math.max(0, Number(dataResumen.balance) || 0);
             const vAp = Math.max(0, Number(dataResumen.apartados) || 0);
             const vInv = Math.max(0, Number(dataResumen.inversiones) || 0);
-            const vRend = Math.max(0, Number(dataResumen.rendimiento_fijo) || 0);
-            const totalAct = vBal + vAp + vInv + vRend;
+            const totalAct = vBal + vAp + vInv;
             const segmentos = [
                 ['alloc-bar-balance', vBal, 'Efectivo'],
                 ['alloc-bar-apartados', vAp, 'Metas/Apartados'],
                 ['alloc-bar-inversiones', vInv, 'Inversiones'],
-                ['alloc-bar-rendimiento', vRend, 'Cuentas con rendimiento'],
             ];
             segmentos.forEach(([id, valor, nombre]) => {
                 const bar = document.getElementById(id);

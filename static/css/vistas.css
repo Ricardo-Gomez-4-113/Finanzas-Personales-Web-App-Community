@@ -384,7 +384,7 @@
     margin: 3px 0 0 0;
     font-size: 1.85rem;
     font-weight: 800;
-    color: var(--accent-color);
+    color: var(--success-color);
     text-align: left;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -421,7 +421,7 @@
     flex-shrink: 0;
 }
 
-.dot-balance { background-color: var(--primary-color); }
+.dot-balance { background-color: var(--success-color); }
 
 .dot-apartados { background-color: var(--gold-color); }
 
@@ -463,7 +463,7 @@
 }
 
 .alloc-bar-balance {
-    background-color: var(--primary-color);
+    background-color: var(--success-color);
 }
 
 .alloc-bar-apartados {

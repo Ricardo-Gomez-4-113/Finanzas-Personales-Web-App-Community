@@ -258,8 +258,8 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     mes_gastos = mes_tot.get('gasto', 0.0)
 
     balance = ingresos - gastos
-    patrimonio_sin_rendimiento = conv(balance) + conv(apartados) + inversiones_total - conv(deuda_msi)
-    patrimonio = patrimonio_sin_rendimiento + conv(rendimiento_fijo)
+    patrimonio = conv(balance) + conv(apartados) + inversiones_total - conv(deuda_msi)
+    patrimonio_sin_rendimiento = patrimonio
 
     return {
         "moneda_base": moneda_base_upper,
