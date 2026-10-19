@@ -155,6 +155,17 @@
                     </span>
                     <span class="nav-label">Inversiones</span>
                 </button>
+                <button type="button" class="tab-btn" data-tab="tab-calculadora-rf" title="Calculadora de Renta Fija">
+                    <span class="nav-icon">
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="2" width="16" height="20" rx="2"/>
+                            <line x1="8" y1="6" x2="16" y2="6"/>
+                            <line x1="16" y1="14" x2="16" y2="18"/>
+                            <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
+                        </svg>
+                    </span>
+                    <span class="nav-label">Calculadora Renta Fija</span>
+                </button>
                 <!-- Pestaña exclusiva para rol admin -->
                 <button type="button" class="tab-btn tab-btn-admin hidden" id="btn-tab-admin" data-tab="tab-admin" title="Panel de Administración del Sistema">
                     <span class="nav-icon">
@@ -798,36 +809,87 @@
                     </div>
                 </div>
             </div>
-            <div class="inversiones-tabla-section cuentas-rend-section">
-                <h3 class="section-subtitle">Cuentas con rendimiento (tasa fija)</h3>
-                <p class="hint-text">Saldos que generan interés diario compuesto (Nu, Cetes, MercadoPago, SOFIPOs). No modifican tu balance disponible. Montos en MXN.</p>
-                <form id="form-rendimiento" class="rend-form">
-                    <div class="form-row-2col">
+        </section>
+
+        <!-- ============================================== -->
+        <!-- PESTAÑA: CALCULADORA DE RENTA FIJA             -->
+        <!-- ============================================== -->
+        <section id="tab-calculadora-rf" class="tab-content">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-heading s-margin-0">
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="2" width="16" height="20" rx="2"/>
+                            <line x1="8" y1="6" x2="16" y2="6"/>
+                            <line x1="16" y1="14" x2="16" y2="18"/>
+                            <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
+                        </svg>
+                        <span>Calculadora de Renta Fija</span>
+                    </h2>
+                    <p class="panel-subtitle">Simulador de rendimiento para cuentas a la vista, pagarés bancarios, CETES y SOFIPOs.</p>
+                </div>
+
+                <!-- Parámetros de Inversión -->
+                <div class="calc-rf-card">
+                    <div class="form-row-3col">
                         <div class="form-group">
-                            <label for="rend-nombre">Nombre de la cuenta:</label>
-                            <input type="text" id="rend-nombre" maxlength="60" placeholder="Ej. Nu, Cetes, MercadoPago" required>
+                            <label for="calc-rf-monto">Monto a invertir ($ MXN):</label>
+                            <input type="number" id="calc-rf-monto" min="0" step="any" placeholder="10,000" value="10000" class="input-calc">
                         </div>
                         <div class="form-group">
-                            <label for="rend-capital">Saldo actual ($ MXN):</label>
-                            <input type="number" step="0.01" min="0.01" id="rend-capital" placeholder="0.00" required>
+                            <label for="calc-rf-tasa">Tasa anual bruta (%):</label>
+                            <input type="number" id="calc-rf-tasa" min="0" max="100" step="0.01" placeholder="11.50" value="11.50" class="input-calc">
+                        </div>
+                        <div class="form-group">
+                            <label for="calc-rf-base">Base de días anual:</label>
+                            <select id="calc-rf-base" class="select-calc">
+                                <option value="365" selected>365 días (Año natural — CETES / Bancos)</option>
+                                <option value="360">360 días (Año comercial — SOFIPOs / Fintechs)</option>
+                            </select>
                         </div>
                     </div>
-                    <div class="form-row-2col">
-                        <div class="form-group">
-                            <label for="rend-tasa">Tasa anual (%):</label>
-                            <input type="number" step="0.01" min="0" max="100" id="rend-tasa" placeholder="10" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="rend-fecha">Rinde desde:</label>
-                            <input type="date" id="rend-fecha" required>
+                </div>
+
+                <!-- Tarjetas de Resultados (Summary Cards) -->
+                <div class="cards cards-calc-rf">
+                    <div class="card card-calc card-calc-dia">
+                        <div class="card-calc-badge">Diario</div>
+                        <h3>Rendimiento por Día</h3>
+                        <p class="calc-rend-val" id="calc-rf-res-dia">$0.00</p>
+                        <div class="calc-total-wrap">
+                            <small class="calc-total-label">Total acumulado (1 día):</small>
+                            <strong class="calc-total-val" id="calc-rf-total-dia">$0.00</strong>
                         </div>
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="btn-guardar-rendimiento"><span>Agregar cuenta</span></button>
+
+                    <div class="card card-calc card-calc-mes">
+                        <div class="card-calc-badge">Mensual</div>
+                        <h3>Rendimiento por Mes</h3>
+                        <p class="calc-rend-val" id="calc-rf-res-mes">$0.00</p>
+                        <div class="calc-total-wrap">
+                            <small class="calc-total-label">Total acumulado (1 mes):</small>
+                            <strong class="calc-total-val" id="calc-rf-total-mes">$0.00</strong>
+                        </div>
                     </div>
-                </form>
-                <p class="hint-text" id="rend-totales"></p>
-                <div class="grid-apartados" id="grid-rendimiento"></div>
+
+                    <div class="card card-calc card-calc-anio">
+                        <div class="card-calc-badge">Anual</div>
+                        <h3>Rendimiento por Año</h3>
+                        <p class="calc-rend-val" id="calc-rf-res-anio">$0.00</p>
+                        <div class="calc-total-wrap">
+                            <small class="calc-total-label">Total acumulado (1 año):</small>
+                            <strong class="calc-total-val" id="calc-rf-total-anio">$0.00</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nota informativa -->
+                <div class="calc-info-note">
+                    <svg class="ui-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span>Cálculo matemático en tiempo real antes de impuestos/retenciones. Fórmulas aplicadas: Diario = <code>Monto × (Tasa / 100) / Base</code>, Mensual = <code>Monto × (Tasa / 100) / 12</code>, Anual = <code>Monto × (Tasa / 100)</code>.</span>
+                </div>
             </div>
         </section>
 
@@ -888,20 +950,20 @@
                         <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         <span>Directorio de Usuarios y Tenants</span>
                     </h3>
-                    <div class="table-responsive">
-                        <table>
+                    <div class="table-responsive admin-table-responsive">
+                        <table class="table-admin-users" id="tabla-usuarios-admin-full">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Usuario</th>
-                                    <th>Correo Electrónico</th>
-                                    <th>Rol</th>
-                                    <th>Estado</th>
-                                    <th>Creado</th>
-                                    <th>Último Acceso</th>
-                                    <th>Logins</th>
-                                    <th>Peso BD</th>
-                                    <th>Acciones</th>
+                                    <th class="th-user-id">ID</th>
+                                    <th class="th-user-name">Usuario</th>
+                                    <th class="th-user-email">Correo Electrónico</th>
+                                    <th class="th-user-role">Rol</th>
+                                    <th class="th-user-status">Estado</th>
+                                    <th class="th-user-created">Creado</th>
+                                    <th class="th-user-access">Último Acceso</th>
+                                    <th class="th-user-logins">Logins</th>
+                                    <th class="th-user-size">Peso BD</th>
+                                    <th class="th-user-actions">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-usuarios-admin">

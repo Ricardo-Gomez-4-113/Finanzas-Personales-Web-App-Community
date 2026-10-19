@@ -11,6 +11,7 @@ import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTicke
 import { cargarRecurrentes } from './recurrentes.js';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
+import { inicializarCalculadoraRF } from './calculadora_rf.js';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
@@ -183,6 +184,7 @@ inicializarFab();
 inicializarEstadoSidebar();
 
 inicializarBuscadorTickers();
+inicializarCalculadoraRF();
 
 verificarSesionInicial();
 

@@ -186,6 +186,7 @@ export function cambiarPestana(tabId) {
         'tab-recurrentes': 'Fijos y MSI',
         'tab-apartados': 'Metas de Ahorro',
         'tab-inversiones': 'Inversiones',
+        'tab-calculadora-rf': 'Calculadora Renta Fija',
         'tab-admin': 'Administración'
     };
     const lblTitulo = document.getElementById('topbar-section-title');

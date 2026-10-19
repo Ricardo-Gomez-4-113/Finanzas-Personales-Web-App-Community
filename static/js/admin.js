@@ -87,48 +87,72 @@ export async function cargarDatosAdmin() {
 
                     const fechaCreacion = (u.created_at || '').split(' ')[0] || '-';
                     const ultimoAccesoRelativo = formatoTiempoRelativo(u.last_login);
-                    const detalleTitle = u.last_login ? `title="Fecha exacta: ${u.last_login}"` : '';
+                    const detalleTitle = u.last_login ? `title="Fecha exacta: ${escapeHTML(u.last_login)}"` : '';
 
                     estado.cache.usuarios[u.id] = u;
                     const esAdminPrincipal = (u.id === 1 || (u.username && u.username.toLowerCase() === 'admin'));
                     
                     let accionesHtml = `
-                        <button type="button" class="btn-edit-user" onclick="abrirModalEditarUsuarioPorId(${u.id})" title="Editar usuario"><svg class="btn-svg-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Editar</button>
+                        <button type="button" class="btn-user-action btn-edit-user" onclick="abrirModalEditarUsuarioPorId(${u.id})" title="Editar usuario">
+                            <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            <span class="btn-action-label">Editar</span>
+                        </button>
                     `;
 
                     if (!esMismoAdmin) {
                         const textoToggle = u.is_active ? 'Suspender' : 'Activar';
                         const nuevoEstado = !u.is_active;
+                        const iconoToggle = u.is_active
+                            ? `<svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>`
+                            : `<svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                        const claseToggle = u.is_active ? 'btn-status-suspend' : 'btn-status-activate';
                         accionesHtml += `
-                            <button type="button" class="btn-status-toggle" onclick="cambiarEstadoUsuario(${u.id}, ${nuevoEstado})">${textoToggle}</button>
+                            <button type="button" class="btn-user-action btn-status-toggle ${claseToggle}" onclick="cambiarEstadoUsuario(${u.id}, ${nuevoEstado})" title="${textoToggle} usuario">
+                                ${iconoToggle}
+                                <span class="btn-action-label">${textoToggle}</span>
+                            </button>
                         `;
                     }
 
                     if (esAdminPrincipal || esMismoAdmin) {
                         accionesHtml += `
-                            <button type="button" class="btn-delete-user btn-disabled" disabled title="No se puede eliminar la cuenta principal de administración"><svg class="btn-svg-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Eliminar</button>
+                            <button type="button" class="btn-user-action btn-delete-user btn-disabled" disabled title="No se puede eliminar la cuenta principal de administración">
+                                <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                <span class="btn-action-label">Eliminar</span>
+                            </button>
                         `;
                     } else {
                         accionesHtml += `
-                            <button type="button" class="btn-delete-user" onclick="eliminarUsuarioTenantPorId(${u.id})" title="Eliminar usuario y su base de datos"><svg class="btn-svg-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Eliminar</button>
+                            <button type="button" class="btn-user-action btn-delete-user" onclick="eliminarUsuarioTenantPorId(${u.id})" title="Eliminar usuario y su base de datos">
+                                <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                <span class="btn-action-label">Eliminar</span>
+                            </button>
                         `;
                     }
 
+                    const correoVal = u.email ? escapeHTML(u.email) : '';
                     const correoHtml = u.email 
-                        ? `<span style="font-family: monospace; font-size: 0.84rem; color: var(--gold-color);">${escapeHTML(u.email)}</span>`
-                        : `<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Sin registrar</span>`;
+                        ? `<span class="user-email-chip" title="${correoVal}">${correoVal}</span>`
+                        : `<span style="color: var(--text-muted); font-size: 0.78rem; font-style: italic;">Sin registrar</span>`;
+
+                    const primeraLetra = (u.username || 'U').charAt(0).toUpperCase();
 
                     tr.innerHTML = `
-                        <td>${u.id}</td>
-                        <td><strong>${escapeHTML(u.username)}</strong></td>
-                        <td>${correoHtml}</td>
-                        <td>${badgeRol}</td>
-                        <td>${badgeEstado}</td>
-                        <td>${fechaCreacion}</td>
-                        <td ${detalleTitle}>${ultimoAccesoRelativo}</td>
-                        <td>${u.login_count}</td>
-                        <td>${escapeHTML(u.db_size_formatted || '0 KB')}</td>
-                        <td class="col-acciones">${accionesHtml}</td>
+                        <td class="col-user-id"><span class="user-id-chip">#${u.id}</span></td>
+                        <td class="col-user-name">
+                            <div class="user-name-cell">
+                                <span class="user-avatar-mini">${escapeHTML(primeraLetra)}</span>
+                                <strong>${escapeHTML(u.username)}</strong>
+                            </div>
+                        </td>
+                        <td class="col-user-email">${correoHtml}</td>
+                        <td class="col-user-role">${badgeRol}</td>
+                        <td class="col-user-status">${badgeEstado}</td>
+                        <td class="col-user-created">${fechaCreacion}</td>
+                        <td class="col-user-access" ${detalleTitle}>${ultimoAccesoRelativo}</td>
+                        <td class="col-user-logins"><span class="login-count-chip">${u.login_count}</span></td>
+                        <td class="col-user-size"><span class="db-size-chip">${escapeHTML(u.db_size_formatted || '0 KB')}</span></td>
+                        <td class="col-user-actions col-acciones">${accionesHtml}</td>
                     `;
                     tbody.appendChild(tr);
                 });

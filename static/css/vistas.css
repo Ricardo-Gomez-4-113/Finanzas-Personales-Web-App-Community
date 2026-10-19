@@ -1590,3 +1590,631 @@
 .rend-mov { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 6px; }
 .rend-mov input { flex: 1 1 110px; min-width: 0; }
 .rend-card-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ==========================================================================
+   CALCULADORA DE RENTA FIJA EN TIEMPO REAL
+   ========================================================================== */
+
+.calc-rf-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.form-row-3col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.input-calc,
+.select-calc {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.input-calc:focus,
+.select-calc:focus {
+    border-color: var(--gold-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.18);
+}
+
+.cards-calc-rf {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.card-calc {
+    position: relative;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.18s, border-color 0.18s;
+}
+
+.card-calc:hover {
+    transform: translateY(-2px);
+    border-color: rgba(197, 160, 89, 0.45);
+}
+
+.card-calc-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--gold-subtle);
+    color: var(--gold-color);
+    border: 1px solid rgba(197, 160, 89, 0.3);
+}
+
+.card-calc h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.calc-rend-val {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--success-color);
+    margin: 4px 0 14px 0;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.calc-total-wrap {
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.82rem;
+}
+
+.calc-total-label {
+    color: var(--text-muted);
+}
+
+.calc-total-val {
+    color: var(--text-color);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+}
+
+.calc-info-note {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.45;
+}
+
+.calc-info-note code {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    color: var(--gold-color);
+}
+
+/* ==========================================================================
+   TABLA DE GESTIÓN DE USUARIOS (PANEL ADMINISTRADOR) - DISEÑO RESPONSIVO
+   Garantiza visibilidad completa con menú lateral plegado o desplegado
+   ========================================================================== */
+
+.table-admin-users {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table-admin-users th,
+.table-admin-users td {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Columna ID */
+.table-admin-users .th-user-id,
+.table-admin-users .col-user-id {
+    width: 50px;
+    text-align: center;
+}
+
+.user-id-chip {
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Columna Usuario */
+.table-admin-users .th-user-name,
+.table-admin-users .col-user-name {
+    min-width: 130px;
+    max-width: 190px;
+}
+
+.user-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.user-avatar-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gold-subtle);
+    color: var(--gold-color);
+    border: 1px solid rgba(197, 160, 89, 0.35);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.user-name-cell strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+/* Columna Email */
+.table-admin-users .th-user-email,
+.table-admin-users .col-user-email {
+    min-width: 140px;
+    max-width: 200px;
+}
+
+.user-email-chip {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: var(--gold-color);
+    font-family: inherit;
+    vertical-align: middle;
+}
+
+/* Columna Rol & Estado */
+.table-admin-users .th-user-role,
+.table-admin-users .col-user-role {
+    width: 65px;
+    text-align: center;
+}
+
+.table-admin-users .th-user-status,
+.table-admin-users .col-user-status {
+    width: 75px;
+    text-align: center;
+}
+
+.badge-status {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.badge-status-active {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-status-suspended {
+    background-color: rgba(190, 18, 60, 0.12);
+    color: var(--danger-color);
+    border: 1px solid rgba(190, 18, 60, 0.25);
+}
+
+/* Columna Creado & Acceso */
+.table-admin-users .th-user-created,
+.table-admin-users .col-user-created {
+    width: 85px;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.table-admin-users .th-user-access,
+.table-admin-users .col-user-access {
+    min-width: 100px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* Columna Logins */
+.table-admin-users .th-user-logins,
+.table-admin-users .col-user-logins {
+    width: 50px;
+    text-align: center;
+}
+
+.login-count-chip {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-color);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1px 6px;
+}
+
+/* Columna Peso BD */
+.table-admin-users .th-user-size,
+.table-admin-users .col-user-size {
+    width: 70px;
+    text-align: right;
+}
+
+.db-size-chip {
+    font-weight: 600;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-color);
+}
+
+/* Columna Acciones */
+.table-admin-users .th-user-actions,
+.table-admin-users .col-user-actions {
+    width: auto;
+    text-align: right;
+}
+
+.table-admin-users .col-user-actions.col-acciones {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    padding-right: 6px;
+}
+
+/* Botones de acción de usuario estandarizados */
+.btn-user-action {
+    height: 26px;
+    padding: 0 7px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.16s ease;
+    white-space: nowrap;
+}
+
+.btn-user-action:hover {
+    transform: translateY(-1px);
+}
+
+.btn-user-action:active {
+    transform: scale(0.96);
+}
+
+.btn-edit-user:hover {
+    background-color: var(--gold-subtle);
+    border-color: var(--gold-color);
+    color: var(--gold-color);
+}
+
+.btn-status-suspend {
+    color: #f59e0b;
+}
+
+.btn-status-suspend:hover {
+    background-color: rgba(245, 158, 11, 0.12);
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+.btn-status-activate {
+    color: #10b981;
+}
+
+.btn-status-activate:hover {
+    background-color: rgba(16, 185, 129, 0.12);
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.btn-delete-user {
+    color: var(--danger-color);
+    border-color: rgba(190, 18, 60, 0.3);
+}
+
+.btn-delete-user:hover {
+    background-color: var(--danger-subtle);
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+}
+
+.btn-delete-user.btn-disabled {
+    border-color: rgba(127, 140, 141, 0.25);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.4;
+    transform: none !important;
+}
+
+.btn-delete-user.btn-disabled:hover {
+    background-color: transparent;
+}
+
+/* ========================================================================= */
+/* ADAPTACIÓN INTELIGENTE: MENÚ LATERAL PLEGADO VS DESPLEGADO                */
+/* ========================================================================= */
+
+/* Caso 1: Menú lateral DESPLEGADO (240px) en pantallas estándar (<= 1366px) */
+#vista-app:not(.sidebar-collapsed) .table-admin-users .btn-action-label {
+    display: none;
+}
+
+#vista-app:not(.sidebar-collapsed) .table-admin-users .btn-user-action {
+    width: 28px;
+    height: 26px;
+    padding: 0;
+    justify-content: center;
+}
+
+/* Caso 2: Menú lateral PLEGADO / COLAPSADO (68px) en pantallas >= 1140px    */
+@media (min-width: 1140px) {
+    #vista-app.sidebar-collapsed .table-admin-users .btn-action-label {
+        display: inline;
+    }
+    #vista-app.sidebar-collapsed .table-admin-users .btn-user-action {
+        width: auto;
+        padding: 0 8px;
+    }
+}
+
+/* Caso 3: Pantallas Ultra-Wide / 1080p nativas (>= 1380px)                 */
+@media (min-width: 1380px) {
+    .table-admin-users .btn-action-label {
+        display: inline !important;
+    }
+    .table-admin-users .btn-user-action {
+        width: auto !important;
+        padding: 0 8px !important;
+    }
+}
+
+/* Caso 4: Tablets y pantallas estrechas (<= 960px)                          */
+@media (max-width: 960px) {
+    .table-admin-users .btn-action-label {
+        display: none !important;
+    }
+    .table-admin-users .btn-user-action {
+        width: 28px !important;
+        height: 26px !important;
+        padding: 0 !important;
+        justify-content: center !important;
+    }
+    .table-admin-users .th-user-name,
+    .table-admin-users .col-user-name {
+        position: sticky;
+        left: 0;
+        background: var(--panel-bg);
+        z-index: 4;
+        box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08);
+    }
+    .table-admin-users thead .th-user-name {
+        z-index: 7;
+        background: var(--th-bg);
+    }
+}
+
+/* ==========================================================================
+   CALCULADORA DE RENTA FIJA EN TIEMPO REAL
+   ========================================================================== */
+
+.calc-rf-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--card-shadow);
+}
+
+.form-row-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    align-items: flex-end;
+}
+
+@media (max-width: 860px) {
+    .form-row-3col {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+.input-calc,
+.select-calc {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input-calc:focus,
+.select-calc:focus {
+    outline: none;
+    border-color: var(--gold-color);
+    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.15);
+}
+
+.cards-calc-rf {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 860px) {
+    .cards-calc-rf {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+.card-calc {
+    position: relative;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 22px 20px 18px;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-calc:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.card-calc-badge {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--gold-subtle);
+    color: var(--gold-color);
+    border: 1px solid var(--gold-border);
+}
+
+.card-calc h3 {
+    margin: 0 0 10px 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.calc-rend-val {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--success-color);
+    font-variant-numeric: tabular-nums;
+    margin: 0 0 16px 0;
+    line-height: 1.2;
+}
+
+.calc-total-wrap {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.calc-total-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.calc-total-val {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.calc-info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.calc-info-note svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--gold-color);
+}
+
+.calc-info-note code {
+    font-size: 0.78rem;
+    background: var(--panel-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
