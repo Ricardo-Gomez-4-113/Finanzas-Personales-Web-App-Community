@@ -798,80 +798,196 @@
         <!-- PESTAÑA: CALCULADORA DE RENTA FIJA             -->
         <!-- ============================================== -->
         <section id="tab-calculadora-rf" class="tab-content">
-            <div class="panel">
-                <div class="panel-header">
-                    <h2 class="panel-heading s-margin-0">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="4" y="2" width="16" height="20" rx="2"/>
-                            <line x1="8" y1="6" x2="16" y2="6"/>
-                            <line x1="16" y1="14" x2="16" y2="18"/>
-                            <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
-                        </svg>
-                        <span>Calculadora de Renta Fija</span>
-                    </h2>
-                    <p class="panel-subtitle">Simulador de rendimiento para cuentas a la vista, pagarés bancarios, CETES y SOFIPOs.</p>
+            <div class="panel calc-rf-panel">
+                <div class="panel-header calc-header">
+                    <div>
+                        <h2 class="panel-heading s-margin-0">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="2" width="16" height="20" rx="2"/>
+                                <line x1="8" y1="6" x2="16" y2="6"/>
+                                <line x1="16" y1="14" x2="16" y2="18"/>
+                                <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
+                            </svg>
+                            <span>Calculadora de Renta Fija</span>
+                        </h2>
+                        <p class="panel-subtitle">Simulador financiero de rendimientos para CETES, pagarés bancarios, cuentas a la vista y SOFIPOs.</p>
+                    </div>
                 </div>
 
-                <!-- Parámetros de Inversión -->
+                <!-- Tarjeta de Parámetros de Inversión -->
                 <div class="calc-rf-card">
-                    <div class="form-row-3col">
-                        <div class="form-group">
-                            <label for="calc-rf-monto">Monto a invertir ($ MXN):</label>
-                            <input type="number" id="calc-rf-monto" min="0" step="any" placeholder="10,000" value="10000" class="input-calc">
-                        </div>
-                        <div class="form-group">
-                            <label for="calc-rf-tasa">Tasa anual bruta (%):</label>
-                            <input type="number" id="calc-rf-tasa" min="0" max="100" step="0.01" placeholder="11.50" value="11.50" class="input-calc">
-                        </div>
-                        <div class="form-group">
-                            <label for="calc-rf-base">Base de días anual:</label>
-                            <select id="calc-rf-base" class="select-calc">
-                                <option value="365" selected>365 días (Año natural — CETES / Bancos)</option>
-                                <option value="360">360 días (Año comercial — SOFIPOs / Fintechs)</option>
-                            </select>
+                    <!-- Presets de Mercado -->
+                    <div class="calc-presets-bar">
+                        <span class="calc-presets-label">Tasas de referencia rápida:</span>
+                        <div class="calc-chips-wrap">
+                            <button type="button" class="calc-chip" data-tasa="10.50" data-base="365">CETES 28d (10.50%)</button>
+                            <button type="button" class="calc-chip" data-tasa="11.00" data-base="365">Pagaré Bancario (11.00%)</button>
+                            <button type="button" class="calc-chip" data-tasa="13.00" data-base="360">SOFIPO / Cajita (13.00%)</button>
+                            <button type="button" class="calc-chip" data-tasa="13.50" data-base="360">Nu / Ualá (13.50%)</button>
                         </div>
                     </div>
+
+                    <form id="form-calc-rf" onsubmit="event.preventDefault();">
+                        <div class="form-row-3col">
+                            <div class="form-group">
+                                <label for="calc-rf-monto">Monto a Invertir:</label>
+                                <div class="calc-input-adornment">
+                                    <span class="calc-adornment-prefix">$</span>
+                                    <input type="number" id="calc-rf-monto" min="0" step="any" placeholder="10,000" value="10000" class="input-calc calc-has-prefix calc-has-suffix" required>
+                                    <span class="calc-adornment-suffix">MXN</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="calc-rf-tasa">Tasa Anual Bruta:</label>
+                                <div class="calc-input-adornment">
+                                    <input type="number" id="calc-rf-tasa" min="0" max="100" step="0.01" placeholder="11.50" value="11.50" class="input-calc calc-has-suffix" required>
+                                    <span class="calc-adornment-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="calc-rf-base">Base de Días Anual:</label>
+                                <select id="calc-rf-base" class="select-calc">
+                                    <option value="365" selected>365 días (Año natural — CETES / Bancos)</option>
+                                    <option value="360">360 días (Año comercial — SOFIPOs / Fintechs)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Barra de Acciones con Botón de Cálculo -->
+                        <div class="calc-actions-row">
+                            <button type="submit" id="btn-calcular-rf" class="btn-primary btn-calc-action">
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                                    <line x1="8" y1="6" x2="16" y2="6"/>
+                                    <line x1="16" y1="14" x2="16" y2="18"/>
+                                    <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
+                                </svg>
+                                <span>Calcular Rendimientos</span>
+                            </button>
+                            <button type="button" id="btn-reset-calc-rf" class="btn-secondary btn-calc-reset" title="Restablecer a valores iniciales">
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                                <span>Restablecer</span>
+                            </button>
+                            <span class="calc-live-indicator" id="calc-live-indicator" title="Los cálculos se actualizan automáticamente o al pulsar Calcular">
+                                <span class="calc-indicator-dot"></span>
+                                <span>Modo interactivo activo</span>
+                            </span>
+                        </div>
+                    </form>
                 </div>
 
                 <!-- Tarjetas de Resultados (Summary Cards) -->
-                <div class="cards cards-calc-rf">
+                <div class="cards-calc-rf" id="calc-cards-container">
+                    <!-- Tarjeta Diario -->
                     <div class="card card-calc card-calc-dia">
-                        <div class="card-calc-badge">Diario</div>
-                        <h3>Rendimiento por Día</h3>
+                        <div class="card-calc-top">
+                            <span class="card-calc-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                                </svg>
+                            </span>
+                            <span class="card-calc-badge">1 Día</span>
+                        </div>
+                        <h3>Ganancia por Día</h3>
                         <p class="calc-rend-val" id="calc-rf-res-dia">$0.00</p>
-                        <div class="calc-total-wrap">
-                            <small class="calc-total-label">Total acumulado (1 día):</small>
-                            <strong class="calc-total-val" id="calc-rf-total-dia">$0.00</strong>
+                        <div class="calc-total-card">
+                            <div class="calc-total-line">
+                                <span>Capital inicial:</span>
+                                <strong id="calc-rf-cap-dia">$0.00</strong>
+                            </div>
+                            <div class="calc-total-line calc-total-highlight">
+                                <span>Total acumulado:</span>
+                                <strong class="calc-total-val" id="calc-rf-total-dia">$0.00</strong>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Tarjeta Mensual -->
                     <div class="card card-calc card-calc-mes">
-                        <div class="card-calc-badge">Mensual</div>
-                        <h3>Rendimiento por Mes</h3>
+                        <div class="card-calc-top">
+                            <span class="card-calc-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                            </span>
+                            <span class="card-calc-badge">30 Días (Promedio)</span>
+                        </div>
+                        <h3>Ganancia por Mes</h3>
                         <p class="calc-rend-val" id="calc-rf-res-mes">$0.00</p>
-                        <div class="calc-total-wrap">
-                            <small class="calc-total-label">Total acumulado (1 mes):</small>
-                            <strong class="calc-total-val" id="calc-rf-total-mes">$0.00</strong>
+                        <div class="calc-total-card">
+                            <div class="calc-total-line">
+                                <span>Capital inicial:</span>
+                                <strong id="calc-rf-cap-mes">$0.00</strong>
+                            </div>
+                            <div class="calc-total-line calc-total-highlight">
+                                <span>Total acumulado:</span>
+                                <strong class="calc-total-val" id="calc-rf-total-mes">$0.00</strong>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Tarjeta Anual -->
                     <div class="card card-calc card-calc-anio">
-                        <div class="card-calc-badge">Anual</div>
-                        <h3>Rendimiento por Año</h3>
+                        <div class="card-calc-top">
+                            <span class="card-calc-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                                </svg>
+                            </span>
+                            <span class="card-calc-badge card-badge-gold">1 Año Completo</span>
+                        </div>
+                        <h3>Ganancia por Año</h3>
                         <p class="calc-rend-val" id="calc-rf-res-anio">$0.00</p>
-                        <div class="calc-total-wrap">
-                            <small class="calc-total-label">Total acumulado (1 año):</small>
-                            <strong class="calc-total-val" id="calc-rf-total-anio">$0.00</strong>
+                        <div class="calc-total-card">
+                            <div class="calc-total-line">
+                                <span>Capital inicial:</span>
+                                <strong id="calc-rf-cap-anio">$0.00</strong>
+                            </div>
+                            <div class="calc-total-line calc-total-highlight">
+                                <span>Total acumulado:</span>
+                                <strong class="calc-total-val" id="calc-rf-total-anio">$0.00</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Nota informativa -->
+                <!-- Tabla de Proyección Temporal por Plazos Típicos -->
+                <div class="calc-table-section">
+                    <div class="calc-table-header">
+                        <h3 class="panel-subheading s-margin-0">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                            </svg>
+                            <span>Proyección por Plazos Financieros Frecuentes</span>
+                        </h3>
+                        <small class="calc-table-sub">Rendimiento estimado antes de retenciones ISR aplicable.</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-calc-plazos">
+                            <thead>
+                                <tr>
+                                    <th>Plazo / Instrumento</th>
+                                    <th class="s-text-align-center">Días</th>
+                                    <th class="s-text-align-right">Ganancia Bruta</th>
+                                    <th class="s-text-align-right">Monto Final Estimado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-calc-rf-plazos">
+                                <!-- Filas generadas dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Nota informativa institucional -->
                 <div class="calc-info-note">
                     <svg class="ui-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
-                    <span>Cálculo matemático en tiempo real antes de impuestos/retenciones. Fórmulas aplicadas: Diario = <code>Monto × (Tasa / 100) / Base</code>, Mensual = <code>Monto × (Tasa / 100) / 12</code>, Anual = <code>Monto × (Tasa / 100)</code>.</span>
+                    <span><strong>Nota metodológica:</strong> Los rendimientos mostrados son cálculos brutos matemáticos basados en interés simple anualizado. Para instrumentos bancarios y CETES la base común es de 365 días; algunas SOFIPOs y Fintechs calculan sobre año comercial de 360 días. No incluye retenciones provisionales de ISR ni comisiones de intermediarios.</span>
                 </div>
             </div>
         </section>

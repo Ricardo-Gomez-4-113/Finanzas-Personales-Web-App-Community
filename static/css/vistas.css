@@ -1592,146 +1592,6 @@
 .rend-card-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 
 /* ==========================================================================
-   CALCULADORA DE RENTA FIJA EN TIEMPO REAL
-   ========================================================================== */
-
-.calc-rf-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-}
-
-.form-row-3col {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-    align-items: flex-end;
-}
-
-.input-calc,
-.select-calc {
-    width: 100%;
-    padding: 10px 12px;
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-color);
-    font-size: 0.95rem;
-    font-weight: 500;
-    transition: border-color 0.18s, box-shadow 0.18s;
-}
-
-.input-calc:focus,
-.select-calc:focus {
-    border-color: var(--gold-color);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.18);
-}
-
-.cards-calc-rf {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.card-calc {
-    position: relative;
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.18s, border-color 0.18s;
-}
-
-.card-calc:hover {
-    transform: translateY(-2px);
-    border-color: rgba(197, 160, 89, 0.45);
-}
-
-.card-calc-badge {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 3px 8px;
-    border-radius: 6px;
-    background: var(--gold-subtle);
-    color: var(--gold-color);
-    border: 1px solid rgba(197, 160, 89, 0.3);
-}
-
-.card-calc h3 {
-    margin: 0 0 8px 0;
-    font-size: 0.88rem;
-    color: var(--text-muted);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.calc-rend-val {
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: var(--success-color);
-    margin: 4px 0 14px 0;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-}
-
-.calc-total-wrap {
-    margin-top: auto;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 0.82rem;
-}
-
-.calc-total-label {
-    color: var(--text-muted);
-}
-
-.calc-total-val {
-    color: var(--text-color);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.95rem;
-}
-
-.calc-info-note {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px 16px;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    line-height: 1.45;
-}
-
-.calc-info-note code {
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 0.8rem;
-    color: var(--gold-color);
-}
-
-/* ==========================================================================
    TABLA DE GESTIÓN DE USUARIOS (PANEL ADMINISTRADOR) - DISEÑO RESPONSIVO
    Garantiza visibilidad completa con menú lateral plegado o desplegado
    ========================================================================== */
@@ -2058,18 +1918,87 @@
 }
 
 /* ==========================================================================
-   CALCULADORA DE RENTA FIJA EN TIEMPO REAL
+   CALCULADORA DE RENTA FIJA EN TIEMPO REAL — INSTITUTIONAL FINTECH SUITE
    ========================================================================== */
 
+.calc-rf-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.calc-header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+    margin-bottom: 4px;
+}
+
+/* Tarjeta Principal de Configuración / Parámetros */
 .calc-rf-card {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 24px;
+    padding: 22px 24px;
     box-shadow: var(--card-shadow);
 }
 
+/* Barra de Presets Rápidos (Tasas de Referencia) */
+.calc-presets-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed var(--border-color);
+    flex-wrap: wrap;
+}
+
+.calc-presets-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.calc-chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.calc-chip {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    user-select: none;
+}
+
+.calc-chip:hover {
+    border-color: var(--gold-color);
+    color: var(--gold-color);
+    background: var(--gold-subtle);
+    transform: translateY(-1px);
+}
+
+.calc-chip.active {
+    background: var(--gold-subtle);
+    color: var(--gold-color);
+    border-color: var(--gold-color);
+    box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.22);
+    font-weight: 700;
+}
+
+/* Formulario y Filas */
 .form-row-3col {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2077,16 +2006,56 @@
     align-items: flex-end;
 }
 
-@media (max-width: 860px) {
-    .form-row-3col {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
+/* Input Adornments ($ y % / MXN) */
+.calc-input-adornment {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.calc-adornment-prefix {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.calc-adornment-suffix {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 2;
+    background: var(--panel-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.input-calc.calc-has-prefix {
+    padding-left: 28px !important;
+}
+
+.input-calc.calc-has-suffix {
+    padding-right: 54px !important;
 }
 
 .input-calc,
 .select-calc {
     width: 100%;
+    height: 42px;
     padding: 10px 14px;
     font-size: 0.95rem;
     font-weight: 600;
@@ -2096,6 +2065,7 @@
     background: var(--bg-color);
     color: var(--text-color);
     box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -2103,9 +2073,80 @@
 .select-calc:focus {
     outline: none;
     border-color: var(--gold-color);
-    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.15);
+    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.16);
 }
 
+/* Barra de Acciones y Botones */
+.calc-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.btn-calc-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(197, 160, 89, 0.28);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-calc-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(197, 160, 89, 0.38);
+}
+
+.btn-calc-action:active {
+    transform: translateY(1px);
+}
+
+.btn-calc-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 18px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.calc-live-indicator {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.calc-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color, #10b981);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulseDot 2.2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Tarjetas de Resultados (Summary Cards) */
 .cards-calc-rf {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2113,48 +2154,81 @@
     margin-bottom: 24px;
 }
 
-@media (max-width: 860px) {
-    .cards-calc-rf {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
-}
-
 .card-calc {
     position: relative;
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 22px 20px 18px;
+    padding: 22px 20px 20px;
     box-shadow: var(--card-shadow);
     display: flex;
     flex-direction: column;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .card-calc:hover {
     transform: translateY(-2px);
+    border-color: rgba(197, 160, 89, 0.45);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+.card-calc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.card-calc-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+}
+
+.card-calc-dia .card-calc-icon {
+    background: rgba(59, 130, 246, 0.12);
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.25);
+}
+
+.card-calc-mes .card-calc-icon {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.card-calc-anio .card-calc-icon {
+    background: var(--gold-subtle);
+    color: var(--gold-color);
+    border-color: rgba(197, 160, 89, 0.35);
+}
+
 .card-calc-badge {
-    position: absolute;
-    top: 14px;
-    right: 16px;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 2px 8px;
-    border-radius: 12px;
+    padding: 3px 10px;
+    border-radius: 14px;
+    background: var(--bg-color);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+
+.card-badge-gold {
     background: var(--gold-subtle);
     color: var(--gold-color);
-    border: 1px solid var(--gold-border);
+    border-color: var(--gold-border);
 }
 
 .card-calc h3 {
-    margin: 0 0 10px 0;
-    font-size: 0.88rem;
+    margin: 0 0 6px 0;
+    font-size: 0.84rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -2162,47 +2236,160 @@
 }
 
 .calc-rend-val {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: 1.85rem;
+    font-weight: 800;
     color: var(--success-color);
     font-variant-numeric: tabular-nums;
     margin: 0 0 16px 0;
-    line-height: 1.2;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
 }
 
-.calc-total-wrap {
+.calc-total-card {
     margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+    padding-top: 14px;
+    border-top: 1px dashed var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.calc-total-line {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 8px;
-}
-
-.calc-total-label {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
 }
 
-.calc-total-val {
-    font-size: 0.95rem;
-    font-weight: 700;
+.calc-total-line strong {
     color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.calc-total-highlight {
+    padding-top: 4px;
+    font-size: 0.85rem;
+    border-top: 1px solid rgba(197, 160, 89, 0.15);
+}
+
+.calc-total-highlight strong.calc-total-val {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--gold-color);
     font-variant-numeric: tabular-nums;
 }
 
+/* Efecto de Pulso Táctil tras Calcular */
+.calc-pulse .card-calc {
+    animation: calcPulseHighlight 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes calcPulseHighlight {
+    0% { transform: scale(0.99); box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.4); }
+    50% { transform: scale(1.015); box-shadow: 0 0 0 6px rgba(197, 160, 89, 0.15); }
+    100% { transform: scale(1); box-shadow: var(--card-shadow); }
+}
+
+/* Tabla de Proyección por Plazos */
+.calc-table-section {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--card-shadow);
+}
+
+.calc-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.calc-table-sub {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.table-calc-plazos {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.88rem;
+}
+
+.table-calc-plazos th {
+    padding: 10px 14px;
+    background: var(--bg-color);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-calc-plazos td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+}
+
+.table-calc-plazos tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table-calc-plazos tbody tr:hover td {
+    background: var(--gold-subtle);
+}
+
+.calc-plazo-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.calc-col-dias {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: var(--bg-color);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    display: inline-block;
+}
+
+.calc-td-ganancia {
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+.calc-td-total {
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+/* Nota Informativa Metodológica */
 .calc-info-note {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 12px 16px;
-    border-radius: 8px;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
     background: var(--bg-color);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
     font-size: 0.82rem;
-    line-height: 1.5;
+    line-height: 1.55;
 }
 
 .calc-info-note svg {
@@ -2211,10 +2398,32 @@
     color: var(--gold-color);
 }
 
-.calc-info-note code {
-    font-size: 0.78rem;
-    background: var(--panel-bg);
-    padding: 1px 5px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
+/* Adaptabilidad Responsiva */
+@media (max-width: 860px) {
+    .calc-presets-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .form-row-3col {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+    .calc-actions-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .calc-actions-row .btn-calc-action,
+    .calc-actions-row .btn-calc-reset {
+        width: 100%;
+        justify-content: center;
+    }
+    .calc-live-indicator {
+        margin-left: 0;
+        justify-content: center;
+    }
+    .cards-calc-rf {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
 }
