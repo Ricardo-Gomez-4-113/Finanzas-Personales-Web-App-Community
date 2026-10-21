@@ -362,8 +362,27 @@ def test_resumen_fijos_msi_compromiso_mensual():
     assert r['gasto_fijo_mensual'] == 5000.0, r['gasto_fijo_mensual']
     assert r['cuota_msi_mensual'] == 1074.92, r['cuota_msi_mensual']
     assert r['compromiso_mensual_total'] == 6074.92, r['compromiso_mensual_total']
+    assert r['gastos_normales_mes'] == 0.0, r['gastos_normales_mes']
     assert r['libre_al_mes'] == 12676.16, r['libre_al_mes']
     assert r['deuda_msi'] == 12899.0, r['deuda_msi']
+
+
+def test_resumen_gastos_normales_mes():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Sueldo", "ingreso", 10000.0, "mensual", 1, date(2026, 10, 1))
+    insertar_recurrente(conn, "Renta", "gasto", 3000.0, "mensual", 1, date(2026, 10, 1))
+    conn.execute("""
+        INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id)
+        VALUES ('2026-10-10', 1500.0, 'gasto', 1, 'Supermercado', NULL, NULL)
+    """)
+    conn.commit()
+
+    r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
+    assert r['ingreso_fijo_mensual'] == 10000.0
+    assert r['gasto_fijo_mensual'] == 3000.0
+    assert r['compromiso_mensual_total'] == 3000.0
+    assert r['gastos_normales_mes'] == 1500.0
+    assert r['libre_al_mes'] == 5500.0
 
 
 def test_exportar_presupuesto_a_fijos_misma_periodicidad():

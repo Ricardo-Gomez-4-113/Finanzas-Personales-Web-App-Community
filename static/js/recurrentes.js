@@ -411,16 +411,18 @@ export async function cargarRecurrentes() {
         const gastoFijo = Number(resumen.gasto_fijo_mensual) || 0;
         const cuotaMsi = Number(resumen.cuota_msi_mensual) || 0;
         const gastoTotal = Number(resumen.compromiso_mensual_total) || (gastoFijo + cuotaMsi);
-        const libre = Number(resumen.libre_al_mes) !== undefined ? Number(resumen.libre_al_mes) : (ingreso - gastoTotal);
+        const gastosNormales = Number(resumen.gastos_normales_mes) || 0;
+        const libre = Number(resumen.libre_al_mes) !== undefined ? Number(resumen.libre_al_mes) : (ingreso - gastoTotal - gastosNormales);
         estado.resumen = resumen;
 
         const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
         setTxt('lbl-rec-ingreso', ingreso);
+        setTxt('lbl-rec-gastos-normales', gastosNormales);
         setTxt('lbl-rec-gasto', gastoTotal);
         setTxt('lbl-rec-deuda', resumen.deuda_msi || 0);
         setTxt('lbl-rec-libre', libre);
 
-        // Alerta visual de déficit mensual si compromisos superan ingresos
+        // Alerta visual de déficit mensual si compromisos y gastos superan ingresos
         const elLibre = document.getElementById('lbl-rec-libre');
         if (elLibre) {
             const cardLibre = elLibre.closest('.card');
@@ -428,10 +430,10 @@ export async function cargarRecurrentes() {
                 const subtext = cardLibre.querySelector('.card-subtext');
                 if (libre < 0) {
                     cardLibre.classList.add('card-deficit');
-                    if (subtext) subtext.textContent = 'Déficit: compromisos superan ingresos';
+                    if (subtext) subtext.textContent = 'Déficit: compromisos y gastos superan ingresos';
                 } else {
                     cardLibre.classList.remove('card-deficit');
-                    if (subtext) subtext.textContent = 'Remanente tras fijos y MSI';
+                    if (subtext) subtext.textContent = 'Remanente tras fijos, MSI y normales';
                 }
             }
         }

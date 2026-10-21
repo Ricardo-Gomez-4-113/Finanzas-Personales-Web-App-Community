@@ -722,15 +722,19 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     mes = f"{hoy.year:04d}-{hoy.month:02d}"
     cursor.execute(
         """
-        SELECT tipo, SUM(monto) AS total FROM transacciones
-        WHERE strftime('%Y-%m', fecha) = ? AND apartado_id IS NULL
-        GROUP BY tipo
+        SELECT 
+            COALESCE(SUM(CASE WHEN tipo = 'gasto' AND apartado_id IS NULL AND recurrente_id IS NULL THEN monto ELSE 0 END), 0.0) AS gastos_normales,
+            COALESCE(SUM(CASE WHEN tipo = 'gasto' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_gastos,
+            COALESCE(SUM(CASE WHEN tipo = 'ingreso' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_ingresos
+        FROM transacciones
+        WHERE strftime('%Y-%m', fecha) = ?
         """,
         (mes,)
     )
-    mes_tot = {row["tipo"]: (row["total"] or 0.0) for row in cursor.fetchall()}
-    mes_ingresos = mes_tot.get('ingreso', 0.0)
-    mes_gastos = mes_tot.get('gasto', 0.0)
+    fila_mes = cursor.fetchone()
+    gastos_normales_mes = float(fila_mes["gastos_normales"]) if fila_mes else 0.0
+    mes_gastos = float(fila_mes["mes_gastos"]) if fila_mes else 0.0
+    mes_ingresos = float(fila_mes["mes_ingresos"]) if fila_mes else 0.0
 
     balance = ingresos - gastos
     patrimonio = conv(apartados) + inversiones_total
@@ -752,7 +756,8 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         "ingreso_fijo_mensual": round(conv(ingreso_fijo), 2),
         "gasto_fijo_mensual": round(conv(gasto_fijo), 2),
         "compromiso_mensual_total": round(conv(compromiso_mensual_total), 2),
-        "libre_al_mes": round(conv(ingreso_fijo - compromiso_mensual_total), 2),
+        "gastos_normales_mes": round(conv(gastos_normales_mes), 2),
+        "libre_al_mes": round(conv(ingreso_fijo - compromiso_mensual_total - gastos_normales_mes), 2),
         "mes_actual": {
             "ingresos": round(conv(mes_ingresos), 2),
             "gastos": round(conv(mes_gastos), 2),

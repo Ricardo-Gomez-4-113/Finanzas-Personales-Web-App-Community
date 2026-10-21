@@ -1040,6 +1040,10 @@
         grid-column: auto;
     }
 
+    .cards.cards-4 > .card {
+        grid-column: span 1 !important;
+    }
+
     .card {
         padding: 10px 10px;
         border-radius: 10px;

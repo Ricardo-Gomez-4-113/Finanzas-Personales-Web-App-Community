@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=7.0">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=7.0">
-    <link rel="stylesheet" href="/static/css/layout.css?v=7.0">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=7.0">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=7.1">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=7.1">
+    <link rel="stylesheet" href="/static/css/layout.css?v=7.1">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=7.1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -414,7 +414,7 @@
         <!-- PESTAÑA: MOVIMIENTOS Y FIJOS (UNIFICADA)       -->
         <!-- ============================================== -->
         <section id="tab-movimientos" class="tab-content">
-            <div class="cards">
+            <div class="cards cards-4">
                 <!-- Compatibilidad DOM -->
                 <span id="lbl-balance" class="hidden"></span>
                 <span id="lbl-ingresos" class="hidden"></span>
@@ -426,6 +426,11 @@
                     <small class="card-subtext">Nóminas recurrentes</small>
                 </div>
                 <div class="card gastos">
+                    <h3>Gastos Normales (Mes)</h3>
+                    <p id="lbl-rec-gastos-normales">$0.00</p>
+                    <small class="card-subtext">Variables del día a día</small>
+                </div>
+                <div class="card gastos">
                     <h3>Gastos Fijos + MSI Mensual</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
                     <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
@@ -433,7 +438,7 @@
                 <div class="card balance">
                     <h3>Libre al Mes</h3>
                     <p id="lbl-rec-libre">$0.00</p>
-                    <small class="card-subtext">Remanente tras fijos y MSI</small>
+                    <small class="card-subtext">Remanente tras fijos, MSI y normales</small>
                 </div>
             </div>
 
@@ -2017,7 +2022,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=7.0"></script>
+    <script type="module" src="/static/js/main.js?v=7.1"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

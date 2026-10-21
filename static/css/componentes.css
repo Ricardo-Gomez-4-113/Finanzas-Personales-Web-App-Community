@@ -121,6 +121,7 @@ body {
     margin: 0;
     font-size: 1.25rem;
     font-weight: bold;
+    font-variant-numeric: tabular-nums;
 }
 
 .card.balance p { color: var(--success-color); }
