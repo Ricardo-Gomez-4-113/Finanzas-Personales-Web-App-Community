@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=6.9">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=6.9">
-    <link rel="stylesheet" href="/static/css/layout.css?v=6.9">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=6.9">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=7.0">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=7.0">
+    <link rel="stylesheet" href="/static/css/layout.css?v=7.0">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=7.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -343,6 +343,8 @@
                     <!-- Compatibilidad DOM -->
                     <span id="lbl-dash-balance" class="hidden"></span>
                     <span id="lbl-dash-deuda" class="hidden"></span>
+                    <span id="lbl-dash-mes-ahorro" class="hidden"></span>
+                    <span id="lbl-dash-tasa-ahorro" class="hidden"></span>
                 </div>
 
                 <!-- Tira de Distribución de Patrimonio (Metas vs Inversiones) -->
@@ -360,11 +362,6 @@
                 <div class="card gastos">
                     <h3>Gastos del Mes</h3>
                     <p id="lbl-dash-mes-gastos">$0.00</p>
-                </div>
-                <div class="card balance">
-                    <h3>Ahorro del Mes</h3>
-                    <p id="lbl-dash-mes-ahorro">$0.00</p>
-                    <small id="lbl-dash-tasa-ahorro" class="pnl-badge">(0% de ahorro)</small>
                 </div>
                 <div class="card balance">
                     <h3>Rendimiento Inversiones</h3>
@@ -418,11 +415,11 @@
         <!-- ============================================== -->
         <section id="tab-movimientos" class="tab-content">
             <div class="cards">
-                <div class="card balance">
-                    <h3>Balance en Efectivo <span class="card-currency-tag">(<span class="lbl-moneda-base">MXN</span>)</span></h3>
-                    <p id="lbl-balance">$0.00</p>
-                    <small class="card-subtext">Disponible en cuenta · <span class="s-opacity-75">Ing:</span> <span id="lbl-ingresos">$0.00</span> · <span class="s-opacity-75">Gas:</span> <span id="lbl-gastos">$0.00</span></small>
-                </div>
+                <!-- Compatibilidad DOM -->
+                <span id="lbl-balance" class="hidden"></span>
+                <span id="lbl-ingresos" class="hidden"></span>
+                <span id="lbl-gastos" class="hidden"></span>
+
                 <div class="card ingresos">
                     <h3>Ingreso Fijo Mensual</h3>
                     <p id="lbl-rec-ingreso">$0.00</p>
@@ -2020,7 +2017,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=6.9"></script>
+    <script type="module" src="/static/js/main.js?v=7.0"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
