@@ -4,7 +4,7 @@
 
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
-import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
+import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
@@ -45,20 +45,18 @@ export async function cargarDatos() {
             setTxt('lbl-dash-inversiones', `${fmt(dataResumen.inversiones)} ${estado.monedaGlobal}`);
             setTxt('lbl-dash-deuda', `${fmt(dataResumen.deuda_msi)}`);
 
-            // Tira de Distribución de Activos (positivos; la deuda no es un activo)
-            const vBal = Math.max(0, Number(dataResumen.balance) || 0);
+            // Tira de Distribución de Patrimonio (Metas vs Inversiones)
             const vAp = Math.max(0, Number(dataResumen.apartados) || 0);
             const vInv = Math.max(0, Number(dataResumen.inversiones) || 0);
-            const totalAct = vBal + vAp + vInv;
+            const totalPat = vAp + vInv;
             const segmentos = [
-                ['alloc-bar-balance', vBal, 'Efectivo'],
                 ['alloc-bar-apartados', vAp, 'Metas/Apartados'],
                 ['alloc-bar-inversiones', vInv, 'Inversiones'],
             ];
             segmentos.forEach(([id, valor, nombre]) => {
                 const bar = document.getElementById(id);
                 if (!bar) return;
-                const pct = totalAct > 0 ? ((valor / totalAct) * 100).toFixed(1) : '0.0';
+                const pct = totalPat > 0 ? ((valor / totalPat) * 100).toFixed(1) : '0.0';
                 bar.style.width = `${pct}%`;
                 bar.title = `${nombre}: ${pct}% (${fmt(valor)})`;
             });
@@ -165,10 +163,25 @@ document.addEventListener('keydown', (e) => {
 // Navegación en el historial del navegador (Atrás / Adelante)
 window.addEventListener('popstate', () => {
     const token = localStorage.getItem('jwt_token');
-    if (token && estado.usuarioActual) {
-        establecerSesionActiva(estado.usuarioActual, token);
-    } else {
+    const hash = window.location.hash.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+
+    if (hash === '#app' || pathname === '/app') {
+        if (token && estado.usuarioActual) {
+            establecerSesionActiva(estado.usuarioActual, token);
+        } else {
+            mostrarVistaLogin("Por favor inicia sesión para acceder al panel.");
+        }
+    } else if (hash === '#login' || pathname === '/login') {
         mostrarVistaLogin();
+    } else {
+        mostrarVistaLanding();
+        if (hash && hash !== '#' && hash !== '#inicio') {
+            const target = document.querySelector(hash);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
     }
 });
 

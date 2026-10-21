@@ -6,14 +6,17 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, Any
 
 import master_db
-from security import registrar_fallo_login, verificar_tasa_login, limpiar_fallos_login
-from finanzas_core import ahora_local
 from security import (
+    registrar_fallo_login, 
+    verificar_tasa_login, 
+    limpiar_fallos_login,
+    obtener_ip_cliente,
     hash_password,
     verify_password,
     create_access_token,
     verify_token
 )
+from finanzas_core import ahora_local
 
 router = APIRouter()
 
@@ -64,7 +67,7 @@ def login(credentials: LoginRequest, request: Request):
     4. Registra la auditoría: actualiza last_login e incrementa login_count.
     5. Emite el token JWT firmado con sub, username, role y db_name.
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = obtener_ip_cliente(request)
     clave_tasa = f"{client_ip}:{credentials.username.strip().lower()}"
     verificar_tasa_login(clave_tasa)
 
@@ -212,8 +215,8 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
             detail="El servicio de envío de correos no está configurado en este servidor. Por favor, solicita asistencia directamente al administrador del sistema para restablecer tu contraseña."
         )
 
-    client_ip = request.client.host if request.client else "unknown"
-    clave_tasa = f"forgot:{client_ip}"
+    client_ip = obtener_ip_cliente(request)
+    clave_tasa = f"forgot:{client_ip}:{req.identifier.strip().lower()}"
     verificar_tasa_login(clave_tasa)
 
     user = master_db.get_user_by_identifier(req.identifier)
@@ -244,8 +247,8 @@ def reset_password(req: ResetPasswordRequest, request: Request):
     Restablece la contraseña utilizando el código de 6 dígitos recibido por correo.
     Aplica una política de seguridad estricta: máximo 2 intentos fallidos antes de invalidar el código.
     """
-    client_ip = request.client.host if request.client else "unknown"
-    clave_tasa = f"reset:{client_ip}"
+    client_ip = obtener_ip_cliente(request)
+    clave_tasa = f"reset:{client_ip}:{req.identifier.strip().lower()}"
     verificar_tasa_login(clave_tasa)
 
     nuevo_hash = hash_password(req.new_password)

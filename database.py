@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 6
+CURRENT_TENANT_SCHEMA_VERSION = 8
 
 
 # =============================================================================
@@ -65,12 +65,12 @@ def configure_sqlite_pragmas(conn: sqlite3.Connection) -> None:
     - journal_mode = WAL: Concurrencia real (lectores no bloquean escritores).
     - synchronous = NORMAL: Durabilidad sin I/O innecesario en cada transacción.
     - foreign_keys = ON: Integridad referencial forzada.
-    - busy_timeout = 5000: Espera de hasta 5 segundos ante contención antes de emitir error.
+    - busy_timeout = 15000: Espera de hasta 15 segundos ante contención antes de emitir error.
     """
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
-    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA busy_timeout = 15000;")
 
 
 # =============================================================================
@@ -222,6 +222,7 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
                 cuotas_generadas INTEGER NOT NULL DEFAULT 0,
                 monto_total REAL,
                 categoria_id INTEGER DEFAULT 1 REFERENCES categorias(id),
+                apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL,
                 activo INTEGER NOT NULL DEFAULT 1,
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -321,7 +322,39 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("PRAGMA user_version = 6;")
         current_version = 6
 
+    # -------------------------------------------------------------
+    # Versión 7: Enlace de Fijos/MSI con Apartados / Metas de ahorro
+    # -------------------------------------------------------------
+    if current_version < 7 and CURRENT_TENANT_SCHEMA_VERSION >= 7:
+        try:
+            cursor.execute("ALTER TABLE recurrentes ADD COLUMN apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_apartado ON recurrentes(apartado_id);")
+        cursor.execute("PRAGMA user_version = 7;")
+        current_version = 7
 
+    # -------------------------------------------------------------
+    # Versión 8: Índice único estricto para evitar duplicados en cuotas de recurrentes
+    # -------------------------------------------------------------
+    if current_version < 8 and CURRENT_TENANT_SCHEMA_VERSION >= 8:
+        cursor.execute("""
+            DELETE FROM transacciones 
+            WHERE recurrente_id IS NOT NULL 
+              AND id NOT IN (
+                  SELECT MIN(id) 
+                  FROM transacciones 
+                  WHERE recurrente_id IS NOT NULL 
+                  GROUP BY recurrente_id, fecha
+              );
+        """)
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_transacciones_rec_fecha 
+            ON transacciones(recurrente_id, fecha) 
+            WHERE recurrente_id IS NOT NULL;
+        """)
+        cursor.execute("PRAGMA user_version = 8;")
+        current_version = 8
 
     conn.commit()
 
@@ -338,7 +371,7 @@ def get_tenant_conn(db_name_or_path: str) -> sqlite3.Connection:
     """Abre una conexión nueva por petición. Las migraciones corren una sola vez por proceso y tenant."""
     db_path = get_tenant_path(db_name_or_path)
     ensure_tenant_directories()
-    conn = sqlite3.connect(db_path, timeout=5.0, check_same_thread=False)
+    conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     configure_sqlite_pragmas(conn)
     if db_path not in _tenants_migrados:
@@ -364,7 +397,7 @@ def init_tenant_db(db_path: str) -> None:
     y las migraciones del esquema financiero completo.
     """
     ensure_tenant_directories()
-    conn = sqlite3.connect(db_path, timeout=5.0, check_same_thread=False)
+    conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         configure_sqlite_pragmas(conn)
@@ -408,7 +441,7 @@ def backup_tenant_db_hot(db_name_or_path: str, dest_path: str, prefer_vacuum: bo
             pass
 
     # Usamos una conexión transaccional con PRAGMAs estándar
-    conn = sqlite3.connect(db_path, timeout=5.0, check_same_thread=False)
+    conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False)
     configure_sqlite_pragmas(conn)
     try:
         if prefer_vacuum:

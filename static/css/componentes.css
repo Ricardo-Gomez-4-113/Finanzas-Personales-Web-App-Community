@@ -20,6 +20,30 @@
     box-sizing: border-box;
 }
 
+/* Scrollbars Universales Estilo FinTech / Minimalistas */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(197, 160, 89, 0.25) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(197, 160, 89, 0.22);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(197, 160, 89, 0.45);
+}
+
 html, body {
     overflow-x: hidden;
     max-width: 100%;
@@ -104,6 +128,28 @@ body {
 .card.ingresos p { color: var(--success-color); }
 
 .card.gastos p { color: var(--danger-color); }
+
+.card.card-deficit {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.04);
+}
+.card.card-deficit p {
+    color: var(--danger-color) !important;
+}
+.card.card-deficit .card-subtext {
+    color: var(--danger-color) !important;
+    font-weight: 600;
+}
+
+.preview-warning {
+    color: var(--danger-color);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+    font-size: 0.85rem;
+}
 
 .panel {
     background: var(--panel-bg);
@@ -802,4 +848,80 @@ tbody tr:hover {
 .s-width-100 { width: 100%; }
 .s-width-33-3 { width: 33.3%; }
 .s-width-33-4 { width: 33.4%; }
+.s-width-50 { width: 50%; }
 .s-word-break-break-all { word-break: break-all; }
+
+/* Sub-pestañas unificadas de Movimientos y Fijos */
+.subtabs-nav {
+    display: inline-flex;
+    background: var(--surface-subtle);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    gap: 6px;
+    margin-bottom: 20px;
+    max-width: 100%;
+}
+
+.subtab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.2s ease);
+}
+
+.subtab-btn:hover {
+    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.subtab-btn.active {
+    background: var(--panel-bg);
+    color: var(--accent-color);
+    border-color: var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.subtab-content {
+    display: none;
+}
+
+.subtab-content.active {
+    display: block;
+    animation: fadeIn 0.18s ease-in-out;
+}
+
+.card-subtext {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.card-currency-tag {
+    white-space: nowrap;
+    display: inline-block;
+    font-size: 0.88em;
+    opacity: 0.85;
+}
+
+@media (max-width: 600px) {
+    .subtabs-nav {
+        display: flex;
+        width: 100%;
+    }
+    .subtab-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+}

@@ -12,12 +12,13 @@ Este módulo implementa:
 
 import os
 import time
+import ipaddress
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Generator, List
 import sqlite3
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from database import get_tenant_conn
 import master_db
@@ -227,3 +228,35 @@ def verificar_tasa_login(clave: str):
 
 def limpiar_fallos_login(clave: str):
     _intentos_fallidos_login.pop(clave, None)
+
+
+def es_ip_privada_o_loopback(ip_str: str) -> bool:
+    """Verifica de forma segura si una dirección IP pertenece a rangos de loopback o red privada interna."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_loopback or ip.is_private
+    except ValueError:
+        return False
+
+
+def obtener_ip_cliente(request: Request) -> str:
+    """
+    Resuelve la dirección IP real del cliente detrás de Cloudflare y proxies reversos confiables.
+    
+    1. Si la conexión TCP directa (request.client.host) proviene de un proxy confiable
+       (loopback 127.0.0.1/::1 o redes privadas/Docker), inspecciona la cabecera 'CF-Connecting-IP'
+       inyectada y autenticada por el borde de Cloudflare.
+    2. Si 'CF-Connecting-IP' contiene una IP válida, se adopta como IP verídica del visitante.
+    3. Si no hay proxy confiable o no existe la cabecera, recurre a request.client.host o 'unknown'.
+    """
+    direct_ip = request.client.host if request.client else "unknown"
+    if es_ip_privada_o_loopback(direct_ip):
+        cf_ip = request.headers.get("CF-Connecting-IP")
+        if cf_ip:
+            cf_ip_clean = cf_ip.strip()
+            try:
+                ipaddress.ip_address(cf_ip_clean)
+                return cf_ip_clean
+            except ValueError:
+                pass
+    return direct_ip

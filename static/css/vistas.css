@@ -1924,13 +1924,13 @@
 .calc-rf-panel {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .calc-header {
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 16px;
-    margin-bottom: 4px;
+    padding-bottom: 14px;
+    margin-bottom: 2px;
 }
 
 /* Tarjeta Principal de Configuración / Parámetros */
@@ -1938,7 +1938,7 @@
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 22px 24px;
+    padding: 18px 20px;
     box-shadow: var(--card-shadow);
 }
 
@@ -2001,8 +2001,8 @@
 /* Formulario y Filas */
 .form-row-3col {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
     align-items: flex-end;
 }
 
@@ -2149,9 +2149,9 @@
 /* Tarjetas de Resultados (Summary Cards) */
 .cards-calc-rf {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
 }
 
 .card-calc {
@@ -2297,9 +2297,16 @@
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 22px 24px;
-    margin-bottom: 24px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
     box-shadow: var(--card-shadow);
+}
+
+.calc-table-section .table-responsive {
+    max-height: none;
+    overflow-y: visible;
+    border: none;
+    background: transparent;
 }
 
 .calc-table-header {

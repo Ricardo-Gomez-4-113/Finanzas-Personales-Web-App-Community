@@ -75,17 +75,18 @@ def eliminar_transaccion(id_transaccion: int, conn: sqlite3.Connection = Depends
     if not trans:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
-    if trans["apartado_id"] is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Este movimiento está vinculado a un sobre o meta de ahorro. Para modificarlo o retirar los fondos, utiliza los controles (+) o (-) dentro de la sección Metas / Apartados."
-        )
-    if es_cuota_msi(cursor, trans["recurrente_id"]):
-        raise HTTPException(status_code=400, detail="Esta cuota pertenece a una compra a meses; adminístrala en Fijos y MSI.")
+    # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
+    if trans["recurrente_id"] is not None:
+        rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (trans["recurrente_id"],)).fetchone()
+        if rec and rec["cuotas_generadas"] > 0:
+            cursor.execute(
+                "UPDATE recurrentes SET cuotas_generadas = MAX(0, cuotas_generadas - 1) WHERE id = ?",
+                (trans["recurrente_id"],)
+            )
 
     cursor.execute("DELETE FROM transacciones WHERE id = ?", (id_transaccion,))
     conn.commit()
-    return {"mensaje": "Transacción eliminada"}
+    return {"mensaje": "Transacción eliminada con éxito"}
 
 @router.put("/api/transacciones/{id_transaccion}", summary="Editar movimiento")
 def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqlite3.Connection = Depends(get_tenant_db)):

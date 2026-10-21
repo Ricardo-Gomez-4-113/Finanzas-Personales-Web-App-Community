@@ -5,6 +5,7 @@
 import { cargarDatosAdmin } from './admin.js';
 import { estado } from './core.js';
 import { cargarRecurrentes } from './recurrentes.js';
+import { renderTablaMovimientos } from './movimientos.js';
 import { cargarPresupuesto, cerrarModalTarjetaPresupuesto } from './presupuesto.js';
 
 
@@ -172,6 +173,12 @@ export function cambiarPestana(tabId) {
     const targetContent = document.getElementById(tabId);
     if (!targetContent) return;
 
+    // Redirigir suavemente de tab-recurrentes a tab-movimientos con subtab de fijos
+    if (tabId === 'tab-recurrentes') {
+        tabId = 'tab-movimientos';
+        setTimeout(() => cambiarSubtabMovimientos('fijos'), 10);
+    }
+
     document.querySelectorAll('.tab-btn').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
     });
@@ -183,8 +190,7 @@ export function cambiarPestana(tabId) {
     // Actualizar título dinámico en la barra superior (topbar)
     const titulosMap = {
         'tab-dashboard': 'Resumen',
-        'tab-movimientos': 'Movimientos',
-        'tab-recurrentes': 'Fijos y MSI',
+        'tab-movimientos': 'Movimientos y Fijos',
         'tab-apartados': 'Metas de Ahorro',
         'tab-presupuesto': 'Organizador de Presupuesto',
         'tab-inversiones': 'Inversiones',
@@ -203,12 +209,13 @@ export function cambiarPestana(tabId) {
         cerrarSidebarMobile();
     }
 
-    // Si entra al panel de administración, recargar métricas frescas
+    // Cargar datos correspondientes al cambiar de pestaña
     if (tabId === 'tab-admin') {
         cargarDatosAdmin();
     }
-    if (tabId === 'tab-recurrentes') {
+    if (tabId === 'tab-movimientos') {
         cargarRecurrentes();
+        renderTablaMovimientos();
     }
     if (tabId === 'tab-presupuesto') {
         cargarPresupuesto();
@@ -219,6 +226,36 @@ export function cambiarPestana(tabId) {
         if (estado.graficas.dona) estado.graficas.dona.resize();
     }, 60);
 }
+
+
+export function cambiarSubtabMovimientos(subtab) {
+    const tabMov = document.getElementById('tab-movimientos');
+    if (tabMov && !tabMov.classList.contains('active')) {
+        cambiarPestana('tab-movimientos');
+    }
+    const btnHistorial = document.getElementById('btn-subtab-historial');
+    const btnFijos = document.getElementById('btn-subtab-fijos');
+    const contentHistorial = document.getElementById('subtab-content-historial');
+    const contentFijos = document.getElementById('subtab-content-fijos');
+
+    if (!btnHistorial || !btnFijos || !contentHistorial || !contentFijos) return;
+
+    if (subtab === 'fijos') {
+        btnHistorial.classList.remove('active');
+        btnFijos.classList.add('active');
+        contentHistorial.classList.remove('active');
+        contentFijos.classList.add('active');
+        cargarRecurrentes();
+    } else {
+        btnFijos.classList.remove('active');
+        btnHistorial.classList.add('active');
+        contentFijos.classList.remove('active');
+        contentHistorial.classList.add('active');
+        renderTablaMovimientos();
+    }
+}
+window.cambiarSubtabMovimientos = cambiarSubtabMovimientos;
+
 
 
 // =============================================================================

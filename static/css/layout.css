@@ -133,23 +133,31 @@
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 16px 12px;
+    gap: 4px;
+    padding: 10px 10px 8px 10px;
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .sidebar-nav .tab-btn {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
-    padding: 11px 14px;
+    padding: 8.5px 12px;
     border: 1px solid transparent;
     border-radius: 8px;
     background: transparent;
     color: var(--text-muted);
-    font-size: 0.92rem;
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
     text-align: left;
@@ -180,17 +188,17 @@
 }
 
 .sidebar-nav .tab-btn .nav-icon {
-    font-size: 1.15rem;
+    font-size: 1rem;
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
+    width: 22px;
 }
 
 .nav-svg-icon {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     flex-shrink: 0;
     stroke-width: 2;
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -266,6 +274,8 @@
     flex-direction: column;
     height: 100vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
 /* Barra Superior Fija (Topbar) */

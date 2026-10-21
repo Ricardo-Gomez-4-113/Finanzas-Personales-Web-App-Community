@@ -49,10 +49,10 @@ def get_master_conn() -> sqlite3.Connection:
     - journal_mode = WAL
     - synchronous = NORMAL
     - foreign_keys = ON
-    - busy_timeout = 5000
+    - busy_timeout = 15000
     """
     os.makedirs(DATA_DIR, exist_ok=True)
-    conn = sqlite3.connect(AUTH_MASTER_DB_PATH, timeout=5.0, check_same_thread=False)
+    conn = sqlite3.connect(AUTH_MASTER_DB_PATH, timeout=15.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     configure_sqlite_pragmas(conn)
     return conn
@@ -579,7 +579,11 @@ def get_admin_stats(ahora: datetime) -> Dict[str, Any]:
             for f in os.listdir(TENANTS_DIR):
                 f_path = os.path.join(TENANTS_DIR, f)
                 if os.path.isfile(f_path):
-                    total_disk_bytes += os.path.getsize(f_path)
+                    try:
+                        total_disk_bytes += os.path.getsize(f_path)
+                    except OSError:
+                        # Los archivos -wal/-shm de SQLite pueden desaparecer entre listdir y getsize (checkpoint)
+                        pass
                 
     
         return {

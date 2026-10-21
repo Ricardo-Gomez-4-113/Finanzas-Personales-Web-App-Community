@@ -9,10 +9,11 @@ Este módulo implementa:
 5. Exportación de reportes a Excel (.xlsx) y respaldos físicos de base de datos por tenant.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 from database import (
@@ -77,14 +78,45 @@ app.include_router(respaldo.router)
 app.include_router(recurrentes.router)
 app.include_router(presupuesto.router)
 
+@app.exception_handler(sqlite3.OperationalError)
+async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):
+    """Manejo controlado de contención y bloqueos temporales en SQLite (evita 500 no capturado)."""
+    err_str = str(exc).lower()
+    if "locked" in err_str or "busy" in err_str:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": "La base de datos se encuentra momentáneamente ocupada procesando otra transacción concurrente. Por favor, reintenta en un momento."
+            },
+            headers={"Retry-After": "1"}
+        )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Error interno de base de datos."}
+    )
+
 @app.middleware("http")
 async def add_security_and_cache_headers(request: Request, call_next):
+    """Agrega cabeceras de seguridad HTTP (HSTS, CSP, nosniff, etc.) y políticas anti-caché."""
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if request.url.path.startswith("/static/") or request.url.path == "/":
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    if request.url.path.startswith("/static/") or request.url.path in ("/", "/login", "/app"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"

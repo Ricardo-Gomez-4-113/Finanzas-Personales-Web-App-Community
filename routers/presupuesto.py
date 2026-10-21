@@ -10,6 +10,12 @@ from finanzas_core import (
     convertir_de_mensual,
     generar_subperiodos_default,
     calcular_distribucion_subperiodos,
+    sugerir_icono_color,
+    detectar_fijos_recurrentes_core as detectar_fijos_recurrentes,
+    sincronizar_fijos_presupuesto_core,
+    exportar_presupuesto_a_fijos_core,
+    materializar_recurrentes,
+    ahora_local,
 )
 from security import get_tenant_db
 
@@ -55,6 +61,19 @@ class TarjetaPresupuestoUpdate(BaseModel):
 
 class PlantillaRequest(BaseModel):
     plantilla: Literal['50-30-20', 'inversionista']
+
+
+class ImportarFijosRequest(BaseModel):
+    modo: Optional[Literal['individual', 'categoria', 'unificado']] = 'individual'
+    recurrentes_ids: Optional[List[int]] = None
+    actualizar_ingreso: bool = True
+    reemplazar: bool = False
+
+
+class ExportarFijosRequest(BaseModel):
+    tarjetas_ids: Optional[List[int]] = None
+    incluir_ingreso: bool = True
+    actualizar_existentes: bool = True
 
 
 # -----------------------------------------------------------------------------
@@ -104,32 +123,7 @@ def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
     }
 
 
-def detectar_fijos_recurrentes(cursor: sqlite3.Cursor, frecuencia_destino: str) -> dict:
-    """Detecta nómina y gastos fijos registrados en la tabla 'recurrentes'."""
-    filas = cursor.execute("SELECT * FROM recurrentes WHERE activo = 1").fetchall()
-    ingreso_mensual = 0.0
-    gasto_mensual = 0.0
-    msi_mensual = 0.0
 
-    for r in filas:
-        m = mensualizar(float(r["monto"]), r["frecuencia"])
-        if r["tipo"] == 'ingreso' and r["total_cuotas"] is None:
-            ingreso_mensual += m
-        elif r["tipo"] == 'gasto':
-            if r["total_cuotas"] is not None:
-                if int(r["cuotas_generadas"]) < int(r["total_cuotas"]):
-                    msi_mensual += m
-            else:
-                gasto_mensual += m
-
-    return {
-        "ingreso_fijo_periodo": convertir_de_mensual(ingreso_mensual, frecuencia_destino),
-        "gasto_fijo_periodo": convertir_de_mensual(gasto_mensual, frecuencia_destino),
-        "cuota_msi_periodo": convertir_de_mensual(msi_mensual, frecuencia_destino),
-        "ingreso_fijo_mensual": round(ingreso_mensual, 2),
-        "gasto_fijo_mensual": round(gasto_mensual, 2),
-        "cuota_msi_mensual": round(msi_mensual, 2)
-    }
 
 
 def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str, subperiodos_config: list = None) -> dict:
@@ -226,61 +220,44 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
 
 
 @router.post("/api/presupuesto/importar-fijos", summary="Importar nómina y gastos de Fijos y MSI")
-def importar_fijos_a_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
+def importar_fijos_a_presupuesto(
+    req: Optional[ImportarFijosRequest] = None,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    if req is None:
+        req = ImportarFijosRequest()
+
     cursor = conn.cursor()
-    cfg = obtener_config_presupuesto(cursor)
-    frecuencia = cfg["frecuencia"]
-    fijos = detectar_fijos_recurrentes(cursor, frecuencia)
-
-    ingreso_importado = fijos["ingreso_fijo_periodo"]
-    gasto_importado = fijos["gasto_fijo_periodo"]
-    msi_importado = fijos["cuota_msi_periodo"]
-
-    # Si hay ingreso fijo registrado, actualizar ingreso_base
-    if ingreso_importado > 0:
-        cursor.execute("""
-            UPDATE presupuesto_config
-            SET ingreso_base = ?, actualizado_en = CURRENT_TIMESTAMP
-            WHERE id = 1
-        """, (ingreso_importado,))
-        ingreso_actual = ingreso_importado
-    else:
-        ingreso_actual = cfg["ingreso_base"]
-
-    # Crear o actualizar tarjeta "Gastos Fijos"
-    if gasto_importado > 0:
-        pct_gasto = round((gasto_importado / ingreso_actual) * 100.0, 2) if ingreso_actual > 0 else 0.0
-        existente = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE nombre LIKE '%Gastos Fijos%' LIMIT 1").fetchone()
-        if existente:
-            cursor.execute("""
-                UPDATE presupuesto_tarjetas
-                SET monto = ?, porcentaje = ?, notas = 'Importado de Fijos y MSI'
-                WHERE id = ?
-            """, (gasto_importado, pct_gasto, existente["id"]))
-        else:
-            cursor.execute("""
-                INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-                VALUES ('Gastos Fijos', 'home', 'blue', ?, ?, 'Renta, servicios y suscripciones fijas', 10)
-            """, (pct_gasto, gasto_importado))
-
-    # Crear o actualizar tarjeta "Compras a Meses (MSI)"
-    if msi_importado > 0:
-        pct_msi = round((msi_importado / ingreso_actual) * 100.0, 2) if ingreso_actual > 0 else 0.0
-        existente_msi = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE nombre LIKE '%Meses%' OR nombre LIKE '%MSI%' LIMIT 1").fetchone()
-        if existente_msi:
-            cursor.execute("""
-                UPDATE presupuesto_tarjetas
-                SET monto = ?, porcentaje = ?, notas = 'Cuotas mensuales activas'
-                WHERE id = ?
-            """, (msi_importado, pct_msi, existente_msi["id"]))
-        else:
-            cursor.execute("""
-                INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-                VALUES ('Compras a Meses (MSI)', 'credit-card', 'amber', ?, ?, 'Cuotas mensuales de MSI activas', 20)
-            """, (pct_msi, msi_importado))
-
+    sincronizar_fijos_presupuesto_core(
+        cursor=cursor,
+        modo=req.modo or "individual",
+        recurrentes_ids=req.recurrentes_ids,
+        actualizar_ingreso=req.actualizar_ingreso,
+        reemplazar=req.reemplazar
+    )
     conn.commit()
     return get_presupuesto(conn)
+
+
+@router.post("/api/presupuesto/exportar-a-fijos", summary="Exportar tarjetas de presupuesto a Movimientos y Fijos con la misma periodicidad")
+def exportar_presupuesto_a_fijos(
+    req: Optional[ExportarFijosRequest] = None,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    if req is None:
+        req = ExportarFijosRequest()
+    cursor = conn.cursor()
+    res = exportar_presupuesto_a_fijos_core(
+        cursor=cursor,
+        tarjetas_ids=req.tarjetas_ids,
+        incluir_ingreso=req.incluir_ingreso,
+        actualizar_existentes=req.actualizar_existentes
+    )
+    hoy = ahora_local().date()
+    materializadas = materializar_recurrentes(conn, hoy)
+    conn.commit()
+    res["transacciones_materializadas"] = materializadas
+    return res
 
 
 @router.post("/api/presupuesto/plantilla", summary="Aplicar plantilla predeterminada de presupuesto")

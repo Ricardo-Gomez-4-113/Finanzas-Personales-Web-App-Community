@@ -104,8 +104,12 @@ function renderizarVistaPresupuesto(data) {
     const boxFijos = document.getElementById('pres-fijos-alert');
     if (boxFijos) {
         const hayFijos = (fijos.ingreso_fijo_periodo > 0 || fijos.gasto_fijo_periodo > 0 || fijos.cuota_msi_periodo > 0);
-        boxFijos.classList.toggle('hidden', !hayFijos);
-        if (hayFijos) {
+        const yaSincronizadoIngreso = (cfg.ingreso_base > 0 && Math.abs(cfg.ingreso_base - fijos.ingreso_fijo_periodo) < 1.0);
+        const bannerDescartado = (localStorage.getItem('presupuesto_fijos_banner_dismissed') === 'true' || sessionStorage.getItem('presupuesto_fijos_banner_dismissed') === 'true');
+        const yaTieneTarjetas = (tarjetas && tarjetas.length > 0);
+        const mostrar = hayFijos && !bannerDescartado && (!yaSincronizadoIngreso || !yaTieneTarjetas);
+        boxFijos.classList.toggle('hidden', !mostrar);
+        if (mostrar) {
             const lblTxt = document.getElementById('pres-fijos-alert-text');
             if (lblTxt) {
                 lblTxt.innerHTML = `Detectado en Fijos y MSI: Nómina de <strong>${fmt(fijos.ingreso_fijo_periodo)}</strong> y gastos/MSI de <strong>${fmt(fijos.gasto_fijo_periodo + fijos.cuota_msi_periodo)}</strong> (${cfg.frecuencia}).`;
@@ -450,17 +454,276 @@ export function alCambiarSubdivisionSelect() {
     }
 }
 
-export async function importarFijosPresupuesto() {
+export function abrirModalImportarFijos() {
+    const modal = document.getElementById('modal-importar-fijos-presupuesto');
+    if (!modal) return;
+
+    if (!cachePresupuesto) {
+        cargarPresupuesto().then(() => abrirModalImportarFijos());
+        return;
+    }
+
+    const cfg = cachePresupuesto.config || {};
+    const fijos = cachePresupuesto.fijos_detectados || {};
+    const tarjetas = cachePresupuesto.tarjetas || [];
+
+    // 1. Bloque de nómina / ingreso base
+    const boxIngreso = document.getElementById('importar-fijos-ingreso-box');
+    const txtIngreso = document.getElementById('importar-fijos-ingreso-txt');
+    const chkIngreso = document.getElementById('chk-importar-ingreso');
+
+    if (fijos.ingreso_fijo_periodo > 0) {
+        if (boxIngreso) boxIngreso.classList.remove('hidden');
+        if (chkIngreso) chkIngreso.checked = true;
+        if (txtIngreso) {
+            txtIngreso.innerHTML = `<strong>${fmt(fijos.ingreso_fijo_periodo)}</strong> ${FRECUENCIA_LABEL[cfg.frecuencia] || ''} <span style="opacity: 0.85;">(Equivalente mensual: ${fmt(fijos.ingreso_fijo_mensual)})</span>`;
+        }
+    } else {
+        if (boxIngreso) boxIngreso.classList.add('hidden');
+        if (chkIngreso) chkIngreso.checked = false;
+    }
+
+    // 2. Modo individual por defecto
+    const radioInd = document.querySelector('input[name="import-fijos-modo"][value="individual"]');
+    if (radioInd) radioInd.checked = true;
+
+    // 3. Renderizar items con checkboxes
+    const contItems = document.getElementById('lista-items-importar-fijos');
+    const itemsGasto = fijos.items_gasto || [];
+
+    if (contItems) {
+        if (itemsGasto.length === 0) {
+            contItems.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se detectaron cargos periódicos ni compras a meses activas.</div>`;
+        } else {
+            const ingresoReferencia = (fijos.ingreso_fijo_periodo > 0 ? fijos.ingreso_fijo_periodo : (cfg.ingreso_base || 1));
+            contItems.innerHTML = itemsGasto.map(item => {
+                const iconSvg = ICONOS_SVG[item.icono] || ICONOS_SVG['wallet'];
+                const pct = ingresoReferencia > 0 ? ((item.monto_periodo / ingresoReferencia) * 100) : 0;
+
+                const yaExiste = tarjetas.find(t => {
+                    const tNom = t.nombre.toLowerCase().trim();
+                    const iNom = item.descripcion.toLowerCase().trim();
+                    return tNom === iNom || (iNom.length >= 3 && tNom.includes(iNom)) || (tNom.length >= 3 && iNom.includes(tNom));
+                });
+
+                return `
+                    <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
+                            <input type="checkbox" class="chk-item-fijo" data-id="${item.id}" checked style="cursor: pointer; width: 16px; height: 16px;">
+                            <div class="pres-card-icon-wrap pres-icon-${item.color}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                ${iconSvg}
+                            </div>
+                            <div style="min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">
+                                    ${escapeHTML(item.descripcion)}
+                                    ${item.es_msi ? `<span style="font-size: 0.72rem; color: #f59e0b; background: rgba(245, 158, 11, 0.15); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">MSI ${item.cuotas_info || ''}</span>` : ''}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                    ${escapeHTML(item.categoria_nombre)}
+                                    ${yaExiste ? `<span style="color: #3b82f6; font-weight: 500;"> · (Sincronizará con "${escapeHTML(yaExiste.nombre)}")</span>` : ''}
+                                </div>
+                            </div>
+                        </label>
+                        <div style="text-align: right; flex-shrink: 0;">
+                            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main);">${fmt(item.monto_periodo)}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${pct.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    const chkReemp = document.getElementById('chk-importar-reemplazar');
+    if (chkReemp) chkReemp.checked = false;
+
+    modal.classList.remove('hidden');
+}
+
+export function cerrarModalImportarFijos() {
+    const modal = document.getElementById('modal-importar-fijos-presupuesto');
+    if (modal) modal.classList.add('hidden');
+}
+
+export function toggleSeleccionarTodosFijos() {
+    const checkboxes = document.querySelectorAll('.chk-item-fijo');
+    const btn = document.getElementById('btn-toggle-todos-fijos');
+    const algunoDesmarcado = Array.from(checkboxes).some(c => !c.checked);
+    checkboxes.forEach(c => c.checked = algunoDesmarcado);
+    if (btn) btn.textContent = algunoDesmarcado ? 'Deseleccionar todos' : 'Seleccionar todos';
+}
+
+export async function ejecutarImportarFijos() {
+    const btn = document.getElementById('btn-confirmar-importar-fijos');
+    if (btn) btn.disabled = true;
+
     try {
-        const res = await apiFetch('/api/presupuesto/importar-fijos', { method: 'POST' });
+        const modoRadio = document.querySelector('input[name="import-fijos-modo"]:checked');
+        const modo = modoRadio ? modoRadio.value : 'individual';
+
+        const chkIngreso = document.getElementById('chk-importar-ingreso');
+        const actualizar_ingreso = chkIngreso ? chkIngreso.checked : true;
+
+        const chkReemplazar = document.getElementById('chk-importar-reemplazar');
+        const reemplazar = chkReemplazar ? chkReemplazar.checked : false;
+
+        const checkboxes = document.querySelectorAll('.chk-item-fijo:checked');
+        const recurrentes_ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id, 10));
+
+        const res = await apiFetch('/api/presupuesto/importar-fijos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                modo,
+                recurrentes_ids,
+                actualizar_ingreso,
+                reemplazar
+            })
+        });
+
         if (!res.ok) {
             toast('No se pudieron importar los datos.', 'error');
             return;
         }
-        toast('Datos importados de Fijos y MSI con éxito.', 'ok');
-        cargarPresupuesto();
+
+        const data = await res.json();
+        cachePresupuesto = data;
+        renderizarVistaPresupuesto(data);
+        cerrarModalImportarFijos();
+        cerrarBannerFijosPresupuesto();
+        toast('Presupuesto sincronizado con éxito desde Fijos y MSI.', 'ok');
     } catch (err) {
-        toast('Error al importar datos.', 'error');
+        toast('Error al sincronizar datos.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+export const importarFijosPresupuesto = abrirModalImportarFijos;
+
+export function abrirModalExportarPresupuesto() {
+    const modal = document.getElementById('modal-exportar-presupuesto');
+    if (!modal) return;
+    if (!cachePresupuesto) {
+        cargarPresupuesto().then(() => abrirModalExportarPresupuesto());
+        return;
+    }
+    const cfg = cachePresupuesto.config || {};
+    const tarjetas = cachePresupuesto.tarjetas || [];
+
+    const badgeFrec = document.getElementById('exportar-frecuencia-badge');
+    if (badgeFrec) {
+        badgeFrec.textContent = (FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia || 'MENSUAL').toUpperCase();
+    }
+
+    const boxIngreso = document.getElementById('exportar-pres-ingreso-box');
+    const txtIngreso = document.getElementById('exportar-pres-ingreso-txt');
+    const chkIngreso = document.getElementById('chk-exportar-ingreso');
+    if (cfg.ingreso_base > 0) {
+        if (boxIngreso) boxIngreso.classList.remove('hidden');
+        if (chkIngreso) chkIngreso.checked = true;
+        if (txtIngreso) txtIngreso.textContent = `${fmt(cfg.ingreso_base)} (${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia})`;
+    } else {
+        if (boxIngreso) boxIngreso.classList.add('hidden');
+        if (chkIngreso) chkIngreso.checked = false;
+    }
+
+    const contItems = document.getElementById('lista-items-exportar-presupuesto');
+    if (contItems) {
+        if (tarjetas.length === 0) {
+            contItems.innerHTML = `<div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No tienes tarjetas de presupuesto para exportar. Crea tarjetas primero.</div>`;
+        } else {
+            contItems.innerHTML = tarjetas.map(t => {
+                const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
+                return `
+                    <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
+                            <input type="checkbox" class="chk-item-exportar" data-id="${t.id}" checked style="cursor: pointer; width: 16px; height: 16px;">
+                            <div class="pres-card-icon-wrap pres-icon-${t.color}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                ${iconSvg}
+                            </div>
+                            <div style="min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">
+                                    ${escapeHTML(t.nombre)}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                    ${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>
+                                </div>
+                            </div>
+                        </label>
+                        <div style="text-align: right; flex-shrink: 0;">
+                            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main); font-variant-numeric: tabular-nums;">${fmt(t.monto)}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums;">${t.porcentaje.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+export function cerrarModalExportarPresupuesto() {
+    const modal = document.getElementById('modal-exportar-presupuesto');
+    if (modal) modal.classList.add('hidden');
+}
+
+export function toggleSeleccionarTodosExportar() {
+    const checkboxes = document.querySelectorAll('.chk-item-exportar');
+    const btn = document.getElementById('btn-toggle-todos-exportar');
+    const algunoDesmarcado = Array.from(checkboxes).some(c => !c.checked);
+    checkboxes.forEach(c => c.checked = algunoDesmarcado);
+    if (btn) btn.textContent = algunoDesmarcado ? 'Deseleccionar todos' : 'Seleccionar todos';
+}
+
+export async function ejecutarExportarPresupuesto() {
+    const btn = document.getElementById('btn-confirmar-exportar-pres');
+    if (btn) btn.disabled = true;
+
+    try {
+        const chkIngreso = document.getElementById('chk-exportar-ingreso');
+        const incluir_ingreso = chkIngreso ? chkIngreso.checked : true;
+
+        const chkActualizar = document.getElementById('chk-exportar-actualizar');
+        const actualizar_existentes = chkActualizar ? chkActualizar.checked : true;
+
+        const checkboxes = document.querySelectorAll('.chk-item-exportar:checked');
+        const tarjetas_ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id, 10));
+
+        if (tarjetas_ids.length === 0 && !incluir_ingreso) {
+            toast('Selecciona al menos un elemento para exportar.', 'error');
+            return;
+        }
+
+        const res = await apiFetch('/api/presupuesto/exportar-a-fijos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tarjetas_ids,
+                incluir_ingreso,
+                actualizar_existentes
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            toast(err.detail || 'No se pudo exportar el presupuesto.', 'error');
+            return;
+        }
+
+        const data = await res.json();
+        cerrarModalExportarPresupuesto();
+        toast(`Exportación exitosa: ${data.total_procesados} movimientos/fijos sincronizados con periodicidad ${data.frecuencia}.`, 'ok');
+
+        if (typeof window.cargarRecurrentes === 'function') {
+            window.cargarRecurrentes();
+        }
+    } catch (e) {
+        console.error('Error al exportar presupuesto:', e);
+        toast('Error de red al exportar a Movimientos y Fijos.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -816,6 +1079,13 @@ export function inicializarPresupuesto() {
     if (inpPct) inpPct.addEventListener('input', () => sincronizarInputsModal('pct'));
 }
 
+export function cerrarBannerFijosPresupuesto() {
+    localStorage.setItem('presupuesto_fijos_banner_dismissed', 'true');
+    sessionStorage.setItem('presupuesto_fijos_banner_dismissed', 'true');
+    const boxFijos = document.getElementById('pres-fijos-alert');
+    if (boxFijos) boxFijos.classList.add('hidden');
+}
+
 Object.assign(window, {
     abrirModalCrearTarjeta,
     cerrarModalTarjetaPresupuesto,
@@ -826,6 +1096,15 @@ Object.assign(window, {
     guardarSubdivisionPersonalizada,
     aplicarPresetChip,
     aplicarPlantillaPresupuesto,
+    abrirModalImportarFijos,
+    cerrarModalImportarFijos,
+    toggleSeleccionarTodosFijos,
+    ejecutarImportarFijos,
     importarFijosPresupuesto,
+    abrirModalExportarPresupuesto,
+    cerrarModalExportarPresupuesto,
+    toggleSeleccionarTodosExportar,
+    ejecutarExportarPresupuesto,
+    cerrarBannerFijosPresupuesto,
     guardarConfigPresupuesto
 });

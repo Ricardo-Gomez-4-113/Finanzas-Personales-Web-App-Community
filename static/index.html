@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=6.1">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=6.1">
-    <link rel="stylesheet" href="/static/css/layout.css?v=6.1">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=6.1">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=6.9">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=6.9">
+    <link rel="stylesheet" href="/static/css/layout.css?v=6.9">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=6.9">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -131,17 +131,11 @@
                     </span>
                     <span class="nav-label">Resumen</span>
                 </button>
-                <button type="button" class="tab-btn" data-tab="tab-movimientos" title="Registro de Movimientos">
+                <button type="button" class="tab-btn" data-tab="tab-movimientos" title="Movimientos, Fijos y Compras a Meses">
                     <span class="nav-icon">
                         <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                     </span>
-                    <span class="nav-label">Movimientos</span>
-                </button>
-                <button type="button" class="tab-btn" data-tab="tab-recurrentes" title="Ingresos y gastos fijos, compras a meses">
-                    <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                    </span>
-                    <span class="nav-label">Fijos y MSI</span>
+                    <span class="nav-label">Movimientos y Fijos</span>
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-presupuesto" title="Organizador de Presupuesto por Tarjetas">
                     <span class="nav-icon">
@@ -328,21 +322,14 @@
         <section id="tab-dashboard" class="tab-content active">
             <div class="hero-networth">
                 <div class="networth-header">
-                    <small>PATRIMONIO NETO TOTAL</small>
+                    <small>PATRIMONIO TOTAL (METAS + INVERSIONES)</small>
                     <h2 id="lbl-dash-patrimonio">$0.00</h2>
                 </div>
                 <div class="networth-breakdown">
                     <div class="breakdown-item">
-                        <span class="breakdown-dot dot-balance"></span>
-                        <div class="breakdown-info">
-                            <small>Balance Efectivo</small>
-                            <strong id="lbl-dash-balance">$0.00</strong>
-                        </div>
-                    </div>
-                    <div class="breakdown-item">
                         <span class="breakdown-dot dot-apartados"></span>
                         <div class="breakdown-info">
-                            <small>En Apartados / Metas</small>
+                            <small>En Metas / Apartados</small>
                             <strong id="lbl-dash-apartados">$0.00</strong>
                         </div>
                     </div>
@@ -353,20 +340,15 @@
                             <strong id="lbl-dash-inversiones">$0.00</strong>
                         </div>
                     </div>
-                    <div class="breakdown-item breakdown-debt">
-                        <span class="breakdown-dot dot-deuda"></span>
-                        <div class="breakdown-info">
-                            <small>Deuda a Meses (−)</small>
-                            <strong id="lbl-dash-deuda">$0.00</strong>
-                        </div>
-                    </div>
+                    <!-- Compatibilidad DOM -->
+                    <span id="lbl-dash-balance" class="hidden"></span>
+                    <span id="lbl-dash-deuda" class="hidden"></span>
                 </div>
 
-                <!-- Tira de Distribución de Patrimonio (Estilo Kubera Asset Allocation) -->
-                <div class="networth-alloc-track" id="networth-alloc-track" title="Distribución de Activos: Efectivo vs Metas vs Inversiones">
-                    <div class="alloc-bar alloc-bar-balance s-width-33-3" id="alloc-bar-balance"></div>
-                    <div class="alloc-bar alloc-bar-apartados s-width-33-3" id="alloc-bar-apartados"></div>
-                    <div class="alloc-bar alloc-bar-inversiones s-width-33-4" id="alloc-bar-inversiones"></div>
+                <!-- Tira de Distribución de Patrimonio (Metas vs Inversiones) -->
+                <div class="networth-alloc-track" id="networth-alloc-track" title="Distribución de Patrimonio: Metas vs Inversiones">
+                    <div class="alloc-bar alloc-bar-apartados s-width-50" id="alloc-bar-apartados"></div>
+                    <div class="alloc-bar alloc-bar-inversiones s-width-50" id="alloc-bar-inversiones"></div>
                 </div>
             </div>
 
@@ -432,206 +414,230 @@
         </section>
 
         <!-- ============================================== -->
-        <!-- PESTAÑA 2: MOVIMIENTOS (INGRESOS Y GASTOS)     -->
+        <!-- PESTAÑA: MOVIMIENTOS Y FIJOS (UNIFICADA)       -->
         <!-- ============================================== -->
         <section id="tab-movimientos" class="tab-content">
             <div class="cards">
                 <div class="card balance">
-                    <h3>Balance Disponible (<span class="lbl-moneda-base">MXN</span>)</h3>
+                    <h3>Balance en Efectivo <span class="card-currency-tag">(<span class="lbl-moneda-base">MXN</span>)</span></h3>
                     <p id="lbl-balance">$0.00</p>
+                    <small class="card-subtext">Disponible en cuenta · <span class="s-opacity-75">Ing:</span> <span id="lbl-ingresos">$0.00</span> · <span class="s-opacity-75">Gas:</span> <span id="lbl-gastos">$0.00</span></small>
                 </div>
-                <div class="card ingresos">
-                    <h3>Ingresos Totales (<span class="lbl-moneda-base">MXN</span>)</h3>
-                    <p id="lbl-ingresos">$0.00</p>
-                </div>
-                <div class="card gastos">
-                    <h3>Gastos Totales (<span class="lbl-moneda-base">MXN</span>)</h3>
-                    <p id="lbl-gastos">$0.00</p>
-                </div>
-            </div>
-
-            <div class="dashboard-grid dashboard-grid-movimientos">
-                <div class="panel">
-                    <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                        <span>Registrar / Quitar Movimiento</span>
-                    </h2>
-                    <form id="transaccion-form">
-                        <div class="form-row-2col">
-                            <div class="form-group">
-                                <label for="fecha">Fecha:</label>
-                                <input type="date" id="fecha" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="tipo">Tipo:</label>
-                                <select id="tipo">
-                                    <option value="gasto">Gasto</option>
-                                    <option value="ingreso">Ingreso</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="monto">Monto ($):</label>
-                            <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="descripcion">Descripción:</label>
-                            <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
-                        </div>
-                        <div class="form-group">
-                            <label for="categoria">Categoría:</label>
-                            <select id="categoria"></select>
-                        </div>
-                        <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" onclick="cambiarPestana('tab-recurrentes')">Ir a Fijos y MSI</button></p>
-                        <div class="form-actions">
-                            <button type="submit" class="btn-primary">
-                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                <span>Guardar Transacción</span>
-                            </button>
-                        </div>
-                    </form>
-                    <div id="mensaje"></div>
-                </div>
-
-                <div class="panel">
-                    <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                        <span>Todos los Movimientos</span>
-                    </h2>
-                    <div class="filtros-movimientos">
-                        <input type="month" id="filtro-mes" aria-label="Filtrar por mes">
-                        <select id="filtro-tipo" aria-label="Filtrar por tipo">
-                            <option value="">Todos los tipos</option>
-                            <option value="gasto">Gastos</option>
-                            <option value="ingreso">Ingresos</option>
-                        </select>
-                        <select id="filtro-categoria" aria-label="Filtrar por categoría">
-                            <option value="">Todas las categorías</option>
-                        </select>
-                        <input type="search" id="filtro-buscar" placeholder="Buscar descripción..." aria-label="Buscar descripción">
-                    </div>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Descripción</th>
-                                    <th>Categoría</th>
-                                    <th>Tipo</th>
-                                    <th>Monto</th>
-                                    <th>Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-movimientos"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ============================================== -->
-        <!-- PESTAÑA: FIJOS Y MSI (RECURRENTES)              -->
-        <!-- ============================================== -->
-        <section id="tab-recurrentes" class="tab-content">
-            <div class="cards">
                 <div class="card ingresos">
                     <h3>Ingreso Fijo Mensual</h3>
                     <p id="lbl-rec-ingreso">$0.00</p>
+                    <small class="card-subtext">Nóminas recurrentes</small>
                 </div>
                 <div class="card gastos">
-                    <h3>Gastos Fijos Mensuales</h3>
+                    <h3>Gastos Fijos + MSI Mensual</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
-                </div>
-                <div class="card balance">
-                    <h3>Deuda a Meses Pendiente</h3>
-                    <p id="lbl-rec-deuda">$0.00</p>
+                    <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
                 </div>
                 <div class="card balance">
                     <h3>Libre al Mes</h3>
                     <p id="lbl-rec-libre">$0.00</p>
+                    <small class="card-subtext">Remanente tras fijos y MSI</small>
                 </div>
             </div>
 
-            <div class="dashboard-grid dashboard-grid-movimientos">
-                <div class="panel">
-                    <h2 class="panel-heading"><span>Agregar fijo o compra a meses</span></h2>
-                    <div class="segmented" role="radiogroup" aria-label="Tipo de registro">
-                        <label class="segmented-opt"><input type="radio" name="rec-modo" value="ingreso"><span>Ingreso fijo (nómina)</span></label>
-                        <label class="segmented-opt"><input type="radio" name="rec-modo" value="gasto" checked><span>Gasto fijo</span></label>
-                        <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
-                    </div>
-                    <form id="form-recurrente">
-                        <div class="form-group">
-                            <label for="rec-desc">Descripción:</label>
-                            <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
-                        </div>
-                        <div id="rec-campos-fijo">
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="rec-monto">Monto por pago ($):</label>
-                                    <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
-                                </div>
-                                <div class="form-group">
-                                    <label for="rec-frecuencia">Frecuencia:</label>
-                                    <select id="rec-frecuencia">
-                                        <option value="mensual">Mensual</option>
-                                        <option value="quincenal">Quincenal</option>
-                                        <option value="semanal">Semanal</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="rec-campos-msi" class="hidden">
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="rec-total">Monto total ($):</label>
-                                    <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
-                                </div>
-                                <div class="form-group">
-                                    <label for="rec-meses">Meses:</label>
-                                    <select id="rec-meses">
-                                        <option value="3">3</option>
-                                        <option value="6">6</option>
-                                        <option value="9">9</option>
-                                        <option value="12" selected>12</option>
-                                        <option value="18">18</option>
-                                        <option value="24">24</option>
-                                        <option value="otro">Otro…</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group hidden" id="rec-meses-otro-wrap">
-                                <label for="rec-meses-otro">Número de meses (2 a 60):</label>
-                                <input type="number" min="2" max="60" step="1" id="rec-meses-otro">
-                            </div>
-                            <p class="hint-text" id="rec-preview"></p>
-                        </div>
-                        <div class="form-row-2col">
-                            <div class="form-group">
-                                <label for="rec-fecha">Fecha del primer pago:</label>
-                                <input type="date" id="rec-fecha" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="rec-categoria">Categoría:</label>
-                                <select id="rec-categoria"></select>
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn-primary" id="btn-guardar-recurrente">
-                                <span>Guardar</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
+            <!-- Navegación por sub-pestañas -->
+            <div class="subtabs-nav" role="tablist">
+                <button type="button" id="btn-subtab-historial" class="subtab-btn active" onclick="cambiarSubtabMovimientos('historial')">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    <span>Historial de Movimientos</span>
+                </button>
+                <button type="button" id="btn-subtab-fijos" class="subtab-btn" onclick="cambiarSubtabMovimientos('fijos')">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                    <span>Fijos y Compras a Meses</span>
+                </button>
+            </div>
 
-                <div class="panel">
-                    <h2 class="panel-heading"><span>Compras a meses</span></h2>
-                    <div id="lista-msi"></div>
-                    <h2 class="panel-heading"><span>Ingresos y gastos fijos</span></h2>
-                    <div id="lista-fijos"></div>
+            <!-- Subtab 1: Historial y Registro de Movimientos -->
+            <div id="subtab-content-historial" class="subtab-content active">
+                <div class="dashboard-grid dashboard-grid-movimientos">
+                    <div class="panel">
+                        <h2 class="panel-heading">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <span>Registrar / Quitar Movimiento</span>
+                        </h2>
+                        <form id="transaccion-form">
+                            <div class="form-row-2col">
+                                <div class="form-group">
+                                    <label for="fecha">Fecha:</label>
+                                    <input type="date" id="fecha" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="tipo">Tipo:</label>
+                                    <select id="tipo">
+                                        <option value="gasto">Gasto</option>
+                                        <option value="ingreso">Ingreso</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="monto">Monto ($):</label>
+                                <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="descripcion">Descripción:</label>
+                                <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
+                            </div>
+                            <div class="form-group">
+                                <label for="categoria">Categoría:</label>
+                                <select id="categoria"></select>
+                            </div>
+                            <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" onclick="cambiarSubtabMovimientos('fijos')">Ir a Fijos y MSI</button></p>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">
+                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                    <span>Guardar Transacción</span>
+                                </button>
+                            </div>
+                        </form>
+                        <div id="mensaje"></div>
+                    </div>
+
+                    <div class="panel">
+                        <h2 class="panel-heading">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span>Todos los Movimientos</span>
+                        </h2>
+                        <div class="filtros-movimientos">
+                            <input type="month" id="filtro-mes" aria-label="Filtrar por mes">
+                            <select id="filtro-tipo" aria-label="Filtrar por tipo">
+                                <option value="">Todos los tipos</option>
+                                <option value="gasto">Gastos</option>
+                                <option value="ingreso">Ingresos</option>
+                            </select>
+                            <select id="filtro-categoria" aria-label="Filtrar por categoría">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                            <input type="search" id="filtro-buscar" placeholder="Buscar descripción..." aria-label="Buscar descripción">
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Descripción</th>
+                                        <th>Categoría</th>
+                                        <th>Tipo</th>
+                                        <th>Monto</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-movimientos"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subtab 2: Fijos y Compras a Meses -->
+            <div id="subtab-content-fijos" class="subtab-content">
+                <div class="dashboard-grid dashboard-grid-movimientos">
+                    <div class="panel">
+                        <h2 class="panel-heading">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            <span>Agregar fijo o compra a meses</span>
+                        </h2>
+                        <div class="segmented" role="radiogroup" aria-label="Tipo de registro">
+                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="ingreso"><span>Ingreso fijo (nómina)</span></label>
+                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="gasto" checked><span>Gasto fijo</span></label>
+                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
+                        </div>
+                        <form id="form-recurrente">
+                            <div class="form-group">
+                                <label for="rec-desc">Descripción:</label>
+                                <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
+                            </div>
+                            <div id="rec-campos-fijo">
+                                <div class="form-row-2col">
+                                    <div class="form-group">
+                                        <label for="rec-monto">Monto por pago ($):</label>
+                                        <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rec-frecuencia">Frecuencia:</label>
+                                        <select id="rec-frecuencia">
+                                            <option value="mensual">Mensual</option>
+                                            <option value="quincenal">Quincenal</option>
+                                            <option value="semanal">Semanal</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="rec-campos-msi" class="hidden">
+                                <div class="form-row-2col">
+                                    <div class="form-group">
+                                        <label for="rec-total">Monto total ($):</label>
+                                        <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rec-meses">Meses:</label>
+                                        <select id="rec-meses">
+                                            <option value="3">3</option>
+                                            <option value="6">6</option>
+                                            <option value="9">9</option>
+                                            <option value="12" selected>12</option>
+                                            <option value="18">18</option>
+                                            <option value="24">24</option>
+                                            <option value="otro">Otro…</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group hidden" id="rec-meses-otro-wrap">
+                                    <label for="rec-meses-otro">Número de meses (2 a 60):</label>
+                                    <input type="number" min="2" max="60" step="1" id="rec-meses-otro">
+                                </div>
+                                <p class="hint-text" id="rec-preview"></p>
+                            </div>
+                            <div class="form-row-2col">
+                                <div class="form-group">
+                                    <label for="rec-fecha">Fecha del primer pago:</label>
+                                    <input type="date" id="rec-fecha" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rec-categoria">Categoría:</label>
+                                    <select id="rec-categoria"></select>
+                                </div>
+                            </div>
+                            <div class="form-group" id="rec-apartado-group">
+                                <label for="rec-apartado-id">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                                    Aportar automáticamente a una meta (opcional):
+                                </label>
+                                <select id="rec-apartado-id">
+                                    <option value="">-- Ninguno (gasto común) --</option>
+                                </select>
+                                <span class="hint-text">Si seleccionas una meta, cada vez que venza el cargo se abonará automáticamente al saldo de tu apartado.</span>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary" id="btn-guardar-recurrente">
+                                    <span>Guardar</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="panel">
+                        <h2 class="panel-heading">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <span>Compras a meses</span>
+                        </h2>
+                        <div id="lista-msi"></div>
+                        <h2 class="panel-heading">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            <span>Ingresos y gastos fijos</span>
+                        </h2>
+                        <div id="lista-fijos"></div>
+                    </div>
                 </div>
             </div>
         </section>
+
+        <!-- Sección de compatibilidad oculta -->
+        <section id="tab-recurrentes" class="tab-content hidden"></section>
 
         <!-- ============================================== -->
         <!-- PESTAÑA: ORGANIZADOR DE PRESUPUESTO POR TARJETAS -->
@@ -654,7 +660,11 @@
                             <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             <span>+ Nueva Tarjeta</span>
                         </button>
-                        <button type="button" id="btn-importar-fijos-pres" class="btn-secondary" title="Sincronizar nómina y gastos fijos desde la pestaña Fijos y MSI">
+                        <button type="button" id="btn-exportar-pres-fijos" class="btn-secondary" title="Exportar presupuesto a Movimientos y Fijos con la misma periodicidad" onclick="abrirModalExportarPresupuesto()">
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Exportar a Movimientos y Fijos</span>
+                        </button>
+                        <button type="button" id="btn-importar-fijos-pres" class="btn-secondary" title="Sincronizar nómina y gastos fijos desde la pestaña Fijos y MSI" onclick="abrirModalImportarFijos()">
                             <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                             <span>Importar de Fijos y MSI</span>
                         </button>
@@ -667,7 +677,7 @@
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                         <span id="pres-fijos-alert-text">Detectamos ingresos o gastos fijos en tu cuenta.</span>
                     </div>
-                    <button type="button" class="btn-sm btn-primary" onclick="importarFijosPresupuesto()">Sincronizar ahora</button>
+                    <button type="button" class="btn-sm btn-primary" onclick="abrirModalImportarFijos()">Sincronizar ahora</button>
                 </div>
 
                 <!-- Tarjeta de Configuración de Ingreso Base y Frecuencia -->
@@ -1345,6 +1355,70 @@
     </div>
 
     <!-- ============================================== -->
+    <!-- MODAL 2B: EDITAR FIJO O COMPRA A MESES (MSI)   -->
+    <!-- ============================================== -->
+    <div id="modal-editar-recurrente" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-editar-recurrente-titulo" onclick="if(event.target === this) cerrarModalEditarRecurrente()">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-editar-recurrente-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span id="modal-editar-recurrente-titulo-txt">Editar Fijo / Compra a Meses</span>
+                </h3>
+                <button type="button" class="btn-modal-close" onclick="cerrarModalEditarRecurrente()">&times;</button>
+            </div>
+            <form id="form-editar-recurrente" onsubmit="guardarEdicionRecurrente(event)">
+                <input type="hidden" id="modal-edit-rec-id">
+
+                <div class="form-group">
+                    <label for="modal-edit-rec-desc">Descripción:</label>
+                    <input type="text" id="modal-edit-rec-desc" required placeholder="Ej. Renta, Nómina, Netflix...">
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="form-group">
+                        <label for="modal-edit-rec-monto">Monto ($):</label>
+                        <input type="number" step="0.01" min="0.01" id="modal-edit-rec-monto" placeholder="0.00" required>
+                        <small id="modal-edit-rec-monto-hint" class="hint-text hidden">En compras a meses la cuota mensual no se puede alterar.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-edit-rec-fecha">Próxima Fecha de Cargo:</label>
+                        <input type="date" id="modal-edit-rec-fecha" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="form-group" id="modal-edit-rec-frecuencia-wrap">
+                        <label for="modal-edit-rec-frecuencia">Frecuencia / Periodicidad:</label>
+                        <select id="modal-edit-rec-frecuencia">
+                            <option value="quincenal">Quincenal (días 15 y último)</option>
+                            <option value="mensual">Mensual (mismo día)</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="anual">Anual</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-edit-rec-categoria">Categoría:</label>
+                        <select id="modal-edit-rec-categoria" required></select>
+                    </div>
+                </div>
+
+                <div class="form-group" id="modal-edit-rec-apartado-wrap">
+                    <label for="modal-edit-rec-apartado">Vincular a Sobre / Meta (Opcional):</label>
+                    <select id="modal-edit-rec-apartado"></select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="cerrarModalEditarRecurrente()">Cancelar</button>
+                    <button type="submit" id="btn-modal-edit-rec-guardar" class="btn-primary">
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar Cambios</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
     <!-- MODAL 3: CREAR NUEVO USUARIO TENANT (ADMIN)   -->
     <!-- ============================================== -->
     <div id="modal-crear-usuario" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-crear-usuario-titulo" onclick="if(event.target === this) cerrarModalCrearUsuario()">
@@ -1606,6 +1680,122 @@
         </div>
     </div>
 
+    <!-- ======================================================== -->
+    <!-- MODAL: EXPORTAR PRESUPUESTO A MOVIMIENTOS Y FIJOS        -->
+    <!-- ======================================================== -->
+    <div id="modal-exportar-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-exportar-pres-title" onclick="if(event.target === this) cerrarModalExportarPresupuesto()">
+        <div class="modal-card modal-subdiv-card">
+            <div class="modal-header">
+                <h3 id="modal-exportar-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Exportar Presupuesto a Movimientos y Fijos</span>
+                </h3>
+                <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalExportarPresupuesto()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-instruction">
+                    Tus tarjetas de presupuesto se programarán como gastos e ingresos fijos activos, <strong>manteniendo la misma periodicidad</strong> configurada en tu presupuesto (<span id="exportar-frecuencia-badge" class="pnl-badge badge-gold">MENSUAL</span>).
+                </p>
+
+                <!-- Bloque Ingreso Fijo Base (Nómina) -->
+                <div id="exportar-pres-ingreso-box" class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
+                        <input type="checkbox" id="chk-exportar-ingreso" checked style="width: 16px; height: 16px; cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">Exportar Ingreso Base (Nómina)</div>
+                            <div id="exportar-pres-ingreso-txt" style="font-size: 0.8rem; color: var(--text-muted);">$0.00</div>
+                        </div>
+                    </label>
+                    <span class="pnl-badge badge-success">Ingreso</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tarjetas de Gasto a Exportar</span>
+                    <button type="button" id="btn-toggle-todos-exportar" class="btn-sm btn-ghost" onclick="toggleSeleccionarTodosExportar()">Deseleccionar todos</button>
+                </div>
+
+                <!-- Lista de Tarjetas con Checkbox -->
+                <div id="lista-items-exportar-presupuesto" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-subtle); scrollbar-width: thin;"></div>
+
+                <div style="margin-top: 14px; padding: 10px; background: var(--surface-card); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-main); margin-bottom: 0;">
+                        <input type="checkbox" id="chk-exportar-actualizar" checked style="width: 15px; height: 15px; cursor: pointer;">
+                        <span>Actualizar registros existentes si ya tienen el mismo nombre (evita duplicados)</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="cerrarModalExportarPresupuesto()">Cancelar</button>
+                <button type="button" id="btn-confirmar-exportar-pres" class="btn-primary" onclick="ejecutarExportarPresupuesto()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Confirmar y Exportar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL: IMPORTAR DE FIJOS Y MSI A PRESUPUESTO             -->
+    <!-- ======================================================== -->
+    <div id="modal-importar-fijos-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-importar-fijos-title" onclick="if(event.target === this) cerrarModalImportarFijos()">
+        <div class="modal-card modal-subdiv-card">
+            <div class="modal-header">
+                <h3 id="modal-importar-fijos-title" class="s-display-flex s-align-items-center s-gap-8px">
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                    <span>Importar de Fijos y MSI a Presupuesto</span>
+                </h3>
+                <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalImportarFijos()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-instruction">Selecciona los cargos periódicos y compras a meses que deseas convertir en tarjetas de presupuesto.</p>
+
+                <!-- Bloque Nómina -->
+                <div id="importar-fijos-ingreso-box" class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
+                        <input type="checkbox" id="chk-importar-ingreso" checked style="width: 16px; height: 16px; cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">Sincronizar Ingreso Fijo Base (Nómina)</div>
+                            <div id="importar-fijos-ingreso-txt" style="font-size: 0.8rem; color: var(--text-muted);">$0.00</div>
+                        </div>
+                    </label>
+                    <span class="pnl-badge badge-success">Ingreso</span>
+                </div>
+
+                <!-- Modo de Importación -->
+                <div style="margin-bottom: 12px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Modo de Organización</span>
+                    <div class="segmented" style="margin-top: 6px;">
+                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="individual" checked><span>Individual (por cargo)</span></label>
+                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="categoria"><span>Por Categoría</span></label>
+                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="unificado"><span>Unificado</span></label>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Cargos Periódicos Detectados</span>
+                    <button type="button" id="btn-toggle-todos-fijos" class="btn-sm btn-ghost" onclick="toggleSeleccionarTodosFijos()">Deseleccionar todos</button>
+                </div>
+
+                <!-- Lista de Items con Checkbox -->
+                <div id="lista-items-importar-fijos" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-subtle); scrollbar-width: thin;"></div>
+
+                <div style="margin-top: 14px; padding: 10px; background: var(--surface-card); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-main); margin-bottom: 0;">
+                        <input type="checkbox" id="chk-importar-reemplazar" style="width: 15px; height: 15px; cursor: pointer;">
+                        <span>Reemplazar todas las tarjetas de presupuesto actuales por las importadas</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="cerrarModalImportarFijos()">Cancelar</button>
+                <button type="button" id="btn-confirmar-importar-fijos" class="btn-primary" onclick="ejecutarImportarFijos()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Importar Seleccionados</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ============================================== -->
     <!-- MODAL 6: RECUPERAR CONTRASEÑA POR EMAIL        -->
     <!-- ============================================== -->
@@ -1830,7 +2020,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js"></script>
+    <script type="module" src="/static/js/main.js?v=6.9"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
