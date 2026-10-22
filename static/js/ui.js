@@ -45,10 +45,20 @@ export function toggleModoOscuro() {
     }
     if (estado.graficas.barras) actualizarColoresGrafica();
     if (estado.graficas.dona) actualizarColoresDona();
+    if (estado.graficas.categorias) {
+        const textColor = nuevoTemaOscuro ? '#FFFFFF' : '#0A0A0A';
+        if (estado.graficas.categorias.options && estado.graficas.categorias.options.plugins && estado.graficas.categorias.options.plugins.legend) {
+            estado.graficas.categorias.options.plugins.legend.labels.color = textColor;
+        }
+        if (estado.graficas.categorias.data && estado.graficas.categorias.data.datasets && estado.graficas.categorias.data.datasets[0]) {
+            estado.graficas.categorias.data.datasets[0].borderColor = nuevoTemaOscuro ? '#0D0D0E' : '#ffffff';
+        }
+        estado.graficas.categorias.update();
+    }
 }
 
 
-// Inicialización de tema guardado (por defecto oscuro estilo GBM)
+// Inicialización de tema guardado (por defecto oscuro Monochrome Ledger)
 export const temaGuardado = localStorage.getItem('theme');
 
 const prefiereOscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
@@ -101,7 +111,7 @@ export function actualizarColoresDona() {
         estado.graficas.dona.options.plugins.legend.labels.color = textColor;
     }
     if (estado.graficas.dona.data && estado.graficas.dona.data.datasets && estado.graficas.dona.data.datasets[0]) {
-        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#171717' : '#ffffff';
+        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
     }
     estado.graficas.dona.update();
 }

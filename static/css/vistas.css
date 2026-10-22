@@ -208,9 +208,9 @@
 }
 
 [data-theme="dark"] .btn-sync:hover {
-    background-color: #008F5D;
-    border-color: #008F5D;
-    color: #ffffff;
+    background-color: #FFFFFF;
+    border-color: #FFFFFF;
+    color: #000000;
 }
 
 .cards-inversiones .inv-card {
@@ -390,8 +390,8 @@
 }
 
 [data-theme="dark"] .hero-networth {
-    background: #171717;
-    border: 1px solid #262626;
+    background: #0D0D0E;
+    border: 1px solid #242427;
 }
 
 .hero-networth::before {
@@ -401,7 +401,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #006847 0%, #008F5D 50%, #008F5D 100%);
+    background: linear-gradient(90deg, #FFFFFF 0%, #22C55E 50%, #A3E635 100%);
 }
 
 .networth-header {
@@ -547,16 +547,16 @@
 }
 
 [data-theme="dark"] .gbm-action-btn {
-    background: #171717;
-    border-color: #262626;
+    background: #161618;
+    border-color: #242427;
     color: #FFFFFF;
 }
 
 [data-theme="dark"] .gbm-action-btn:hover {
-    background: rgba(0, 104, 71, 0.16);
-    border-color: #008F5D;
+    background: #242427;
+    border-color: #45454B;
     color: #FFFFFF;
-    box-shadow: 0 4px 14px rgba(0, 104, 71, 0.25);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 /* Cabecera de Apartados */

@@ -106,7 +106,13 @@
     border-radius: 4px;
     background: var(--primary-subtle);
     color: var(--primary-color);
-    border: 1px solid rgba(0, 143, 93, 0.25);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .brand-badge {
+    background: rgba(34, 197, 94, 0.12);
+    color: #A3E635;
+    border: 1px solid rgba(163, 230, 53, 0.25);
 }
 
 .btn-sidebar-collapse {
@@ -169,23 +175,23 @@
 }
 
 .sidebar-nav .tab-btn:hover {
-    background: var(--primary-subtle);
-    color: var(--primary-color);
+    background: var(--surface-subtle);
+    color: var(--text-color);
 }
 
 .sidebar-nav .tab-btn.active {
-    background: rgba(0, 104, 71, 0.08);
-    color: var(--primary-color);
-    border: 1px solid rgba(0, 104, 71, 0.2);
+    background: var(--surface-subtle);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-left: 3.5px solid var(--primary-color);
 }
 
 [data-theme="dark"] .sidebar-nav .tab-btn.active {
-    background: rgba(0, 104, 71, 0.16);
-    color: #008F5D;
-    border: 1px solid rgba(0, 143, 93, 0.3);
-    border-left: 3.5px solid #008F5D;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 3px 0 8px rgba(0, 104, 71, 0.2);
+    background: #161618;
+    color: #FFFFFF;
+    border: 1px solid #242427;
+    border-left: 3.5px solid #FFFFFF;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 3px 0 8px rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-nav .tab-btn .nav-icon {
@@ -234,9 +240,9 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #10b981;
+    background-color: #22c55e;
     flex-shrink: 0;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
     animation: status-pulse 2s infinite ease-in-out;
 }
 

@@ -1,129 +1,155 @@
 /* ==========================================================================
-   tokens.css - Paleta Oficial Monocromática Obsidiana + Verde Bandera FinTech
-   (GBM-inspired hierarchy: #0A0A0A, #171717, #262626, #FFFFFF, #A3A3A3, #006847, #008F5D)
+   tokens.css - Paleta Oficial Monochrome Ledger & Alpine Cyber
+   (Canvas: #000000, Cards/Bento: #0D0D0E, Superficie N2/Inputs/Modales: #161618,
+    Bordes/Divisores: #242427, Focus: #45454B, Texto: #FFFFFF / #A1A1AA,
+    Cifras Tabulares: #E4E4E7, Señales: #22C55E / #A3E635, Botón Primario: #FFFFFF / #000000)
    ========================================================================== */
 
 :root {
     /* Modo Claro (Alternativo armónico) */
     --bg-color: #f7f7f8;
     --panel-bg: #ffffff;
-    --text-color: #0a0a0a;
-    --text-muted: #737373;
-    --text-main: #0a0a0a;
-    --border-color: #e5e5e5;
-    --th-bg: #f0f0f2;
-    --table-border: #e5e5e5;
+    --surface-level2: #f0f0f2;
     --surface-subtle: #f0f0f2;
-    --card-shadow: 0 2px 10px rgba(10, 10, 10, 0.05);
+    --surface-modal: #ffffff;
+    --input-bg: #ffffff;
+    --text-color: #0a0a0a;
+    --text-muted: #71717a;
+    --text-main: #0a0a0a;
+    --text-tabular: #18181b;
+    --border-color: #e4e4e7;
+    --border-focus: #a1a1aa;
+    --th-bg: #f4f4f5;
+    --table-border: #e4e4e7;
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
 
     /* Estructura Dashboard */
     --sidebar-width: 240px;
     --sidebar-collapsed-width: 68px;
     --topbar-height: 60px;
 
-    /* Primario: Verde Bandera (#006847) e Interactivo (#008F5D) */
-    --primary-color: #006847;
-    --primary-hover: #008F5D;
-    --primary-light: #c2ebd9;
-    --primary-subtle: rgba(0, 104, 71, 0.10);
+    /* Primario / Acento Neutro: Blanco / Negro invertido */
+    --primary-color: #000000;
+    --primary-hover: #27272a;
+    --primary-text: #ffffff;
+    --primary-light: #e4e4e7;
+    --primary-subtle: rgba(0, 0, 0, 0.06);
 
-    /* Acentos / Destacados */
-    --gold-color: #008F5D;
-    --gold-hover: #006847;
-    --gold-subtle: rgba(0, 143, 93, 0.08);
-    --gold-border: rgba(0, 143, 93, 0.28);
+    /* Acentos / Señal de Rendimiento Alpine Cyber */
+    --gold-color: #22c55e;
+    --gold-hover: #16a34a;
+    --gold-subtle: rgba(34, 197, 94, 0.08);
+    --gold-border: rgba(34, 197, 94, 0.28);
 
-    --accent-color: #008F5D;
-    --accent-hover: #006847;
-    --accent-subtle: rgba(0, 143, 93, 0.08);
+    --accent-color: #22c55e;
+    --accent-hover: #16a34a;
+    --accent-subtle: rgba(34, 197, 94, 0.08);
 
-    /* Éxito / Ganancias / Ingresos */
-    --success-color: #006847;
-    --success-hover: #008F5D;
-    --success-subtle: rgba(0, 104, 71, 0.10);
+    /* Éxito / Ganancias / Ingresos (#22C55E / #A3E635) */
+    --success-color: #22c55e;
+    --success-hover: #16a34a;
+    --success-subtle: rgba(34, 197, 94, 0.10);
+    --signal-lime: #84cc16;
+    --signal-lime-subtle: rgba(132, 204, 22, 0.12);
 
     /* Egresos / Pasivos / Peligro */
-    --danger-color: #dc2626;
-    --danger-subtle: rgba(220, 38, 38, 0.10);
-    --warning-color: #d97706;
-    --warning-subtle: rgba(217, 119, 6, 0.10);
-    --warning-border: rgba(217, 119, 6, 0.30);
+    --danger-color: #ef4444;
+    --danger-subtle: rgba(239, 68, 68, 0.10);
+    --warning-color: #f59e0b;
+    --warning-subtle: rgba(245, 158, 11, 0.10);
+    --warning-border: rgba(245, 158, 11, 0.30);
 
     /* Indigo y Cyan complementarios sobrios */
-    --indigo-color: #008F5D;
-    --indigo-subtle: rgba(0, 143, 93, 0.10);
-    --indigo-border: rgba(0, 143, 93, 0.28);
-    --cyan-color: #008F5D;
-    --cyan-subtle: rgba(0, 143, 93, 0.10);
-    --cyan-border: rgba(0, 143, 93, 0.28);
+    --indigo-color: #22c55e;
+    --indigo-subtle: rgba(34, 197, 94, 0.08);
+    --indigo-border: rgba(34, 197, 94, 0.25);
+    --cyan-color: #06b6d4;
+    --cyan-subtle: rgba(6, 182, 212, 0.08);
+    --cyan-border: rgba(6, 182, 212, 0.25);
 
     /* Resplandores y Glows */
-    --emerald-glow: rgba(0, 104, 71, 0.14);
-    --rose-glow: rgba(220, 38, 38, 0.12);
-    --gold-glow: rgba(0, 143, 93, 0.14);
-    --primary-glow: rgba(0, 104, 71, 0.25);
+    --emerald-glow: rgba(34, 197, 94, 0.15);
+    --lime-glow: rgba(132, 204, 22, 0.18);
+    --rose-glow: rgba(239, 68, 68, 0.12);
+    --gold-glow: rgba(34, 197, 94, 0.15);
+    --primary-glow: rgba(0, 0, 0, 0.15);
 }
 
-/* Modo Oscuro: Exacto según roles HEX especificados por el usuario */
+/* Modo Oscuro: Monochrome Ledger & Alpine Cyber */
 [data-theme="dark"] {
-    /* Fondo Base (Negro): #0A0A0A */
-    --bg-color: #0A0A0A;
+    /* Canvas Base: #000000 (Negro absoluto OLED) */
+    --bg-color: #000000;
 
-    /* Superficie / Cards: #171717 */
-    --panel-bg: #171717;
-    --surface-subtle: #202020;
-    --th-bg: #1b1b1b;
+    /* Superficie Cards / Bento: #0D0D0E */
+    --panel-bg: #0D0D0E;
 
-    /* Texto Primario (Blanco): #FFFFFF */
+    /* Superficie Nivel 2 / Inputs / Modales: #161618 */
+    --surface-level2: #161618;
+    --surface-subtle: #161618;
+    --surface-modal: #161618;
+    --input-bg: #161618;
+    --th-bg: #161618;
+
+    /* Bordes y Divisores: #242427 (Focus / Active: #45454B) */
+    --border-color: #242427;
+    --border-focus: #45454B;
+    --table-border: #242427;
+    --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.85);
+
+    /* Texto Primario: #FFFFFF */
     --text-color: #FFFFFF;
     --text-main: #FFFFFF;
 
-    /* Texto Secundario (Muted): #A3A3A3 */
-    --text-muted: #A3A3A3;
+    /* Texto Secundario (Muted): #A1A1AA */
+    --text-muted: #A1A1AA;
 
-    /* Bordes y Divisores: #262626 */
-    --border-color: #262626;
-    --table-border: #262626;
-    --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.75);
+    /* Cifras Numéricas Tabulares: #E4E4E7 (`tabular-nums`) */
+    --text-tabular: #E4E4E7;
 
-    /* Éxito (Verde Bandera): #006847 & Hover / Interactivo: #008F5D */
-    --primary-color: #006847;
-    --primary-hover: #008F5D;
-    --primary-light: rgba(0, 104, 71, 0.25);
-    --primary-subtle: rgba(0, 104, 71, 0.15);
+    /* Botón Primario / Acento Neutro: #FFFFFF con texto #000000 */
+    --primary-color: #FFFFFF;
+    --primary-hover: #E4E4E7;
+    --primary-text: #000000;
+    --primary-light: rgba(255, 255, 255, 0.20);
+    --primary-subtle: rgba(255, 255, 255, 0.08);
 
-    --success-color: #006847;
-    --success-hover: #008F5D;
-    --success-subtle: rgba(0, 104, 71, 0.18);
+    /* Señal Primaria / Éxito / Rendimiento: #22C55E / #A3E635 */
+    --success-color: #22C55E;
+    --success-hover: #16A34A;
+    --success-subtle: rgba(34, 197, 94, 0.14);
 
-    /* Acento / Destacados / PnL */
-    --gold-color: #008F5D;
-    --gold-hover: #00a86d;
-    --gold-subtle: rgba(0, 143, 93, 0.14);
-    --gold-border: rgba(0, 143, 93, 0.35);
+    --signal-lime: #A3E635;
+    --signal-lime-subtle: rgba(163, 230, 53, 0.14);
 
-    --accent-color: #008F5D;
-    --accent-hover: #00a86d;
-    --accent-subtle: rgba(0, 143, 93, 0.14);
+    /* Acento / Rendimiento Bursátil / PnL Alpine Cyber */
+    --gold-color: #22C55E;
+    --gold-hover: #A3E635;
+    --gold-subtle: rgba(34, 197, 94, 0.12);
+    --gold-border: rgba(34, 197, 94, 0.32);
+
+    --accent-color: #22C55E;
+    --accent-hover: #A3E635;
+    --accent-subtle: rgba(34, 197, 94, 0.12);
 
     /* Egresos / Peligro */
-    --danger-color: #ef4444;
-    --danger-subtle: rgba(239, 68, 68, 0.16);
-    --warning-color: #f59e0b;
-    --warning-subtle: rgba(245, 158, 11, 0.16);
+    --danger-color: #EF4444;
+    --danger-subtle: rgba(239, 68, 68, 0.15);
+    --warning-color: #F59E0B;
+    --warning-subtle: rgba(245, 158, 11, 0.15);
     --warning-border: rgba(245, 158, 11, 0.35);
 
     /* Indigo y Cyan sobrios */
-    --indigo-color: #008F5D;
-    --indigo-subtle: rgba(0, 143, 93, 0.16);
-    --indigo-border: rgba(0, 143, 93, 0.35);
-    --cyan-color: #008F5D;
-    --cyan-subtle: rgba(0, 143, 93, 0.16);
-    --cyan-border: rgba(0, 143, 93, 0.35);
+    --indigo-color: #22C55E;
+    --indigo-subtle: rgba(34, 197, 94, 0.12);
+    --indigo-border: rgba(34, 197, 94, 0.30);
+    --cyan-color: #06B6D4;
+    --cyan-subtle: rgba(6, 182, 212, 0.12);
+    --cyan-border: rgba(6, 182, 212, 0.30);
 
-    /* Resplandores y Glows */
-    --emerald-glow: rgba(0, 104, 71, 0.22);
-    --rose-glow: rgba(239, 68, 68, 0.18);
-    --gold-glow: rgba(0, 143, 93, 0.22);
-    --primary-glow: rgba(0, 143, 93, 0.35);
+    /* Resplandores y Glows Alpine Cyber */
+    --emerald-glow: rgba(34, 197, 94, 0.22);
+    --lime-glow: rgba(163, 230, 53, 0.25);
+    --rose-glow: rgba(239, 68, 68, 0.16);
+    --gold-glow: rgba(34, 197, 94, 0.22);
+    --primary-glow: rgba(255, 255, 255, 0.18);
 }

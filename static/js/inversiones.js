@@ -230,7 +230,7 @@ export function actualizarGraficaDona(posiciones) {
                     data: dataValores,
                     backgroundColor: colores,
                     borderWidth: 2,
-                    borderColor: esOscuro ? '#0f1624' : '#ffffff'
+                    borderColor: esOscuro ? '#0D0D0E' : '#ffffff'
                 }]
             },
             options: {
