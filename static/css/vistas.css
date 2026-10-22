@@ -179,9 +179,9 @@
 }
 
 .btn-sync {
-    background-color: var(--gold-subtle);
-    color: var(--gold-color);
-    border: 1px solid var(--gold-border);
+    background-color: var(--surface-subtle);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     width: auto;
     margin: 0;
     height: 32px;
@@ -190,7 +190,7 @@
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -201,56 +201,29 @@
 }
 
 .btn-sync:hover {
-    background-color: var(--gold-color);
-    color: #ffffff;
+    background-color: var(--border-color);
+    color: var(--text-color);
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(154, 115, 41, 0.25);
 }
 
 [data-theme="dark"] .btn-sync:hover {
-    background-color: var(--gold-color);
-    color: #080c14;
+    background-color: #27272a;
+    color: #ffffff;
 }
 
 .cards-inversiones .inv-card {
+    background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .cards-inversiones .inv-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .cards-inversiones .inv-card:hover {
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
-}
-
-.cards-inversiones .inv-card.inv-card-capital {
-    border-top: 3.5px solid var(--cyan-color);
-    background: linear-gradient(180deg, var(--cyan-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--cyan-border);
-}
-.cards-inversiones .inv-card.inv-card-capital h3 {
-    color: var(--cyan-color);
-}
-
-.cards-inversiones .inv-card.inv-card-mercado {
-    border-top: 3.5px solid var(--accent-color);
-    background: linear-gradient(180deg, var(--emerald-glow) 0%, var(--panel-bg) 65%);
-    border-color: rgba(16, 185, 129, 0.35);
-}
-.cards-inversiones .inv-card.inv-card-mercado h3 {
-    color: var(--accent-color);
-}
-
-.cards-inversiones .inv-card.inv-card-pnl {
-    border-top: 3.5px solid var(--gold-color);
-    background: linear-gradient(180deg, var(--gold-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--gold-border);
-}
-.cards-inversiones .inv-card.inv-card-pnl h3 {
-    color: var(--gold-color);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .pnl-badge {
@@ -397,37 +370,25 @@
     display: inline-block;
 }
 
-/* --- TARJETA HERO: PATRIMONIO NETO CONSOLIDADO --- */
+/* --- TARJETA HERO: PATRIMONIO NETO CONSOLIDADO (MONOCHROME) --- */
 .hero-networth {
-    background: linear-gradient(135deg, rgba(15, 28, 63, 0.04) 0%, rgba(197, 160, 89, 0.08) 50%, rgba(16, 185, 129, 0.06) 100%);
-    border: 1px solid var(--gold-border);
-    border-radius: 14px;
-    padding: 16px 22px;
-    margin-bottom: 18px;
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--card-shadow);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 16px;
-    position: relative;
-    overflow: hidden;
+    gap: 14px;
 }
 
 [data-theme="dark"] .hero-networth {
-    background: linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(15, 23, 42, 0.98) 50%, rgba(30, 41, 59, 0.90) 100%);
-    border: 1px solid var(--gold-border);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(197, 160, 89, 0.35);
-}
-
-.hero-networth::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--gold-color) 0%, #10b981 50%, #06b6d4 100%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
 }
 
 .networth-header {
@@ -438,18 +399,18 @@
 
 .networth-header small {
     display: block;
-    font-size: 0.74rem;
-    font-weight: 800;
-    color: var(--gold-color);
-    letter-spacing: 1.2px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
     text-transform: uppercase;
 }
 
 .networth-header h2 {
     margin: 3px 0 0 0;
-    font-size: 2rem;
+    font-size: 1.9rem;
     font-weight: 800;
-    color: var(--success-color);
+    color: var(--text-color);
     text-align: left;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -812,6 +773,7 @@
 }
 
 .card-kpi {
+    background: var(--panel-bg);
     padding: 14px 16px;
     border-radius: 12px;
     border: 1px solid var(--border-color);
@@ -821,47 +783,11 @@
 
 .card-kpi:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .card-kpi:hover {
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
-}
-
-.cards-admin .card.card-kpi:nth-child(1) {
-    border-top: 3.5px solid var(--indigo-color);
-    background: linear-gradient(180deg, var(--indigo-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--indigo-border);
-}
-.cards-admin .card.card-kpi:nth-child(1) h3 {
-    color: var(--indigo-color);
-}
-
-.cards-admin .card.card-kpi:nth-child(2) {
-    border-top: 3.5px solid var(--accent-color);
-    background: linear-gradient(180deg, var(--emerald-glow) 0%, var(--panel-bg) 65%);
-    border-color: rgba(16, 185, 129, 0.35);
-}
-.cards-admin .card.card-kpi:nth-child(2) h3 {
-    color: var(--accent-color);
-}
-
-.cards-admin .card.card-kpi:nth-child(3) {
-    border-top: 3.5px solid var(--danger-color);
-    background: linear-gradient(180deg, var(--rose-glow) 0%, var(--panel-bg) 65%);
-    border-color: rgba(244, 63, 94, 0.35);
-}
-.cards-admin .card.card-kpi:nth-child(3) h3 {
-    color: var(--danger-color);
-}
-
-.cards-admin .card.card-kpi:nth-child(4) {
-    border-top: 3.5px solid var(--gold-color);
-    background: linear-gradient(180deg, var(--gold-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--gold-border);
-}
-.cards-admin .card.card-kpi:nth-child(4) h3 {
-    color: var(--gold-color);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .card-kpi h3 {
@@ -2669,59 +2595,11 @@
 
 .pres-kpi-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .pres-kpi-card:hover {
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
-}
-
-.pres-cards-kpi .pres-kpi-card:nth-child(1) {
-    border-top: 3.5px solid var(--accent-color);
-    background: linear-gradient(180deg, var(--emerald-glow) 0%, var(--panel-bg) 65%);
-    border-color: rgba(16, 185, 129, 0.35);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(1) .pres-kpi-title {
-    color: var(--accent-color);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(1) .pres-kpi-val {
-    color: var(--success-color);
-}
-
-.pres-cards-kpi .pres-kpi-card:nth-child(2) {
-    border-top: 3.5px solid var(--indigo-color);
-    background: linear-gradient(180deg, var(--indigo-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--indigo-border);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(2) .pres-kpi-title {
-    color: var(--indigo-color);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(2) .pres-kpi-val {
-    color: var(--indigo-color);
-}
-
-.pres-cards-kpi .pres-kpi-card:nth-child(3) {
-    border-top: 3.5px solid var(--gold-color);
-    background: linear-gradient(180deg, var(--gold-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--gold-border);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(3) .pres-kpi-title {
-    color: var(--gold-color);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(3) .pres-kpi-val {
-    color: var(--gold-color);
-}
-
-.pres-cards-kpi .pres-kpi-card:nth-child(4) {
-    border-top: 3.5px solid var(--cyan-color);
-    background: linear-gradient(180deg, var(--cyan-glow) 0%, var(--panel-bg) 65%);
-    border-color: var(--cyan-border);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(4) .pres-kpi-title {
-    color: var(--cyan-color);
-}
-.pres-cards-kpi .pres-kpi-card:nth-child(4) .pres-kpi-val {
-    color: var(--cyan-color);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .pres-kpi-header {

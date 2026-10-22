@@ -1,122 +1,94 @@
 /* ==========================================================================
-   tokens.css - Variables de color y estructura (modo claro y oscuro)
+   tokens.css - Variables de diseño minimalista Blanco y Negro (Monochrome)
    ========================================================================== */
 
-/* ========================================================== */
-/* 1. VARIABLES DE COLOR Y ESTRUCTURA (MODO CLARO Y OSCURO)   */
-/*    ESTILO: SOVEREIGN WEALTH & PRIVATE BANKING              */
-/* ========================================================== */
 :root {
-    /* Fondo Claro: Slate / Alabastro Limpio FinTech */
-    --bg-color: #f8fafc;
+    /* Fondo Claro: Blanco Nieve y Zinc Minimalista */
+    --bg-color: #fafafa;
     --panel-bg: #ffffff;
-    --text-color: #0f172a;
-    --text-muted: #64748b;
-    --text-main: #0f172a;
-    --border-color: #e2e8f0;
-    --th-bg: #f1f5f9;
-    --table-border: #e2e8f0;
-    --surface-subtle: #f8fafc;
-    --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 14px -2px rgba(15, 23, 42, 0.06);
+    --text-color: #09090b;
+    --text-muted: #71717a;
+    --text-main: #09090b;
+    --border-color: #e4e4e7;
+    --th-bg: #f4f4f5;
+    --table-border: #e4e4e7;
+    --surface-subtle: #f4f4f5;
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 
-    /* Variables de Estructura Dashboard & Marca Finora */
+    /* Estructura */
     --sidebar-width: 240px;
     --sidebar-collapsed-width: 68px;
     --topbar-height: 60px;
-    --primary-color: #0f1c3f;
-    --primary-hover: #1a2d5e;
-    --primary-light: #ece8dd;
-    --primary-subtle: rgba(15, 28, 63, 0.06);
 
-    /* Acentos de Riqueza y Metales Preciosos (Satin Gold) */
-    --gold-color: #b48328;
-    --gold-hover: #9a6d1e;
-    --gold-subtle: rgba(180, 131, 40, 0.12);
-    --gold-border: rgba(180, 131, 40, 0.35);
+    /* Primario: Negro Sólido Minimalista */
+    --primary-color: #09090b;
+    --primary-hover: #27272a;
+    --primary-light: #f4f4f5;
+    --primary-subtle: rgba(0, 0, 0, 0.05);
 
-    /* Rendimiento de Activos / Flujo Positivo (Esmeralda Soberana) */
-    --accent-color: #0d9488;
-    --accent-hover: #0f766e;
-    --accent-subtle: rgba(13, 148, 136, 0.12);
+    /* Acentos Neutrales */
+    --neutral-border: #e4e4e7;
+    --neutral-subtle: #f4f4f5;
 
-    /* Éxito / Ingresos / Ganancias (Contraste alto >= 4.5:1 en fondo claro) */
+    /* Colores Funcionales: Exclusivos para Movimientos y Usuarios */
     --success-color: #16a34a;
-    --success-subtle: rgba(22, 163, 74, 0.12);
-
-    /* Egresos / Pasivos (Vino / Borgoña Sobrio / Coral) */
-    --danger-color: #e11d48;
-    --danger-subtle: rgba(225, 29, 72, 0.12);
+    --success-subtle: rgba(22, 163, 74, 0.10);
+    --danger-color: #dc2626;
+    --danger-subtle: rgba(220, 38, 38, 0.10);
     --warning-color: #d97706;
-    --warning-subtle: rgba(217, 119, 6, 0.12);
-    --warning-border: rgba(217, 119, 6, 0.35);
+    --warning-subtle: rgba(217, 119, 6, 0.10);
 
-    /* Indigo / Violeta para Gastos Fijos & MSI */
+    /* Badges de Movimientos y Tarjetas de Presupuesto */
     --indigo-color: #4f46e5;
     --indigo-subtle: rgba(79, 70, 229, 0.12);
-    --indigo-border: rgba(79, 70, 229, 0.35);
-
-    /* Cyan para Inversiones / Rendimiento */
+    --gold-color: #b48328;
+    --gold-subtle: rgba(180, 131, 40, 0.12);
+    --gold-border: rgba(180, 131, 40, 0.35);
+    --accent-color: #16a34a;
+    --accent-subtle: rgba(22, 163, 74, 0.12);
     --cyan-color: #0891b2;
     --cyan-subtle: rgba(8, 145, 178, 0.12);
-    --cyan-border: rgba(8, 145, 178, 0.35);
-
-    /* Resplandores y Glows Semánticos */
-    --emerald-glow: rgba(22, 163, 74, 0.14);
-    --rose-glow: rgba(225, 29, 72, 0.14);
-    --gold-glow: rgba(180, 131, 40, 0.16);
-    --indigo-glow: rgba(79, 70, 229, 0.14);
-    --cyan-glow: rgba(8, 145, 178, 0.14);
 }
 
-/* Variables para el Modo Oscuro: Obsidian Vault & Satin Gold */
+/* Modo Oscuro: Negro Puro / Zinc Profundo */
 [data-theme="dark"] {
-    --bg-color: #0b0f19;
-    --panel-bg: #111827;
-    --text-color: #f8fafc;
-    --text-muted: #94a3b8;
-    --text-main: #f8fafc;
-    --border-color: #1e293b;
-    --th-bg: #162032;
-    --table-border: #1e293b;
-    --surface-subtle: rgba(255, 255, 255, 0.04);
-    --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --bg-color: #09090b;
+    --panel-bg: #121215;
+    --text-color: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-main: #fafafa;
+    --border-color: #27272a;
+    --th-bg: #18181b;
+    --table-border: #27272a;
+    --surface-subtle: #18181b;
+    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 
-    /* Identidad de Patrimonio: Oro Champaña Satinado y Azul Bóveda */
-    --primary-color: #c5a059;
-    --primary-hover: #d8b46d;
-    --primary-light: rgba(197, 160, 89, 0.18);
-    --primary-subtle: rgba(197, 160, 89, 0.12);
+    /* Primario: Blanco Puro Minimalista */
+    --primary-color: #ffffff;
+    --primary-hover: #e4e4e7;
+    --primary-light: rgba(255, 255, 255, 0.1);
+    --primary-subtle: rgba(255, 255, 255, 0.08);
 
-    --gold-color: #c5a059;
-    --gold-hover: #d8b46d;
-    --gold-subtle: rgba(197, 160, 89, 0.16);
-    --gold-border: rgba(197, 160, 89, 0.38);
+    /* Acentos Neutrales */
+    --neutral-border: #27272a;
+    --neutral-subtle: rgba(255, 255, 255, 0.05);
 
-    --accent-color: #10b981;
-    --accent-hover: #34d399;
-    --accent-subtle: rgba(16, 185, 129, 0.18);
+    /* Colores Funcionales: Exclusivos para Movimientos y Usuarios */
+    --success-color: #22c55e;
+    --success-subtle: rgba(34, 197, 94, 0.14);
+    --danger-color: #ef4444;
+    --danger-subtle: rgba(239, 68, 68, 0.14);
+    --warning-color: #f59e0b;
+    --warning-subtle: rgba(245, 158, 11, 0.14);
 
-    --success-color: #34d399;
-    --success-subtle: rgba(52, 211, 153, 0.18);
-
-    --danger-color: #fb7185;
-    --danger-subtle: rgba(251, 113, 133, 0.18);
-    --warning-color: #fbbf24;
-    --warning-subtle: rgba(245, 158, 11, 0.18);
-    --warning-border: rgba(245, 158, 11, 0.38);
-
+    /* Badges de Movimientos y Tarjetas de Presupuesto */
     --indigo-color: #818cf8;
     --indigo-subtle: rgba(129, 140, 248, 0.18);
-    --indigo-border: rgba(129, 140, 248, 0.38);
-
-    --cyan-color: #22d3ee;
-    --cyan-subtle: rgba(34, 211, 238, 0.18);
-    --cyan-border: rgba(34, 211, 238, 0.38);
-
-    /* Resplandores y Glows Semánticos */
-    --emerald-glow: rgba(16, 185, 129, 0.22);
-    --rose-glow: rgba(244, 63, 94, 0.22);
-    --gold-glow: rgba(197, 160, 89, 0.26);
-    --indigo-glow: rgba(129, 140, 248, 0.22);
-    --cyan-glow: rgba(34, 211, 238, 0.22);
+    --gold-color: #fbbf24;
+    --gold-subtle: rgba(251, 191, 36, 0.18);
+    --gold-border: rgba(251, 191, 36, 0.35);
+    --accent-color: #22c55e;
+    --accent-subtle: rgba(34, 197, 94, 0.14);
+    --cyan-color: #38bdf8;
+    --cyan-subtle: rgba(56, 189, 248, 0.18);
 }

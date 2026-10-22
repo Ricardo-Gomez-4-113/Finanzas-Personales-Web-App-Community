@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261022_18">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261022_18">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261022_18">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261022_18">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261022_19">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261022_19">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261022_19">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261022_19">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -363,7 +363,7 @@
                     <h3>Gastos del Mes</h3>
                     <p id="lbl-dash-mes-gastos">$0.00</p>
                 </div>
-                <div class="card card-rendimiento">
+                <div class="card balance">
                     <h3>Rendimiento Inversiones</h3>
                     <p id="lbl-dash-pnl">$0.00</p>
                 </div>
@@ -430,7 +430,7 @@
                     <p id="lbl-rec-gastos-normales">$0.00</p>
                     <small class="card-subtext">Variables del día a día</small>
                 </div>
-                <div class="card card-fijos-msi">
+                <div class="card gastos">
                     <h3>Gastos Fijos + MSI Mensual</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
                     <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
@@ -848,15 +848,15 @@
                 </div>
 
                 <div class="cards cards-inversiones">
-                    <div class="card inv-card inv-card-capital">
+                    <div class="card inv-card">
                         <h3>Capital Invertido (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-invertido">$0.00</p>
                     </div>
-                    <div class="card inv-card inv-card-mercado">
+                    <div class="card inv-card">
                         <h3>Valor de Mercado (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-valor">$0.00</p>
                     </div>
-                    <div class="card inv-card inv-card-pnl">
+                    <div class="card inv-card">
                         <h3>Ganancia / Pérdida (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-pnl">$0.00 <span id="lbl-inv-pnl-pct" class="pnl-badge">(0.00%)</span></p>
                     </div>
@@ -1962,7 +1962,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261022_18"></script>
+    <script type="module" src="/static/js/main.js?v=20261022_19"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
