@@ -9,8 +9,10 @@ Reúne los cálculos que antes estaban duplicados en main.py y export_service.py
 
 import calendar
 from datetime import date, datetime, timedelta
+import json
+import re
 import sqlite3
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Union
 
 
 def ahora_local() -> datetime:
@@ -278,6 +280,407 @@ def calcular_distribucion_subperiodos(monto_total: float, subperiodos: list) -> 
             "monto": monto_sp
         })
     return res
+
+
+def calcular_distribucion_tarjeta_asimetrica(
+    monto_total: float,
+    subperiodos_config: list,
+    distribucion_custom_json: Optional[Union[str, list]] = None
+) -> list:
+    """Calcula la distribución de una tarjeta respetando asignaciones asimétricas si existen."""
+    import json
+    if distribucion_custom_json:
+        try:
+            custom = json.loads(distribucion_custom_json) if isinstance(distribucion_custom_json, str) else [dict(x) for x in distribucion_custom_json]
+            if isinstance(custom, list) and len(custom) > 0:
+                total = float(monto_total)
+                suma_montos = sum(float(sp.get("monto", 0.0)) for sp in custom)
+                if abs(suma_montos - total) > 0.01:
+                    for sp in custom:
+                        if "porcentaje" in sp and sp["porcentaje"] is not None:
+                            sp["monto"] = round(total * (float(sp["porcentaje"]) / 100.0), 2)
+                        elif suma_montos > 0:
+                            ratio = float(sp.get("monto", 0.0)) / suma_montos
+                            sp["monto"] = round(total * ratio, 2)
+                            sp["porcentaje"] = round(ratio * 100.0, 1)
+                return custom
+        except Exception:
+            pass
+    return calcular_distribucion_subperiodos(monto_total, subperiodos_config)
+
+
+def validar_sustentabilidad_gasto_fijo(
+    cursor: sqlite3.Cursor,
+    tipo: str,
+    monto: float,
+    frecuencia: str,
+    total_cuotas: Optional[int] = None,
+    recurrente_id: Optional[int] = None
+) -> None:
+    """
+    Regla 3.2: Sustentabilidad Exclusiva de Gastos Fijos vs. Remanente Temporal.
+    1. Precondición: Prohibido registrar o activar gastos fijos sin al menos un ingreso fijo activo.
+    2. Independencia de remanente: Un gasto fijo debe ser autosustentable con los ingresos fijos recurrentes.
+    """
+    if tipo == 'ingreso':
+        return
+
+    # 1. Precondición de Ingreso Fijo
+    ingreso_fijo_count = cursor.execute(
+        "SELECT COUNT(*) FROM recurrentes WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL"
+    ).fetchone()[0]
+    if ingreso_fijo_count < 1:
+        raise ValueError(
+            "No es posible registrar un gasto fijo sin contar con al menos un ingreso fijo recurrente activo (ej. sueldo, pensión o nómina)."
+        )
+
+    # 2. Capacidad Fija = SUM(Ingresos Fijos) - [SUM(Gastos Fijos Previos) + SUM(Cuotas MSI)]
+    recurrentes_activos = cursor.execute(
+        "SELECT id, tipo, monto, frecuencia, total_cuotas, cuotas_generadas FROM recurrentes WHERE activo = 1"
+    ).fetchall()
+
+    ingresos_fijos_total = 0.0
+    compromisos_previos_total = 0.0
+
+    for r in recurrentes_activos:
+        if recurrente_id is not None and r["id"] == recurrente_id:
+            continue
+        m = mensualizar(float(r["monto"]), r["frecuencia"])
+        if r["tipo"] == 'ingreso' and r["total_cuotas"] is None:
+            ingresos_fijos_total += m
+        elif r["tipo"] == 'gasto':
+            if r["total_cuotas"] is not None:
+                if int(r["cuotas_generadas"]) < int(r["total_cuotas"]):
+                    compromisos_previos_total += m
+            else:
+                compromisos_previos_total += m
+
+    capacidad_fija = ingresos_fijos_total - compromisos_previos_total
+    nuevo_compromiso_mensual = mensualizar(float(monto), frecuencia)
+
+    # Tolerancia numérica por redondeo (0.01)
+    if nuevo_compromiso_mensual - capacidad_fija > 0.01:
+        raise ValueError(
+            "No es posible registrar este compromiso como Gasto Fijo. Aunque cuentas con saldo disponible gracias al remanente de periodos pasados, tus ingresos fijos recurrentes no son suficientes para cubrirlo a largo plazo. Regístralo como un gasto normal puntual o incrementa tus ingresos fijos."
+        )
+
+
+def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
+    """Calcula la suma de fondos retenidos en apartados activos (monto_actual)."""
+    try:
+        row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0.0) FROM apartados").fetchone()
+        return float(row[0]) if row and row[0] is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def validar_saldo_disponible_fecha(
+    cursor: sqlite3.Cursor,
+    fecha: str,
+    monto: float,
+    tipo: str = 'gasto',
+    transaccion_id: Optional[int] = None
+) -> None:
+    """
+    Regla 3.3: Restricción Temporal de Fondos (No Gastar Antes de Cobrar / Sin Sobregiro).
+    Invariante: Saldo Disponible Operativo(T) >= 0 para toda fecha T.
+    Saldo Disponible Operativo = Saldo en Cuenta (externo) - sum(Apartados Activos).
+    """
+    if tipo == 'ingreso':
+        if transaccion_id is not None:
+            validar_edicion_transaccion(cursor, transaccion_id, fecha, monto, tipo)
+        return
+
+    # Saldo acumulado en cuenta a la fecha solicitada (solo transacciones externas: apartado_id IS NULL)
+    query_base = """
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0) AS saldo
+        FROM transacciones
+        WHERE fecha <= ? AND apartado_id IS NULL
+    """
+    params = [fecha]
+    if transaccion_id is not None:
+        query_base += " AND id != ?"
+        params.append(transaccion_id)
+
+    saldo_en_cuenta = float(cursor.execute(query_base, tuple(params)).fetchone()[0])
+    total_apartados = obtener_total_apartados(cursor)
+    saldo_operativo = saldo_en_cuenta - total_apartados
+
+    if saldo_operativo - monto < -0.001:
+        deficit = abs(saldo_operativo - monto)
+        if total_apartados > 0 and (saldo_en_cuenta - monto >= -0.001):
+            raise ValueError(
+                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} con fecha {fecha}. "
+                f"El saldo disponible operativo es de ${saldo_operativo:,.2f} (saldo en cuenta ${saldo_en_cuenta:,.2f} "
+                f"menos ${total_apartados:,.2f} retenidos en apartados). Este gasto comprometería fondos guardados en apartados."
+            )
+        else:
+            raise ValueError(
+                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} con fecha {fecha}. "
+                f"El saldo disponible a esa fecha sería de -${deficit:,.2f}. "
+                f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo transferido de periodos pasados."
+            )
+
+    # Verificar fechas posteriores para asegurar que no se produzca sobregiro acumulativo
+    query_post = """
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        FROM transacciones
+        WHERE fecha > ? AND apartado_id IS NULL
+    """
+    params_post = [fecha]
+    if transaccion_id is not None:
+        query_post += " AND id != ?"
+        params_post.append(transaccion_id)
+    query_post += " GROUP BY fecha ORDER BY fecha ASC"
+
+    filas_post = cursor.execute(query_post, tuple(params_post)).fetchall()
+    saldo_corriente = saldo_operativo - monto
+    for fp in filas_post:
+        saldo_corriente += float(fp["delta"])
+        if saldo_corriente < -0.001:
+            deficit_post = abs(saldo_corriente)
+            if total_apartados > 0:
+                raise ValueError(
+                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} "
+                    f"en fecha posterior ({fp['fecha']}) comprometiendo fondos retenidos en apartados."
+                )
+            else:
+                raise ValueError(
+                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} en fecha posterior ({fp['fecha']})."
+                )
+
+
+def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int) -> None:
+    """
+    Protección Retroactiva de Ingresos:
+    Invariante: un ingreso histórico no puede eliminarse si respalda gastos ejecutados posteriormente.
+    Simula la deducción del ingreso para toda fecha t >= T_ingreso.
+    Si provoca saldo operativo negativo en cualquier fecha t >= T_ingreso, lanza ValueError.
+    """
+    trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (transaccion_id,)).fetchone()
+    if not trans:
+        return
+    if trans["tipo"] != 'ingreso':
+        return
+
+    if "apartado_id" in trans.keys() and trans["apartado_id"] is not None:
+        raise ValueError("No puedes eliminar un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados.")
+
+    t_ingreso = trans["fecha"]
+    monto_ingreso = float(trans["monto"])
+    total_apartados = obtener_total_apartados(cursor)
+
+    row_prev = cursor.execute("""
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        FROM transacciones
+        WHERE fecha < ? AND apartado_id IS NULL AND id != ?
+    """, (t_ingreso, transaccion_id)).fetchone()
+    saldo_corriente = float(row_prev[0]) - total_apartados
+
+    filas = cursor.execute("""
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        FROM transacciones
+        WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
+        GROUP BY fecha
+        ORDER BY fecha ASC
+    """, (t_ingreso, transaccion_id)).fetchall()
+
+    deltas_por_fecha = {row["fecha"]: float(row["delta"]) for row in filas}
+    if t_ingreso not in deltas_por_fecha:
+        deltas_por_fecha[t_ingreso] = 0.0
+
+    for f in sorted(deltas_por_fecha.keys()):
+        saldo_corriente += deltas_por_fecha[f]
+        if saldo_corriente < -0.001:
+            deficit = abs(saldo_corriente)
+            raise ValueError(
+                f"No es posible eliminar este ingreso de ${monto_ingreso:,.2f} con fecha {t_ingreso}: "
+                f"dicho ingreso respalda gastos ya ejecutados. Provocaría un saldo negativo de -${deficit:,.2f} "
+                f"en fecha {f}."
+            )
+
+
+def validar_edicion_transaccion(
+    cursor: sqlite3.Cursor,
+    transaccion_id: int,
+    nueva_fecha: str,
+    nuevo_monto: float,
+    nuevo_tipo: str
+) -> None:
+    """
+    Protección Retroactiva de Ingresos:
+    Invariante: si se reduce el monto de un ingreso, se posterga su fecha o se cambia a gasto,
+    simula la cronología resultante. Si genera déficit en cualquier fecha t, lanza ValueError.
+    """
+    trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (transaccion_id,)).fetchone()
+    if not trans:
+        return
+
+    if "apartado_id" in trans.keys() and trans["apartado_id"] is not None:
+        raise ValueError("No puedes modificar un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados.")
+
+    tipo_orig = trans["tipo"]
+    fecha_orig = trans["fecha"]
+
+    if tipo_orig != 'ingreso' and nuevo_tipo != 'ingreso':
+        return
+
+    total_apartados = obtener_total_apartados(cursor)
+    t_min = min(fecha_orig, nueva_fecha)
+
+    row_prev = cursor.execute("""
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        FROM transacciones
+        WHERE fecha < ? AND apartado_id IS NULL AND id != ?
+    """, (t_min, transaccion_id)).fetchone()
+    saldo_corriente = float(row_prev[0]) - total_apartados
+
+    filas = cursor.execute("""
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        FROM transacciones
+        WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
+        GROUP BY fecha
+        ORDER BY fecha ASC
+    """, (t_min, transaccion_id)).fetchall()
+
+    deltas_por_fecha = {row["fecha"]: float(row["delta"]) for row in filas}
+
+    delta_nuevo = nuevo_monto if nuevo_tipo == 'ingreso' else -nuevo_monto
+    deltas_por_fecha[nueva_fecha] = deltas_por_fecha.get(nueva_fecha, 0.0) + delta_nuevo
+    if fecha_orig not in deltas_por_fecha:
+        deltas_por_fecha[fecha_orig] = 0.0
+
+    for f in sorted(deltas_por_fecha.keys()):
+        saldo_corriente += deltas_por_fecha[f]
+        if saldo_corriente < -0.001:
+            deficit = abs(saldo_corriente)
+            raise ValueError(
+                f"No es posible modificar este ingreso: dicho ingreso respalda gastos ya ejecutados. "
+                f"Provocaría un saldo negativo de -${deficit:,.2f} en fecha {f}."
+            )
+
+
+def _safe_date(year: int, month: int, day: int) -> date:
+    max_day = calendar.monthrange(year, month)[1]
+    return date(year, month, min(day, max_day))
+
+
+def obtener_ventana_corte_fecha(
+    cursor: sqlite3.Cursor,
+    fecha_str: str,
+    transaccion_id: Optional[int] = None
+) -> dict:
+    """
+    Regla 3.1: Esquema de Períodos de Pago Personalizados & Delimitación de Ventana Activa.
+    Calcula los cortes de pago [D1, D2 - 1] para la fecha dada y determina la capacidad de la ventana.
+    """
+    f_target = date.fromisoformat(fecha_str)
+
+    # Obtener ingresos fijos activos para deducir fechas de corte
+    ingresos = cursor.execute("""
+        SELECT dia, monto, frecuencia FROM recurrentes
+        WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
+        ORDER BY dia ASC
+    """).fetchall()
+
+    if not ingresos:
+        d_inicio = date(f_target.year, f_target.month, 1)
+        max_d = calendar.monthrange(f_target.year, f_target.month)[1]
+        d_fin = date(f_target.year, f_target.month, max_d)
+        ingreso_ventana = 0.0
+    else:
+        dias_corte = set()
+        for ing in ingresos:
+            d = int(ing["dia"]) if ing["dia"] else 1
+            dias_corte.add(d)
+            if ing["frecuencia"] == 'quincenal':
+                dia2 = (d + 15) if d <= 15 else (d - 15)
+                dias_corte.add(dia2)
+
+        dias_ordenados = sorted(list(dias_corte))
+
+        # Encontrar corte correspondiente para f_target
+        cortes_previos = [d for d in dias_ordenados if _safe_date(f_target.year, f_target.month, d) <= f_target]
+        if cortes_previos:
+            d1_dia = cortes_previos[-1]
+            idx = dias_ordenados.index(d1_dia)
+            d_inicio = _safe_date(f_target.year, f_target.month, d1_dia)
+            if idx + 1 < len(dias_ordenados):
+                d2_dia = dias_ordenados[idx + 1]
+                d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+            else:
+                d2_dia = dias_ordenados[0]
+                m_next = 1 if f_target.month == 12 else f_target.month + 1
+                y_next = f_target.year + 1 if f_target.month == 12 else f_target.year
+                d_next = _safe_date(y_next, m_next, d2_dia)
+            d_fin = d_next - timedelta(days=1)
+        else:
+            d1_dia = dias_ordenados[-1]
+            d2_dia = dias_ordenados[0]
+            m_prev = 12 if f_target.month == 1 else f_target.month - 1
+            y_prev = f_target.year - 1 if f_target.month == 1 else f_target.year
+            d_inicio = _safe_date(y_prev, m_prev, d1_dia)
+            d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+            d_fin = d_next - timedelta(days=1)
+
+        ingreso_ventana = 0.0
+        for ing in ingresos:
+            m = float(ing["monto"])
+            if ing["frecuencia"] == 'quincenal':
+                ingreso_ventana += m
+            elif ing["frecuencia"] == 'semanal':
+                ingreso_ventana += m * 2
+            else:
+                ingreso_ventana += m / max(1, len(dias_ordenados))
+
+    query_rem = """
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        FROM transacciones WHERE fecha < ?
+    """
+    params_rem = [d_inicio.isoformat()]
+    if transaccion_id is not None:
+        query_rem += " AND id != ?"
+        params_rem.append(transaccion_id)
+    remanente = cursor.execute(query_rem, tuple(params_rem)).fetchone()[0]
+
+    remanente_disponible = max(0.0, float(remanente))
+    capacidad_total = round(ingreso_ventana + remanente_disponible, 2)
+
+    query_cargos = """
+        SELECT COALESCE(SUM(monto), 0.0) FROM transacciones
+        WHERE tipo = 'gasto' AND fecha BETWEEN ? AND ?
+    """
+    params_cargos = [d_inicio.isoformat(), d_fin.isoformat()]
+    if transaccion_id is not None:
+        query_cargos += " AND id != ?"
+        params_cargos.append(transaccion_id)
+    cargos = cursor.execute(query_cargos, tuple(params_cargos)).fetchone()[0]
+
+    return {
+        "inicio": d_inicio.isoformat(),
+        "fin": d_fin.isoformat(),
+        "ingreso_ventana": round(ingreso_ventana, 2),
+        "remanente_disponible": round(remanente_disponible, 2),
+        "capacidad_total": capacidad_total,
+        "cargos_actuales": round(float(cargos), 2)
+    }
+
+
+def validar_limite_cargos_ventana(
+    cursor: sqlite3.Cursor,
+    fecha_str: str,
+    monto: float,
+    transaccion_id: Optional[int] = None
+) -> None:
+    """Valida que la suma de cargos en la ventana activa no exceda la capacidad asignada."""
+    v = obtener_ventana_corte_fecha(cursor, fecha_str, transaccion_id=transaccion_id)
+    if v["capacidad_total"] > 0:
+        if v["cargos_actuales"] + monto - v["capacidad_total"] > 0.01:
+            total_proyectado = v["cargos_actuales"] + monto
+            raise ValueError(
+                f"El presupuesto del período ({v['inicio']} al {v['fin']}) ha sido superado. "
+                f"La capacidad total asignada es de ${v['capacidad_total']:,.2f} y los compromisos acumulados alcanzarían ${total_proyectado:,.2f}."
+            )
 
 
 def sugerir_icono_color(descripcion: str, categoria: str = "") -> tuple:
@@ -620,17 +1023,57 @@ def exportar_presupuesto_a_fijos_core(
         ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
         apartado_id = ap["id"] if ap else None
 
-        proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+        # Determinar día y próxima fecha considerando dia_pago o días de sub-períodos
+        dia_asignado = None
+        try:
+            if "dia_pago" in t.keys() and t["dia_pago"] is not None:
+                dia_asignado = int(t["dia_pago"])
+        except Exception:
+            pass
 
-        # Buscar si ya existe un recurrente con esa descripción
-        existente = cursor.execute(
-            "SELECT id, total_cuotas FROM recurrentes WHERE LOWER(TRIM(descripcion)) = LOWER(?) AND tipo = 'gasto' LIMIT 1",
-            (nombre,)
-        ).fetchone()
+        if dia_asignado is None and "distribucion_subperiodos" in t.keys() and t["distribucion_subperiodos"]:
+            try:
+                sub_list = json.loads(t["distribucion_subperiodos"]) if isinstance(t["distribucion_subperiodos"], str) else t["distribucion_subperiodos"]
+                if isinstance(sub_list, list):
+                    for sp in sub_list:
+                        if sp.get("dia") is not None:
+                            dia_asignado = int(sp["dia"])
+                            break
+            except Exception:
+                pass
+
+        if dia_asignado is not None:
+            dia_fijo = dia_asignado
+            if frecuencia == 'mensual':
+                max_d_mes = ultimo_dia_mes(hoy.year, hoy.month)
+                if hoy.day <= dia_asignado:
+                    proxima = date(hoy.year, hoy.month, min(dia_asignado, max_d_mes))
+                else:
+                    anio, mes = (hoy.year + 1, 1) if hoy.month == 12 else (hoy.year, hoy.month + 1)
+                    proxima = date(anio, mes, min(dia_asignado, ultimo_dia_mes(anio, mes)))
+            else:
+                proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+        else:
+            proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+            dia_fijo = proxima.day
+
+        # Buscar si ya existe un recurrente con esa descripción (normalizando etiquetas como (MSI))
+        nombre_limpio = re.sub(r'\s*\((?:msi|meses sin intereses)\)', '', nombre, flags=re.IGNORECASE).strip()
+        existente = cursor.execute("""
+            SELECT id, total_cuotas FROM recurrentes 
+            WHERE tipo = 'gasto' AND (
+                LOWER(TRIM(descripcion)) = LOWER(?)
+                OR LOWER(TRIM(descripcion)) = LOWER(?)
+                OR LOWER(TRIM(REPLACE(REPLACE(descripcion, ' (MSI)', ''), ' (msi)', ''))) = LOWER(?)
+            )
+            LIMIT 1
+        """, (nombre, nombre_limpio, nombre_limpio)).fetchone()
 
         if existente:
             # Si es una compra a meses activa, preservamos su naturaleza MSI
             if existente["total_cuotas"] is not None:
+                if actualizar_existentes and dia_asignado is not None:
+                    cursor.execute("UPDATE recurrentes SET dia = ? WHERE id = ?", (dia_fijo, existente["id"]))
                 detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "ignorado_msi"})
                 continue
 
@@ -639,14 +1082,14 @@ def exportar_presupuesto_a_fijos_core(
                     UPDATE recurrentes
                     SET monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?, categoria_id = ?, apartado_id = COALESCE(?, apartado_id), activo = 1
                     WHERE id = ?
-                """, (round(monto, 2), frecuencia, proxima.day, proxima.isoformat(), cat_id, apartado_id, existente["id"]))
+                """, (round(monto, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_id, apartado_id, existente["id"]))
                 actualizados += 1
                 detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "actualizado"})
         else:
             cursor.execute("""
                 INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo)
                 VALUES (?, 'gasto', ?, ?, ?, ?, ?, ?, 1)
-            """, (nombre, round(monto, 2), frecuencia, proxima.day, proxima.isoformat(), cat_id, apartado_id))
+            """, (nombre, round(monto, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_id, apartado_id))
             creados += 1
             detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "creado"})
 

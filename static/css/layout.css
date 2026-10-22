@@ -177,14 +177,16 @@
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
     color: #ffffff;
     border: 1px solid rgba(197, 160, 89, 0.35);
+    border-left: 3.5px solid var(--gold-color);
     box-shadow: 0 4px 14px rgba(15, 28, 63, 0.25);
 }
 
 [data-theme="dark"] .sidebar-nav .tab-btn.active {
-    background: linear-gradient(135deg, rgba(197, 160, 89, 0.16) 0%, rgba(197, 160, 89, 0.06) 100%);
+    background: linear-gradient(90deg, rgba(197, 160, 89, 0.18) 0%, rgba(197, 160, 89, 0.04) 100%);
     color: var(--gold-color);
     border: 1px solid var(--gold-border);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    border-left: 3.5px solid var(--gold-color);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 3px 0 8px rgba(197, 160, 89, 0.2);
 }
 
 .sidebar-nav .tab-btn .nav-icon {
@@ -235,7 +237,13 @@
     border-radius: 50%;
     background-color: #10b981;
     flex-shrink: 0;
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+    animation: status-pulse 2s infinite ease-in-out;
+}
+
+@keyframes status-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.92); }
 }
 
 /* Estado Colapsado de Sidebar (Escritorio) */

@@ -7,7 +7,16 @@ from typing import Literal, Optional
 import re
 import sqlite3
 
-from finanzas_core import ahora_local, calcular_resumen, convertir, materializar_recurrentes
+from finanzas_core import (
+    ahora_local,
+    calcular_resumen,
+    convertir,
+    materializar_recurrentes,
+    validar_saldo_disponible_fecha,
+    validar_eliminacion_transaccion,
+    validar_edicion_transaccion,
+    validar_limite_cargos_ventana,
+)
 from mercado import obtener_tasas_cambio
 from security import (
     get_tenant_db
@@ -58,6 +67,14 @@ class TransaccionUpdate(BaseModel):
 def crear_transaccion(t: Transaccion, conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     validar_categoria(cursor, t.categoria_id)
+
+    if t.tipo == 'gasto':
+        try:
+            validar_saldo_disponible_fecha(cursor, t.fecha, t.monto, t.tipo)
+            validar_limite_cargos_ventana(cursor, t.fecha, t.monto)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
     cursor.execute(
         """
         INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion) 
@@ -74,6 +91,18 @@ def eliminar_transaccion(id_transaccion: int, conn: sqlite3.Connection = Depends
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (id_transaccion,)).fetchone()
     if not trans:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
+
+    if trans["apartado_id"] is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes eliminar un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados."
+        )
+
+    if trans["tipo"] == 'ingreso':
+        try:
+            validar_eliminacion_transaccion(cursor, id_transaccion)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
     if trans["recurrente_id"] is not None:
@@ -96,10 +125,12 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
     if trans["apartado_id"] is not None:
-        if (t.monto is not None and round(float(t.monto), 2) != round(float(trans["monto"]), 2)) or (t.tipo is not None and t.tipo != trans["tipo"]):
+        if (t.monto is not None and round(float(t.monto), 2) != round(float(trans["monto"]), 2)) or \
+           (t.tipo is not None and t.tipo != trans["tipo"]) or \
+           (t.fecha is not None and t.fecha != trans["fecha"]):
             raise HTTPException(
                 status_code=400,
-                detail="No puedes alterar el monto ni el tipo de un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados."
+                detail="No puedes alterar la fecha, el monto ni el tipo de un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados."
             )
     if es_cuota_msi(cursor, trans["recurrente_id"]):
         raise HTTPException(status_code=400, detail="Esta cuota pertenece a una compra a meses; adminístrala en Fijos y MSI.")
@@ -110,6 +141,17 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
     nuevo_tipo = t.tipo if t.tipo is not None else trans["tipo"]
     nueva_desc = t.descripcion if t.descripcion is not None else trans["descripcion"]
     nueva_cat = t.categoria_id if t.categoria_id is not None else trans["categoria_id"]
+
+    try:
+        if trans["apartado_id"] is None:
+            if trans["tipo"] == 'ingreso' or nuevo_tipo == 'ingreso':
+                validar_edicion_transaccion(cursor, id_transaccion, nueva_fecha, nuevo_monto, nuevo_tipo)
+
+            if nuevo_tipo == 'gasto':
+                validar_saldo_disponible_fecha(cursor, nueva_fecha, nuevo_monto, nuevo_tipo, transaccion_id=id_transaccion)
+                validar_limite_cargos_ventana(cursor, nueva_fecha, nuevo_monto, transaccion_id=id_transaccion)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     cursor.execute(
         """

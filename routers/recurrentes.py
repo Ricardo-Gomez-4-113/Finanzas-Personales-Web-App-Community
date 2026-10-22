@@ -14,6 +14,7 @@ from finanzas_core import (
     mensualizar,
     primera_fecha_quincenal,
     proxima_fecha_vigente,
+    validar_sustentabilidad_gasto_fijo,
 )
 from routers.movimientos import validar_categoria
 from security import get_tenant_db
@@ -113,6 +114,14 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
             status_code=400,
             detail="Solo los gastos recurrentes pueden vincularse a un sobre o meta de ahorro."
         )
+
+    # Validar sustentabilidad financiera exclusiva de gastos fijos y compras a meses
+    if tipo == 'gasto':
+        try:
+            validar_sustentabilidad_gasto_fijo(cursor, tipo, monto, frecuencia, total_cuotas)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
     proxima = primera_fecha_quincenal(fecha) if frecuencia == 'quincenal' else fecha
     cursor.execute(
         """
@@ -145,6 +154,53 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
     if req.monto is not None and es_msi:
         raise HTTPException(status_code=400, detail="Una compra a meses no admite cambiar el monto por cuota.")
     validar_categoria(cursor, req.categoria_id)
+
+    if fila["tipo"] == 'gasto':
+        nuevo_monto = req.monto if req.monto is not None else float(fila["monto"])
+        nueva_frec = req.frecuencia if req.frecuencia is not None else fila["frecuencia"]
+        activo_efectivo = req.activo if req.activo is not None else bool(fila["activo"])
+        if activo_efectivo:
+            try:
+                validar_sustentabilidad_gasto_fijo(
+                    cursor, 'gasto', nuevo_monto, nueva_frec, fila["total_cuotas"], recurrente_id=recurrente_id
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+
+    elif fila["tipo"] == 'ingreso':
+        nuevo_monto = req.monto if req.monto is not None else float(fila["monto"])
+        nueva_frec = req.frecuencia if req.frecuencia is not None else fila["frecuencia"]
+        activo_efectivo = req.activo if req.activo is not None else bool(fila["activo"])
+        gastos_fijos_activos = cursor.execute("SELECT COUNT(*) FROM recurrentes WHERE tipo = 'gasto' AND activo = 1").fetchone()[0]
+        if gastos_fijos_activos > 0:
+            otros_ingresos = cursor.execute(
+                "SELECT monto, frecuencia FROM recurrentes WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL AND id != ?",
+                (recurrente_id,)
+            ).fetchall()
+            if not activo_efectivo and len(otros_ingresos) == 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No es posible pausar este ingreso fijo porque existen gastos fijos activos que requieren de un ingreso recurrente de respaldo."
+                )
+            total_ingreso_mensual = sum(mensualizar(float(oi["monto"]), oi["frecuencia"]) for oi in otros_ingresos)
+            if activo_efectivo:
+                total_ingreso_mensual += mensualizar(nuevo_monto, nueva_frec)
+            recurrentes_gastos = cursor.execute(
+                "SELECT monto, frecuencia, total_cuotas, cuotas_generadas FROM recurrentes WHERE tipo = 'gasto' AND activo = 1"
+            ).fetchall()
+            compromisos_total = 0.0
+            for rg in recurrentes_gastos:
+                m_g = mensualizar(float(rg["monto"]), rg["frecuencia"])
+                if rg["total_cuotas"] is not None:
+                    if int(rg["cuotas_generadas"] or 0) < int(rg["total_cuotas"]):
+                        compromisos_total += m_g
+                else:
+                    compromisos_total += m_g
+            if compromisos_total - total_ingreso_mensual > 0.01:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No es posible modificar o pausar este ingreso fijo porque los gastos fijos activos superarían la capacidad recurrente."
+                )
 
     campos, valores = [], []
     if req.descripcion is not None:
@@ -222,8 +278,38 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
 @router.delete("/api/recurrentes/{recurrente_id}", summary="Eliminar fijo o compra a meses")
 def eliminar_recurrente(recurrente_id: int, conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
-    if not cursor.execute("SELECT 1 FROM recurrentes WHERE id = ?", (recurrente_id,)).fetchone():
+    fila_del = cursor.execute("SELECT tipo, activo FROM recurrentes WHERE id = ?", (recurrente_id,)).fetchone()
+    if not fila_del:
         raise HTTPException(status_code=404, detail="Registro no encontrado.")
+    if fila_del["tipo"] == 'ingreso' and bool(fila_del["activo"]):
+        gastos_fijos_activos = cursor.execute("SELECT COUNT(*) FROM recurrentes WHERE tipo = 'gasto' AND activo = 1").fetchone()[0]
+        if gastos_fijos_activos > 0:
+            otros_ingresos = cursor.execute(
+                "SELECT monto, frecuencia FROM recurrentes WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL AND id != ?",
+                (recurrente_id,)
+            ).fetchall()
+            if len(otros_ingresos) == 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No es posible eliminar este ingreso fijo porque existen compromisos de gastos fijos activos que dependen de él."
+                )
+            total_ingreso_mensual = sum(mensualizar(float(oi["monto"]), oi["frecuencia"]) for oi in otros_ingresos)
+            recurrentes_gastos = cursor.execute(
+                "SELECT monto, frecuencia, total_cuotas, cuotas_generadas FROM recurrentes WHERE tipo = 'gasto' AND activo = 1"
+            ).fetchall()
+            compromisos_total = 0.0
+            for rg in recurrentes_gastos:
+                m_g = mensualizar(float(rg["monto"]), rg["frecuencia"])
+                if rg["total_cuotas"] is not None:
+                    if int(rg["cuotas_generadas"] or 0) < int(rg["total_cuotas"]):
+                        compromisos_total += m_g
+                else:
+                    compromisos_total += m_g
+            if compromisos_total - total_ingreso_mensual > 0.01:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No es posible eliminar este ingreso fijo porque los gastos fijos activos superarían la capacidad recurrente."
+                )
     # Las transacciones ya generadas se conservan (ON DELETE SET NULL)
     cursor.execute("DELETE FROM recurrentes WHERE id = ?", (recurrente_id,))
     conn.commit()

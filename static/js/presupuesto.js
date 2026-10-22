@@ -60,12 +60,12 @@ function actualizarOpcionesSubdivisionSelect(frecuencia, subTipoActual) {
         optionsHtml += `
             <option value="quincenas">2 Quincenas</option>
             <option value="semanas">4 Semanas</option>
-            <option value="personalizada">Personalizada ⚙️</option>
+            <option value="personalizada">Personalizada</option>
         `;
     } else if (frecuencia === 'quincenal') {
         optionsHtml += `
             <option value="semanas">2 Semanas</option>
-            <option value="personalizada">Personalizada ⚙️</option>
+            <option value="personalizada">Personalizada</option>
         `;
     }
 
@@ -158,7 +158,7 @@ function renderBarraSubperiodos(cfg) {
     const pillTotal = document.createElement('button');
     pillTotal.type = 'button';
     pillTotal.className = `pres-subperiodo-pill ${subperiodoActivoId === 'total' ? 'active' : ''}`;
-    pillTotal.innerHTML = `<span>🌐 Periodo Completo (${fmt(cfg.ingreso_base)})</span>`;
+    pillTotal.innerHTML = `<span>Periodo Completo (${fmt(cfg.ingreso_base)})</span>`;
     pillTotal.onclick = () => {
         subperiodoActivoId = 'total';
         renderizarVistaPresupuesto(cachePresupuesto);
@@ -170,7 +170,7 @@ function renderBarraSubperiodos(cfg) {
         const pill = document.createElement('button');
         pill.type = 'button';
         pill.className = `pres-subperiodo-pill ${subperiodoActivoId === sp.id ? 'active' : ''}`;
-        pill.innerHTML = `<span>📅 ${escapeHTML(sp.nombre)} (${sp.porcentaje}% · ${fmt(sp.monto)})</span>`;
+        pill.innerHTML = `<span>${escapeHTML(sp.nombre)} (${sp.porcentaje}% · ${fmt(sp.monto)})</span>`;
         pill.onclick = () => {
             subperiodoActivoId = sp.id;
             renderizarVistaPresupuesto(cachePresupuesto);
@@ -197,12 +197,23 @@ function renderKPIs(cfg, res, tarjetas) {
     let asignadoMostrar = res.total_asignado_monto;
     let disponibleMostrar = res.disponible_monto;
     let tagSub = `${cfg.frecuencia.toUpperCase()} · 100.0%`;
+    let esExcedido = res.excedido;
+    let pctAsignadoMostrar = res.total_asignado_pct;
+    let pctDisponibleMostrar = res.disponible_pct;
 
     if (spActivo) {
-        const factor = (spActivo.porcentaje / 100.0);
         ingresoMostrar = spActivo.monto;
-        asignadoMostrar = Math.round(res.total_asignado_monto * factor * 100) / 100;
+        let sumaAsigSub = 0;
+        tarjetas.forEach(t => {
+            const spItem = (t.subdivision || []).find(s => s.id === spActivo.id);
+            const m = (spItem && spItem.monto !== undefined) ? Number(spItem.monto) : (t.monto * (spActivo.porcentaje / 100.0));
+            sumaAsigSub += m;
+        });
+        asignadoMostrar = Math.round(sumaAsigSub * 100) / 100;
         disponibleMostrar = Math.max(0, Math.round((ingresoMostrar - asignadoMostrar) * 100) / 100);
+        esExcedido = (asignadoMostrar > ingresoMostrar);
+        pctAsignadoMostrar = ingresoMostrar > 0 ? (asignadoMostrar / ingresoMostrar) * 100 : 0;
+        pctDisponibleMostrar = Math.max(0, 100.0 - pctAsignadoMostrar);
         tagSub = `${spActivo.nombre.toUpperCase()} · ${spActivo.porcentaje}%`;
     }
 
@@ -212,18 +223,18 @@ function renderKPIs(cfg, res, tarjetas) {
     setEl('lbl-pres-kpi-asignado', fmt(asignadoMostrar));
     const badgeAsig = document.getElementById('badge-pres-asignado');
     if (badgeAsig) {
-        badgeAsig.textContent = `${res.total_asignado_pct.toFixed(1)}% del total`;
-        badgeAsig.className = `pnl-badge ${res.excedido ? 'badge-danger' : 'badge-gold'}`;
+        badgeAsig.textContent = `${pctAsignadoMostrar.toFixed(1)}% ${spActivo ? 'del sub-periodo' : 'del total'}`;
+        badgeAsig.className = `pnl-badge ${esExcedido ? 'badge-danger' : 'badge-gold'}`;
     }
 
     setEl('lbl-pres-kpi-disponible', fmt(disponibleMostrar));
     const badgeDisp = document.getElementById('badge-pres-disponible');
     if (badgeDisp) {
-        if (res.excedido) {
-            badgeDisp.textContent = `Excedido en ${(res.total_asignado_pct - 100).toFixed(1)}%`;
+        if (esExcedido) {
+            badgeDisp.textContent = `Excedido en ${(pctAsignadoMostrar - 100).toFixed(1)}%`;
             badgeDisp.className = 'pnl-badge badge-danger';
         } else {
-            badgeDisp.textContent = `${res.disponible_pct.toFixed(1)}% libre`;
+            badgeDisp.textContent = `${pctDisponibleMostrar.toFixed(1)}% libre`;
             badgeDisp.className = 'pnl-badge badge-success';
         }
     }
@@ -234,11 +245,12 @@ function renderKPIs(cfg, res, tarjetas) {
     tarjetas.forEach(t => {
         const n = t.nombre.toLowerCase();
         if (n.includes('inversión') || n.includes('inversion') || n.includes('etf') || n.includes('ahorro') || n.includes('cetes') || n.includes('fondo') || n.includes('renta fija')) {
-            const montoT = spActivo ? (t.monto * (spActivo.porcentaje / 100.0)) : t.monto;
+            const spItem = spActivo ? (t.subdivision || []).find(s => s.id === spActivo.id) : null;
+            const montoT = spItem ? Number(spItem.monto) : (spActivo ? (t.monto * (spActivo.porcentaje / 100.0)) : t.monto);
             ahorroInvMonto += montoT;
-            ahorroInvPct += t.porcentaje;
         }
     });
+    ahorroInvPct = ingresoMostrar > 0 ? (ahorroInvMonto / ingresoMostrar) * 100 : 0;
     setEl('lbl-pres-kpi-inv', fmt(ahorroInvMonto));
     const badgeInv = document.getElementById('badge-pres-inv');
     if (badgeInv) {
@@ -260,34 +272,56 @@ function renderBarraDistribucion(tarjetas, res, cfg) {
         return;
     }
 
+    const subperiodos = cfg.subdivision_config || [];
+    const esSubperiodo = (subperiodoActivoId !== 'total');
+    const spActivo = esSubperiodo ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
+
+    let ingresoBaseRef = cfg.ingreso_base;
+    if (spActivo && spActivo.monto > 0) {
+        ingresoBaseRef = spActivo.monto;
+    }
+
+    let sumaSlices = 0;
     tarjetas.forEach(t => {
-        const pct = Math.max(0, Math.min(100, t.porcentaje));
+        let montoCard = t.monto;
+        let pct = t.porcentaje;
+        if (spActivo) {
+            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
+            montoCard = (spItem && spItem.monto !== undefined) ? Number(spItem.monto) : (t.monto * (spActivo.porcentaje / 100.0));
+            pct = ingresoBaseRef > 0 ? (montoCard / ingresoBaseRef) * 100 : 0;
+        }
+        pct = Math.max(0, Math.min(100, pct));
         if (pct <= 0) return;
+        sumaSlices += pct;
+
         const slice = document.createElement('div');
         slice.className = `pres-alloc-slice pres-color-${t.color}`;
         slice.style.width = `${pct}%`;
-        slice.title = `${t.nombre}: ${pct.toFixed(1)}% (${fmt(t.monto)})`;
+        slice.title = `${t.nombre}: ${pct.toFixed(1)}% (${fmt(montoCard)})`;
         track.appendChild(slice);
 
         if (legend) {
             const item = document.createElement('div');
             item.className = 'pres-legend-item';
-            item.innerHTML = `<span class="pres-legend-dot pres-color-${t.color}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong></span>`;
+            item.innerHTML = `<span class="pres-legend-dot pres-color-${t.color}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${fmt(montoCard)})</span>`;
             legend.appendChild(item);
         }
     });
 
-    if (res.disponible_pct > 0 && !res.excedido) {
+    const librePct = Math.max(0, Math.round((100.0 - sumaSlices) * 10) / 10);
+    const libreMonto = Math.max(0, Math.round((ingresoBaseRef - (ingresoBaseRef * (sumaSlices / 100))) * 100) / 100);
+
+    if (librePct > 0) {
         const sliceDisp = document.createElement('div');
         sliceDisp.className = 'pres-alloc-slice pres-slice-libre';
-        sliceDisp.style.width = `${res.disponible_pct}%`;
-        sliceDisp.title = `Disponible sin asignar: ${res.disponible_pct.toFixed(1)}% (${fmt(res.disponible_monto)})`;
+        sliceDisp.style.width = `${librePct}%`;
+        sliceDisp.title = `Disponible sin asignar: ${librePct.toFixed(1)}% (${fmt(libreMonto)})`;
         track.appendChild(sliceDisp);
 
         if (legend) {
             const item = document.createElement('div');
             item.className = 'pres-legend-item pres-legend-libre';
-            item.innerHTML = `<span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${res.disponible_pct.toFixed(1)}%</strong></span>`;
+            item.innerHTML = `<span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${fmt(libreMonto)})</span>`;
             legend.appendChild(item);
         }
     }
@@ -332,7 +366,8 @@ function renderGridTarjetas(tarjetas, cfg) {
         if (spActivo) {
             const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
             montoMostrar = spItem ? spItem.monto : Math.round(t.monto * (spActivo.porcentaje / 100.0) * 100) / 100;
-            tagFreq = `en ${spActivo.nombre}`;
+            const diaTag = (spItem && spItem.dia) ? ` · Día ${spItem.dia}` : (t.dia_pago ? ` · Día ${t.dia_pago}` : '');
+            tagFreq = `en ${spActivo.nombre}${diaTag}`;
             badgePctTxt = `${t.porcentaje.toFixed(1)}% (${spActivo.porcentaje}% de periodo)`;
         }
 
@@ -343,13 +378,60 @@ function renderGridTarjetas(tarjetas, cfg) {
                 <div class="pres-card-subperiodo-breakdown">
                     <div class="pres-card-sub-pills-row">
                         ${t.subdivision.map(sp => `
-                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%">
-                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>
+                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%${sp.dia ? ' · Día ' + sp.dia : ''}">
+                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>${sp.dia ? ` · <span class="pres-sub-pill-dia">Día ${sp.dia}</span>` : ''}
                             </span>
                         `).join('')}
                     </div>
                 </div>
             `;
+        }
+
+        let diaBadgeHtml = '';
+        if (spActivo) {
+            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
+            const diaActivo = (spItem && spItem.dia) ? spItem.dia : t.dia_pago;
+            if (diaActivo) {
+                diaBadgeHtml = `
+                    <span class="pres-card-dia-badge" title="Día de cargo en ${escapeHTML(spActivo.nombre)}: ${diaActivo}">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Día ${diaActivo}
+                    </span>
+                `;
+            }
+        } else {
+            if (t.dia_pago) {
+                diaBadgeHtml = `
+                    <span class="pres-card-dia-badge" title="Día de cargo mensual programado: ${t.dia_pago}">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Día ${t.dia_pago}
+                    </span>
+                `;
+            } else if (t.subdivision && t.subdivision.some(s => s.dia)) {
+                const diasSub = t.subdivision.filter(s => s.dia).map(s => s.dia);
+                const txtDias = diasSub.length > 1 ? `Días ${diasSub.join(', ')}` : `Día ${diasSub[0]}`;
+                diaBadgeHtml = `
+                    <span class="pres-card-dia-badge" title="Días de cargo por sub-período: ${diasSub.join(', ')}">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        ${txtDias}
+                    </span>
+                `;
+            }
         }
 
         card.innerHTML = `
@@ -358,7 +440,10 @@ function renderGridTarjetas(tarjetas, cfg) {
                     ${iconSvg}
                 </div>
                 <div class="pres-card-titles">
-                    <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
+                        ${diaBadgeHtml}
+                    </div>
                     ${t.notas ? `<p class="pres-card-notes">${escapeHTML(t.notas)}</p>` : ''}
                 </div>
                 <div class="pres-card-actions">
@@ -453,153 +538,6 @@ export function alCambiarSubdivisionSelect() {
         guardarConfigPresupuesto();
     }
 }
-
-export function abrirModalImportarFijos() {
-    const modal = document.getElementById('modal-importar-fijos-presupuesto');
-    if (!modal) return;
-
-    if (!cachePresupuesto) {
-        cargarPresupuesto().then(() => abrirModalImportarFijos());
-        return;
-    }
-
-    const cfg = cachePresupuesto.config || {};
-    const fijos = cachePresupuesto.fijos_detectados || {};
-    const tarjetas = cachePresupuesto.tarjetas || [];
-
-    // 1. Bloque de nómina / ingreso base
-    const boxIngreso = document.getElementById('importar-fijos-ingreso-box');
-    const txtIngreso = document.getElementById('importar-fijos-ingreso-txt');
-    const chkIngreso = document.getElementById('chk-importar-ingreso');
-
-    if (fijos.ingreso_fijo_periodo > 0) {
-        if (boxIngreso) boxIngreso.classList.remove('hidden');
-        if (chkIngreso) chkIngreso.checked = true;
-        if (txtIngreso) {
-            txtIngreso.innerHTML = `<strong>${fmt(fijos.ingreso_fijo_periodo)}</strong> ${FRECUENCIA_LABEL[cfg.frecuencia] || ''} <span style="opacity: 0.85;">(Equivalente mensual: ${fmt(fijos.ingreso_fijo_mensual)})</span>`;
-        }
-    } else {
-        if (boxIngreso) boxIngreso.classList.add('hidden');
-        if (chkIngreso) chkIngreso.checked = false;
-    }
-
-    // 2. Modo individual por defecto
-    const radioInd = document.querySelector('input[name="import-fijos-modo"][value="individual"]');
-    if (radioInd) radioInd.checked = true;
-
-    // 3. Renderizar items con checkboxes
-    const contItems = document.getElementById('lista-items-importar-fijos');
-    const itemsGasto = fijos.items_gasto || [];
-
-    if (contItems) {
-        if (itemsGasto.length === 0) {
-            contItems.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se detectaron cargos periódicos ni compras a meses activas.</div>`;
-        } else {
-            const ingresoReferencia = (fijos.ingreso_fijo_periodo > 0 ? fijos.ingreso_fijo_periodo : (cfg.ingreso_base || 1));
-            contItems.innerHTML = itemsGasto.map(item => {
-                const iconSvg = ICONOS_SVG[item.icono] || ICONOS_SVG['wallet'];
-                const pct = ingresoReferencia > 0 ? ((item.monto_periodo / ingresoReferencia) * 100) : 0;
-
-                const yaExiste = tarjetas.find(t => {
-                    const tNom = t.nombre.toLowerCase().trim();
-                    const iNom = item.descripcion.toLowerCase().trim();
-                    return tNom === iNom || (iNom.length >= 3 && tNom.includes(iNom)) || (tNom.length >= 3 && iNom.includes(tNom));
-                });
-
-                return `
-                    <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
-                            <input type="checkbox" class="chk-item-fijo" data-id="${item.id}" checked style="cursor: pointer; width: 16px; height: 16px;">
-                            <div class="pres-card-icon-wrap pres-icon-${item.color}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                ${iconSvg}
-                            </div>
-                            <div style="min-width: 0;">
-                                <div style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">
-                                    ${escapeHTML(item.descripcion)}
-                                    ${item.es_msi ? `<span style="font-size: 0.72rem; color: #f59e0b; background: rgba(245, 158, 11, 0.15); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">MSI ${item.cuotas_info || ''}</span>` : ''}
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted);">
-                                    ${escapeHTML(item.categoria_nombre)}
-                                    ${yaExiste ? `<span style="color: #3b82f6; font-weight: 500;"> · (Sincronizará con "${escapeHTML(yaExiste.nombre)}")</span>` : ''}
-                                </div>
-                            </div>
-                        </label>
-                        <div style="text-align: right; flex-shrink: 0;">
-                            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main);">${fmt(item.monto_periodo)}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);">${pct.toFixed(1)}%</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-    }
-
-    const chkReemp = document.getElementById('chk-importar-reemplazar');
-    if (chkReemp) chkReemp.checked = false;
-
-    modal.classList.remove('hidden');
-}
-
-export function cerrarModalImportarFijos() {
-    const modal = document.getElementById('modal-importar-fijos-presupuesto');
-    if (modal) modal.classList.add('hidden');
-}
-
-export function toggleSeleccionarTodosFijos() {
-    const checkboxes = document.querySelectorAll('.chk-item-fijo');
-    const btn = document.getElementById('btn-toggle-todos-fijos');
-    const algunoDesmarcado = Array.from(checkboxes).some(c => !c.checked);
-    checkboxes.forEach(c => c.checked = algunoDesmarcado);
-    if (btn) btn.textContent = algunoDesmarcado ? 'Deseleccionar todos' : 'Seleccionar todos';
-}
-
-export async function ejecutarImportarFijos() {
-    const btn = document.getElementById('btn-confirmar-importar-fijos');
-    if (btn) btn.disabled = true;
-
-    try {
-        const modoRadio = document.querySelector('input[name="import-fijos-modo"]:checked');
-        const modo = modoRadio ? modoRadio.value : 'individual';
-
-        const chkIngreso = document.getElementById('chk-importar-ingreso');
-        const actualizar_ingreso = chkIngreso ? chkIngreso.checked : true;
-
-        const chkReemplazar = document.getElementById('chk-importar-reemplazar');
-        const reemplazar = chkReemplazar ? chkReemplazar.checked : false;
-
-        const checkboxes = document.querySelectorAll('.chk-item-fijo:checked');
-        const recurrentes_ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id, 10));
-
-        const res = await apiFetch('/api/presupuesto/importar-fijos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                modo,
-                recurrentes_ids,
-                actualizar_ingreso,
-                reemplazar
-            })
-        });
-
-        if (!res.ok) {
-            toast('No se pudieron importar los datos.', 'error');
-            return;
-        }
-
-        const data = await res.json();
-        cachePresupuesto = data;
-        renderizarVistaPresupuesto(data);
-        cerrarModalImportarFijos();
-        cerrarBannerFijosPresupuesto();
-        toast('Presupuesto sincronizado con éxito desde Fijos y MSI.', 'ok');
-    } catch (err) {
-        toast('Error al sincronizar datos.', 'error');
-    } finally {
-        if (btn) btn.disabled = false;
-    }
-}
-
-export const importarFijosPresupuesto = abrirModalImportarFijos;
 
 export function abrirModalExportarPresupuesto() {
     const modal = document.getElementById('modal-exportar-presupuesto');
@@ -754,6 +692,86 @@ export async function aplicarPlantillaPresupuesto(plantillaNombre) {
 
 let idTarjetaEditando = null;
 
+function renderSubperiodosInputsTarjeta(tarjeta) {
+    const wrap = document.getElementById('tarjeta-pres-subdivision-wrapper');
+    const cont = document.getElementById('tarjeta-pres-subdivision-items');
+    if (!wrap || !cont) return;
+
+    const subTipo = cachePresupuesto?.config?.subdivision_tipo;
+    const subConfig = cachePresupuesto?.config?.subdivision_config || [];
+
+    if (!subTipo || subTipo === 'ninguna' || subConfig.length === 0) {
+        wrap.classList.add('hidden');
+        cont.innerHTML = '';
+        return;
+    }
+
+    wrap.classList.remove('hidden');
+    cont.innerHTML = '';
+
+    const montoTotal = tarjeta ? Number(tarjeta.monto) : (parseFloat(document.getElementById('tarjeta-pres-monto')?.value) || 0);
+    const distribucionExistente = (tarjeta && tarjeta.subdivision) ? tarjeta.subdivision : [];
+
+    subConfig.forEach((sp, idx) => {
+        let valAsignado = '';
+        let valDia = '';
+        if (distribucionExistente.length > idx) {
+            if (distribucionExistente[idx].monto !== undefined && distribucionExistente[idx].monto !== null) {
+                valAsignado = distribucionExistente[idx].monto;
+            }
+            if (distribucionExistente[idx].dia !== undefined && distribucionExistente[idx].dia !== null) {
+                valDia = distribucionExistente[idx].dia;
+            }
+        } else if (montoTotal > 0) {
+            valAsignado = (Math.round(montoTotal * (Number(sp.porcentaje || 0) / 100) * 100) / 100).toFixed(2);
+        }
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;';
+        row.innerHTML = `
+            <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 500; min-width: 80px;">${escapeHTML(sp.nombre)}:</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end;">
+                <div class="calc-input-adornment" style="max-width: 130px;">
+                    <span class="calc-adornment-prefix">$</span>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix input-subperiodo-tarjeta"
+                        data-sub-id="${escapeHTML(sp.id)}" data-sub-nombre="${escapeHTML(sp.nombre)}" value="${valAsignado !== '' ? valAsignado : ''}">
+                </div>
+                <div class="calc-input-adornment" style="max-width: 85px;" title="Día de cargo mensual para este sub-período (1-31)">
+                    <span class="calc-adornment-prefix">Día</span>
+                    <input type="number" min="1" max="31" placeholder="--" class="input-calc calc-has-prefix input-subperiodo-dia"
+                        data-sub-id="${escapeHTML(sp.id)}" value="${valDia !== '' ? valDia : ''}">
+                </div>
+            </div>
+        `;
+        cont.appendChild(row);
+    });
+
+    const subInputs = cont.querySelectorAll('.input-subperiodo-tarjeta');
+    subInputs.forEach(inp => {
+        inp.addEventListener('input', () => {
+            let total = 0;
+            let anyEntered = false;
+            subInputs.forEach(i => {
+                if (i.value !== '') {
+                    anyEntered = true;
+                    total += parseFloat(i.value) || 0;
+                }
+            });
+            if (anyEntered) {
+                const inpMonto = document.getElementById('tarjeta-pres-monto');
+                if (inpMonto) {
+                    inpMonto.value = total.toFixed(2);
+                    const ingreso = Number(cachePresupuesto?.config?.ingreso_base) || 0;
+                    const inpPct = document.getElementById('tarjeta-pres-pct');
+                    if (inpPct) {
+                        inpPct.value = (ingreso > 0 && total > 0) ? ((total / ingreso) * 100).toFixed(1) : '';
+                    }
+                }
+            }
+        });
+    });
+}
+
 export function abrirModalCrearTarjeta() {
     idTarjetaEditando = null;
     const modal = document.getElementById('modal-tarjeta-presupuesto');
@@ -764,7 +782,10 @@ export function abrirModalCrearTarjeta() {
     form.reset();
     document.getElementById('tarjeta-pres-icono').value = 'wallet';
     document.getElementById('tarjeta-pres-color').value = 'gold';
+    const inpDia = document.getElementById('tarjeta-pres-dia');
+    if (inpDia) inpDia.value = '';
     if (titulo) titulo.textContent = 'Nueva Tarjeta de Presupuesto';
+    renderSubperiodosInputsTarjeta(null);
     modal.classList.remove('hidden');
 
     const inpNombre = document.getElementById('tarjeta-pres-nombre');
@@ -783,8 +804,11 @@ export function abrirModalEditarTarjeta(t) {
     document.getElementById('tarjeta-pres-icono').value = t.icono || 'wallet';
     document.getElementById('tarjeta-pres-color').value = t.color || 'gold';
     document.getElementById('tarjeta-pres-notas').value = t.notas || '';
+    const inpDia = document.getElementById('tarjeta-pres-dia');
+    if (inpDia) inpDia.value = (t.dia_pago !== undefined && t.dia_pago !== null) ? t.dia_pago : '';
 
     if (titulo) titulo.textContent = 'Editar Tarjeta de Presupuesto';
+    renderSubperiodosInputsTarjeta(t);
     modal.classList.remove('hidden');
 }
 
@@ -794,6 +818,29 @@ export function cerrarModalTarjetaPresupuesto() {
     idTarjetaEditando = null;
 }
 
+function sincronizarSubperiodosDesdeMonto(montoTotal) {
+    const inputsSub = document.querySelectorAll('.input-subperiodo-tarjeta');
+    if (inputsSub.length === 0) return;
+    const subConfig = cachePresupuesto?.config?.subdivision_config || [];
+
+    let sumaActual = 0;
+    inputsSub.forEach(inp => {
+        sumaActual += (parseFloat(inp.value) || 0);
+    });
+
+    inputsSub.forEach((inp, idx) => {
+        let ratio = 0;
+        if (sumaActual > 0) {
+            ratio = (parseFloat(inp.value) || 0) / sumaActual;
+        } else if (subConfig[idx] && subConfig[idx].porcentaje) {
+            ratio = Number(subConfig[idx].porcentaje) / 100.0;
+        } else {
+            ratio = 1.0 / inputsSub.length;
+        }
+        inp.value = montoTotal > 0 ? (Math.round(montoTotal * ratio * 100) / 100).toFixed(2) : '';
+    });
+}
+
 function sincronizarInputsModal(origen) {
     if (!cachePresupuesto) return;
     const ingreso = Number(cachePresupuesto.config?.ingreso_base) || 0;
@@ -801,10 +848,12 @@ function sincronizarInputsModal(origen) {
     const inpPct = document.getElementById('tarjeta-pres-pct');
     if (!inpMonto || !inpPct) return;
 
+    let monto = 0;
     if (origen === 'monto') {
-        const monto = parseFloat(inpMonto.value);
+        monto = parseFloat(inpMonto.value);
         if (isNaN(monto) || monto <= 0 || ingreso <= 0) {
             inpPct.value = '';
+            monto = 0;
         } else {
             inpPct.value = (Math.round((monto / ingreso) * 1000) / 10).toFixed(1);
         }
@@ -812,9 +861,15 @@ function sincronizarInputsModal(origen) {
         const pct = parseFloat(inpPct.value);
         if (isNaN(pct) || pct <= 0 || ingreso <= 0) {
             inpMonto.value = '';
+            monto = 0;
         } else {
-            inpMonto.value = (Math.round(ingreso * (pct / 100) * 100) / 100).toFixed(2);
+            monto = Math.round(ingreso * (pct / 100) * 100) / 100;
+            inpMonto.value = monto.toFixed(2);
         }
+    }
+
+    if (origen === 'monto' || origen === 'pct') {
+        sincronizarSubperiodosDesdeMonto(monto);
     }
 }
 
@@ -832,8 +887,8 @@ export function aplicarPresetChip(nombre, icono, color, notasSugeridas, pctSuger
 export async function guardarTarjetaPresupuesto(e) {
     e.preventDefault();
     const nombre = document.getElementById('tarjeta-pres-nombre').value.trim();
-    const monto = parseFloat(document.getElementById('tarjeta-pres-monto').value) || 0;
-    const porcentaje = parseFloat(document.getElementById('tarjeta-pres-pct').value) || 0;
+    let monto = parseFloat(document.getElementById('tarjeta-pres-monto').value) || 0;
+    let porcentaje = parseFloat(document.getElementById('tarjeta-pres-pct').value) || 0;
     const icono = document.getElementById('tarjeta-pres-icono').value;
     const color = document.getElementById('tarjeta-pres-color').value;
     const notas = document.getElementById('tarjeta-pres-notas').value.trim();
@@ -843,7 +898,50 @@ export async function guardarTarjetaPresupuesto(e) {
         return;
     }
 
-    const body = { nombre, monto, porcentaje, icono, color, notas };
+    const diaRaw = document.getElementById('tarjeta-pres-dia')?.value;
+    const dia_pago = diaRaw ? parseInt(diaRaw, 10) : null;
+
+    const ingreso = Number(cachePresupuesto?.config?.ingreso_base) || 0;
+    let distribucion_subperiodos = undefined;
+
+    const inputsSub = document.querySelectorAll('.input-subperiodo-tarjeta');
+    if (inputsSub.length > 0) {
+        const subItems = [];
+        let anyCustomDay = false;
+        let anyCustomMonto = false;
+        const subConfig = cachePresupuesto?.config?.subdivision_config || [];
+
+        inputsSub.forEach((inp, idx) => {
+            const val = parseFloat(inp.value) || 0;
+            const diaInp = document.querySelector(`.input-subperiodo-dia[data-sub-id="${inp.dataset.subId}"]`);
+            const diaVal = diaInp && diaInp.value ? parseInt(diaInp.value, 10) : null;
+            if (diaVal !== null) anyCustomDay = true;
+
+            const expectedMonto = (subConfig[idx] && monto > 0) ? Math.round(monto * (Number(subConfig[idx].porcentaje || 0) / 100) * 100) / 100 : 0;
+            if (Math.abs(val - expectedMonto) > 0.05) {
+                anyCustomMonto = true;
+            }
+
+            subItems.push({
+                id: inp.dataset.subId,
+                nombre: inp.dataset.subNombre,
+                monto: Math.round(val * 100) / 100,
+                porcentaje: monto > 0 ? Number(((val / monto) * 100).toFixed(1)) : 0,
+                dia: diaVal
+            });
+        });
+
+        if (anyCustomDay || anyCustomMonto) {
+            distribucion_subperiodos = subItems;
+        } else {
+            distribucion_subperiodos = null;
+        }
+    }
+
+    const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago };
+    if (distribucion_subperiodos !== undefined) {
+        body.distribucion_subperiodos = distribucion_subperiodos;
+    }
 
     try {
         let res;
@@ -1067,9 +1165,6 @@ export function inicializarPresupuesto() {
     const selSub = document.getElementById('pres-subdivision-tipo');
     if (selSub) selSub.addEventListener('change', alCambiarSubdivisionSelect);
 
-    const btnImportar = document.getElementById('btn-importar-fijos-pres');
-    if (btnImportar) btnImportar.addEventListener('click', importarFijosPresupuesto);
-
     const formTarjeta = document.getElementById('form-tarjeta-presupuesto');
     if (formTarjeta) formTarjeta.addEventListener('submit', guardarTarjetaPresupuesto);
 
@@ -1096,11 +1191,6 @@ Object.assign(window, {
     guardarSubdivisionPersonalizada,
     aplicarPresetChip,
     aplicarPlantillaPresupuesto,
-    abrirModalImportarFijos,
-    cerrarModalImportarFijos,
-    toggleSeleccionarTodosFijos,
-    ejecutarImportarFijos,
-    importarFijosPresupuesto,
     abrirModalExportarPresupuesto,
     cerrarModalExportarPresupuesto,
     toggleSeleccionarTodosExportar,

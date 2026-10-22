@@ -10,6 +10,7 @@ from finanzas_core import (
     convertir_de_mensual,
     generar_subperiodos_default,
     calcular_distribucion_subperiodos,
+    calcular_distribucion_tarjeta_asimetrica,
     sugerir_icono_color,
     detectar_fijos_recurrentes_core as detectar_fijos_recurrentes,
     sincronizar_fijos_presupuesto_core,
@@ -47,6 +48,8 @@ class TarjetaPresupuestoCreate(BaseModel):
     porcentaje: Optional[float] = Field(None, ge=0, le=100)
     monto: Optional[float] = Field(None, ge=0, le=1e12)
     notas: Optional[str] = Field("", max_length=255)
+    dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
+    distribucion_subperiodos: Optional[List[dict]] = None
 
 
 class TarjetaPresupuestoUpdate(BaseModel):
@@ -57,6 +60,8 @@ class TarjetaPresupuestoUpdate(BaseModel):
     monto: Optional[float] = Field(None, ge=0, le=1e12)
     notas: Optional[str] = Field(None, max_length=255)
     orden: Optional[int] = None
+    dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
+    distribucion_subperiodos: Optional[List[dict]] = None
 
 
 class PlantillaRequest(BaseModel):
@@ -134,8 +139,14 @@ def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str, sub
     d["monto"] = round(monto, 2)
     d["porcentaje"] = round(pct, 2)
     d["equivalentes"] = eq
+    custom_dist = d.get("distribucion_subperiodos")
+    if isinstance(custom_dist, str):
+        try:
+            d["distribucion_subperiodos"] = json.loads(custom_dist)
+        except Exception:
+            d["distribucion_subperiodos"] = None
     if subperiodos_config:
-        d["subdivision"] = calcular_distribucion_subperiodos(monto, subperiodos_config)
+        d["subdivision"] = calcular_distribucion_tarjeta_asimetrica(monto, subperiodos_config, d.get("distribucion_subperiodos"))
     else:
         d["subdivision"] = []
     return d
@@ -224,19 +235,10 @@ def importar_fijos_a_presupuesto(
     req: Optional[ImportarFijosRequest] = None,
     conn: sqlite3.Connection = Depends(get_tenant_db)
 ):
-    if req is None:
-        req = ImportarFijosRequest()
-
-    cursor = conn.cursor()
-    sincronizar_fijos_presupuesto_core(
-        cursor=cursor,
-        modo=req.modo or "individual",
-        recurrentes_ids=req.recurrentes_ids,
-        actualizar_ingreso=req.actualizar_ingreso,
-        reemplazar=req.reemplazar
+    raise HTTPException(
+        status_code=400,
+        detail="Operación bloqueada: El flujo de importación es estrictamente unidireccional (Presupuesto -> Gastos Fijos). El presupuesto es una herramienta de planeación estratégica y no permite sobreescribirse automáticamente desde los gastos fijos."
     )
-    conn.commit()
-    return get_presupuesto(conn)
 
 
 @router.post("/api/presupuesto/exportar-a-fijos", summary="Exportar tarjetas de presupuesto a Movimientos y Fijos con la misma periodicidad")
@@ -303,20 +305,21 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     monto = req.monto
     porcentaje = req.porcentaje
 
-    if porcentaje is not None and monto is None:
-        monto = round(ingreso * (porcentaje / 100.0), 2) if ingreso > 0 else 0.0
-    elif monto is not None and porcentaje is None:
+    if monto is not None:
         porcentaje = round((monto / ingreso) * 100.0, 2) if ingreso > 0 else 0.0
-    elif porcentaje is None and monto is None:
+    elif porcentaje is not None:
+        monto = round(ingreso * (porcentaje / 100.0), 2) if ingreso > 0 else 0.0
+    else:
         porcentaje = 0.0
         monto = 0.0
 
     # Determinar orden consecutivo
+    dist_json = json.dumps(req.distribucion_subperiodos) if req.distribucion_subperiodos else None
     max_orden = cursor.execute("SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas").fetchone()[0]
     cursor.execute("""
-        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1))
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json))
 
     tarjeta_id = cursor.lastrowid
     conn.commit()
@@ -347,18 +350,23 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("notas = ?"); valores.append(req.notas)
     if req.orden is not None:
         campos.append("orden = ?"); valores.append(req.orden)
+    if "dia_pago" in req.model_fields_set:
+        campos.append("dia_pago = ?"); valores.append(req.dia_pago)
+    if "distribucion_subperiodos" in req.model_fields_set:
+        dist_json = json.dumps(req.distribucion_subperiodos) if req.distribucion_subperiodos else None
+        campos.append("distribucion_subperiodos = ?"); valores.append(dist_json)
 
-    # Si se actualiza monto o porcentaje, sincronizar el otro campo
-    if req.porcentaje is not None:
-        pct = round(req.porcentaje, 2)
-        monto = round(ingreso * (pct / 100.0), 2) if ingreso > 0 else 0.0
-        campos.extend(["porcentaje = ?", "monto = ?"])
-        valores.extend([pct, monto])
-    elif req.monto is not None:
+    # Si se actualiza monto o porcentaje, priorizar monto explícito y sincronizar el otro campo
+    if req.monto is not None:
         monto = round(req.monto, 2)
         pct = round((monto / ingreso) * 100.0, 2) if ingreso > 0 else 0.0
         campos.extend(["monto = ?", "porcentaje = ?"])
         valores.extend([monto, pct])
+    elif req.porcentaje is not None:
+        pct = round(req.porcentaje, 2)
+        monto = round(ingreso * (pct / 100.0), 2) if ingreso > 0 else 0.0
+        campos.extend(["porcentaje = ?", "monto = ?"])
+        valores.extend([pct, monto])
 
     if campos:
         valores.append(tarjeta_id)

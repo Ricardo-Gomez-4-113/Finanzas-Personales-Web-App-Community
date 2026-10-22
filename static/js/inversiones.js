@@ -456,8 +456,14 @@ export async function eliminarInversion(id) {
 
 export async function sincronizarPrecios() {
     const btn = document.getElementById('btn-sync-precios');
-    const originalText = btn.textContent;
-    btn.textContent = '⏳ Sincronizando...';
+    if (!btn || btn.disabled) return;
+
+    const span = btn.querySelector('span');
+    const textoOriginal = span ? span.textContent : 'Actualizar Cotizaciones';
+    const svgIcon = btn.querySelector('.btn-svg-icon');
+
+    if (span) span.textContent = 'Sincronizando...';
+    if (svgIcon) svgIcon.classList.add('spin-icon');
     btn.disabled = true;
 
     try {
@@ -466,14 +472,15 @@ export async function sincronizarPrecios() {
             const data = await res.json();
             await cargarInversiones();
             await recargar();
-            toast(data.mensaje, 'ok');
+            toast(data.mensaje || 'Cotizaciones actualizadas con éxito.', 'ok');
         } else {
             toast("Error al sincronizar cotizaciones.", 'error');
         }
     } catch (err) {
         toast("Error de conexión al sincronizar.", 'error');
     } finally {
-        btn.textContent = originalText;
+        if (span) span.textContent = textoOriginal;
+        if (svgIcon) svgIcon.classList.remove('spin-icon');
         btn.disabled = false;
     }
 }

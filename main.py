@@ -116,7 +116,12 @@ async def add_security_and_cache_headers(request: Request, call_next):
         "base-uri 'self'; "
         "form-action 'self';"
     )
-    if request.url.path.startswith("/static/") or request.url.path in ("/", "/login", "/app"):
+    path = request.url.path
+    if path.startswith("/api/") or path == "/api" or path.startswith("/auth/") or path == "/auth":
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    elif path.startswith("/static/") or path in ("/", "/login", "/app"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"

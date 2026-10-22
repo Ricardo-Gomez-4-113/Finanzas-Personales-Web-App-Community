@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 8
+CURRENT_TENANT_SCHEMA_VERSION = 10
 
 
 # =============================================================================
@@ -300,6 +300,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
                 monto REAL NOT NULL DEFAULT 0.0,
                 notas TEXT DEFAULT '',
                 orden INTEGER NOT NULL DEFAULT 0,
+                dia_pago INTEGER DEFAULT NULL,
+                distribucion_subperiodos TEXT DEFAULT NULL,
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -355,6 +357,28 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         """)
         cursor.execute("PRAGMA user_version = 8;")
         current_version = 8
+
+    # -------------------------------------------------------------
+    # Versión 9: Presupuesto asimétrico por sub-período
+    # -------------------------------------------------------------
+    if current_version < 9 and CURRENT_TENANT_SCHEMA_VERSION >= 9:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN distribucion_subperiodos TEXT DEFAULT NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("PRAGMA user_version = 9;")
+        current_version = 9
+
+    # -------------------------------------------------------------
+    # Versión 10: Día de cargo en tarjetas de presupuesto (general y por sub-período)
+    # -------------------------------------------------------------
+    if current_version < 10 and CURRENT_TENANT_SCHEMA_VERSION >= 10:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN dia_pago INTEGER DEFAULT NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("PRAGMA user_version = 10;")
+        current_version = 10
 
     conn.commit()
 

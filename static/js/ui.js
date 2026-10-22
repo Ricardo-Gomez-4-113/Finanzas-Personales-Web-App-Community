@@ -7,6 +7,7 @@ import { estado } from './core.js';
 import { cargarRecurrentes } from './recurrentes.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { cargarPresupuesto, cerrarModalTarjetaPresupuesto } from './presupuesto.js';
+import { cargarInversiones } from './inversiones.js';
 
 
 // =============================================================================
@@ -219,6 +220,9 @@ export function cambiarPestana(tabId) {
     }
     if (tabId === 'tab-presupuesto') {
         cargarPresupuesto();
+    }
+    if (tabId === 'tab-inversiones') {
+        cargarInversiones();
     }
 
     setTimeout(() => {

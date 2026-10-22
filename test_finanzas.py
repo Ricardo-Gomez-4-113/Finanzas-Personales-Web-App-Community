@@ -5,8 +5,64 @@ Ejecutar desde la raíz del proyecto:
     python3 test_finanzas.py
 """
 
+import json
 import sqlite3
+import sys
+import types
 from datetime import date, timedelta
+
+# Compatibilidad para ejecutar suite en entornos host donde FastAPI/Pydantic residen dentro del contenedor
+if 'fastapi' not in sys.modules:
+    try:
+        import fastapi
+    except ImportError:
+        fastapi = types.ModuleType('fastapi')
+        class HTTPException(Exception):
+            def __init__(self, status_code, detail=None):
+                self.status_code = status_code
+                self.detail = detail
+                super().__init__(f"{status_code}: {detail}")
+        class APIRouter:
+            def get(self, *a, **kw): return lambda f: f
+            def post(self, *a, **kw): return lambda f: f
+            def put(self, *a, **kw): return lambda f: f
+            def patch(self, *a, **kw): return lambda f: f
+            def delete(self, *a, **kw): return lambda f: f
+        class Request: pass
+        class status:
+            HTTP_401_UNAUTHORIZED = 401
+            HTTP_403_FORBIDDEN = 403
+        def Depends(f): return f
+
+        fastapi.HTTPException = HTTPException
+        fastapi.APIRouter = APIRouter
+        fastapi.Depends = Depends
+        fastapi.Request = Request
+        fastapi.status = status
+
+        sec = types.ModuleType('fastapi.security')
+        class OAuth2PasswordBearer:
+            def __init__(self, *a, **kw): pass
+        sec.OAuth2PasswordBearer = OAuth2PasswordBearer
+        fastapi.security = sec
+
+        sys.modules['fastapi'] = fastapi
+        sys.modules['fastapi.security'] = sec
+
+if 'pydantic' not in sys.modules:
+    try:
+        import pydantic
+    except ImportError:
+        pydantic = types.ModuleType('pydantic')
+        class BaseModel:
+            def __init__(self, **kw):
+                self.model_fields_set = set(kw.keys())
+                for k, v in kw.items(): setattr(self, k, v)
+            def dict(self): return self.__dict__
+        def Field(default=None, **kw): return default
+        pydantic.BaseModel = BaseModel
+        pydantic.Field = Field
+        sys.modules['pydantic'] = pydantic
 
 import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
@@ -17,6 +73,14 @@ from finanzas_core import (
     materializar_recurrentes,
     deuda_pendiente,
     valor_rendimiento,
+    validar_sustentabilidad_gasto_fijo,
+    validar_saldo_disponible_fecha,
+    validar_eliminacion_transaccion,
+    validar_edicion_transaccion,
+    obtener_ventana_corte_fecha,
+    validar_limite_cargos_ventana,
+    calcular_distribucion_tarjeta_asimetrica,
+    exportar_presupuesto_a_fijos_core,
 )
 
 
@@ -256,9 +320,38 @@ def test_importar_fijos_individual_y_limpieza():
 def test_migracion_v8_indice_unico():
     conn = nueva_bd()
     v = conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 8, v
+    assert v >= 8, v
     idx = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_transacciones_rec_fecha'").fetchone()
     assert idx is not None
+
+
+def test_migracion_v9_distribucion_subperiodos():
+    conn = nueva_bd()
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    assert v >= 9, v
+    cols = [col[1] for col in conn.execute("PRAGMA table_info(presupuesto_tarjetas)").fetchall()]
+    assert "distribucion_subperiodos" in cols
+
+
+def test_migracion_v10_dia_pago():
+    conn = nueva_bd()
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    assert v == 10, v
+    cols = [col[1] for col in conn.execute("PRAGMA table_info(presupuesto_tarjetas)").fetchall()]
+    assert "dia_pago" in cols
+
+
+def test_distribucion_tarjeta_asimetrica():
+    subperiodos = [
+        {"id": "q1", "nombre": "Q1", "porcentaje": 50.0},
+        {"id": "q2", "nombre": "Q2", "porcentaje": 50.0}
+    ]
+    custom = '[{"id": "q1", "nombre": "Q1", "porcentaje": 70.0, "monto": 700.0}, {"id": "q2", "nombre": "Q2", "porcentaje": 30.0, "monto": 300.0}]'
+    dist = calcular_distribucion_tarjeta_asimetrica(1000.0, subperiodos, custom)
+    assert len(dist) == 2
+    assert dist[0]["monto"] == 700.0
+    assert dist[1]["monto"] == 300.0
+
 
 
 def test_materializar_ingreso_no_afecta_apartado():
@@ -451,6 +544,492 @@ def test_editar_recurrente_frecuencia_y_campos():
     assert fila2["dia"] == 15
 
 
+def test_crear_gasto_fijo_sin_ingreso_fijo_falla():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # 1. Sin ningún ingreso fijo registrado en recurrentes debe fallar
+    try:
+        validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=1500.0, frecuencia='mensual')
+        assert False, "Debió rechazar la creación de gasto fijo sin un ingreso fijo activo"
+    except ValueError as e:
+        assert "al menos un ingreso fijo recurrente activo" in str(e)
+
+    # 2. Con ingreso fijo pero inactivo (activo = 0) debe seguir fallando
+    cursor.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Sueldo Inactivo', 'ingreso', 20000.0, 'mensual', 1, '2026-01-01', 0)
+    """)
+    conn.commit()
+    try:
+        validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=1500.0, frecuencia='mensual')
+        assert False, "Debió rechazar la creación de gasto fijo con ingreso fijo inactivo"
+    except ValueError as e:
+        assert "al menos un ingreso fijo recurrente activo" in str(e)
+
+    # 3. Con ingreso fijo activo, la validación tiene éxito si el monto es cubierto
+    cursor.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Sueldo Activo', 'ingreso', 20000.0, 'mensual', 1, '2026-01-01', 1)
+    """)
+    conn.commit()
+    validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=1500.0, frecuencia='mensual')
+
+
+def test_gasto_fijo_rechazado_por_depender_de_remanente():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Saldo histórico masivo en transacciones de periodos pasados (remanente)
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 500000.0, 'ingreso')")
+
+    # Ingreso fijo activo de 10,000 mensual
+    cursor.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Nómina', 'ingreso', 10000.0, 'mensual', 1, '2026-11-01', 1)
+    """)
+    # Gasto fijo previo de 7,000 mensual -> Capacidad fija restante: 3,000 mensual
+    cursor.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Renta', 'gasto', 7000.0, 'mensual', 1, '2026-11-01', 1)
+    """)
+    conn.commit()
+
+    # Intentar registrar nuevo gasto fijo de 4,000 mensual (supera capacidad fija de 3,000)
+    # A pesar de contar con 500,000 en caja de remanente, debe ser rechazado
+    try:
+        validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=4000.0, frecuencia='mensual')
+        assert False, "Debió rechazar el gasto fijo por depender de remanente"
+    except ValueError as e:
+        assert "No es posible registrar este compromiso como Gasto Fijo" in str(e)
+        assert "remanente" in str(e)
+
+    # Un compromiso de 3,000 mensual sí debe ser aceptado
+    validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=3000.0, frecuencia='mensual')
+
+
+def test_gasto_previo_a_fecha_de_cobro_sin_remanente_falla():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Nómina programada para el día 15
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 12000.0, 'ingreso')")
+    conn.commit()
+
+    # Intentar gastar el día 10 sin saldo previo acumulado debe fallar (saldo sería negativo)
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-10', monto=2500.0, tipo='gasto')
+        assert False, "Debió fallar por no contar con saldo disponible a la fecha"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+        assert "2026-11-10" in str(e)
+
+
+def test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Remanente disponible de periodo anterior
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 5000.0, 'ingreso')")
+    # Próxima nómina el día 15
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 12000.0, 'ingreso')")
+    conn.commit()
+
+    # Gasto de 3,000 el día 10 debe permitirse porque el remanente previo (5,000) lo respalda
+    validar_saldo_disponible_fecha(cursor, fecha='2026-11-10', monto=3000.0, tipo='gasto')
+
+    # Intentar gastar 6,000 el día 10 debe fallar porque supera los 5,000 de remanente disponible
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-10', monto=6000.0, tipo='gasto')
+        assert False, "Debió fallar porque 6,000 supera el remanente disponible de 5,000"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+
+
+def test_cargos_quincena_no_superan_presupuesto_de_quincena():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Ingreso fijo recurrente de 8,000 quincenal (días 15 y 30)
+    cursor.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Nómina Quincenal', 'ingreso', 8000.0, 'quincenal', 15, '2026-11-15', 1)
+    """)
+    # Registrar cargos existentes de 6,500 en la quincena (15 al 29 nov)
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-16', 6500.0, 'gasto')")
+    tx_id = cursor.lastrowid
+    conn.commit()
+
+    # Cargo adicional de 1,000 dentro de la ventana de corte no supera el límite (6,500 + 1,000 = 7,500 <= 8,000)
+    validar_limite_cargos_ventana(cursor, fecha_str='2026-11-20', monto=1000.0)
+
+    # Validar fechas límite de la quincena (días 28 y 29 de noviembre quedan dentro de la ventana de corte)
+    v29 = obtener_ventana_corte_fecha(cursor, fecha_str='2026-11-29')
+    assert v29["inicio"] == '2026-11-15'
+    assert v29["fin"] == '2026-11-29'
+    assert v29["cargos_actuales"] == 6500.0
+
+    # Cargo adicional de 2,000 supera la capacidad de la quincena (6,500 + 2,000 = 8,500 > 8,000)
+    try:
+        validar_limite_cargos_ventana(cursor, fecha_str='2026-11-20', monto=2000.0)
+        assert False, "Debió rechazar cargo que supera el límite de la quincena"
+    except ValueError as e:
+        assert "El presupuesto del período" in str(e)
+        assert "ha sido superado" in str(e)
+
+    # Actualizar transacción existente de 6,500 a 7,000 no debe duplicar el cargo (7,000 <= 8,000)
+    validar_limite_cargos_ventana(cursor, fecha_str='2026-11-16', monto=7000.0, transaccion_id=tx_id)
+
+
+def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
+    from routers.presupuesto import get_presupuesto, eliminar_tarjeta
+    conn = nueva_bd()
+    cursor = conn.cursor()
+
+    # 1. En métricas patrimoniales (calcular_resumen): gastos normales y mes actual excluyen transacciones eliminadas
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 1500.0, 'gasto')")
+    tx_id = cursor.lastrowid
+    conn.commit()
+
+    r1 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
+    assert r1['gastos_normales_mes'] == 1500.0
+    assert r1['mes_actual']['gastos'] == 1500.0
+
+    cursor.execute("DELETE FROM transacciones WHERE id = ?", (tx_id,))
+    conn.commit()
+
+    r2 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
+    assert r2['gastos_normales_mes'] == 0.0
+    assert r2['mes_actual']['gastos'] == 0.0
+
+    # 2. En tarjetas KPI del presupuesto (get_presupuesto): resumen asignado y disponible excluyen tarjetas eliminadas
+    cursor.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0 WHERE id = 1")
+    cursor.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden)
+        VALUES ('Suscripciones', 'film', 'purple', 10.0, 1000.0, 1)
+    """)
+    t_id = cursor.lastrowid
+    conn.commit()
+
+    p1 = get_presupuesto(conn)
+    assert p1['resumen']['total_asignado_monto'] == 1000.0
+    assert p1['resumen']['disponible_monto'] == 9000.0
+    assert len(p1['tarjetas']) == 1
+
+    eliminar_tarjeta(t_id, conn)
+
+    p2 = get_presupuesto(conn)
+    assert p2['resumen']['total_asignado_monto'] == 0.0
+    assert p2['resumen']['disponible_monto'] == 10000.0
+    assert len(p2['tarjetas']) == 0
+
+
+def test_importacion_presupuesto_a_fijos_estricta():
+    from fastapi import HTTPException
+    from routers.presupuesto import importar_fijos_a_presupuesto
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+
+    conn = nueva_bd()
+
+    # 1. Bloqueo estricto de Fijos -> Presupuesto con HTTP 400
+    try:
+        importar_fijos_a_presupuesto(None, conn)
+        assert False, "Debió rechazar la importación de fijos a presupuesto con HTTP 400"
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "estrictamente unidireccional" in exc.detail
+
+    # 2. Flujo permitido y estricto de Presupuesto -> Fijos
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 15000.0, frecuencia = 'quincenal' WHERE id = 1")
+    conn.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
+        VALUES ('Ahorro Emergencia', 'shield', 'purple', 20.0, 3000.0, 'Reserva de liquidez', 1)
+    """)
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 11, 1))
+    assert res['frecuencia'] == 'quincenal'
+    assert res['total_procesados'] == 2  # Nómina base + Tarjeta
+
+    recs = conn.execute("SELECT descripcion, tipo, monto, frecuencia FROM recurrentes ORDER BY id").fetchall()
+    assert len(recs) == 2
+    assert recs[0]['tipo'] == 'ingreso'
+    assert recs[0]['monto'] == 15000.0
+    assert recs[0]['frecuencia'] == 'quincenal'
+    assert recs[1]['descripcion'] == 'Ahorro Emergencia'
+    assert recs[1]['tipo'] == 'gasto'
+    assert recs[1]['monto'] == 3000.0
+    assert recs[1]['frecuencia'] == 'quincenal'
+
+
+def test_gasto_respeta_saldo_retenido_en_apartados():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Ingreso de 10,000 en la cuenta
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 10000.0, 'ingreso')")
+    # Apartado con 4,000 retenidos
+    cursor.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Fondo Emergencia', 'libre', 4000.0)")
+    conn.commit()
+
+    # Saldo en cuenta = 10,000, Apartados = 4,000 -> Saldo Operativo = 6,000
+    # Gasto de 5,000 el 2026-11-05 debe ser permitido (6,000 - 5,000 = 1,000 >= 0)
+    validar_saldo_disponible_fecha(cursor, fecha='2026-11-05', monto=5000.0, tipo='gasto')
+
+    # Intentar gastar 7,000 el 2026-11-05 debe fallar porque el saldo operativo disponible es 6,000 (compromete apartados)
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-05', monto=7000.0, tipo='gasto')
+        assert False, "Debió fallar porque 7,000 compromete los 4,000 guardados en apartados"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+        assert "apartados" in str(e).lower()
+
+    # Si se registra el gasto de 5,000 en BD
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 5000.0, 'gasto')")
+    conn.commit()
+
+    # Ahora el saldo operativo disponible es 1,000.
+    # Un gasto de 1,500 en fecha 2026-11-06 debe fallar
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-06', monto=1500.0, tipo='gasto')
+        assert False, "Debió fallar porque saldo operativo restante es 1,000"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+        assert "apartados" in str(e).lower()
+
+    # Validar que crear_transaccion vía API rechaza con HTTP 422
+    from routers.movimientos import crear_transaccion, Transaccion
+    try:
+        crear_transaccion(Transaccion(fecha='2026-11-06', monto=1500.0, tipo='gasto', categoria_id=1), conn)
+        assert False, "Debió fallar crear_transaccion con HTTP 422"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422, f"Esperado HTTP 422, obtenido {e}"
+
+
+def test_edicion_ingreso_retroactivo_no_genera_saldo_negativo_futuro():
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    # Ingreso de 10,000 el 2026-11-01
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 10000.0, 'ingreso')")
+    id_ingreso = cursor.lastrowid
+    # Gasto de 8,000 el 2026-11-05 respaldado por dicho ingreso
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 8000.0, 'gasto')")
+    id_gasto = cursor.lastrowid
+    conn.commit()
+
+    # 1. Reducir el ingreso a 5,000 debe fallar porque dejaría saldo -3,000 en fecha 2026-11-05
+    try:
+        validar_edicion_transaccion(cursor, transaccion_id=id_ingreso, nueva_fecha='2026-11-01', nuevo_monto=5000.0, nuevo_tipo='ingreso')
+        assert False, "Debió fallar: reducir ingreso a 5,000 deja déficit futuro de 3,000"
+    except ValueError as e:
+        assert "respalda gastos" in str(e) or "saldo negativo" in str(e)
+
+    # 2. Postergar la fecha del ingreso al 2026-11-10 debe fallar porque el 2026-11-05 habría déficit de 8,000
+    try:
+        validar_edicion_transaccion(cursor, transaccion_id=id_ingreso, nueva_fecha='2026-11-10', nuevo_monto=10000.0, nuevo_tipo='ingreso')
+        assert False, "Debió fallar: postergar fecha a posterior al gasto deja déficit temporal"
+    except ValueError as e:
+        assert "respalda gastos" in str(e) or "saldo negativo" in str(e)
+
+    # 3. Cambiar el tipo de ingreso a gasto debe fallar
+    try:
+        validar_edicion_transaccion(cursor, transaccion_id=id_ingreso, nueva_fecha='2026-11-01', nuevo_monto=10000.0, nuevo_tipo='gasto')
+        assert False, "Debió fallar: convertir ingreso en gasto provoca déficit masivo"
+    except ValueError as e:
+        assert "respalda gastos" in str(e) or "saldo negativo" in str(e)
+
+    # 4. Eliminar el ingreso debe fallar porque respalda el gasto de 8,000
+    try:
+        validar_eliminacion_transaccion(cursor, transaccion_id=id_ingreso)
+        assert False, "Debió fallar: eliminar ingreso con gastos posteriores"
+    except ValueError as e:
+        assert "respalda gastos" in str(e) or "saldo negativo" in str(e)
+
+    # 5. Reducir el ingreso a 9,000 sí debe permitirse porque 9,000 - 8,000 = 1,000 >= 0
+    validar_edicion_transaccion(cursor, transaccion_id=id_ingreso, nueva_fecha='2026-11-01', nuevo_monto=9000.0, nuevo_tipo='ingreso')
+
+    # 6. Validar que la capa de API (routers/movimientos) rechaza con HTTP 422
+    from routers.movimientos import eliminar_transaccion, actualizar_transaccion, TransaccionUpdate
+    try:
+        eliminar_transaccion(id_ingreso, conn)
+        assert False, "Debió fallar eliminar_transaccion con 422"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422, f"Esperado HTTP 422, obtenido {e}"
+
+    try:
+        actualizar_transaccion(id_ingreso, TransaccionUpdate(monto=5000.0), conn)
+        assert False, "Debió fallar actualizar_transaccion con 422"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422, f"Esperado HTTP 422, obtenido {e}"
+
+    # 7. Actualización permitida vía API se persiste adecuadamente
+    res_act = actualizar_transaccion(id_ingreso, TransaccionUpdate(monto=9000.0), conn)
+    assert res_act["mensaje"] == "Transacción actualizada con éxito"
+    assert float(cursor.execute("SELECT monto FROM transacciones WHERE id = ?", (id_ingreso,)).fetchone()[0]) == 9000.0
+
+    # 8. Blindaje de movimientos vinculados a apartados
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo Emergencia', 'libre', 500.0)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 500.0, 'gasto', 1)")
+    id_ap_mov = cursor.lastrowid
+    conn.commit()
+
+    # Direct core check
+    try:
+        validar_edicion_transaccion(cursor, id_ap_mov, '2026-11-02', 400.0, 'gasto')
+        assert False, "Debió fallar modificar movimiento de apartado en core"
+    except ValueError as e:
+        assert "apartado" in str(e).lower()
+
+    # Intentos de alterar fecha, monto o tipo vía API retornan HTTP 400
+    try:
+        actualizar_transaccion(id_ap_mov, TransaccionUpdate(monto=400.0), conn)
+        assert False, "Debió fallar actualizar monto en apartado con 400"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 400
+
+    try:
+        actualizar_transaccion(id_ap_mov, TransaccionUpdate(fecha='2026-11-03'), conn)
+        assert False, "Debió fallar actualizar fecha en apartado con 400"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 400
+
+    try:
+        eliminar_transaccion(id_ap_mov, conn)
+        assert False, "Debió fallar eliminar apartado con 400"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 400
+
+    # Actualizar únicamente descripción del apartado no provoca falso 422 ni doble deducción
+    res_desc = actualizar_transaccion(id_ap_mov, TransaccionUpdate(descripcion='Apartado corregido'), conn)
+    assert res_desc["mensaje"] == "Transacción actualizada con éxito"
+
+    # 9. Al eliminar el gasto respaldado y vaciar apartado, el ingreso puede eliminarse limpiamente
+    eliminar_transaccion(id_gasto, conn)
+    cursor.execute("UPDATE apartados SET monto_actual = 0 WHERE id = 1")
+    conn.commit()
+    eliminar_transaccion(id_ingreso, conn)
+    assert cursor.execute("SELECT COUNT(*) FROM transacciones WHERE id IN (?, ?)", (id_ingreso, id_gasto)).fetchone()[0] == 0
+
+
+def test_normalizacion_fin_de_mes_febrero():
+    # Año normal (2026): febrero tiene 28 días
+    # Transición 31 de enero -> 28 de febrero -> 31 de marzo
+    f_ene_26 = date(2026, 1, 31)
+    f_feb_26 = siguiente_fecha(f_ene_26, 'mensual', 31)
+    assert f_feb_26 == date(2026, 2, 28), f"Esperado 2026-02-28, obtenido {f_feb_26}"
+    f_mar_26 = siguiente_fecha(f_feb_26, 'mensual', 31)
+    assert f_mar_26 == date(2026, 3, 31), f"Esperado 2026-03-31, obtenido {f_mar_26}"
+
+    # Año bisiesto (2024): febrero tiene 29 días
+    # Transición 31 de enero -> 29 de febrero -> 31 de marzo
+    f_ene_24 = date(2024, 1, 31)
+    f_feb_24 = siguiente_fecha(f_ene_24, 'mensual', 31)
+    assert f_feb_24 == date(2024, 2, 29), f"Esperado 2024-02-29, obtenido {f_feb_24}"
+    f_mar_24 = siguiente_fecha(f_feb_24, 'mensual', 31)
+    assert f_mar_24 == date(2024, 3, 31), f"Esperado 2024-03-31, obtenido {f_mar_24}"
+
+    # Año bisiesto futuro (2028): febrero tiene 29 días
+    f_ene_28 = date(2028, 1, 31)
+    f_feb_28 = siguiente_fecha(f_ene_28, 'mensual', 31)
+    assert f_feb_28 == date(2028, 2, 29), f"Esperado 2028-02-29, obtenido {f_feb_28}"
+    f_mar_28 = siguiente_fecha(f_feb_28, 'mensual', 31)
+    assert f_mar_28 == date(2028, 3, 31), f"Esperado 2028-03-31, obtenido {f_mar_28}"
+
+
+def test_presupuesto_tarjeta_dia_pago_y_subperiodos():
+    conn = nueva_bd()
+    cur = conn.cursor()
+    sub_dist = [
+        {"id": "q1", "nombre": "Quincena 1", "monto": 250.0, "porcentaje": 50.0, "dia": 5},
+        {"id": "q2", "nombre": "Quincena 2", "monto": 250.0, "porcentaje": 50.0, "dia": 20}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
+        VALUES ('Dentista', 'wallet', 'blue', 5.0, 500.0, 5, ?)
+    """, (json.dumps(sub_dist),))
+    conn.commit()
+
+    fila = cur.execute("SELECT * FROM presupuesto_tarjetas WHERE nombre = 'Dentista'").fetchone()
+    assert fila["dia_pago"] == 5
+    parsed = json.loads(fila["distribucion_subperiodos"])
+    assert parsed[0]["dia"] == 5
+    assert parsed[1]["dia"] == 20
+
+
+def test_exportar_presupuesto_no_duplica_msi_y_respeta_dias():
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # 1. Crear recurrente MSI Pixel 10
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
+        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+    """)
+    # 2. Crear tarjeta en presupuesto nombrada 'Pixel 10 (MSI)' con dia_pago=14
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
+        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 1074.92, 14)
+    """)
+    # 3. Crear tarjeta normal 'Sueldo madre' con subperiodo dia 30
+    sub_madre = [
+        {"id": "q1", "nombre": "Q1", "monto": 0.0, "porcentaje": 0.0, "dia": None},
+        {"id": "q2", "nombre": "Q2", "monto": 2000.0, "porcentaje": 100.0, "dia": 30}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
+        VALUES ('Sueldo madre', 'heart', 'rose', 10.67, 2000.0, 30, ?)
+    """, (json.dumps(sub_madre),))
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    # Pixel 10 debe ser ignorado como MSI
+    msi_item = next((d for d in res["detalles"] if "Pixel" in d["descripcion"]), None)
+    assert msi_item is not None
+    assert msi_item["accion"] == "ignorado_msi"
+
+    # Verificar que solo hay 1 registro de Pixel 10 en recurrentes (el MSI original)
+    pixel_recs = cur.execute("SELECT * FROM recurrentes WHERE descripcion LIKE '%Pixel%'").fetchall()
+    assert len(pixel_recs) == 1
+    assert pixel_recs[0]["total_cuotas"] == 10
+
+    # Sueldo madre se debió crear con dia = 30
+    madre_rec = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Sueldo madre'").fetchone()
+    assert madre_rec is not None
+    assert madre_rec["dia"] == 30
+
+
+def test_calcular_distribucion_tarjeta_asimetrica_recalcula_si_monto_cambia():
+    subperiodos = [
+        {"id": "q1", "nombre": "Q1", "porcentaje": 50.0},
+        {"id": "q2", "nombre": "Q2", "porcentaje": 50.0}
+    ]
+    # Asignación original 70% / 30% con monto base 1000 ($700 y $300)
+    custom = [
+        {"id": "q1", "nombre": "Q1", "porcentaje": 70.0, "monto": 700.0, "dia": 5},
+        {"id": "q2", "nombre": "Q2", "porcentaje": 30.0, "monto": 300.0, "dia": 20}
+    ]
+    # Si el monto de la tarjeta cambia a 2000, los montos deben reescalarse a 1400 y 600
+    dist = calcular_distribucion_tarjeta_asimetrica(2000.0, subperiodos, custom)
+    assert len(dist) == 2
+    assert dist[0]["monto"] == 1400.0
+    assert dist[0]["dia"] == 5
+    assert dist[1]["monto"] == 600.0
+    assert dist[1]["dia"] == 20
+
+
+def test_exportar_presupuesto_dia_segundo_subperiodo():
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # Tarjeta tipo NU: Q1 no tiene día asignado, Q2 tiene día 15
+    sub_nu = [
+        {"id": "q1", "nombre": "Q1", "monto": 0.0, "porcentaje": 0.0, "dia": None},
+        {"id": "q2", "nombre": "Q2", "monto": 5000.0, "porcentaje": 100.0, "dia": 15}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
+        VALUES ('Tarjeta NU Especial', 'credit-card', 'purple', 26.67, 5000.0, NULL, ?)
+    """, (json.dumps(sub_nu),))
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    nu_rec = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Tarjeta NU Especial'").fetchone()
+    assert nu_rec is not None
+    assert nu_rec["dia"] == 15, f"Esperado día 15, obtenido {nu_rec['dia']}"
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -468,12 +1047,31 @@ if __name__ == '__main__':
     test_recurrente_aporta_a_meta()
     test_importar_fijos_individual_y_limpieza()
     test_migracion_v8_indice_unico()
+    test_migracion_v9_distribucion_subperiodos()
+    test_migracion_v10_dia_pago()
+    test_distribucion_tarjeta_asimetrica()
+    test_calcular_distribucion_tarjeta_asimetrica_recalcula_si_monto_cambia()
     test_materializar_ingreso_no_afecta_apartado()
     test_proxima_fecha_vigente_reactivar()
     test_concurrencia_materializar_sin_duplicados()
     test_resumen_fijos_msi_compromiso_mensual()
+    test_resumen_gastos_normales_mes()
     test_exportar_presupuesto_a_fijos_misma_periodicidad()
     test_editar_recurrente_frecuencia_y_campos()
+    test_crear_gasto_fijo_sin_ingreso_fijo_falla()
+    test_gasto_fijo_rechazado_por_depender_de_remanente()
+    test_gasto_previo_a_fecha_de_cobro_sin_remanente_falla()
+    test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso()
+    test_cargos_quincena_no_superan_presupuesto_de_quincena()
+    test_tarjetas_kpi_mes_en_curso_excluyen_eliminados()
+    test_importacion_presupuesto_a_fijos_estricta()
+    test_gasto_respeta_saldo_retenido_en_apartados()
+    test_edicion_ingreso_retroactivo_no_genera_saldo_negativo_futuro()
+    test_normalizacion_fin_de_mes_febrero()
+    test_presupuesto_tarjeta_dia_pago_y_subperiodos()
+    test_exportar_presupuesto_no_duplica_msi_y_respeta_dias()
+    test_exportar_presupuesto_dia_segundo_subperiodo()
     print('OK')
+
 
 

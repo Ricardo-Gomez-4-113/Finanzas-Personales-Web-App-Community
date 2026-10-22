@@ -295,9 +295,9 @@ Las pruebas usan solo la biblioteca estándar (sin pytest) y una base SQLite en 
 
 Este proyecto se distribuye bajo la licencia **GNU General Public License v3.0 (GNU GPLv3)**. Consulta el archivo [`LICENSE`](./LICENSE) para el texto legal completo.
 
-* **Libertad de Uso y Estudio:** Puedes descargar, auditar, instalar y utilizar esta plataforma de forma totalmente libre y gratuita para tu uso personal, familiar o interno.
+* **Libertad de Uso y Estudio (incluyendo fines comerciales e internos):** Puedes descargar, auditar, desplegar y utilizar esta plataforma con total libertad para cualquier propósito personal, familiar, comercial o corporativo interno.
 * **Libertad de Modificación y Contribución:** Eres libre de modificar el código fuente, corregir errores o añadir nuevas funcionalidades, siempre y cuando cualquier redistribución o trabajo derivado se mantenga bajo los mismos términos libres y de código abierto de la licencia GPLv3.
-* **Protección contra Apropiación y Reventa Comercial (Copyleft):** No se autoriza empaquetar, cerrar el código fuente ni comercializar este software como un producto privativo o de reventa cerrada. El código y sus derivados deben permanecer siempre abiertos y accesibles para toda la comunidad.
+* **Copyleft y Código Abierto:** Obligación irrestricta de distribuir cualquier software derivado o redistribuido bajo la misma licencia GNU GPLv3, entregando el código fuente completo accesible para toda la comunidad y prohibiendo cierres privativos.
 
 > **Aviso Legal:** Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
 

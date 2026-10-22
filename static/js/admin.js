@@ -451,7 +451,7 @@ export async function solicitarEliminarMiCuenta() {
         return;
     }
 
-    const confirm1 = confirm("⚠️ ATENCIÓN: ¿Estás seguro de que deseas eliminar permanentemente tu cuenta?\n\nEsta acción es irreversible y eliminará de inmediato:\n• Tu usuario y credenciales de acceso.\n• Todos tus movimientos de caja y categorías.\n• Tus apartados y metas de ahorro.\n• Tu portafolio bursátil y cotizaciones.\n\n¿Deseas continuar?");
+    const confirm1 = confirm("ATENCIÓN: ¿Estás seguro de que deseas eliminar permanentemente tu cuenta?\n\nEsta acción es irreversible y eliminará de inmediato:\n• Tu usuario y credenciales de acceso.\n• Todos tus movimientos de caja y categorías.\n• Tus apartados y metas de ahorro.\n• Tu portafolio bursátil y cotizaciones.\n\n¿Deseas continuar?");
     if (!confirm1) return;
 
     const respuesta = prompt("Para confirmar la eliminación definitiva de tu cuenta y todos tus datos, escribe ELIMINAR:");

@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=7.1">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=7.1">
-    <link rel="stylesheet" href="/static/css/layout.css?v=7.1">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=7.1">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261022_18">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261022_18">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261022_18">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261022_18">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -363,7 +363,7 @@
                     <h3>Gastos del Mes</h3>
                     <p id="lbl-dash-mes-gastos">$0.00</p>
                 </div>
-                <div class="card balance">
+                <div class="card card-rendimiento">
                     <h3>Rendimiento Inversiones</h3>
                     <p id="lbl-dash-pnl">$0.00</p>
                 </div>
@@ -430,7 +430,7 @@
                     <p id="lbl-rec-gastos-normales">$0.00</p>
                     <small class="card-subtext">Variables del día a día</small>
                 </div>
-                <div class="card gastos">
+                <div class="card card-fijos-msi">
                     <h3>Gastos Fijos + MSI Mensual</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
                     <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
@@ -666,20 +666,7 @@
                             <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             <span>Exportar a Movimientos y Fijos</span>
                         </button>
-                        <button type="button" id="btn-importar-fijos-pres" class="btn-secondary" title="Sincronizar nómina y gastos fijos desde la pestaña Fijos y MSI" onclick="abrirModalImportarFijos()">
-                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                            <span>Importar de Fijos y MSI</span>
-                        </button>
                     </div>
-                </div>
-
-                <!-- Alerta contextual cuando hay datos en Fijos y MSI -->
-                <div id="pres-fijos-alert" class="pres-fijos-banner hidden">
-                    <div class="pres-fijos-banner-info">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        <span id="pres-fijos-alert-text">Detectamos ingresos o gastos fijos en tu cuenta.</span>
-                    </div>
-                    <button type="button" class="btn-sm btn-primary" onclick="abrirModalImportarFijos()">Sincronizar ahora</button>
                 </div>
 
                 <!-- Tarjeta de Configuración de Ingreso Base y Frecuencia -->
@@ -709,7 +696,7 @@
                                         <option value="ninguna">Sin división (Periodo completo)</option>
                                         <option value="quincenas">2 Quincenas</option>
                                         <option value="semanas">4 Semanas</option>
-                                        <option value="personalizada">Personalizada ⚙️</option>
+                                        <option value="personalizada">Personalizada</option>
                                     </select>
                                     <button type="button" id="btn-custom-subdivision" class="btn-subdiv-gear hidden" title="Ajustar porcentajes de sub-periodos" onclick="abrirModalSubdivisionPersonalizada()">
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -844,7 +831,7 @@
         <section id="tab-inversiones" class="tab-content">
             <div class="panel inversiones-section">
                 <div class="inversiones-header">
-                    <div>
+                    <div class="inversiones-header-title-wrap">
                         <h2 class="panel-heading s-margin-0">
                             <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                             <span>Portafolio de Inversiones (ETFs & Acciones)</span>
@@ -861,15 +848,15 @@
                 </div>
 
                 <div class="cards cards-inversiones">
-                    <div class="card inv-card">
+                    <div class="card inv-card inv-card-capital">
                         <h3>Capital Invertido (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-invertido">$0.00</p>
                     </div>
-                    <div class="card inv-card">
+                    <div class="card inv-card inv-card-mercado">
                         <h3>Valor de Mercado (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-valor">$0.00</p>
                     </div>
-                    <div class="card inv-card">
+                    <div class="card inv-card inv-card-pnl">
                         <h3>Ganancia / Pérdida (<span class="lbl-moneda-base">MXN</span>)</h3>
                         <p id="lbl-inv-pnl">$0.00 <span id="lbl-inv-pnl-pct" class="pnl-badge">(0.00%)</span></p>
                     </div>
@@ -1644,6 +1631,21 @@
                     <input type="text" id="tarjeta-pres-notas" placeholder="Ej. VOO, QQQ, Renta, Luz..." autocomplete="off">
                 </div>
 
+                <div class="form-group">
+                    <label for="tarjeta-pres-dia">Día de Cargo General (1 al 31, opcional):</label>
+                    <div class="calc-input-adornment" style="max-width: 140px;">
+                        <span class="calc-adornment-prefix">Día</span>
+                        <input type="number" id="tarjeta-pres-dia" min="1" max="31" placeholder="Ej. 14" class="input-calc calc-has-prefix">
+                    </div>
+                    <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-display-block" style="margin-top: 4px;">Día del mes programado para este cargo. Si tienes sub-períodos, puedes asignar un día a cada quincena o semana abajo.</small>
+                </div>
+
+                <div id="tarjeta-pres-subdivision-wrapper" class="form-group hidden" style="margin-top: 10px; padding: 10px; background: var(--surface-subtle); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; display: block;">Asignación y Fechas por Sub-período (Opcional):</label>
+                    <small style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 8px;">Distribuye libremente montos y selecciona en qué fecha o día (1 al 31) se hace cada cargo dentro de esta tarjeta.</small>
+                    <div id="tarjeta-pres-subdivision-items"></div>
+                </div>
+
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalTarjetaPresupuesto()">Cancelar</button>
                     <button type="submit" class="btn-primary">
@@ -1731,68 +1733,6 @@
                 <button type="button" id="btn-confirmar-exportar-pres" class="btn-primary" onclick="ejecutarExportarPresupuesto()">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     <span>Confirmar y Exportar</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ======================================================== -->
-    <!-- MODAL: IMPORTAR DE FIJOS Y MSI A PRESUPUESTO             -->
-    <!-- ======================================================== -->
-    <div id="modal-importar-fijos-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-importar-fijos-title" onclick="if(event.target === this) cerrarModalImportarFijos()">
-        <div class="modal-card modal-subdiv-card">
-            <div class="modal-header">
-                <h3 id="modal-importar-fijos-title" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                    <span>Importar de Fijos y MSI a Presupuesto</span>
-                </h3>
-                <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalImportarFijos()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p class="modal-instruction">Selecciona los cargos periódicos y compras a meses que deseas convertir en tarjetas de presupuesto.</p>
-
-                <!-- Bloque Nómina -->
-                <div id="importar-fijos-ingreso-box" class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
-                        <input type="checkbox" id="chk-importar-ingreso" checked style="width: 16px; height: 16px; cursor: pointer;">
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">Sincronizar Ingreso Fijo Base (Nómina)</div>
-                            <div id="importar-fijos-ingreso-txt" style="font-size: 0.8rem; color: var(--text-muted);">$0.00</div>
-                        </div>
-                    </label>
-                    <span class="pnl-badge badge-success">Ingreso</span>
-                </div>
-
-                <!-- Modo de Importación -->
-                <div style="margin-bottom: 12px;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Modo de Organización</span>
-                    <div class="segmented" style="margin-top: 6px;">
-                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="individual" checked><span>Individual (por cargo)</span></label>
-                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="categoria"><span>Por Categoría</span></label>
-                        <label class="segmented-opt"><input type="radio" name="import-fijos-modo" value="unificado"><span>Unificado</span></label>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Cargos Periódicos Detectados</span>
-                    <button type="button" id="btn-toggle-todos-fijos" class="btn-sm btn-ghost" onclick="toggleSeleccionarTodosFijos()">Deseleccionar todos</button>
-                </div>
-
-                <!-- Lista de Items con Checkbox -->
-                <div id="lista-items-importar-fijos" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-subtle); scrollbar-width: thin;"></div>
-
-                <div style="margin-top: 14px; padding: 10px; background: var(--surface-card); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-main); margin-bottom: 0;">
-                        <input type="checkbox" id="chk-importar-reemplazar" style="width: 15px; height: 15px; cursor: pointer;">
-                        <span>Reemplazar todas las tarjetas de presupuesto actuales por las importadas</span>
-                    </label>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn-secondary" onclick="cerrarModalImportarFijos()">Cancelar</button>
-                <button type="button" id="btn-confirmar-importar-fijos" class="btn-primary" onclick="ejecutarImportarFijos()">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Importar Seleccionados</span>
                 </button>
             </div>
         </div>
@@ -2022,7 +1962,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=7.1"></script>
+    <script type="module" src="/static/js/main.js?v=20261022_18"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
