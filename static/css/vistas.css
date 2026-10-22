@@ -179,9 +179,9 @@
 }
 
 .btn-sync {
-    background-color: var(--surface-subtle);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
+    background-color: var(--primary-subtle);
+    color: var(--primary-color);
+    border: 1px solid rgba(66, 78, 224, 0.25);
     width: auto;
     margin: 0;
     height: 32px;
@@ -201,14 +201,16 @@
 }
 
 .btn-sync:hover {
-    background-color: var(--border-color);
-    color: var(--text-color);
+    background-color: var(--primary-color);
+    color: #ffffff;
+    border-color: var(--primary-color);
     transform: translateY(-1px);
 }
 
 [data-theme="dark"] .btn-sync:hover {
-    background-color: #27272a;
-    color: #ffffff;
+    background-color: #828bf6;
+    border-color: #828bf6;
+    color: #080808;
 }
 
 .cards-inversiones .inv-card {
@@ -370,7 +372,7 @@
     display: inline-block;
 }
 
-/* --- TARJETA HERO: PATRIMONIO NETO CONSOLIDADO (MONOCHROME) --- */
+/* --- TARJETA HERO: PATRIMONIO NETO CONSOLIDADO (GBM FINTECH) --- */
 .hero-networth {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
@@ -383,12 +385,23 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 14px;
+    position: relative;
+    overflow: hidden;
 }
 
 [data-theme="dark"] .hero-networth {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
+    background: linear-gradient(145deg, #1d1d20 0%, #151518 100%);
+    border: 1px solid #32373c;
+}
+
+.hero-networth::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #424ee0 0%, #828bf6 50%, #00b074 100%);
 }
 
 .networth-header {
@@ -401,14 +414,14 @@
     display: block;
     font-size: 0.72rem;
     font-weight: 700;
-    color: var(--text-muted);
-    letter-spacing: 1px;
+    color: var(--gold-color);
+    letter-spacing: 1.2px;
     text-transform: uppercase;
 }
 
 .networth-header h2 {
     margin: 3px 0 0 0;
-    font-size: 1.9rem;
+    font-size: 2rem;
     font-weight: 800;
     color: var(--text-color);
     text-align: left;

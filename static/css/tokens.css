@@ -1,94 +1,120 @@
 /* ==========================================================================
-   tokens.css - Variables de diseño minimalista Blanco y Negro (Monochrome)
+   tokens.css - Paleta Oficial GBM (Grupo Bursátil Mexicano | gbm.com)
    ========================================================================== */
 
 :root {
-    /* Fondo Claro: Blanco Nieve y Zinc Minimalista */
-    --bg-color: #fafafa;
+    /* Fondo Claro: Neutros Oficiales de GBM (gbm.com) */
+    --bg-color: #f4f5f8;
     --panel-bg: #ffffff;
-    --text-color: #09090b;
-    --text-muted: #71717a;
-    --text-main: #09090b;
-    --border-color: #e4e4e7;
-    --th-bg: #f4f4f5;
-    --table-border: #e4e4e7;
-    --surface-subtle: #f4f4f5;
-    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --text-color: #1d1d20;
+    --text-muted: #727272;
+    --text-main: #1d1d20;
+    --border-color: #e0e1e4;
+    --th-bg: #ededef;
+    --table-border: #e0e1e4;
+    --surface-subtle: #ededef;
+    --card-shadow: 0 2px 10px rgba(29, 29, 32, 0.06);
 
-    /* Estructura */
+    /* Estructura Dashboard */
     --sidebar-width: 240px;
     --sidebar-collapsed-width: 68px;
     --topbar-height: 60px;
 
-    /* Primario: Negro Sólido Minimalista */
-    --primary-color: #09090b;
-    --primary-hover: #27272a;
-    --primary-light: #f4f4f5;
-    --primary-subtle: rgba(0, 0, 0, 0.05);
+    /* Primario GBM: Morado / Azul Eléctrico (#424ee0) */
+    --primary-color: #424ee0;
+    --primary-hover: #828bf6;
+    --primary-light: #ced0f8;
+    --primary-subtle: rgba(66, 78, 224, 0.10);
 
-    /* Acentos Neutrales */
-    --neutral-border: #e4e4e7;
-    --neutral-subtle: #f4f4f5;
+    /* Acento de Marca GBM (reemplaza al dorado) */
+    --gold-color: #424ee0;
+    --gold-hover: #353fb8;
+    --gold-subtle: rgba(66, 78, 224, 0.08);
+    --gold-border: rgba(66, 78, 224, 0.28);
 
-    /* Colores Funcionales: Exclusivos para Movimientos y Usuarios */
-    --success-color: #16a34a;
-    --success-subtle: rgba(22, 163, 74, 0.10);
-    --danger-color: #dc2626;
-    --danger-subtle: rgba(220, 38, 38, 0.10);
+    /* Rendimiento de Activos / Flujo Positivo */
+    --accent-color: #424ee0;
+    --accent-hover: #353fb8;
+    --accent-subtle: rgba(66, 78, 224, 0.08);
+
+    /* Éxito / Ingresos / Ganancias (Verde FinTech) */
+    --success-color: #00b074;
+    --success-subtle: rgba(0, 176, 116, 0.10);
+
+    /* Egresos / Pasivos (Rojo GBM #bb4141) */
+    --danger-color: #bb4141;
+    --danger-subtle: rgba(187, 65, 65, 0.10);
     --warning-color: #d97706;
     --warning-subtle: rgba(217, 119, 6, 0.10);
+    --warning-border: rgba(217, 119, 6, 0.30);
 
-    /* Badges de Movimientos y Tarjetas de Presupuesto */
-    --indigo-color: #4f46e5;
-    --indigo-subtle: rgba(79, 70, 229, 0.12);
-    --gold-color: #b48328;
-    --gold-subtle: rgba(180, 131, 40, 0.12);
-    --gold-border: rgba(180, 131, 40, 0.35);
-    --accent-color: #16a34a;
-    --accent-subtle: rgba(22, 163, 74, 0.12);
+    /* Indigo y Cyan */
+    --indigo-color: #424ee0;
+    --indigo-subtle: rgba(66, 78, 224, 0.10);
+    --indigo-border: rgba(66, 78, 224, 0.28);
     --cyan-color: #0891b2;
-    --cyan-subtle: rgba(8, 145, 178, 0.12);
+    --cyan-subtle: rgba(8, 145, 178, 0.10);
+    --cyan-border: rgba(8, 145, 178, 0.28);
+
+    /* Resplandores y Glows */
+    --emerald-glow: rgba(0, 176, 116, 0.12);
+    --rose-glow: rgba(187, 65, 65, 0.12);
+    --gold-glow: rgba(66, 78, 224, 0.12);
+    --primary-glow: rgba(66, 78, 224, 0.25);
 }
 
-/* Modo Oscuro: Negro Puro / Zinc Profundo */
+/* Modo Oscuro: GBM Pro / Trading (#080808 y #1d1d20) */
 [data-theme="dark"] {
-    --bg-color: #09090b;
-    --panel-bg: #121215;
-    --text-color: #fafafa;
-    --text-muted: #a1a1aa;
-    --text-main: #fafafa;
-    --border-color: #27272a;
-    --th-bg: #18181b;
-    --table-border: #27272a;
-    --surface-subtle: #18181b;
-    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --bg-color: #080808;
+    --panel-bg: #1d1d20;
+    --text-color: #ffffff;
+    --text-muted: #8c8c8c;
+    --text-main: #ffffff;
+    --border-color: #32373c;
+    --th-bg: #26262a;
+    --table-border: #32373c;
+    --surface-subtle: #26262a;
+    --card-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
 
-    /* Primario: Blanco Puro Minimalista */
-    --primary-color: #ffffff;
-    --primary-hover: #e4e4e7;
-    --primary-light: rgba(255, 255, 255, 0.1);
-    --primary-subtle: rgba(255, 255, 255, 0.08);
+    /* Primario GBM: Morado / Azul Eléctrico (#424ee0 / #828bf6) */
+    --primary-color: #424ee0;
+    --primary-hover: #828bf6;
+    --primary-light: rgba(66, 78, 224, 0.25);
+    --primary-subtle: rgba(66, 78, 224, 0.15);
 
-    /* Acentos Neutrales */
-    --neutral-border: #27272a;
-    --neutral-subtle: rgba(255, 255, 255, 0.05);
+    /* Acento de Marca GBM (reemplaza al dorado) */
+    --gold-color: #828bf6;
+    --gold-hover: #9fa6f9;
+    --gold-subtle: rgba(66, 78, 224, 0.16);
+    --gold-border: rgba(130, 139, 246, 0.35);
 
-    /* Colores Funcionales: Exclusivos para Movimientos y Usuarios */
-    --success-color: #22c55e;
-    --success-subtle: rgba(34, 197, 94, 0.14);
+    /* Rendimiento de Activos / Flujo Positivo */
+    --accent-color: #828bf6;
+    --accent-hover: #9fa6f9;
+    --accent-subtle: rgba(130, 139, 246, 0.16);
+
+    /* Éxito / Ingresos / Ganancias (Verde FinTech) */
+    --success-color: #10b981;
+    --success-subtle: rgba(16, 185, 129, 0.16);
+
+    /* Egresos / Pasivos (Rojo GBM #ef4444) */
     --danger-color: #ef4444;
-    --danger-subtle: rgba(239, 68, 68, 0.14);
+    --danger-subtle: rgba(239, 68, 68, 0.16);
     --warning-color: #f59e0b;
-    --warning-subtle: rgba(245, 158, 11, 0.14);
+    --warning-subtle: rgba(245, 158, 11, 0.16);
+    --warning-border: rgba(245, 158, 11, 0.35);
 
-    /* Badges de Movimientos y Tarjetas de Presupuesto */
-    --indigo-color: #818cf8;
-    --indigo-subtle: rgba(129, 140, 248, 0.18);
-    --gold-color: #fbbf24;
-    --gold-subtle: rgba(251, 191, 36, 0.18);
-    --gold-border: rgba(251, 191, 36, 0.35);
-    --accent-color: #22c55e;
-    --accent-subtle: rgba(34, 197, 94, 0.14);
+    /* Indigo y Cyan */
+    --indigo-color: #828bf6;
+    --indigo-subtle: rgba(130, 139, 246, 0.18);
+    --indigo-border: rgba(130, 139, 246, 0.35);
     --cyan-color: #38bdf8;
     --cyan-subtle: rgba(56, 189, 248, 0.18);
+    --cyan-border: rgba(56, 189, 248, 0.35);
+
+    /* Resplandores y Glows */
+    --emerald-glow: rgba(16, 185, 129, 0.18);
+    --rose-glow: rgba(239, 68, 68, 0.18);
+    --gold-glow: rgba(66, 78, 224, 0.22);
+    --primary-glow: rgba(130, 139, 246, 0.35);
 }
