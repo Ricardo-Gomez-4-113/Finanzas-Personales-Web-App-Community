@@ -10,8 +10,8 @@ export function actualizarGrafica(dataMensual) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#f0f0f0' : '#0d172a';
-    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.12)' : 'rgba(13, 23, 42, 0.08)';
+    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
+    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
     
     const meses = dataMensual.map(m => m.mes);
     const ingresos = dataMensual.map(m => m.ingresos);
@@ -44,7 +44,7 @@ export function actualizarGrafica(dataMensual) {
                     {
                         label: 'Ingresos',
                         data: ingresos,
-                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.75)',
                         borderColor: colorVar('--accent-color'),
                         borderWidth: 1,
                         borderRadius: 6
@@ -52,7 +52,7 @@ export function actualizarGrafica(dataMensual) {
                     {
                         label: 'Gastos',
                         data: gastos,
-                        backgroundColor: 'rgba(244, 63, 94, 0.75)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.75)',
                         borderColor: colorVar('--danger-color'),
                         borderWidth: 1,
                         borderRadius: 6
@@ -78,7 +78,7 @@ export function actualizarGrafica(dataMensual) {
 // 5.3 GASTO POR CATEGORÍA (dona) Y PRÓXIMOS MOVIMIENTOS
 // =============================================================================
 
-const PALETA_CATEGORIAS = ['#c5a059', '#1e3a8a', '#0d9488', '#d97706', '#475569', '#4338ca', '#7c3aed', '#be123c', '#0284c7', '#84cc16'];
+const PALETA_CATEGORIAS = ['#22c55e', '#a3e635', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#64748b', '#10b981', '#14b8a6'];
 
 export function actualizarGraficaCategorias(data) {
     const canvas = document.getElementById('graficaCategorias');
@@ -100,19 +100,29 @@ export function actualizarGraficaCategorias(data) {
     const labels = cats.map(c => c.categoria);
     const valores = cats.map(c => c.total);
     const colores = labels.map((_, i) => PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]);
-    const textColor = document.documentElement.getAttribute('data-theme') === 'dark' ? '#f0f0f0' : '#0d172a';
+    const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
 
     if (estado.graficas.categorias) {
         estado.graficas.categorias.data.labels = labels;
         estado.graficas.categorias.data.datasets[0].data = valores;
         estado.graficas.categorias.data.datasets[0].backgroundColor = colores;
+        estado.graficas.categorias.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
         estado.graficas.categorias.options.plugins.legend.labels.color = textColor;
         estado.graficas.categorias.update();
         return;
     }
     estado.graficas.categorias = new Chart(canvas.getContext('2d'), {
         type: 'doughnut',
-        data: { labels, datasets: [{ data: valores, backgroundColor: colores, borderWidth: 1 }] },
+        data: {
+            labels,
+            datasets: [{
+                data: valores,
+                backgroundColor: colores,
+                borderWidth: 1,
+                borderColor: esOscuro ? '#0D0D0E' : '#ffffff'
+            }]
+        },
         options: {
             responsive: true,
             cutout: '62%',

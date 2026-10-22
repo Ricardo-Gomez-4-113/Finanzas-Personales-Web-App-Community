@@ -1,11 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-    <rect width="32" height="32" rx="9" fill="#080c14" stroke="#c5a059" stroke-width="1.2"/>
-    <path d="M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z" fill="url(#gold-grad)"/>
-    <circle cx="16" cy="14" r="2.2" fill="#10b981"/>
-    <defs>
-        <linearGradient id="gold-grad" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#dfba73"/>
-            <stop offset="1" stop-color="#c5a059"/>
-        </linearGradient>
-    </defs>
+    <rect width="32" height="32" rx="9" fill="#000000" stroke="#242427" stroke-width="1.2"/>
+    <path d="M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z" fill="#FFFFFF"/>
+    <circle cx="16" cy="14" r="2.2" fill="#22C55E"/>
 </svg>

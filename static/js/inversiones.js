@@ -145,7 +145,7 @@ export function actualizarGraficaDona(posiciones) {
 
     const noDataMsg = document.getElementById('dona-sin-datos');
     const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#f0f0f0' : '#222222';
+    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
 
     if (!posiciones || posiciones.length === 0) {
         if (noDataMsg) noDataMsg.classList.remove('hidden');
@@ -161,18 +161,16 @@ export function actualizarGraficaDona(posiciones) {
     canvas.classList.remove('hidden');
 
     const paleta = [
-        '#c5a059', // Champagne Gold / Commodities & Metals
-        '#1e3a8a', // Deep Sovereign Navy / Equities
-        '#0d9488', // Sovereign Emerald / Cash & Liquidity
-        '#d97706', // Warm Amber / Real Estate
-        '#475569', // Slate Platinum / Fixed Income
-        '#4338ca', // Royal Indigo / Tech Growth
-        '#7c3aed', // Deep Violet / Alternatives & PE
-        '#be123c', // Burgundy / Growth Assets
-        '#0284c7', // Sky Azure / International Markets
-        '#84cc16', // Sage / Sustainable ESG
-        '#b45309', // Burnished Bronze / Infrastructure
-        '#64748b'  // Treasury Steel
+        '#22c55e', // Alpine Emerald / High-Yield & Liquidity
+        '#a3e635', // Alpine Lime / Core Growth
+        '#06b6d4', // Cyan / Sovereign & Global Markets
+        '#3b82f6', // Sapphire / Equities & ETFs
+        '#8b5cf6', // Violet / Tech & Innovation
+        '#f59e0b', // Amber / Real Estate & Commodities
+        '#ec4899', // Rose / Venture & Growth
+        '#64748b', // Slate / Fixed Income & Treasury
+        '#14b8a6', // Teal / Sustainable ESG
+        '#d97706'  // Bronze / Infrastructure
     ];
 
     const labels = posiciones.map(p => p.ticker);
@@ -193,7 +191,7 @@ export function actualizarGraficaDona(posiciones) {
         }, 0);
 
         const modoOscuroActivo = document.documentElement.getAttribute('data-theme') === 'dark';
-        const colorEtiqueta = modoOscuroActivo ? '#f0f0f0' : '#0d172a';
+        const colorEtiqueta = modoOscuroActivo ? '#FFFFFF' : '#0A0A0A';
 
         return data.labels.map((label, i) => {
             const val = Number(dataset.data[i] || 0);
@@ -203,7 +201,7 @@ export function actualizarGraficaDona(posiciones) {
             return {
                 text: `${label} (${pct}%)`,
                 fillStyle: bg,
-                strokeStyle: dataset.borderColor || (modoOscuroActivo ? '#0f1624' : '#ffffff'),
+                strokeStyle: dataset.borderColor || (modoOscuroActivo ? '#0D0D0E' : '#ffffff'),
                 lineWidth: 1,
                 hidden: isHidden,
                 index: i,
@@ -216,7 +214,7 @@ export function actualizarGraficaDona(posiciones) {
         estado.graficas.dona.data.labels = labels;
         estado.graficas.dona.data.datasets[0].data = dataValores;
         estado.graficas.dona.data.datasets[0].backgroundColor = colores;
-        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0f1624' : '#ffffff';
+        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
         estado.graficas.dona.options.plugins.legend.position = legendPos;
         estado.graficas.dona.options.plugins.legend.labels.color = textColor;
         estado.graficas.dona.options.plugins.legend.labels.generateLabels = funcionGenerarEtiquetas;

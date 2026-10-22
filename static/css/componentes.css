@@ -473,7 +473,7 @@ form > button[type="submit"]:active,
 
 [data-theme="dark"] .btn-editar:hover {
     background-color: var(--gold-color);
-    color: #080c14;
+    color: #000000;
 }
 
 .btn-eliminar {
