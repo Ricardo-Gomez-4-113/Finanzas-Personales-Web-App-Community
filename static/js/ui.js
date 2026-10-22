@@ -41,19 +41,19 @@ export function toggleModoOscuro() {
         actualizarIconosModoOscuro(false);
     }
     if (window.Chart) {
-        Chart.defaults.color = nuevoTemaOscuro ? '#f8fafc' : '#0d172a';
+        Chart.defaults.color = nuevoTemaOscuro ? '#FFFFFF' : '#0A0A0A';
     }
     if (estado.graficas.barras) actualizarColoresGrafica();
     if (estado.graficas.dona) actualizarColoresDona();
 }
 
 
-// Inicialización de tema guardado
+// Inicialización de tema guardado (por defecto oscuro estilo GBM)
 export const temaGuardado = localStorage.getItem('theme');
 
-const prefiereOscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+const prefiereOscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
 
-export const inicialOscuro = temaGuardado ? temaGuardado === 'dark' : prefiereOscuro;
+export const inicialOscuro = temaGuardado ? temaGuardado === 'dark' : true;
 
 if (inicialOscuro) {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -64,15 +64,15 @@ if (inicialOscuro) {
 }
 
 if (window.Chart) {
-    Chart.defaults.color = inicialOscuro ? '#f8fafc' : '#0d172a';
+    Chart.defaults.color = inicialOscuro ? '#FFFFFF' : '#0A0A0A';
 }
 
 
 export function actualizarColoresGrafica() {
     if (!estado.graficas.barras) return;
     const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#f8fafc' : '#0d172a';
-    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
+    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
+    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
 
     if (window.Chart) Chart.defaults.color = textColor;
     if (estado.graficas.barras.options && estado.graficas.barras.options.scales) {
@@ -95,13 +95,13 @@ export function actualizarColoresGrafica() {
 export function actualizarColoresDona() {
     if (!estado.graficas.dona) return;
     const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#f8fafc' : '#0d172a';
+    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
     if (window.Chart) Chart.defaults.color = textColor;
     if (estado.graficas.dona.options && estado.graficas.dona.options.plugins && estado.graficas.dona.options.plugins.legend) {
         estado.graficas.dona.options.plugins.legend.labels.color = textColor;
     }
     if (estado.graficas.dona.data && estado.graficas.dona.data.datasets && estado.graficas.dona.data.datasets[0]) {
-        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0f1624' : '#ffffff';
+        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#171717' : '#ffffff';
     }
     estado.graficas.dona.update();
 }

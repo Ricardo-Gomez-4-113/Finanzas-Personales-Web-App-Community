@@ -9,14 +9,14 @@
     - Panel de Administración: Tarjetas KPI, tabla de gestión de usuarios con estado relativo y modal de alta de tenants.
     - Modales emergentes para edición in situ de movimientos, inversiones y creación de usuarios.
 -->
-<html lang="es-MX">
+<html lang="es-MX" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Finanzas Cloud | Gestión Patrimonial y Finanzas Personales (Community Edition)</title>
     <meta name="description" content="Plataforma autoalojada de finanzas personales y gestión patrimonial (MXN/USD) con aislamiento físico de bases de datos SQLite por usuario.">
     <meta name="author" content="RGM Labs">
-    <meta name="theme-color" content="#080808">
+    <meta name="theme-color" content="#0A0A0A">
     <!-- Favicon SVG Finanzas Cloud Sovereign Wealth -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23080c14' stroke='%23c5a059' stroke-width='1.5'/><path d='M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z' fill='%23dfba73'/><circle cx='16' cy='14' r='2.2' fill='%2310b981'/></svg>">
     <link rel="alternate icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -25,10 +25,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261022_gbm">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261022_gbm">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261022_gbm">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261022_gbm">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261022_gbm2">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261022_gbm2">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261022_gbm2">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261022_gbm2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -352,6 +352,26 @@
                     <div class="alloc-bar alloc-bar-apartados s-width-50" id="alloc-bar-apartados"></div>
                     <div class="alloc-bar alloc-bar-inversiones s-width-50" id="alloc-bar-inversiones"></div>
                 </div>
+            </div>
+
+            <!-- Barra de Acciones Rápidas (Organización de Portafolio GBM+) -->
+            <div class="gbm-quick-actions" aria-label="Acciones rápidas de portafolio y patrimonio">
+                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-movimientos')" title="Registrar un nuevo movimiento de caja">
+                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Registrar Operación</span>
+                </button>
+                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-inversiones')" title="Gestionar activos bursátiles e instrumentos">
+                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Portafolio Bursátil</span>
+                </button>
+                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-presupuesto')" title="Planificar gastos fijos y quincenas">
+                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Presupuesto & Metas</span>
+                </button>
+                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-calculadora-rf')" title="Simular rendimientos de Renta Fija (Smart Cash)">
+                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                    <span>Calculadora Smart Cash</span>
+                </button>
             </div>
 
             <div class="cards">
@@ -1962,7 +1982,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261022_gbm"></script>
+    <script type="module" src="/static/js/main.js?v=20261022_gbm2"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
