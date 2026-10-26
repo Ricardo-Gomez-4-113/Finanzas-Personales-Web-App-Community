@@ -33,10 +33,12 @@ if 'fastapi' not in sys.modules:
             HTTP_401_UNAUTHORIZED = 401
             HTTP_403_FORBIDDEN = 403
         def Depends(f): return f
+        def Query(default=None, *a, **kw): return default
 
         fastapi.HTTPException = HTTPException
         fastapi.APIRouter = APIRouter
         fastapi.Depends = Depends
+        fastapi.Query = Query
         fastapi.Request = Request
         fastapi.status = status
 
@@ -887,20 +889,17 @@ def test_edicion_ingreso_retroactivo_no_genera_saldo_negativo_futuro():
     except Exception as e:
         assert getattr(e, "status_code", None) == 400
 
-    try:
-        eliminar_transaccion(id_ap_mov, conn)
-        assert False, "Debió fallar eliminar apartado con 400"
-    except Exception as e:
-        assert getattr(e, "status_code", None) == 400
-
     # Actualizar únicamente descripción del apartado no provoca falso 422 ni doble deducción
     res_desc = actualizar_transaccion(id_ap_mov, TransaccionUpdate(descripcion='Apartado corregido'), conn)
     assert res_desc["mensaje"] == "Transacción actualizada con éxito"
 
+    # Eliminación permitida de movimiento vinculado a apartado: descuenta de apartados.monto_actual
+    eliminar_transaccion(id_ap_mov, conn)
+    assert cursor.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 0.0
+    assert cursor.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_ap_mov,)).fetchone()[0] == 0
+
     # 9. Al eliminar el gasto respaldado y vaciar apartado, el ingreso puede eliminarse limpiamente
     eliminar_transaccion(id_gasto, conn)
-    cursor.execute("UPDATE apartados SET monto_actual = 0 WHERE id = 1")
-    conn.commit()
     eliminar_transaccion(id_ingreso, conn)
     assert cursor.execute("SELECT COUNT(*) FROM transacciones WHERE id IN (?, ?)", (id_ingreso, id_gasto)).fetchone()[0] == 0
 
@@ -1030,6 +1029,139 @@ def test_exportar_presupuesto_dia_segundo_subperiodo():
     assert nu_rec["dia"] == 15, f"Esperado día 15, obtenido {nu_rec['dia']}"
 
 
+def test_eliminacion_transacciones_individual_y_lote():
+    from routers.movimientos import (
+        eliminar_transaccion,
+        eliminar_transacciones_lote,
+        EliminarLoteRequest,
+    )
+
+    conn = nueva_bd()
+    cur = conn.cursor()
+
+    # 1. Movimiento ligado a meta / apartado (ahorro / gasto)
+    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 1000.0)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 300.0, 'gasto', 1)")
+    id_t1 = cur.lastrowid
+    conn.commit()
+
+    eliminar_transaccion(id_t1, conn)
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 700.0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t1,)).fetchone()[0] == 0
+
+    # 2. Movimiento ligado a meta / apartado (retiro / ingreso)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 200.0, 'ingreso', 1)")
+    id_t2 = cur.lastrowid
+    conn.commit()
+
+    eliminar_transaccion(id_t2, conn)
+    # Reincorpora el retiro: 700 + 200 = 900
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 900.0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t2,)).fetchone()[0] == 0
+
+    # 3. Movimiento ligado a recurrente / MSI terminado
+    cur.execute("""
+        INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
+        VALUES (1, 'Compra TV', 'gasto', 1000.0, 'mensual', 15, '2026-11-15', 3, 3, 0)
+    """)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-03', 1000.0, 'gasto', 1)")
+    id_t3 = cur.lastrowid
+    conn.commit()
+
+    eliminar_transaccion(id_t3, conn)
+    rec = cur.execute("SELECT cuotas_generadas, activo FROM recurrentes WHERE id = 1").fetchone()
+    assert rec["cuotas_generadas"] == 2
+    assert rec["activo"] == 1, "Debió reactivarse el recurrente al decrementar sus cuotas"
+
+    # 4. Parámetro forzar=True en ingreso con gastos posteriores
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-04', 5000.0, 'ingreso')")
+    id_ingreso = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 4000.0, 'gasto')")
+    id_gasto = cur.lastrowid
+    conn.commit()
+
+    # Sin forzar falla con HTTP 422
+    try:
+        eliminar_transaccion(id_ingreso, conn, forzar=False)
+        assert False, "Debió fallar con 422"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422
+
+    # Con forzar=True se elimina
+    res_f = eliminar_transaccion(id_ingreso, conn, forzar=True)
+    assert res_f["mensaje"] == "Transacción eliminada con éxito"
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_ingreso,)).fetchone()[0] == 0
+
+    # 5. Eliminación por lote (POST /api/transacciones/eliminar-lote)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-06', 100.0, 'gasto', 1)")
+    id_batch_1 = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-07', 500.0, 'gasto', 1)")
+    id_batch_2 = cur.lastrowid
+    conn.commit()
+
+    res_lote = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_batch_1, id_batch_2]), conn)
+    assert res_lote["eliminados"] == 2
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id IN (?, ?)", (id_batch_1, id_batch_2)).fetchone()[0] == 0
+    # Apartado descuenta 100: 900 - 100 = 800
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 800.0
+    # Recurrente cuotas decrementa a 1
+    assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 1
+
+    # 6. Validación de déficit en lote (forzar=False vs forzar=True)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-10', 3000.0, 'ingreso')")
+    id_ing2 = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-11', 2500.0, 'gasto')")
+    id_gas2 = cur.lastrowid
+    conn.commit()
+
+    try:
+        eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_ing2], forzar=False), conn)
+        assert False, "Debió fallar lote con 422 por déficit"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422
+
+    res_lote_f = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_ing2], forzar=True), conn)
+    assert res_lote_f["eliminados"] == 1
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_ing2,)).fetchone()[0] == 0
+
+    # 7. Vaciado total (todos=True)
+    res_vaciar = eliminar_transacciones_lote(EliminarLoteRequest(todos=True), conn)
+    assert cur.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
+
+    # 8. Comprobar que eliminar en lote no genere falso 422 en fechas históricas anteriores a los ingresos eliminados
+    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (2, 'Auto', 'meta', 200.0)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 50.0, 'gasto')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-02', 10000.0, 'ingreso')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-06-01', 1000.0, 'ingreso')")
+    id_hist_del = cur.lastrowid
+    conn.commit()
+
+    # No debe fallar con 422 falso en 2025-01-01
+    res_no_falso_422 = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_hist_del], forzar=False), conn)
+    assert res_no_falso_422["eliminados"] == 1
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_hist_del,)).fetchone()[0] == 0
+
+    # 9. Eliminación múltiple ligada al mismo apartado y mismo recurrente
+    cur.execute("UPDATE apartados SET monto_actual = 500.0 WHERE id = 1")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-20', 100.0, 'gasto', 1)")
+    id_ap_m1 = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-21', 150.0, 'gasto', 1)")
+    id_ap_m2 = cur.lastrowid
+    cur.execute("UPDATE recurrentes SET cuotas_generadas = 2 WHERE id = 1")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-22', 500.0, 'gasto', 1)")
+    id_rec_m1 = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-23', 500.0, 'gasto', 1)")
+    id_rec_m2 = cur.lastrowid
+    conn.commit()
+
+    res_multi = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_ap_m1, id_ap_m2, id_rec_m1, id_rec_m2]), conn)
+    assert res_multi["eliminados"] == 4
+    # Apartado 1: 500 - 100 - 150 = 250
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 250.0
+    # Recurrente 1: 2 - 2 = 0 cuotas generadas
+    assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 0
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1071,6 +1203,7 @@ if __name__ == '__main__':
     test_presupuesto_tarjeta_dia_pago_y_subperiodos()
     test_exportar_presupuesto_no_duplica_msi_y_respeta_dias()
     test_exportar_presupuesto_dia_segundo_subperiodo()
+    test_eliminacion_transacciones_individual_y_lote()
     print('OK')
 
 

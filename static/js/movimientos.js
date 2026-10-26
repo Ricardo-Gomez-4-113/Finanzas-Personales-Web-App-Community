@@ -140,13 +140,17 @@ export function renderTablaMovimientos() {
         const mensaje = (estado.cache.listaTransacciones || []).length === 0
             ? 'No hay movimientos. Registra tu primer movimiento o agrega tu nómina en Fijos y MSI.'
             : 'Ningún movimiento coincide con los filtros.';
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${mensaje}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${mensaje}</td></tr>`;
+        actualizarSeleccionMovimientos();
         return;
     }
 
     lista.forEach(t => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="chk-mov-item" value="${t.id}" data-id="${t.id}" aria-label="Seleccionar movimiento">
+            </td>
             <td>${escapeHTML(t.fecha)}</td>
             <td>${escapeHTML(t.descripcion || '-')} ${badgesMovimiento(t)}</td>
             <td>${escapeHTML(t.categoria || 'Sin categoría')}</td>
@@ -159,6 +163,7 @@ export function renderTablaMovimientos() {
         `;
         tbody.appendChild(tr);
     });
+    actualizarSeleccionMovimientos();
 }
 
 
@@ -245,18 +250,193 @@ if (formTrans) {
 }
 
 
-export async function eliminarTransaccion(id) {
-    if (!confirm("¿Eliminar este movimiento?")) return;
+export function actualizarSeleccionMovimientos() {
+    const checkboxes = Array.from(document.querySelectorAll('#tabla-movimientos .chk-mov-item'));
+    const seleccionados = checkboxes.filter(cb => cb.checked);
+    const barra = document.getElementById('barra-lote-movimientos');
+    const lbl = document.getElementById('lbl-mov-seleccionados');
+    const chkTodos = document.getElementById('chk-mov-todos');
+
+    if (lbl) {
+        lbl.textContent = `${seleccionados.length} seleccionado${seleccionados.length === 1 ? '' : 's'}`;
+    }
+
+    if (barra) {
+        barra.style.display = seleccionados.length > 0 ? 'flex' : 'none';
+    }
+
+    if (chkTodos) {
+        chkTodos.disabled = checkboxes.length === 0;
+        if (checkboxes.length === 0) {
+            chkTodos.checked = false;
+            chkTodos.indeterminate = false;
+        } else if (seleccionados.length === checkboxes.length) {
+            chkTodos.checked = true;
+            chkTodos.indeterminate = false;
+        } else if (seleccionados.length > 0) {
+            chkTodos.checked = false;
+            chkTodos.indeterminate = true;
+        } else {
+            chkTodos.checked = false;
+            chkTodos.indeterminate = false;
+        }
+    }
+}
+
+export function toggleSeleccionarTodosMovimientos(checked) {
+    const checkboxes = document.querySelectorAll('#tabla-movimientos .chk-mov-item');
+    checkboxes.forEach(cb => { cb.checked = checked; });
+    actualizarSeleccionMovimientos();
+}
+
+export async function eliminarTransaccion(id, forzar = false) {
+    const t = (estado.cache.listaTransacciones || []).find(item => item.id === id);
+    let advertencias = [];
+    if (t) {
+        if (t.apartado_id) {
+            advertencias.push('• Está ligado a una meta de ahorro (su saldo acumulado se ajustará automáticamente).');
+        }
+        if (t.recurrente_id) {
+            advertencias.push('• Corresponde a un cargo o ingreso fijo (se restará 1 cuota generada).');
+        }
+    }
+
+    let pregunta = "¿Eliminar este movimiento?";
+    if (advertencias.length > 0) {
+        pregunta = `⚠️ Advertencia:\n${advertencias.join('\n')}\n\n${pregunta}`;
+    }
+
+    if (!forzar && !confirm(pregunta)) return;
+
     try {
-        const response = await apiFetch(`/api/transacciones/${id}`, { method: 'DELETE' });
+        const url = `/api/transacciones/${id}${forzar ? '?forzar=true' : ''}`;
+        const response = await apiFetch(url, { method: 'DELETE' });
         if (response.ok) {
+            toast("Movimiento eliminado con éxito.", 'success');
             recargar();
+        } else if (response.status === 422) {
+            const err = await response.json().catch(() => ({}));
+            const msg = (formatErrorDetail(err.detail, "Este ingreso respalda gastos posteriores y provocaría saldo negativo.")) +
+                        "\n\n¿Deseas FORZAR la eliminación de este movimiento?";
+            if (confirm(msg)) {
+                await eliminarTransaccion(id, true);
+            }
         } else {
             const err = await response.json().catch(() => ({}));
-            toast(err.detail || "No se pudo eliminar el movimiento.", 'error');
+            toast(formatErrorDetail(err.detail, "No se pudo eliminar el movimiento."), 'error');
         }
     } catch (error) {
         console.error("Error al eliminar:", error);
+        toast("Error de red al intentar eliminar el movimiento.", 'error');
+    }
+}
+
+export async function eliminarMovimientosLote(forzar = false) {
+    const checkboxes = Array.from(document.querySelectorAll('#tabla-movimientos .chk-mov-item:checked'));
+    const ids = checkboxes.map(cb => Number(cb.value)).filter(Boolean);
+    if (ids.length === 0) {
+        toast("No hay movimientos seleccionados.", "info");
+        return;
+    }
+
+    const items = (estado.cache.listaTransacciones || []).filter(t => ids.includes(t.id));
+    const ligadosMeta = items.filter(t => t.apartado_id).length;
+    const ligadosFijo = items.filter(t => t.recurrente_id).length;
+
+    let advertencias = [];
+    if (ligadosMeta > 0) {
+        advertencias.push(`• ${ligadosMeta} movimiento(s) ligado(s) a metas (los saldos se reajustarán).`);
+    }
+    if (ligadosFijo > 0) {
+        advertencias.push(`• ${ligadosFijo} movimiento(s) ligado(s) a fijos o compras a meses (se restarán sus cuotas).`);
+    }
+
+    let pregunta = `¿Deseas eliminar los ${ids.length} movimientos seleccionados?`;
+    if (advertencias.length > 0) {
+        pregunta = `⚠️ Advertencia previa:\n${advertencias.join('\n')}\n\n${pregunta}`;
+    }
+
+    if (!forzar && !confirm(pregunta)) return;
+
+    try {
+        const response = await apiFetch('/api/transacciones/eliminar-lote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids, todos: false, forzar: forzar })
+        });
+
+        if (response.ok) {
+            const res = await response.json().catch(() => ({}));
+            toast(res.mensaje || `Se eliminaron ${ids.length} movimientos.`, 'success');
+            recargar();
+        } else if (response.status === 422) {
+            const err = await response.json().catch(() => ({}));
+            const msg = (formatErrorDetail(err.detail, "La eliminación provocaría un saldo operativo negativo.")) +
+                        "\n\n¿Deseas FORZAR la eliminación de estos movimientos seleccionados?";
+            if (confirm(msg)) {
+                await eliminarMovimientosLote(true);
+            }
+        } else {
+            const err = await response.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, "No se pudieron eliminar los movimientos."), 'error');
+        }
+    } catch (error) {
+        console.error("Error al eliminar por lote:", error);
+        toast("Error de red al intentar eliminar movimientos.", 'error');
+    }
+}
+
+export async function vaciarTodosLosMovimientos(forzar = false) {
+    const items = estado.cache.listaTransacciones || [];
+    if (items.length === 0) {
+        toast("No hay movimientos para vaciar.", "info");
+        return;
+    }
+
+    const ligadosMeta = items.filter(t => t.apartado_id).length;
+    const ligadosFijo = items.filter(t => t.recurrente_id).length;
+
+    let advertencias = [];
+    if (ligadosMeta > 0) {
+        advertencias.push(`• ${ligadosMeta} movimiento(s) ligado(s) a metas de ahorro (se revertirá su saldo acumulado).`);
+    }
+    if (ligadosFijo > 0) {
+        advertencias.push(`• ${ligadosFijo} movimiento(s) correspondientes a fijos o MSI (se ajustarán sus cuotas generadas).`);
+    }
+
+    let pregunta = `⚠️ ACCIÓN IRREVERSIBLE: Se eliminarán TODOS los ${items.length} movimientos registrados.`;
+    if (advertencias.length > 0) {
+        pregunta += `\n\n${advertencias.join('\n')}`;
+    }
+    pregunta += "\n\n¿Estás completamente seguro de vaciar todos los movimientos?";
+
+    if (!forzar && !confirm(pregunta)) return;
+
+    try {
+        const response = await apiFetch('/api/transacciones/eliminar-lote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: null, todos: true, forzar: forzar })
+        });
+
+        if (response.ok) {
+            const res = await response.json().catch(() => ({}));
+            toast(res.mensaje || "Todos los movimientos han sido eliminados.", 'success');
+            recargar();
+        } else if (response.status === 422) {
+            const err = await response.json().catch(() => ({}));
+            const msg = (formatErrorDetail(err.detail, "La eliminación provocaría un saldo operativo negativo.")) +
+                        "\n\n¿Deseas FORZAR el vaciado de todas formas?";
+            if (confirm(msg)) {
+                await vaciarTodosLosMovimientos(true);
+            }
+        } else {
+            const err = await response.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, "No se pudieron vaciar los movimientos."), 'error');
+        }
+    } catch (error) {
+        console.error("Error al vaciar movimientos:", error);
+        toast("Error de red al intentar vaciar movimientos.", 'error');
     }
 }
 
@@ -355,6 +535,32 @@ function inicializarMovimientos() {
         el.addEventListener(el.type === 'search' ? 'input' : 'change', renderTablaMovimientos);
         if (el.type === 'search') el.addEventListener('change', renderTablaMovimientos);
     });
+
+    const chkTodos = document.getElementById('chk-mov-todos');
+    if (chkTodos) {
+        chkTodos.addEventListener('change', (e) => {
+            toggleSeleccionarTodosMovimientos(e.target.checked);
+        });
+    }
+
+    const tbody = document.getElementById('tabla-movimientos');
+    if (tbody) {
+        tbody.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('chk-mov-item')) {
+                actualizarSeleccionMovimientos();
+            }
+        });
+    }
+
+    const btnEliminarLote = document.getElementById('btn-eliminar-lote-mov');
+    if (btnEliminarLote) {
+        btnEliminarLote.addEventListener('click', () => eliminarMovimientosLote(false));
+    }
+
+    const btnVaciarTodos = document.getElementById('btn-vaciar-todos-mov');
+    if (btnVaciarTodos) {
+        btnVaciarTodos.addEventListener('click', () => vaciarTodosLosMovimientos(false));
+    }
 }
 
 inicializarMovimientos();
@@ -375,5 +581,9 @@ Object.assign(window, {
     abrirModalEditarTransaccionPorId,
     cerrarModalEditarTransaccion,
     eliminarTransaccion,
-    guardarEdicionTransaccion
+    guardarEdicionTransaccion,
+    actualizarSeleccionMovimientos,
+    toggleSeleccionarTodosMovimientos,
+    eliminarMovimientosLote,
+    vaciarTodosLosMovimientos
 });

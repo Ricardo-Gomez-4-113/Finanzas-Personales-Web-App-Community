@@ -2,8 +2,12 @@
 
 from fastapi import APIRouter
 from fastapi import HTTPException, Depends
+try:
+    from fastapi import Query
+except ImportError:
+    def Query(default=None, *a, **kw): return default
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 import re
 import sqlite3
 
@@ -16,6 +20,7 @@ from finanzas_core import (
     validar_eliminacion_transaccion,
     validar_edicion_transaccion,
     validar_limite_cargos_ventana,
+    obtener_total_apartados,
 )
 from mercado import obtener_tasas_cambio
 from security import (
@@ -23,6 +28,11 @@ from security import (
 )
 
 router = APIRouter()
+
+class EliminarLoteRequest(BaseModel):
+    ids: Optional[List[int]] = None
+    todos: bool = False
+    forzar: bool = False
 
 class Transaccion(BaseModel):
     fecha: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha en formato ISO YYYY-MM-DD")
@@ -86,36 +96,193 @@ def crear_transaccion(t: Transaccion, conn: sqlite3.Connection = Depends(get_ten
     return {"mensaje": "Transacción guardada con éxito"}
 
 @router.delete("/api/transacciones/{id_transaccion}", summary="Eliminar movimiento")
-def eliminar_transaccion(id_transaccion: int, conn: sqlite3.Connection = Depends(get_tenant_db)):
+def eliminar_transaccion(
+    id_transaccion: int,
+    conn: sqlite3.Connection = Depends(get_tenant_db),
+    forzar: bool = Query(False)
+):
+    if isinstance(forzar, sqlite3.Connection):
+        conn = forzar
+        forzar = False
+
     cursor = conn.cursor()
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (id_transaccion,)).fetchone()
     if not trans:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
-    if trans["apartado_id"] is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="No puedes eliminar un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados."
-        )
-
-    if trans["tipo"] == 'ingreso':
+    if trans["tipo"] == 'ingreso' and not forzar:
         try:
             validar_eliminacion_transaccion(cursor, id_transaccion)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
+    # Si está vinculado a un apartado de ahorro / meta
+    if trans["apartado_id"] is not None:
+        ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (trans["apartado_id"],)).fetchone()
+        if ap:
+            monto_actual = float(ap["monto_actual"])
+            monto_trans = float(trans["monto"])
+            if trans["tipo"] == 'gasto':
+                nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
+            elif trans["tipo"] == 'ingreso':
+                nuevo_monto = round(monto_actual + monto_trans, 2)
+            else:
+                nuevo_monto = monto_actual
+            cursor.execute(
+                "UPDATE apartados SET monto_actual = ? WHERE id = ?",
+                (nuevo_monto, trans["apartado_id"])
+            )
+
     # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
     if trans["recurrente_id"] is not None:
         rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (trans["recurrente_id"],)).fetchone()
-        if rec and rec["cuotas_generadas"] > 0:
-            cursor.execute(
-                "UPDATE recurrentes SET cuotas_generadas = MAX(0, cuotas_generadas - 1) WHERE id = ?",
-                (trans["recurrente_id"],)
-            )
+        if rec:
+            cuotas = int(rec["cuotas_generadas"] or 0)
+            nuevas_cuotas = max(0, cuotas - 1)
+            if rec["total_cuotas"] is not None and rec["activo"] == 0:
+                cursor.execute(
+                    "UPDATE recurrentes SET cuotas_generadas = ?, activo = 1 WHERE id = ?",
+                    (nuevas_cuotas, trans["recurrente_id"])
+                )
+            else:
+                cursor.execute(
+                    "UPDATE recurrentes SET cuotas_generadas = ? WHERE id = ?",
+                    (nuevas_cuotas, trans["recurrente_id"])
+                )
 
     cursor.execute("DELETE FROM transacciones WHERE id = ?", (id_transaccion,))
     conn.commit()
     return {"mensaje": "Transacción eliminada con éxito"}
+
+
+@router.post("/api/transacciones/eliminar-lote", summary="Eliminar movimientos por lote o vaciado total")
+def eliminar_transacciones_lote(
+    req: EliminarLoteRequest,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    cursor = conn.cursor()
+    if req.todos:
+        transacciones = cursor.execute("SELECT * FROM transacciones").fetchall()
+    elif req.ids:
+        if not req.ids:
+            return {"mensaje": "No se especificaron movimientos para eliminar", "eliminados": 0}
+        placeholders = ",".join("?" for _ in req.ids)
+        transacciones = cursor.execute(
+            f"SELECT * FROM transacciones WHERE id IN ({placeholders})",
+            tuple(req.ids)
+        ).fetchall()
+    else:
+        return {"mensaje": "No se especificaron movimientos para eliminar", "eliminados": 0}
+
+    if not transacciones:
+        return {"mensaje": "No se encontraron movimientos para eliminar", "eliminados": 0}
+
+    # Validación de déficit si no es forzado y no es vaciado total
+    ingresos_externos = [t for t in transacciones if t["tipo"] == 'ingreso' and t["apartado_id"] is None]
+    if not req.forzar and not req.todos and ingresos_externos:
+        ids_set = tuple(t["id"] for t in transacciones)
+        placeholders_sim = ",".join("?" for _ in ids_set)
+        t_min = min(t["fecha"] for t in ingresos_externos)
+        cursor.execute("SAVEPOINT sim_lote")
+        try:
+            for t in transacciones:
+                if t["apartado_id"] is not None:
+                    ap = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
+                    if ap:
+                        m_act = float(ap["monto_actual"])
+                        m_t = float(t["monto"])
+                        nuevo_m = max(0.0, round(m_act - m_t, 2)) if t["tipo"] == 'gasto' else round(m_act + m_t, 2)
+                        cursor.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (nuevo_m, t["apartado_id"]))
+            cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
+            
+            tot_ap = obtener_total_apartados(cursor)
+
+            row_prev = cursor.execute("""
+                SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+                FROM transacciones
+                WHERE fecha < ? AND apartado_id IS NULL
+            """, (t_min,)).fetchone()
+            saldo_corriente = float(row_prev[0]) - tot_ap
+
+            filas_saldo = cursor.execute("""
+                SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+                FROM transacciones
+                WHERE fecha >= ? AND apartado_id IS NULL
+                GROUP BY fecha
+                ORDER BY fecha ASC
+            """, (t_min,)).fetchall()
+
+            deltas_por_fecha = {row["fecha"]: float(row["delta"]) for row in filas_saldo}
+            if t_min not in deltas_por_fecha:
+                deltas_por_fecha[t_min] = 0.0
+
+            deficit_encontrado = None
+            fecha_deficit = None
+            for f in sorted(deltas_por_fecha.keys()):
+                saldo_corriente += deltas_por_fecha[f]
+                if saldo_corriente < -0.001:
+                    deficit_encontrado = abs(saldo_corriente)
+                    fecha_deficit = f
+                    break
+        finally:
+            cursor.execute("ROLLBACK TO sim_lote")
+            cursor.execute("RELEASE sim_lote")
+            
+        if deficit_encontrado is not None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"No es posible eliminar los movimientos seleccionados: provocaría un saldo negativo de "
+                    f"-${deficit_encontrado:,.2f} en fecha {fecha_deficit}. Puedes forzar la eliminación si deseas continuar."
+                )
+            )
+
+    # Procesar ajustes en una transacción SQL atómica
+    for t in transacciones:
+        if t["apartado_id"] is not None:
+            ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
+            if ap:
+                monto_actual = float(ap["monto_actual"])
+                monto_trans = float(t["monto"])
+                if t["tipo"] == 'gasto':
+                    nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
+                elif t["tipo"] == 'ingreso':
+                    nuevo_monto = round(monto_actual + monto_trans, 2)
+                else:
+                    nuevo_monto = monto_actual
+                cursor.execute(
+                    "UPDATE apartados SET monto_actual = ? WHERE id = ?",
+                    (nuevo_monto, t["apartado_id"])
+                )
+
+        if t["recurrente_id"] is not None:
+            rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (t["recurrente_id"],)).fetchone()
+            if rec:
+                cuotas = int(rec["cuotas_generadas"] or 0)
+                nuevas_cuotas = max(0, cuotas - 1)
+                if rec["total_cuotas"] is not None and rec["activo"] == 0:
+                    cursor.execute(
+                        "UPDATE recurrentes SET cuotas_generadas = ?, activo = 1 WHERE id = ?",
+                        (nuevas_cuotas, t["recurrente_id"])
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE recurrentes SET cuotas_generadas = ? WHERE id = ?",
+                        (nuevas_cuotas, t["recurrente_id"])
+                    )
+
+    if req.todos:
+        cursor.execute("DELETE FROM transacciones")
+    else:
+        ids_del = tuple(t["id"] for t in transacciones)
+        pl = ",".join("?" for _ in ids_del)
+        cursor.execute(f"DELETE FROM transacciones WHERE id IN ({pl})", ids_del)
+
+    conn.commit()
+    return {
+        "mensaje": f"Se eliminaron {len(transacciones)} movimientos con éxito",
+        "eliminados": len(transacciones)
+    }
 
 @router.put("/api/transacciones/{id_transaccion}", summary="Editar movimiento")
 def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqlite3.Connection = Depends(get_tenant_db)):

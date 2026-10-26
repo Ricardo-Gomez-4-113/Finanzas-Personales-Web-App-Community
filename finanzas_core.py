@@ -463,8 +463,9 @@ def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int)
     if trans["tipo"] != 'ingreso':
         return
 
+    # Los movimientos vinculados a apartados son movimientos internos de metas; no bloquean como ingreso externo
     if "apartado_id" in trans.keys() and trans["apartado_id"] is not None:
-        raise ValueError("No puedes eliminar un movimiento vinculado a un apartado de ahorro. Utiliza la sección Metas / Apartados.")
+        return
 
     t_ingreso = trans["fecha"]
     monto_ingreso = float(trans["monto"])

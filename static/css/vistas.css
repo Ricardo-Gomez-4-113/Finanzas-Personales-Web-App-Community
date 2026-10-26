@@ -1654,6 +1654,65 @@
    ========================================================================== */
 .filtros-movimientos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .filtros-movimientos > * { flex: 1 1 150px; min-width: 0; }
+
+/* Barra de acciones en lote de movimientos */
+.barra-lote {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    animation: fadeInLote 0.2s ease-out;
+}
+@keyframes fadeInLote {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.barra-lote-info {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+.barra-lote-acciones {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.btn-danger-solid {
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: var(--danger-color);
+    border: 1px solid var(--danger-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-danger-solid:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+.chk-mov-item, #chk-mov-todos {
+    width: 16px !important;
+    height: 16px !important;
+    padding: 0 !important;
+    margin: 0 auto;
+    display: block;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
 .rec-item {
     border: 1px solid var(--border-color);
     border-radius: 10px;
