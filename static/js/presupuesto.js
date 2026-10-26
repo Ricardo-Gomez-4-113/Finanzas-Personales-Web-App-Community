@@ -379,11 +379,14 @@ function renderGridTarjetas(tarjetas, cfg) {
             miniDesgloseHtml = `
                 <div class="pres-card-subperiodo-breakdown">
                     <div class="pres-card-sub-pills-row">
-                        ${t.subdivision.map(sp => `
-                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%${sp.dia ? ' · Día ' + sp.dia : ''}">
-                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>${sp.dia ? ` · <span class="pres-sub-pill-dia">Día ${sp.dia}</span>` : ''}
+                        ${t.subdivision.map(sp => {
+                            const mostrarDiaSp = sp.monto > 0 && sp.dia;
+                            return `
+                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%${mostrarDiaSp ? ' · Día ' + sp.dia : ''}">
+                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>${mostrarDiaSp ? ` · <span class="pres-sub-pill-dia">Día ${sp.dia}</span>` : ''}
                             </span>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                 </div>
             `;
@@ -392,7 +395,7 @@ function renderGridTarjetas(tarjetas, cfg) {
         let diaBadgeHtml = '';
         if (spActivo) {
             const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
-            const diaActivo = (spItem && spItem.dia) ? spItem.dia : t.dia_pago;
+            const diaActivo = (spItem && spItem.monto > 0 && spItem.dia) ? spItem.dia : ((spItem && spItem.monto > 0) ? t.dia_pago : null);
             if (diaActivo) {
                 diaBadgeHtml = `
                     <span class="pres-card-dia-badge" title="Día de cargo en ${escapeHTML(spActivo.nombre)}: ${diaActivo}">
@@ -407,21 +410,9 @@ function renderGridTarjetas(tarjetas, cfg) {
                 `;
             }
         } else {
-            if (t.dia_pago) {
-                diaBadgeHtml = `
-                    <span class="pres-card-dia-badge" title="Día de cargo mensual programado: ${t.dia_pago}">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                        Día ${t.dia_pago}
-                    </span>
-                `;
-            } else if (t.subdivision && t.subdivision.some(s => s.dia)) {
-                const diasSub = t.subdivision.filter(s => s.dia).map(s => s.dia);
-                const txtDias = diasSub.length > 1 ? `Días ${diasSub.join(', ')}` : `Día ${diasSub[0]}`;
+            const subsConDia = (t.subdivision || []).filter(s => s.monto > 0 && s.dia);
+            if (subsConDia.length > 1) {
+                const diasSub = subsConDia.map(s => s.dia);
                 diaBadgeHtml = `
                     <span class="pres-card-dia-badge" title="Días de cargo por sub-período: ${diasSub.join(', ')}">
                         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -430,9 +421,24 @@ function renderGridTarjetas(tarjetas, cfg) {
                             <line x1="8" y1="2" x2="8" y2="6"/>
                             <line x1="3" y1="10" x2="21" y2="10"/>
                         </svg>
-                        ${txtDias}
+                        Días ${diasSub.join(', ')}
                     </span>
                 `;
+            } else {
+                const diaUnico = subsConDia.length === 1 ? subsConDia[0].dia : t.dia_pago;
+                if (diaUnico) {
+                    diaBadgeHtml = `
+                        <span class="pres-card-dia-badge" title="Día de cargo mensual programado: ${diaUnico}">
+                            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            Día ${diaUnico}
+                        </span>
+                    `;
+                }
             }
         }
 
@@ -925,7 +931,7 @@ export async function guardarTarjetaPresupuesto(e) {
         inputsSub.forEach((inp, idx) => {
             const val = parseFloat(inp.value) || 0;
             const diaInp = document.querySelector(`.input-subperiodo-dia[data-sub-id="${inp.dataset.subId}"]`);
-            const diaVal = diaInp && diaInp.value ? parseInt(diaInp.value, 10) : null;
+            const diaVal = (val > 0 && diaInp && diaInp.value) ? parseInt(diaInp.value, 10) : null;
             if (diaVal !== null) anyCustomDay = true;
 
             const expectedMonto = (subConfig[idx] && monto > 0) ? Math.round(monto * (Number(subConfig[idx].porcentaje || 0) / 100) * 100) / 100 : 0;
@@ -941,6 +947,13 @@ export async function guardarTarjetaPresupuesto(e) {
                 dia: diaVal
             });
         });
+
+        // Si solo hay un sub-período con monto > 0 y el usuario definió Día de Cargo General, sincronizarlo
+        const activos = subItems.filter(s => s.monto > 0);
+        if (activos.length === 1 && dia_pago !== null) {
+            activos[0].dia = dia_pago;
+            anyCustomDay = true;
+        }
 
         if (anyCustomDay || anyCustomMonto) {
             distribucion_subperiodos = subItems;
@@ -1181,8 +1194,19 @@ export function inicializarPresupuesto() {
 
     const inpMonto = document.getElementById('tarjeta-pres-monto');
     const inpPct = document.getElementById('tarjeta-pres-pct');
+    const inpDiaGen = document.getElementById('tarjeta-pres-dia');
     if (inpMonto) inpMonto.addEventListener('input', () => sincronizarInputsModal('monto'));
     if (inpPct) inpPct.addEventListener('input', () => sincronizarInputsModal('pct'));
+    if (inpDiaGen) {
+        inpDiaGen.addEventListener('input', () => {
+            const inputsSub = Array.from(document.querySelectorAll('.input-subperiodo-tarjeta'));
+            const activos = inputsSub.filter(i => (parseFloat(i.value) || 0) > 0);
+            if (activos.length === 1) {
+                const diaInp = document.querySelector(`.input-subperiodo-dia[data-sub-id="${activos[0].dataset.subId}"]`);
+                if (diaInp) diaInp.value = inpDiaGen.value;
+            }
+        });
+    }
 }
 
 export function cerrarBannerFijosPresupuesto() {

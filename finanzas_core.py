@@ -293,6 +293,10 @@ def calcular_distribucion_tarjeta_asimetrica(
         try:
             custom = json.loads(distribucion_custom_json) if isinstance(distribucion_custom_json, str) else [dict(x) for x in distribucion_custom_json]
             if isinstance(custom, list) and len(custom) > 0:
+                if subperiodos_config and len(custom) == len(subperiodos_config):
+                    for idx, sp_cfg in enumerate(subperiodos_config):
+                        custom[idx]["id"] = sp_cfg.get("id", custom[idx].get("id"))
+                        custom[idx]["nombre"] = sp_cfg.get("nombre", custom[idx].get("nombre"))
                 total = float(monto_total)
                 suma_montos = sum(float(sp.get("monto", 0.0)) for sp in custom)
                 if abs(suma_montos - total) > 0.01:
@@ -303,6 +307,9 @@ def calcular_distribucion_tarjeta_asimetrica(
                             ratio = float(sp.get("monto", 0.0)) / suma_montos
                             sp["monto"] = round(total * ratio, 2)
                             sp["porcentaje"] = round(ratio * 100.0, 1)
+                for sp in custom:
+                    if float(sp.get("monto", 0.0) or 0.0) <= 0:
+                        sp["dia"] = None
                 return custom
         except Exception:
             pass

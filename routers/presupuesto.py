@@ -230,13 +230,18 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         WHERE id = 1
     """, (ingreso_nuevo, frecuencia_nueva, dia_pago, sub_tipo, json.dumps(config_list)))
 
-    # Recalcular los montos de las tarjetas según sus porcentajes
-    filas = cursor.execute("SELECT id, porcentaje FROM presupuesto_tarjetas").fetchall()
+    # Preservar el monto exacto de cada tarjeta y actualizar su porcentaje respecto al nuevo ingreso_base
+    filas = cursor.execute("SELECT id, porcentaje, monto FROM presupuesto_tarjetas").fetchall()
     for fila in filas:
         t_id = fila["id"]
-        pct = float(fila["porcentaje"])
-        monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
-        cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (monto_recalc, t_id))
+        monto_actual = float(fila["monto"] or 0.0)
+        pct = float(fila["porcentaje"] or 0.0)
+        if monto_actual > 0:
+            pct_recalc = round((monto_actual / ingreso_nuevo) * 100.0, 2) if ingreso_nuevo > 0 else 0.0
+            cursor.execute("UPDATE presupuesto_tarjetas SET porcentaje = ? WHERE id = ?", (pct_recalc, t_id))
+        else:
+            monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
+            cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (monto_recalc, t_id))
 
     # Sincronizar nómina en recurrentes si existe
     rec_nomina = cursor.execute("""
@@ -340,8 +345,21 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
         porcentaje = 0.0
         monto = 0.0
 
+    # Normalizar distribucion_subperiodos y sincronizar dia_pago si es de un solo sub-período activo
+    dist_list = None
+    if req.distribucion_subperiodos:
+        dist_list = [dict(x) for x in req.distribucion_subperiodos]
+        positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
+        for sp in dist_list:
+            if float(sp.get("monto", 0.0) or 0.0) <= 0:
+                sp["dia"] = None
+        if len(positivos) == 1 and req.dia_pago is not None:
+            positivos[0]["dia"] = req.dia_pago
+        elif len(positivos) == 1 and positivos[0].get("dia") is not None and req.dia_pago is None:
+            req.dia_pago = int(positivos[0]["dia"])
+
     # Determinar orden consecutivo
-    dist_json = json.dumps(req.distribucion_subperiodos) if req.distribucion_subperiodos else None
+    dist_json = json.dumps(dist_list) if dist_list else None
     max_orden = cursor.execute("SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas").fetchone()[0]
     cursor.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos)
@@ -377,11 +395,37 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("notas = ?"); valores.append(req.notas)
     if req.orden is not None:
         campos.append("orden = ?"); valores.append(req.orden)
-    if "dia_pago" in req.model_fields_set:
-        campos.append("dia_pago = ?"); valores.append(req.dia_pago)
+    dia_efectivo = req.dia_pago if "dia_pago" in req.model_fields_set else fila["dia_pago"]
+
     if "distribucion_subperiodos" in req.model_fields_set:
-        dist_json = json.dumps(req.distribucion_subperiodos) if req.distribucion_subperiodos else None
+        dist_list = [dict(x) for x in req.distribucion_subperiodos] if req.distribucion_subperiodos else None
+        if dist_list:
+            positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
+            for sp in dist_list:
+                if float(sp.get("monto", 0.0) or 0.0) <= 0:
+                    sp["dia"] = None
+            if len(positivos) == 1 and "dia_pago" in req.model_fields_set and req.dia_pago is not None:
+                positivos[0]["dia"] = req.dia_pago
+            elif len(positivos) == 1 and positivos[0].get("dia") is not None:
+                dia_efectivo = int(positivos[0]["dia"])
+        dist_json = json.dumps(dist_list) if dist_list else None
         campos.append("distribucion_subperiodos = ?"); valores.append(dist_json)
+    elif "dia_pago" in req.model_fields_set and fila["distribucion_subperiodos"]:
+        try:
+            dist_list = json.loads(fila["distribucion_subperiodos"])
+            if isinstance(dist_list, list):
+                positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
+                for sp in dist_list:
+                    if float(sp.get("monto", 0.0) or 0.0) <= 0:
+                        sp["dia"] = None
+                if len(positivos) == 1 and req.dia_pago is not None:
+                    positivos[0]["dia"] = req.dia_pago
+                    campos.append("distribucion_subperiodos = ?"); valores.append(json.dumps(dist_list))
+        except Exception:
+            pass
+
+    if "dia_pago" in req.model_fields_set or dia_efectivo != fila["dia_pago"]:
+        campos.append("dia_pago = ?"); valores.append(dia_efectivo)
 
     # Si se actualiza monto o porcentaje, priorizar monto explícito y sincronizar el otro campo
     if req.monto is not None:
