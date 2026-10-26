@@ -346,9 +346,17 @@ def test_migracion_v10_dia_pago():
 def test_migracion_v11_dia_pago_config():
     conn = nueva_bd()
     v = conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 11, v
+    assert v >= 11, v
     cols = [col[1] for col in conn.execute("PRAGMA table_info(presupuesto_config)").fetchall()]
     assert "dia_pago" in cols
+
+
+def test_migracion_v12_presupuesto_tarjeta_id():
+    conn = nueva_bd()
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    assert v >= 12, v
+    cols = [col[1] for col in conn.execute("PRAGMA table_info(recurrentes)").fetchall()]
+    assert "presupuesto_tarjeta_id" in cols
 
 
 def test_exportar_presupuesto_con_dia_pago_configurado():
@@ -1057,6 +1065,125 @@ def test_exportar_presupuesto_dia_segundo_subperiodo():
     assert nu_rec["dia"] == 15, f"Esperado día 15, obtenido {nu_rec['dia']}"
 
 
+def test_exportar_tarjeta_dividida_en_subperiodos():
+    from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # Ingreso quincenal de 10000
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    # Tarjeta dividida Transporte: 2000 en Dia 1 y 2000 en Dia 16
+    sub_transporte = [
+        {"id": "q1", "nombre": "Quincena 1", "monto": 2000.0, "porcentaje": 50.0, "dia": 1},
+        {"id": "q2", "nombre": "Quincena 2", "monto": 2000.0, "porcentaje": 50.0, "dia": 16}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
+        VALUES ('Transporte', 'wallet', 'cyan', 40.0, 4000.0, NULL, ?)
+    """, (json.dumps(sub_transporte),))
+    t_id = cur.lastrowid
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 20))
+    assert res["total_procesados"] >= 2
+
+    # Deben crearse dos recurrentes independientes con presupuesto_tarjeta_id
+    recs = cur.execute("SELECT descripcion, tipo, monto, frecuencia, dia, presupuesto_tarjeta_id FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC", (t_id,)).fetchall()
+    assert len(recs) == 2
+    assert recs[0]["descripcion"] == "Transporte (Quincena 1)"
+    assert recs[0]["monto"] == 2000.0
+    assert recs[0]["dia"] == 1
+    assert recs[0]["frecuencia"] == "mensual"
+    assert recs[0]["presupuesto_tarjeta_id"] == t_id
+
+    assert recs[1]["descripcion"] == "Transporte (Quincena 2)"
+    assert recs[1]["monto"] == 2000.0
+    assert recs[1]["dia"] == 16
+    assert recs[1]["frecuencia"] == "mensual"
+    assert recs[1]["presupuesto_tarjeta_id"] == t_id
+
+    # Re-exportar con actualización: no debe duplicar
+    cur.execute("UPDATE presupuesto_tarjetas SET monto = 4200.0 WHERE id = ?", (t_id,))
+    sub_transporte_act = [
+        {"id": "q1", "nombre": "Quincena 1", "monto": 2100.0, "porcentaje": 50.0, "dia": 1},
+        {"id": "q2", "nombre": "Quincena 2", "monto": 2100.0, "porcentaje": 50.0, "dia": 16}
+    ]
+    cur.execute("UPDATE presupuesto_tarjetas SET distribucion_subperiodos = ? WHERE id = ?", (json.dumps(sub_transporte_act), t_id))
+    conn.commit()
+
+    res2 = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 20))
+    recs2 = cur.execute("SELECT descripcion, monto FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC", (t_id,)).fetchall()
+    assert len(recs2) == 2
+    assert recs2[0]["monto"] == 2100.0
+    assert recs2[1]["monto"] == 2100.0
+
+
+def test_exportar_tarjeta_subperiodo_dia_futuro_no_materializa_antes_de_tiempo():
+    from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 20000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    # Tarjeta NU con 5000 el día 30
+    sub_nu = [
+        {"id": "q1", "nombre": "Q1", "monto": 0.0, "porcentaje": 0.0, "dia": None},
+        {"id": "q2", "nombre": "Q2", "monto": 5000.0, "porcentaje": 100.0, "dia": 30}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
+        VALUES ('Tarjeta NU', 'credit-card', 'purple', 25.0, 5000.0, 30, ?)
+    """, (json.dumps(sub_nu),))
+    conn.commit()
+
+    # Exportamos el día 26 de octubre
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 26))
+    rec = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Tarjeta NU'").fetchone()
+    assert rec is not None
+    assert rec["monto"] == 5000.0
+    assert rec["dia"] == 30
+    assert rec["proxima_fecha"] == "2026-10-30"
+
+    # Al ejecutar materializar_recurrentes el día 26, NO debe insertarse en transacciones
+    mat_26 = materializar_recurrentes(conn, date(2026, 10, 26))
+    txs_26 = cur.execute("SELECT * FROM transacciones WHERE recurrente_id = ?", (rec["id"],)).fetchall()
+    assert len(txs_26) == 0
+
+    # Cuando llega el día 30, se materializa exactamente por 5000 (no el mensual completo)
+    mat_30 = materializar_recurrentes(conn, date(2026, 10, 30))
+    txs_30 = cur.execute("SELECT * FROM transacciones WHERE recurrente_id = ?", (rec["id"],)).fetchall()
+    assert len(txs_30) == 1
+    assert txs_30[0]["monto"] == 5000.0
+    assert txs_30[0]["fecha"] == "2026-10-30"
+
+
+def test_edicion_transaccion_no_aumenta_gasto_permite_guardar_aunque_periodo_supere_limite():
+    from routers.movimientos import actualizar_transaccion, TransaccionUpdate
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # Ingreso quincenal de 5000 el día 15
+    cur.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo) VALUES ('Nómina', 'ingreso', 5000.0, 'quincenal', 15, '2026-11-15', 1)")
+    # Gastos en la misma quincena que superan la capacidad (ej. 6000 total)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-16', 4000.0, 'gasto', 'Renta', 1)")
+    id_t1 = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-18', 2000.0, 'gasto', 'Servicios', 1)")
+    id_t2 = cur.lastrowid
+    conn.commit()
+
+    # Editar id_t2 reduciendo el monto de 2000 a 1000 debe permitirse
+    actualizar_transaccion(id_t2, TransaccionUpdate(monto=1000.0), conn=conn)
+    t2_mod = cur.execute("SELECT monto FROM transacciones WHERE id = ?", (id_t2,)).fetchone()
+    assert t2_mod["monto"] == 1000.0
+
+    # Editar fecha y monto individualmente (ej. mover fecha al día 20 con nuevo monto 1500) debe permitirse
+    actualizar_transaccion(id_t2, TransaccionUpdate(fecha="2026-11-20", monto=1500.0), conn=conn)
+    t2_mod2 = cur.execute("SELECT fecha, monto FROM transacciones WHERE id = ?", (id_t2,)).fetchone()
+    assert t2_mod2["fecha"] == "2026-11-20"
+    assert t2_mod2["monto"] == 1500.0
+
+    # Editar descripción de id_t1 manteniendo el monto debe permitirse
+    actualizar_transaccion(id_t1, TransaccionUpdate(descripcion="Renta Depto"), conn=conn)
+    t1_mod = cur.execute("SELECT descripcion FROM transacciones WHERE id = ?", (id_t1,)).fetchone()
+    assert t1_mod["descripcion"] == "Renta Depto"
+
+
 def test_eliminacion_transacciones_individual_y_lote():
     from routers.movimientos import (
         eliminar_transaccion,
@@ -1190,6 +1317,76 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 0
 
 
+def test_listar_transacciones_incluye_metadata_presupuesto():
+    from routers.movimientos import listar_transacciones
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto) VALUES (5, 'Transporte', 'car', 'blue', 10.0, 4000.0)")
+    cur.execute("""
+        INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, presupuesto_tarjeta_id, activo)
+        VALUES (10, 'Transporte (Quincena 1)', 'gasto', 2000.0, 'mensual', 1, '2026-11-01', 5, 1)
+    """)
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, recurrente_id) VALUES ('2026-11-01', 2000.0, 'gasto', 'Transporte (Quincena 1)', 10)")
+    conn.commit()
+
+    txs = listar_transacciones(conn)
+    assert len(txs) == 1
+    t = txs[0]
+    assert t["presupuesto_tarjeta_id"] == 5
+    assert t["tarjeta_nombre"] == "Transporte"
+    assert t["tarjeta_monto_total"] == 4000.0
+
+
+def test_sincronizacion_config_presupuesto_con_recurrentes():
+    from routers.presupuesto import update_config_presupuesto, ConfigPresupuestoUpdate
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES (1, 'Nómina Fija (Presupuesto)', 'ingreso', 10000.0, 'mensual', 15, '2026-11-15', 1)
+    """)
+    conn.commit()
+
+    # Actualizar config de presupuesto a quincenal de 18,751.08
+    req = ConfigPresupuestoUpdate(ingreso_base=18751.08, frecuencia='quincenal', dia_pago=15)
+    update_config_presupuesto(req, conn)
+
+    rec = cur.execute("SELECT monto, frecuencia, dia FROM recurrentes WHERE id = 1").fetchone()
+    assert rec["monto"] == 18751.08
+    assert rec["frecuencia"] == 'quincenal'
+    assert rec["dia"] == 15
+
+
+def test_quincena_cortes_dias_estandar_15_y_fin_de_mes():
+    from finanzas_core import obtener_ventana_corte_fecha
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # Nómina quincenal con día 15
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Nómina', 'ingreso', 18751.08, 'quincenal', 15, '2026-10-15', 1)
+    """)
+    conn.commit()
+
+    # Octubre 26 cae en la quincena 15 al 29
+    v26 = obtener_ventana_corte_fecha(cur, '2026-10-26')
+    assert v26["inicio"] == '2026-10-15'
+    assert v26["fin"] == '2026-10-29'
+    assert v26["ingreso_ventana"] == 18751.08
+
+    # Octubre 30 cae en la quincena 30 de oct al 14 de nov
+    v30 = obtener_ventana_corte_fecha(cur, '2026-10-30')
+    assert v30["inicio"] == '2026-10-30'
+    assert v30["fin"] == '2026-11-14'
+    assert v30["ingreso_ventana"] == 18751.08
+
+    # Noviembre 5 cae en la misma quincena 30 de oct al 14 de nov
+    v5 = obtener_ventana_corte_fecha(cur, '2026-11-05')
+    assert v5["inicio"] == '2026-10-30'
+    assert v5["fin"] == '2026-11-14'
+    assert v5["ingreso_ventana"] == 18751.08
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1233,7 +1430,14 @@ if __name__ == '__main__':
     test_exportar_presupuesto_no_duplica_msi_y_respeta_dias()
     test_exportar_presupuesto_dia_segundo_subperiodo()
     test_exportar_presupuesto_con_dia_pago_configurado()
+    test_migracion_v12_presupuesto_tarjeta_id()
+    test_exportar_tarjeta_dividida_en_subperiodos()
+    test_exportar_tarjeta_subperiodo_dia_futuro_no_materializa_antes_de_tiempo()
+    test_edicion_transaccion_no_aumenta_gasto_permite_guardar_aunque_periodo_supere_limite()
     test_eliminacion_transacciones_individual_y_lote()
+    test_listar_transacciones_incluye_metadata_presupuesto()
+    test_sincronizacion_config_presupuesto_con_recurrentes()
+    test_quincena_cortes_dias_estandar_15_y_fin_de_mes()
     print('OK')
 
 

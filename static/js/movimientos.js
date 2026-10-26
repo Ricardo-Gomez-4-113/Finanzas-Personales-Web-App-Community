@@ -115,6 +115,9 @@ function badgesMovimiento(t) {
             ? `<span class="badge-tag badge-msi">MSI ${m[1]}/${m[2]}</span>`
             : '<span class="badge-tag badge-fijo">Fijo</span>');
     }
+    if (t.tarjeta_nombre) {
+        badges.push(`<span class="badge-tag badge-presupuesto" title="Vinculado al presupuesto: ${escapeHTML(t.tarjeta_nombre)}">Presupuesto: ${escapeHTML(t.tarjeta_nombre)}</span>`);
+    }
     return badges.join(' ');
 }
 
@@ -449,9 +452,13 @@ export async function vaciarTodosLosMovimientos(forzar = false) {
 // Modal de edición
 // =============================================================================
 
-export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion, categoriaId) {
+export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion, categoriaId, itemCompleto = null) {
     const modal = document.getElementById('modal-editar-transaccion');
     if (!modal) return;
+
+    if (!itemCompleto && typeof estado !== 'undefined' && estado.cache) {
+        itemCompleto = (estado.cache.transacciones && estado.cache.transacciones[id]) || (estado.cache.listaTransacciones || []).find(item => item.id === id);
+    }
 
     document.getElementById('modal-edit-trans-id').value = id;
     document.getElementById('modal-edit-trans-fecha').value = fecha || '';
@@ -460,6 +467,47 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
     document.getElementById('modal-edit-trans-desc').value = descripcion || '';
     llenarSelect('modal-edit-trans-categoria', tipo || 'gasto', true);
     if (categoriaId) document.getElementById('modal-edit-trans-categoria').value = String(categoriaId);
+
+    const subInfoEl = document.getElementById('modal-edit-trans-subperiodos-info');
+    if (subInfoEl) {
+        if (itemCompleto && itemCompleto.presupuesto_tarjeta_id) {
+            const hermanos = (estado.cache?.listaTransacciones || []).filter(h => h.presupuesto_tarjeta_id === itemCompleto.presupuesto_tarjeta_id);
+            const totalMostrar = itemCompleto.tarjeta_monto_total || hermanos.reduce((acc, h) => acc + (parseFloat(h.monto) || 0), 0);
+
+            subInfoEl.innerHTML = `
+                <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: #22d3ee; display: inline-flex; align-items: center; gap: 5px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                            Tarjeta de Presupuesto: ${escapeHTML(itemCompleto.tarjeta_nombre || 'Dividida')}
+                        </span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
+                            Total mensual: ${fmt(totalMostrar)}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
+                        Esta tarjeta se compone de cargos independientes por sub-período. Puedes ver las partes juntas, aunque cada una se procesa por separado:
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        ${hermanos.map(h => `
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 4px; font-size: 0.78rem; background: ${h.id === itemCompleto.id ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.03)'}; border: ${h.id === itemCompleto.id ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid transparent'};">
+                                <span style="font-weight: ${h.id === itemCompleto.id ? '600' : '400'}; color: ${h.id === itemCompleto.id ? '#22d3ee' : 'var(--text-main)'};">
+                                    ${escapeHTML(h.descripcion || 'Movimiento')} ${h.id === itemCompleto.id ? '← (editando)' : ''}
+                                </span>
+                                <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
+                                    ${fmt(h.monto)} · ${escapeHTML(h.fecha)}
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            subInfoEl.classList.remove('hidden');
+        } else {
+            subInfoEl.innerHTML = '';
+            subInfoEl.classList.add('hidden');
+        }
+    }
 
     modal.classList.remove('hidden');
     setTimeout(() => {
@@ -473,6 +521,11 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
 
 
 export function cerrarModalEditarTransaccion() {
+    const subInfoEl = document.getElementById('modal-edit-trans-subperiodos-info');
+    if (subInfoEl) {
+        subInfoEl.innerHTML = '';
+        subInfoEl.classList.add('hidden');
+    }
     const modal = document.getElementById('modal-editar-transaccion');
     if (modal) modal.classList.add('hidden');
 }
@@ -575,9 +628,9 @@ inicializarMovimientos();
 // =============================================================================
 
 export function abrirModalEditarTransaccionPorId(id) {
-    const t = estado.cache.transacciones[id];
+    const t = (estado.cache?.transacciones && estado.cache.transacciones[id]) || (estado.cache?.listaTransacciones || []).find(item => item.id === id);
     if (!t) return;
-    abrirModalEditarTransaccion(t.id, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id);
+    abrirModalEditarTransaccion(t.id, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id, t);
 }
 
 Object.assign(window, {

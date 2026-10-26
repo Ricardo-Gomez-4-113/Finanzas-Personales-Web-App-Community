@@ -577,6 +577,13 @@ export function abrirModalExportarPresupuesto() {
         } else {
             contItems.innerHTML = tarjetas.map(t => {
                 const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
+                let subDivididoTxt = '';
+                if (t.distribucion_subperiodos && Array.isArray(t.distribucion_subperiodos)) {
+                    const subsPositivos = t.distribucion_subperiodos.filter(s => (parseFloat(s.monto) || 0) > 0);
+                    if (subsPositivos.length > 1) {
+                        subDivididoTxt = ` · <span style="color: #22d3ee; font-weight: 500;">Dividida en ${subsPositivos.length} cargos</span>`;
+                    }
+                }
                 return `
                     <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
@@ -589,7 +596,7 @@ export function abrirModalExportarPresupuesto() {
                                     ${escapeHTML(t.nombre)}
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted);">
-                                    ${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>
+                                    ${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>${subDivididoTxt}
                                 </div>
                             </div>
                         </label>

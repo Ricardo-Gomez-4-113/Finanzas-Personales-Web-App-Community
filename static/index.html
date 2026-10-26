@@ -42,11 +42,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261026_pres_v5">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261026_pres_v5">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261026_pres_v5">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261026_pres_v5">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261026_pres_v7">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261026_pres_v7">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261026_pres_v7">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261026_pres_v7">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -1491,6 +1490,7 @@
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalEditarTransaccion()">&times;</button>
             </div>
+            <div id="modal-edit-trans-subperiodos-info" class="hidden"></div>
             <form id="form-editar-transaccion" onsubmit="guardarEdicionTransaccion(event)">
                 <input type="hidden" id="modal-edit-trans-id">
 
@@ -1548,6 +1548,7 @@
             </div>
             <form id="form-editar-recurrente" onsubmit="guardarEdicionRecurrente(event)">
                 <input type="hidden" id="modal-edit-rec-id">
+                <div id="modal-edit-rec-subperiodos-info" class="hidden"></div>
 
                 <div class="form-group">
                     <label for="modal-edit-rec-desc">Descripción:</label>
@@ -2204,7 +2205,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261026_pres_v5"></script>
+    <script type="module" src="/static/js/main.js?v=20261026_pres_v7"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 11
+CURRENT_TENANT_SCHEMA_VERSION = 12
 
 
 # =============================================================================
@@ -223,6 +223,7 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
                 monto_total REAL,
                 categoria_id INTEGER DEFAULT 1 REFERENCES categorias(id),
                 apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL,
+                presupuesto_tarjeta_id INTEGER REFERENCES presupuesto_tarjetas(id) ON DELETE SET NULL,
                 activo INTEGER NOT NULL DEFAULT 1,
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -237,6 +238,7 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             pass
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transacciones_rec ON transacciones(recurrente_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transacciones_apa ON transacciones(apartado_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_tarjeta ON recurrentes(presupuesto_tarjeta_id);")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS cuentas_rendimiento (
@@ -391,6 +393,18 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             pass
         cursor.execute("PRAGMA user_version = 11;")
         current_version = 11
+
+    # -------------------------------------------------------------
+    # Versión 12: Enlace de Fijos/MSI con Tarjetas de Presupuesto
+    # -------------------------------------------------------------
+    if current_version < 12 and CURRENT_TENANT_SCHEMA_VERSION >= 12:
+        try:
+            cursor.execute("ALTER TABLE recurrentes ADD COLUMN presupuesto_tarjeta_id INTEGER REFERENCES presupuesto_tarjetas(id) ON DELETE SET NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_tarjeta ON recurrentes(presupuesto_tarjeta_id);")
+        cursor.execute("PRAGMA user_version = 12;")
+        current_version = 12
 
     conn.commit()
 

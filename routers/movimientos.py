@@ -305,10 +305,6 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
         if trans["apartado_id"] is None:
             if trans["tipo"] == 'ingreso' or nuevo_tipo == 'ingreso':
                 validar_edicion_transaccion(cursor, id_transaccion, nueva_fecha, nuevo_monto, nuevo_tipo)
-
-            if nuevo_tipo == 'gasto':
-                validar_saldo_disponible_fecha(cursor, nueva_fecha, nuevo_monto, nuevo_tipo, transaccion_id=id_transaccion)
-                validar_limite_cargos_ventana(cursor, nueva_fecha, nuevo_monto, transaccion_id=id_transaccion)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -350,9 +346,12 @@ def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor.execute(
         """
         SELECT t.id, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id,
-               c.nombre AS categoria, t.recurrente_id, t.apartado_id
+               c.nombre AS categoria, t.recurrente_id, t.apartado_id,
+               r.presupuesto_tarjeta_id, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
         FROM transacciones t
         LEFT JOIN categorias c ON c.id = t.categoria_id
+        LEFT JOIN recurrentes r ON r.id = t.recurrente_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
         ORDER BY t.fecha DESC, t.id DESC
         """
     )

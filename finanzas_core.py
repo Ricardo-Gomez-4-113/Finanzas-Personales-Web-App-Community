@@ -391,6 +391,10 @@ def validar_saldo_disponible_fecha(
             validar_edicion_transaccion(cursor, transaccion_id, fecha, monto, tipo)
         return
 
+    # Si se edita una transacción existente, permitir la actualización para homologar con presupuesto
+    if transaccion_id is not None:
+        return
+
     # Saldo acumulado en cuenta a la fecha solicitada (solo transacciones externas: apartado_id IS NULL)
     query_base = """
         SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0) AS saldo
@@ -577,6 +581,20 @@ def obtener_ventana_corte_fecha(
     """
     f_target = date.fromisoformat(fecha_str)
 
+    # Sincronización automática de nómina de presupuesto si la configuración fue actualizada
+    cfg = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
+    cfg_ingreso = float(cfg["ingreso_base"]) if cfg and "ingreso_base" in cfg.keys() and cfg["ingreso_base"] else 0.0
+    cfg_frecuencia = (cfg["frecuencia"] if cfg and "frecuencia" in cfg.keys() and cfg["frecuencia"] else "mensual")
+    cfg_dia = int(cfg["dia_pago"]) if cfg and "dia_pago" in cfg.keys() and cfg["dia_pago"] is not None else None
+
+    if cfg_ingreso > 0:
+        cursor.execute("""
+            UPDATE recurrentes
+            SET monto = ?, frecuencia = ?
+            WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
+            AND (presupuesto_tarjeta_id IS NOT NULL OR LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%')
+        """, (cfg_ingreso, cfg_frecuencia))
+
     # Obtener ingresos fijos activos para deducir fechas de corte
     ingresos = cursor.execute("""
         SELECT dia, monto, frecuencia FROM recurrentes
@@ -585,18 +603,64 @@ def obtener_ventana_corte_fecha(
     """).fetchall()
 
     if not ingresos:
-        d_inicio = date(f_target.year, f_target.month, 1)
-        max_d = calendar.monthrange(f_target.year, f_target.month)[1]
-        d_fin = date(f_target.year, f_target.month, max_d)
-        ingreso_ventana = 0.0
+        if cfg_ingreso > 0:
+            d_base = cfg_dia if cfg_dia is not None else (15 if cfg_frecuencia == 'quincenal' else 1)
+            if cfg_frecuencia == 'quincenal':
+                if d_base == 15 or d_base >= 28:
+                    dias_corte = {15, 30}
+                elif d_base == 1 or d_base == 16:
+                    dias_corte = {1, 16}
+                else:
+                    dias_corte = {d_base, d_base + 15 if d_base <= 15 else d_base - 15}
+            else:
+                dias_corte = {d_base}
+            dias_ordenados = sorted(list(dias_corte))
+
+            cortes_previos = [d for d in dias_ordenados if _safe_date(f_target.year, f_target.month, d) <= f_target]
+            if cortes_previos:
+                d1_dia = cortes_previos[-1]
+                idx = dias_ordenados.index(d1_dia)
+                d_inicio = _safe_date(f_target.year, f_target.month, d1_dia)
+                if idx + 1 < len(dias_ordenados):
+                    d2_dia = dias_ordenados[idx + 1]
+                    d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+                else:
+                    d2_dia = dias_ordenados[0]
+                    m_next = 1 if f_target.month == 12 else f_target.month + 1
+                    y_next = f_target.year + 1 if f_target.month == 12 else f_target.year
+                    d_next = _safe_date(y_next, m_next, d2_dia)
+                d_fin = d_next - timedelta(days=1)
+            else:
+                d1_dia = dias_ordenados[-1]
+                d2_dia = dias_ordenados[0]
+                m_prev = 12 if f_target.month == 1 else f_target.month - 1
+                y_prev = f_target.year - 1 if f_target.month == 1 else f_target.year
+                d_inicio = _safe_date(y_prev, m_prev, d1_dia)
+                d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+                d_fin = d_next - timedelta(days=1)
+
+            ingreso_ventana = cfg_ingreso if cfg_frecuencia == 'quincenal' else cfg_ingreso / max(1, len(dias_ordenados))
+        else:
+            d_inicio = date(f_target.year, f_target.month, 1)
+            max_d = calendar.monthrange(f_target.year, f_target.month)[1]
+            d_fin = date(f_target.year, f_target.month, max_d)
+            ingreso_ventana = 0.0
     else:
         dias_corte = set()
         for ing in ingresos:
             d = int(ing["dia"]) if ing["dia"] else 1
-            dias_corte.add(d)
             if ing["frecuencia"] == 'quincenal':
-                dia2 = (d + 15) if d <= 15 else (d - 15)
-                dias_corte.add(dia2)
+                if d == 15 or d >= 28:
+                    dias_corte.add(15)
+                    dias_corte.add(30)
+                elif d == 1 or d == 16:
+                    dias_corte.add(1)
+                    dias_corte.add(16)
+                else:
+                    dias_corte.add(d)
+                    dias_corte.add(d + 15 if d <= 15 else d - 15)
+            else:
+                dias_corte.add(d)
 
         dias_ordenados = sorted(list(dias_corte))
 
@@ -633,6 +697,18 @@ def obtener_ventana_corte_fecha(
                 ingreso_ventana += m * 2
             else:
                 ingreso_ventana += m / max(1, len(dias_ordenados))
+
+    # Reconocer ingresos reales registrados en transacciones durante la ventana
+    query_ingresos_reales = """
+        SELECT COALESCE(SUM(monto), 0.0) FROM transacciones
+        WHERE tipo = 'ingreso' AND fecha BETWEEN ? AND ?
+    """
+    params_ing = [d_inicio.isoformat(), d_fin.isoformat()]
+    if transaccion_id is not None:
+        query_ingresos_reales += " AND id != ?"
+        params_ing.append(transaccion_id)
+    ingresos_reales = float(cursor.execute(query_ingresos_reales, tuple(params_ing)).fetchone()[0])
+    ingreso_ventana = max(ingreso_ventana, ingresos_reales)
 
     query_rem = """
         SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
@@ -674,6 +750,10 @@ def validar_limite_cargos_ventana(
     transaccion_id: Optional[int] = None
 ) -> None:
     """Valida que la suma de cargos en la ventana activa no exceda la capacidad asignada."""
+    if transaccion_id is not None:
+        # Permitir edición de transacciones existentes para homologar con la edición individual de presupuesto
+        return
+
     v = obtener_ventana_corte_fecha(cursor, fecha_str, transaccion_id=transaccion_id)
     if v["capacidad_total"] > 0:
         if v["cargos_actuales"] + monto - v["capacidad_total"] > 0.01:
@@ -969,9 +1049,11 @@ def exportar_presupuesto_a_fijos_core(
 ) -> dict:
     """
     Exporta las tarjetas del presupuesto a gastos fijos periódicos (`recurrentes`).
-    Garantiza que pasen con la misma periodicidad definida en el presupuesto (mensual, quincenal, semanal).
+    Garantiza que pasen con la periodicidad adecuada y respetando sub-períodos independientes.
     """
     hoy = fecha_base or ahora_local().date()
+    if cursor.connection and not cursor.connection.row_factory:
+        cursor.connection.row_factory = sqlite3.Row
     cfg = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     frecuencia = (cfg["frecuencia"] if cfg else "mensual")
     ingreso_base = float(cfg["ingreso_base"] if cfg else 0.0)
@@ -986,25 +1068,37 @@ def exportar_presupuesto_a_fijos_core(
     actualizados = 0
     detalles = []
 
+    def _calc_proxima_fecha(dia_n: Optional[int], freq: str, hoy_d: date) -> tuple[int, date]:
+        if dia_n is not None:
+            dia_f = dia_n
+            if freq == 'mensual':
+                max_d = ultimo_dia_mes(hoy_d.year, hoy_d.month)
+                if hoy_d.day <= dia_f:
+                    prox = date(hoy_d.year, hoy_d.month, min(dia_f, max_d))
+                else:
+                    a, m = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
+                    prox = date(a, m, min(dia_f, ultimo_dia_mes(a, m)))
+            elif freq == 'quincenal':
+                dia2 = (dia_f + 15) if dia_f <= 15 else (dia_f - 15)
+                c1, c2 = min(dia_f, dia2), max(dia_f, dia2)
+                if hoy_d.day <= c1:
+                    prox = date(hoy_d.year, hoy_d.month, min(c1, ultimo_dia_mes(hoy_d.year, hoy_d.month)))
+                elif hoy_d.day <= c2:
+                    prox = date(hoy_d.year, hoy_d.month, min(c2, ultimo_dia_mes(hoy_d.year, hoy_d.month)))
+                else:
+                    a, m = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
+                    prox = date(a, m, min(c1, ultimo_dia_mes(a, m)))
+            else:
+                prox = hoy_d
+        else:
+            prox = primera_fecha_quincenal(hoy_d) if freq == 'quincenal' else hoy_d
+            dia_f = prox.day
+        return dia_f, prox
+
     # 1. Exportar Ingreso Base (Nómina) si se solicitó y es > 0
     if incluir_ingreso and ingreso_base > 0:
         cat_ingreso = resolver_categoria_por_nombre(cursor, "Nómina", tipo="ingreso")
-        if dia_pago_ingreso is not None:
-            dia_fijo = dia_pago_ingreso
-            if frecuencia == 'mensual':
-                max_d_mes = ultimo_dia_mes(hoy.year, hoy.month)
-                if hoy.day <= dia_pago_ingreso:
-                    proxima = date(hoy.year, hoy.month, min(dia_pago_ingreso, max_d_mes))
-                else:
-                    anio, mes = (hoy.year + 1, 1) if hoy.month == 12 else (hoy.year, hoy.month + 1)
-                    proxima = date(anio, mes, min(dia_pago_ingreso, ultimo_dia_mes(anio, mes)))
-            elif frecuencia == 'quincenal':
-                proxima = primera_fecha_quincenal(hoy)
-            else:
-                proxima = hoy
-        else:
-            proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
-            dia_fijo = proxima.day
+        dia_fijo, proxima = _calc_proxima_fecha(dia_pago_ingreso, frecuencia, hoy)
 
         existente = cursor.execute(
             "SELECT id FROM recurrentes WHERE tipo = 'ingreso' AND (LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%') LIMIT 1"
@@ -1036,85 +1130,118 @@ def exportar_presupuesto_a_fijos_core(
         filas_tarjetas = cursor.execute(tarjetas_query).fetchall()
 
     for t in filas_tarjetas:
-        monto = float(t["monto"])
-        if monto <= 0:
+        monto_tarjeta = float(t["monto"])
+        if monto_tarjeta <= 0:
             continue
         nombre = t["nombre"].strip()
         cat_id = resolver_categoria_por_nombre(cursor, f"{nombre} {t['notas'] or ''}", tipo="gasto")
-
-        # Buscar apartado vinculado si coincide el nombre con una meta
         ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
         apartado_id = ap["id"] if ap else None
+        tarjeta_id = t["id"]
 
-        # Determinar día y próxima fecha considerando dia_pago o días de sub-períodos
-        dia_asignado = None
-        try:
-            if "dia_pago" in t.keys() and t["dia_pago"] is not None:
-                dia_asignado = int(t["dia_pago"])
-        except Exception:
-            pass
-
-        if dia_asignado is None and "distribucion_subperiodos" in t.keys() and t["distribucion_subperiodos"]:
+        # Parsear distribucion_subperiodos si existe
+        sub_list = None
+        if "distribucion_subperiodos" in t.keys() and t["distribucion_subperiodos"]:
             try:
-                sub_list = json.loads(t["distribucion_subperiodos"]) if isinstance(t["distribucion_subperiodos"], str) else t["distribucion_subperiodos"]
-                if isinstance(sub_list, list):
-                    for sp in sub_list:
-                        if sp.get("dia") is not None:
-                            dia_asignado = int(sp["dia"])
-                            break
+                raw = json.loads(t["distribucion_subperiodos"]) if isinstance(t["distribucion_subperiodos"], str) else t["distribucion_subperiodos"]
+                if isinstance(raw, list):
+                    sub_list = raw
             except Exception:
-                pass
+                sub_list = None
 
-        if dia_asignado is not None:
-            dia_fijo = dia_asignado
-            if frecuencia == 'mensual':
-                max_d_mes = ultimo_dia_mes(hoy.year, hoy.month)
-                if hoy.day <= dia_asignado:
-                    proxima = date(hoy.year, hoy.month, min(dia_asignado, max_d_mes))
-                else:
-                    anio, mes = (hoy.year + 1, 1) if hoy.month == 12 else (hoy.year, hoy.month + 1)
-                    proxima = date(anio, mes, min(dia_asignado, ultimo_dia_mes(anio, mes)))
-            else:
-                proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+        sub_positivos = [sp for sp in (sub_list or []) if float(sp.get("monto", 0.0) or 0.0) > 0]
+
+        if len(sub_positivos) > 1:
+            # Caso A: Tarjeta dividida en múltiples sub-períodos (ej. Transporte con $2,000 en Día 1 y $2,000 en Día 16)
+            items_a_exportar = []
+            for idx_sp, sp in enumerate(sub_positivos):
+                s_monto = round(float(sp["monto"]), 2)
+                s_dia = int(sp["dia"]) if sp.get("dia") is not None else (int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None)
+                if s_dia is None:
+                    if frecuencia == 'quincenal' or (cfg and cfg.get("subdivision_tipo") == 'quincenas'):
+                        s_dia = 1 if idx_sp == 0 else 16
+                    else:
+                        s_dia = idx_sp + 1
+                s_nombre = sp.get("nombre") or f"Sub-{idx_sp + 1}"
+                s_desc = f"{nombre} ({s_nombre})"
+                s_frec = 'mensual'
+                dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
+                items_a_exportar.append({
+                    "descripcion": s_desc,
+                    "monto": s_monto,
+                    "frecuencia": s_frec,
+                    "dia": dia_f,
+                    "proxima": prox_f
+                })
         else:
-            proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
-            dia_fijo = proxima.day
+            # Caso B: Tarjeta única o con un solo sub-período activo (ej. Tarjeta NU en Día 30)
+            if len(sub_positivos) == 1:
+                sp = sub_positivos[0]
+                s_monto = round(float(sp["monto"]), 2)
+                s_dia = int(sp["dia"]) if sp.get("dia") is not None else (int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None)
+            else:
+                s_monto = round(monto_tarjeta, 2)
+                s_dia = int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None
 
-        # Buscar si ya existe un recurrente con esa descripción (normalizando etiquetas como (MSI))
+            s_frec = frecuencia
+            if s_dia is not None and frecuencia in ('mensual', 'quincenal'):
+                s_frec = 'mensual'
+
+            dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
+            items_a_exportar = [{
+                "descripcion": nombre,
+                "monto": s_monto,
+                "frecuencia": s_frec,
+                "dia": dia_f,
+                "proxima": prox_f
+            }]
+
+        # Buscar recurrentes existentes vinculados a esta tarjeta o con descripción coincidente
         nombre_limpio = re.sub(r'\s*\((?:msi|meses sin intereses)\)', '', nombre, flags=re.IGNORECASE).strip()
-        existente = cursor.execute("""
-            SELECT id, total_cuotas FROM recurrentes 
+        recs_existentes = cursor.execute("""
+            SELECT * FROM recurrentes
             WHERE tipo = 'gasto' AND (
-                LOWER(TRIM(descripcion)) = LOWER(?)
+                presupuesto_tarjeta_id = ?
+                OR LOWER(TRIM(descripcion)) = LOWER(?)
                 OR LOWER(TRIM(descripcion)) = LOWER(?)
                 OR LOWER(TRIM(REPLACE(REPLACE(descripcion, ' (MSI)', ''), ' (msi)', ''))) = LOWER(?)
+                OR LOWER(TRIM(descripcion)) LIKE LOWER(?)
             )
-            LIMIT 1
-        """, (nombre, nombre_limpio, nombre_limpio)).fetchone()
+            ORDER BY id ASC
+        """, (tarjeta_id, nombre, nombre_limpio, nombre_limpio, f"{nombre} (%")).fetchall()
 
-        if existente:
-            # Si es una compra a meses activa, preservamos su naturaleza MSI
-            if existente["total_cuotas"] is not None:
-                if actualizar_existentes and dia_asignado is not None:
-                    cursor.execute("UPDATE recurrentes SET dia = ? WHERE id = ?", (dia_fijo, existente["id"]))
-                detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "ignorado_msi"})
-                continue
+        for idx_it, itm in enumerate(items_a_exportar):
+            existente = recs_existentes[idx_it] if idx_it < len(recs_existentes) else None
+            if existente:
+                if existente["total_cuotas"] is not None:
+                    # Preservar compra a meses (MSI)
+                    if actualizar_existentes and itm["dia"] is not None:
+                        cursor.execute("UPDATE recurrentes SET dia = ?, presupuesto_tarjeta_id = ? WHERE id = ?", (itm["dia"], tarjeta_id, existente["id"]))
+                    detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "ignorado_msi"})
+                    continue
 
-            if actualizar_existentes:
+                if actualizar_existentes:
+                    cursor.execute("""
+                        UPDATE recurrentes
+                        SET descripcion = ?, monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?,
+                            categoria_id = ?, apartado_id = COALESCE(?, apartado_id), presupuesto_tarjeta_id = ?, activo = 1
+                        WHERE id = ?
+                    """, (itm["descripcion"], itm["monto"], itm["frecuencia"], itm["dia"], itm["proxima"].isoformat(), cat_id, apartado_id, tarjeta_id, existente["id"]))
+                    actualizados += 1
+                    detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "actualizado"})
+            else:
                 cursor.execute("""
-                    UPDATE recurrentes
-                    SET monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?, categoria_id = ?, apartado_id = COALESCE(?, apartado_id), activo = 1
-                    WHERE id = ?
-                """, (round(monto, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_id, apartado_id, existente["id"]))
-                actualizados += 1
-                detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "actualizado"})
-        else:
-            cursor.execute("""
-                INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo)
-                VALUES (?, 'gasto', ?, ?, ?, ?, ?, ?, 1)
-            """, (nombre, round(monto, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_id, apartado_id))
-            creados += 1
-            detalles.append({"descripcion": nombre, "monto": monto, "frecuencia": frecuencia, "accion": "creado"})
+                    INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
+                    VALUES (?, 'gasto', ?, ?, ?, ?, ?, ?, ?, 1)
+                """, (itm["descripcion"], itm["monto"], itm["frecuencia"], itm["dia"], itm["proxima"].isoformat(), cat_id, apartado_id, tarjeta_id))
+                creados += 1
+                detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "creado"})
+
+        # Si había más recurrentes previos que items a exportar, desactivar sobrantes
+        if len(recs_existentes) > len(items_a_exportar):
+            for sobrante in recs_existentes[len(items_a_exportar):]:
+                if sobrante["total_cuotas"] is None:
+                    cursor.execute("UPDATE recurrentes SET activo = 0 WHERE id = ?", (sobrante["id"],))
 
     return {
         "frecuencia": frecuencia,

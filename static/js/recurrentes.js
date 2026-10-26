@@ -202,10 +202,12 @@ function renderListaFijos(items) {
         card.className = 'rec-item';
         const esIngreso = r.tipo === 'ingreso';
         const badgeMeta = r.apartado_nombre ? `<span class="badge-tag badge-apartado" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); display: inline-flex; align-items: center; gap: 4px;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg> Aporta a: ${escapeHTML(r.apartado_nombre)}</span>` : '';
+        const badgePres = r.presupuesto_tarjeta_id ? `<span class="badge-tag" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); display: inline-flex; align-items: center; gap: 4px;" title="Vinculado al presupuesto: ${escapeHTML(r.tarjeta_nombre || 'Dividido')}"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Presupuesto: ${escapeHTML(r.tarjeta_nombre || 'Dividido')}</span>` : '';
         card.innerHTML = `
             <div class="rec-item-head">
                 <strong>${escapeHTML(r.descripcion)}</strong>
                 <div class="s-display-flex s-align-items-center s-gap-8px">
+                    ${badgePres}
                     ${badgeMeta}
                     <span class="badge-tag ${r.activo ? 'badge-fijo' : ''}">${r.activo ? (esIngreso ? 'Ingreso' : 'Gasto') : 'Pausado'}</span>
                 </div>
@@ -317,10 +319,58 @@ export function abrirModalEditarRecurrente(id) {
         if (selApa) selApa.value = item.apartado_id || '';
     }
 
+    // Información de sub-períodos si está vinculado a una tarjeta de presupuesto dividida
+    const subInfoEl = document.getElementById('modal-edit-rec-subperiodos-info');
+    if (subInfoEl) {
+        if (item.presupuesto_tarjeta_id) {
+            const hermanos = (estado.cache.recurrentes || []).filter(h => h.presupuesto_tarjeta_id === item.presupuesto_tarjeta_id);
+            const totalHermanos = hermanos.reduce((acc, h) => acc + (parseFloat(h.monto) || 0), 0);
+            const totalMostrar = item.tarjeta_monto_total ? item.tarjeta_monto_total : totalHermanos;
+
+            subInfoEl.innerHTML = `
+                <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: #22d3ee; display: inline-flex; align-items: center; gap: 5px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                            Tarjeta de Presupuesto: ${escapeHTML(item.tarjeta_nombre || 'Dividida')}
+                        </span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
+                            Total: ${fmt(totalMostrar)}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
+                        Esta tarjeta se compone de cargos independientes. Puedes ver las partes juntas, aunque cada una se procesa por separado:
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        ${hermanos.map(h => `
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 4px; font-size: 0.78rem; background: ${h.id === item.id ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.03)'}; border: ${h.id === item.id ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid transparent'};">
+                                <span style="font-weight: ${h.id === item.id ? '600' : '400'}; color: ${h.id === item.id ? '#22d3ee' : 'var(--text-main)'};">
+                                    ${escapeHTML(h.descripcion)} ${h.id === item.id ? '← (editando)' : ''}
+                                </span>
+                                <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
+                                    ${fmt(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            subInfoEl.classList.remove('hidden');
+        } else {
+            subInfoEl.innerHTML = '';
+            subInfoEl.classList.add('hidden');
+        }
+    }
+
     document.getElementById('modal-editar-recurrente')?.classList.remove('hidden');
 }
 
 export function cerrarModalEditarRecurrente() {
+    const subInfoEl = document.getElementById('modal-edit-rec-subperiodos-info');
+    if (subInfoEl) {
+        subInfoEl.innerHTML = '';
+        subInfoEl.classList.add('hidden');
+    }
     document.getElementById('modal-editar-recurrente')?.classList.add('hidden');
 }
 

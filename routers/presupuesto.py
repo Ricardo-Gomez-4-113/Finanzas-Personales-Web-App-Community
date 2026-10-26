@@ -238,6 +238,20 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
         cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (monto_recalc, t_id))
 
+    # Sincronizar nómina en recurrentes si existe
+    rec_nomina = cursor.execute("""
+        SELECT id, dia FROM recurrentes
+        WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%')
+        LIMIT 1
+    """).fetchone()
+    if rec_nomina:
+        dia_fijo = dia_pago if dia_pago is not None else rec_nomina["dia"]
+        cursor.execute("""
+            UPDATE recurrentes
+            SET monto = ?, frecuencia = ?, dia = COALESCE(?, dia)
+            WHERE id = ?
+        """, (ingreso_nuevo, frecuencia_nueva, dia_fijo, rec_nomina["id"]))
+
     conn.commit()
     return get_presupuesto(conn)
 

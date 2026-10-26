@@ -32,6 +32,7 @@ class RecurrenteCreate(BaseModel):
     fecha_inicio: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     categoria_id: Optional[int] = None
     apartado_id: Optional[int] = None
+    presupuesto_tarjeta_id: Optional[int] = None
 
 
 class RecurrenteUpdate(BaseModel):
@@ -42,6 +43,7 @@ class RecurrenteUpdate(BaseModel):
     apartado_id: Optional[int] = None
     activo: Optional[bool] = None
     categoria_id: Optional[int] = None
+    presupuesto_tarjeta_id: Optional[int] = None
 
 
 def validar_apartado(cursor, apartado_id: Optional[int]) -> None:
@@ -67,6 +69,9 @@ def _serializar(fila) -> dict:
     d["activo"] = bool(d["activo"])
     d["apartado_id"] = d.get("apartado_id")
     d["apartado_nombre"] = d.get("apartado_nombre")
+    d["presupuesto_tarjeta_id"] = d.get("presupuesto_tarjeta_id")
+    d["tarjeta_nombre"] = d.get("tarjeta_nombre")
+    d["tarjeta_monto_total"] = float(d.get("tarjeta_monto_total", 0.0)) if d.get("tarjeta_monto_total") is not None else None
     return d
 
 
@@ -74,9 +79,10 @@ def _serializar(fila) -> dict:
 def listar_recurrentes(conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     filas = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
         ORDER BY r.activo DESC, r.proxima_fecha ASC, r.id ASC
     """).fetchall()
     return [_serializar(f) for f in filas]
@@ -126,19 +132,20 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
     cursor.execute(
         """
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
-                                 total_cuotas, cuotas_generadas, monto_total, categoria_id, apartado_id, activo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 1)
+                                 total_cuotas, cuotas_generadas, monto_total, categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)
         """,
         (req.descripcion.strip(), tipo, monto, frecuencia, fecha.day, proxima.isoformat(),
-         total_cuotas, monto_total, categoria_id, req.apartado_id)
+         total_cuotas, monto_total, categoria_id, req.apartado_id, req.presupuesto_tarjeta_id)
     )
     nuevo_id = cursor.lastrowid
     conn.commit()
     materializar_recurrentes(conn, ahora_local().date())
     fila = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
         WHERE r.id = ?
     """, (nuevo_id,)).fetchone()
     return _serializar(fila)
@@ -259,6 +266,8 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
             campos.append("dia = ?"); valores.append(nueva_vigente.day)
     if req.categoria_id is not None:
         campos.append("categoria_id = ?"); valores.append(req.categoria_id)
+    if "presupuesto_tarjeta_id" in req.model_fields_set:
+        campos.append("presupuesto_tarjeta_id = ?"); valores.append(req.presupuesto_tarjeta_id)
 
     if campos:
         valores.append(recurrente_id)
@@ -267,9 +276,10 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
         materializar_recurrentes(conn, ahora_local().date())
 
     fila = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
         WHERE r.id = ?
     """, (recurrente_id,)).fetchone()
     return _serializar(fila)
