@@ -1049,14 +1049,14 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 700.0
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t1,)).fetchone()[0] == 0
 
-    # 2. Movimiento ligado a meta / apartado (retiro / ingreso)
+    # 2. Movimiento ligado a meta / apartado (retiro / ingreso): si se elimina el retiro, NO vuelve a la meta
     cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 200.0, 'ingreso', 1)")
     id_t2 = cur.lastrowid
     conn.commit()
 
     eliminar_transaccion(id_t2, conn)
-    # Reincorpora el retiro: 700 + 200 = 900
-    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 900.0
+    # El retiro se borra, pero el dinero no regresa a la meta: se mantiene en 700.0
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 700.0
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t2,)).fetchone()[0] == 0
 
     # 3. Movimiento ligado a recurrente / MSI terminado
@@ -1102,8 +1102,8 @@ def test_eliminacion_transacciones_individual_y_lote():
     res_lote = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_batch_1, id_batch_2]), conn)
     assert res_lote["eliminados"] == 2
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id IN (?, ?)", (id_batch_1, id_batch_2)).fetchone()[0] == 0
-    # Apartado descuenta 100: 900 - 100 = 800
-    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 800.0
+    # Apartado descuenta 100: 700 - 100 = 600
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 600.0
     # Recurrente cuotas decrementa a 1
     assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 1
 

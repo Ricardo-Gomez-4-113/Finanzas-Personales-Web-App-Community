@@ -117,17 +117,14 @@ def eliminar_transaccion(
             raise HTTPException(status_code=422, detail=str(e))
 
     # Si está vinculado a un apartado de ahorro / meta
-    if trans["apartado_id"] is not None:
+    # Si es gasto (depósito/ahorro): se descuenta de la meta.
+    # Si es ingreso (retiro de ahorro): NO se reincorpora a la meta (el dinero sacado no vuelve a la meta).
+    if trans["apartado_id"] is not None and trans["tipo"] == 'gasto':
         ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (trans["apartado_id"],)).fetchone()
         if ap:
             monto_actual = float(ap["monto_actual"])
             monto_trans = float(trans["monto"])
-            if trans["tipo"] == 'gasto':
-                nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
-            elif trans["tipo"] == 'ingreso':
-                nuevo_monto = round(monto_actual + monto_trans, 2)
-            else:
-                nuevo_monto = monto_actual
+            nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
             cursor.execute(
                 "UPDATE apartados SET monto_actual = ? WHERE id = ?",
                 (nuevo_monto, trans["apartado_id"])
@@ -186,12 +183,12 @@ def eliminar_transacciones_lote(
         cursor.execute("SAVEPOINT sim_lote")
         try:
             for t in transacciones:
-                if t["apartado_id"] is not None:
+                if t["apartado_id"] is not None and t["tipo"] == 'gasto':
                     ap = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
                     if ap:
                         m_act = float(ap["monto_actual"])
                         m_t = float(t["monto"])
-                        nuevo_m = max(0.0, round(m_act - m_t, 2)) if t["tipo"] == 'gasto' else round(m_act + m_t, 2)
+                        nuevo_m = max(0.0, round(m_act - m_t, 2))
                         cursor.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (nuevo_m, t["apartado_id"]))
             cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
             
@@ -239,17 +236,12 @@ def eliminar_transacciones_lote(
 
     # Procesar ajustes en una transacción SQL atómica
     for t in transacciones:
-        if t["apartado_id"] is not None:
+        if t["apartado_id"] is not None and t["tipo"] == 'gasto':
             ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
             if ap:
                 monto_actual = float(ap["monto_actual"])
                 monto_trans = float(t["monto"])
-                if t["tipo"] == 'gasto':
-                    nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
-                elif t["tipo"] == 'ingreso':
-                    nuevo_monto = round(monto_actual + monto_trans, 2)
-                else:
-                    nuevo_monto = monto_actual
+                nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
                 cursor.execute(
                     "UPDATE apartados SET monto_actual = ? WHERE id = ?",
                     (nuevo_monto, t["apartado_id"])

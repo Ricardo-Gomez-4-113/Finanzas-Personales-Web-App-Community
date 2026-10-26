@@ -294,7 +294,11 @@ export async function eliminarTransaccion(id, forzar = false) {
     let advertencias = [];
     if (t) {
         if (t.apartado_id) {
-            advertencias.push('• Está ligado a una meta de ahorro (su saldo acumulado se ajustará automáticamente).');
+            if (t.tipo === 'gasto') {
+                advertencias.push('• Está ligado a una meta de ahorro (su saldo acumulado se descontará).');
+            } else {
+                advertencias.push('• Corresponde a un retiro de meta de ahorro (el monto no volverá a la meta).');
+            }
         }
         if (t.recurrente_id) {
             advertencias.push('• Corresponde a un cargo o ingreso fijo (se restará 1 cuota generada).');
