@@ -88,8 +88,10 @@ function renderizarVistaPresupuesto(data) {
     // 1. Inputs de configuración de ingreso base y sub-división
     const inpIngreso = document.getElementById('pres-ingreso-base');
     const selFrecuencia = document.getElementById('pres-frecuencia');
+    const inpDia = document.getElementById('pres-ingreso-dia');
     if (inpIngreso && document.activeElement !== inpIngreso) inpIngreso.value = cfg.ingreso_base || '';
     if (selFrecuencia && document.activeElement !== selFrecuencia) selFrecuencia.value = cfg.frecuencia || 'mensual';
+    if (inpDia && document.activeElement !== inpDia) inpDia.value = (cfg.dia_pago !== undefined && cfg.dia_pago !== null) ? cfg.dia_pago : '';
 
     actualizarOpcionesSubdivisionSelect(cfg.frecuencia || 'mensual', cfg.subdivision_tipo || 'ninguna');
 
@@ -490,11 +492,13 @@ export async function guardarConfigPresupuesto(e) {
     const inp = document.getElementById('pres-ingreso-base');
     const selFrec = document.getElementById('pres-frecuencia');
     const selSub = document.getElementById('pres-subdivision-tipo');
+    const inpDia = document.getElementById('pres-ingreso-dia');
     if (!inp || !selFrec) return;
 
     const ingreso_base = parseFloat(inp.value) || 0;
     const frecuencia = selFrec.value;
     const subdivision_tipo = selSub ? selSub.value : 'ninguna';
+    const dia_pago = (inpDia && inpDia.value) ? parseInt(inpDia.value, 10) : null;
 
     // Si seleccionó personalizada pero aún no tiene periodos, abrir el modal
     if (subdivision_tipo === 'personalizada' && (!cachePresupuesto?.config?.subdivision_config?.length || cachePresupuesto.config.subdivision_tipo !== 'personalizada')) {
@@ -506,7 +510,7 @@ export async function guardarConfigPresupuesto(e) {
         const res = await apiFetch('/api/presupuesto/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingreso_base, frecuencia, subdivision_tipo })
+            body: JSON.stringify({ ingreso_base, frecuencia, subdivision_tipo, dia_pago })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -736,9 +740,9 @@ function renderSubperiodosInputsTarjeta(tarjeta) {
                     <input type="number" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix input-subperiodo-tarjeta"
                         data-sub-id="${escapeHTML(sp.id)}" data-sub-nombre="${escapeHTML(sp.nombre)}" value="${valAsignado !== '' ? valAsignado : ''}">
                 </div>
-                <div class="calc-input-adornment" style="max-width: 85px;" title="Día de cargo mensual para este sub-período (1-31)">
+                <div class="calc-input-adornment" style="max-width: 96px;" title="Día de cargo mensual para este sub-período (1-31)">
                     <span class="calc-adornment-prefix">Día</span>
-                    <input type="number" min="1" max="31" placeholder="--" class="input-calc calc-has-prefix input-subperiodo-dia"
+                    <input type="number" min="1" max="31" placeholder="--" class="input-calc calc-has-prefix-dia input-subperiodo-dia"
                         data-sub-id="${escapeHTML(sp.id)}" value="${valDia !== '' ? valDia : ''}">
                 </div>
             </div>
@@ -1042,7 +1046,7 @@ function renderFilasEditorSubperiodos() {
         row.className = 'subperiodo-editor-row';
         row.innerHTML = `
             <input type="text" class="subperiodo-editor-input-name" value="${escapeHTML(sp.nombre)}" placeholder="Nombre del periodo" data-idx="${idx}">
-            <div class="calc-input-adornment" style="width: 100px;">
+            <div class="calc-input-adornment" style="width: 105px;">
                 <input type="number" min="0" max="100" step="any" class="subperiodo-editor-input-pct" value="${sp.porcentaje}" data-idx="${idx}">
                 <span class="calc-adornment-suffix">%</span>
             </div>

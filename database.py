@@ -27,7 +27,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 10
+CURRENT_TENANT_SCHEMA_VERSION = 11
 
 
 # =============================================================================
@@ -281,14 +281,15 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 ingreso_base REAL NOT NULL DEFAULT 0.0,
                 frecuencia TEXT NOT NULL CHECK(frecuencia IN ('semanal','quincenal','mensual')) DEFAULT 'mensual',
+                dia_pago INTEGER DEFAULT NULL,
                 subdivision_tipo TEXT NOT NULL DEFAULT 'ninguna',
                 subdivision_config TEXT NOT NULL DEFAULT '[]',
                 actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         cursor.execute("""
-            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, subdivision_tipo, subdivision_config)
-            VALUES (1, 0.0, 'mensual', 'ninguna', '[]');
+            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, dia_pago, subdivision_tipo, subdivision_config)
+            VALUES (1, 0.0, 'mensual', NULL, 'ninguna', '[]');
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS presupuesto_tarjetas (
@@ -379,6 +380,17 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             pass
         cursor.execute("PRAGMA user_version = 10;")
         current_version = 10
+
+    # -------------------------------------------------------------
+    # Versión 11: Día de cobro en configuración de ingreso fijo base
+    # -------------------------------------------------------------
+    if current_version < 11 and CURRENT_TENANT_SCHEMA_VERSION >= 11:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN dia_pago INTEGER DEFAULT NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("PRAGMA user_version = 11;")
+        current_version = 11
 
     conn.commit()
 

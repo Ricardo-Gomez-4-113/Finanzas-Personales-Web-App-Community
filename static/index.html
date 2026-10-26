@@ -13,10 +13,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Finanzas Cloud | Gestión Patrimonial y Finanzas Personales (Community Edition)</title>
-    <meta name="description" content="Plataforma autoalojada de finanzas personales y gestión patrimonial (MXN/USD) con aislamiento físico de bases de datos SQLite por usuario.">
+    <title>Finanzas Cloud | Software de Finanzas Personales, Inversiones y Gestión Patrimonial (MXN/USD)</title>
+    <meta name="description" content="Software privado de finanzas personales y gestión patrimonial en México. Controla ingresos, gastos, metas de ahorro por sobres y portafolios bursátiles MXN/USD en tiempo real con bases SQLite físicamente aisladas.">
+    <meta name="keywords" content="finanzas personales, gestión patrimonial, software financiero México, control de gastos, presupuesto por sobres, portafolio de inversiones, seguimiento de acciones y ETFs, finanzas cloud, SQLite multi-tenant, patrimonio neto MXN USD, RGM Labs">
     <meta name="author" content="RGM Labs">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="theme-color" content="#000000">
+    <link rel="canonical" href="https://finanzas.rgmlabs.org/">
+
+    <!-- Open Graph / Facebook / WhatsApp / LinkedIn -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Finanzas Cloud">
+    <meta property="og:locale" content="es_MX">
+    <meta property="og:url" content="https://finanzas.rgmlabs.org/">
+    <meta property="og:title" content="Finanzas Cloud | Gestión Patrimonial y Finanzas Personales Soberanas">
+    <meta property="og:description" content="Consolida tu patrimonio neto en tiempo real, domina tus presupuestos por sobres y supervisa portafolios bursátiles (MXN/USD) con bases de datos SQLite físicamente aisladas.">
+    <meta property="og:image" content="https://finanzas.rgmlabs.org/static/favicon.svg">
+
+    <!-- Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Finanzas Cloud | Software de Gestión Patrimonial e Inversiones (MXN/USD)">
+    <meta name="twitter:description" content="El estándar institucional para tu patrimonio personal. Control de caja, sobres de ahorro y cotizaciones bursátiles en vivo con aislamiento físico SQLite.">
+
     <!-- Favicon SVG Finanzas Cloud Sovereign Wealth -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23000000' stroke='%23242427' stroke-width='1.5'/><path d='M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z' fill='%23ffffff'/><circle cx='16' cy='14' r='2.2' fill='%2322c55e'/></svg>">
     <link rel="alternate icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -25,11 +43,138 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Hojas de estilo y biblioteca de gráficos Chart.js -->
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261026_mov_lote_v2">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261026_mov_lote_v2">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261026_mov_lote_v2">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261026_mov_lote_v2">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261026_pres_v5">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261026_pres_v5">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261026_pres_v5">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261026_pres_v5">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+
+    <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://finanzas.rgmlabs.org/#organization",
+          "name": "Finanzas Cloud · RGM Labs",
+          "url": "https://finanzas.rgmlabs.org/",
+          "logo": "https://finanzas.rgmlabs.org/static/favicon.svg",
+          "description": "Proyecto independiente desarrollado por RGM Labs especializado en software de gestión patrimonial soberana y finanzas personales con aislamiento físico de datos."
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://finanzas.rgmlabs.org/#software",
+          "name": "Finanzas Cloud",
+          "applicationCategory": "FinanceApplication",
+          "applicationSubCategory": "Personal Finance & Wealth Management",
+          "operatingSystem": "Web, Linux, Docker",
+          "url": "https://finanzas.rgmlabs.org/",
+          "inLanguage": "es-MX",
+          "author": {
+            "@id": "https://finanzas.rgmlabs.org/#organization"
+          },
+          "description": "Plataforma privada de inteligencia patrimonial para consolidar riqueza neta, flujo de caja, presupuestos por sobres y portafolios bursátiles bimoneda (MXN/USD) con bases de datos SQLite físicamente aisladas por usuario.",
+          "featureList": [
+            "Tablero de Patrimonio Neto 360° en MXN y USD",
+            "Presupuestos inteligentes por quincenas y semanas con sincronización automática",
+            "Control y amortización de compras a Meses Sin Intereses (MSI)",
+            "Seguimiento de portafolio bursátil en tiempo real vía Yahoo Finance",
+            "Análisis de rendimientos en Cetes y Renta Fija con retención de ISR",
+            "Metas y sobres de ahorro con capital blindado",
+            "Arquitectura Multi-Tenant con aislamiento físico SQLite WAL por usuario",
+            "Exportación de auditorías en Excel (.xlsx) y respaldos calientes (.db)"
+          ],
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Edición Community (Self-Hosted Open Source)",
+              "price": "0",
+              "priceCurrency": "MXN",
+              "availability": "https://schema.org/InStock",
+              "url": "https://github.com/Ricardo-Gomez-4-113/Finanzas-Personales-Web-App-Community"
+            },
+            {
+              "@type": "Offer",
+              "name": "Plan Finanzas Cloud Gestionado",
+              "price": "50",
+              "priceCurrency": "MXN",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "50.00",
+                "priceCurrency": "MXN",
+                "unitText": "MONTH"
+              },
+              "availability": "https://schema.org/InStock",
+              "url": "https://finanzas.rgmlabs.org/"
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://finanzas.rgmlabs.org/#faqpage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "¿Por qué cobran $50 MXN/mes si el código es gratis en GitHub?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "El software es 100% libre bajo licencia GNU GPLv3: puedes descargar el código completo e instalarlo en tu propio servidor sin costo. Los $50 MXN al mes del plan Finanzas Cloud cubren exclusivamente la infraestructura en la nube 24/7, certificados SSL, servicio de correo transaccional OTP ya configurado, respaldos automáticos y soporte técnico prioritario."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Qué es Finanzas Cloud y en qué se distingue de una app bancaria convencional?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Finanzas Cloud es un centro de comando financiero privado que consolida cuentas de liquidez, apartados de ahorro y portafolios de inversión bursátil en un solo lugar. A diferencia de las apps comerciales, no vende créditos, no incluye rastreadores publicitarios y opera con bases de datos físicamente aisladas bajo control del usuario."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Mis datos financieros están completamente aislados de otros usuarios?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí, al 100%. Finanzas Cloud implementa una arquitectura multi-tenant física donde cada cuenta posee su propio archivo SQLite independiente en modo WAL. Tus transacciones, metas e inversiones nunca se mezclan en tablas compartidas."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿De dónde provienen las cotizaciones bursátiles y el tipo de cambio?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "La plataforma consulta en tiempo real los mercados financieros internacionales mediante Yahoo Finance para actualizar precios de acciones y ETFs, además de sincronizar automáticamente el tipo de cambio interbancario USD/MXN."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Puedo descargar y respaldar mi información en cualquier momento?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí. Puedes descargar una copia íntegra en caliente de tu archivo SQLite (.db) con un clic, así como exportar reportes ejecutivos en formato Excel (.xlsx) sin bloqueo de proveedor."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Cómo gestiona Finanzas Cloud los Meses Sin Intereses (MSI) y gastos fijos?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Finanzas Cloud incorpora un motor especializado para México que registra cada plan a Meses Sin Intereses, calcula cuotas pagadas vs pendientes, monitorea fechas de corte y amortiza automáticamente el capital reduciendo el pasivo en tiempo real de tu patrimonio neto."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿La plataforma realiza cálculos fiscales de retención de ISR para inversiones?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí. La calculadora de Renta Fija aplica la tasa oficial federal de retención de ISR vigente sobre el capital para CETES Directo, Bonos y SOFIPOs (Nu, Finsus, Klar), mostrando la ganancia neta real después de impuestos."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
 </head>
 <body>
 
@@ -56,7 +201,7 @@
                         </defs>
                     </svg>
                 </div>
-                <h2>Finanzas <span class="s-color-var-gold-color">Cloud</span></h2>
+                <h2>Finanzas <span style="color: var(--gold-color);">Cloud</span></h2>
                 <p>Monitoreo Patrimonial y Finanzas Personales</p>
             </div>
             <form id="form-login" onsubmit="iniciarSesion(event)">
@@ -68,26 +213,27 @@
                     <label for="login-password">Contraseña</label>
                     <input type="password" id="login-password" placeholder="Tu contraseña" required autocomplete="current-password">
                 </div>
-                <div class="login-options-row s-display-flex s-justify-content-flex-end s-margin-top-6px s-margin-bottom-14px">
-                    <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" class="link-forgot-password s-font-size-0-8rem s-color-var-gold-color s-text-decoration-none s-font-weight-500">¿Olvidaste tu contraseña?</a>
+                <div class="login-options-row" style="display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 14px;">
+                    <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" class="link-forgot-password" style="font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500;">¿Olvidaste tu contraseña?</a>
                 </div>
                 <button type="submit" id="btn-login-submit" class="btn-primary btn-block">Ingresar a la Plataforma</button>
-                <div id="login-error" class="login-error-msg hidden"></div>
+                <div id="login-error" class="login-error-msg" style="display: none;"></div>
             </form>
-            <div class="s-text-align-center s-margin-top-20px s-padding-top-16px s-border-top-1px-solid-var-border-color">
-                <p class="s-font-size-0-74rem s-color-var-text-muted s-margin-12px-0-0-0 s-line-height-1-4">
+            <div style="text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <a href="/" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    <span>Volver a la página principal</span>
+                </a>
+                <p style="font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0 0; line-height: 1.4;">
                     Al ingresar aceptas nuestros 
-                    <a href="javascript:void(0)" onclick="abrirModalLegal('terminos')" class="s-color-var-gold-color s-text-decoration-underline">Términos</a> y el 
-                    <a href="javascript:void(0)" onclick="abrirModalLegal('privacidad')" class="s-color-var-gold-color s-text-decoration-underline">Aviso de Privacidad</a>.
+                    <a href="javascript:void(0)" onclick="abrirModalLegal('terminos')" style="color: var(--gold-color); text-decoration: underline;">Términos</a> y el 
+                    <a href="javascript:void(0)" onclick="abrirModalLegal('privacidad')" style="color: var(--gold-color); text-decoration: underline;">Aviso de Privacidad</a>.
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- VISTA 2: APLICACIÓN PRINCIPAL MULTI-TENANT (MODERNO DASHBOARD) -->
-    <!-- ========================================================== -->
-    <div id="vista-app" class="app-layout hidden">
+    <div id="vista-app" class="app-layout hidden" style="display: none;">
         <!-- Fondo oscurecido para versión móvil al abrir el panel lateral -->
         <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="cerrarSidebarMobile()"></div>
 
@@ -715,7 +861,7 @@
                                 <label for="pres-ingreso-base">Ingreso Fijo Base:</label>
                                 <div class="calc-input-adornment">
                                     <span class="calc-adornment-prefix">$</span>
-                                    <input type="number" id="pres-ingreso-base" min="0" step="any" placeholder="Ej. 15,000" class="input-calc calc-has-prefix calc-has-suffix" required>
+                                    <input type="number" id="pres-ingreso-base" min="0" step="any" placeholder="0.00" class="input-calc calc-has-prefix calc-has-suffix" required>
                                     <span class="calc-adornment-suffix">MXN</span>
                                 </div>
                             </div>
@@ -726,6 +872,13 @@
                                     <option value="mensual" selected>Mensual (Cada mes)</option>
                                     <option value="semanal">Semanal (Cada semana)</option>
                                 </select>
+                            </div>
+                            <div class="form-group pres-fg-dia" id="wrap-pres-dia-pago">
+                                <label for="pres-ingreso-dia">Día de Cobro:</label>
+                                <div class="calc-input-adornment">
+                                    <span class="calc-adornment-prefix">Día</span>
+                                    <input type="number" id="pres-ingreso-dia" min="1" max="31" placeholder="15" class="input-calc calc-has-prefix-dia" title="Día del mes de cobro del ingreso fijo (1 a 31)">
+                                </div>
                             </div>
                             <div class="form-group pres-fg-subdiv" id="wrap-pres-subdivision">
                                 <label for="pres-subdivision-tipo">Dividir Presupuesto en:</label>
@@ -1673,7 +1826,7 @@
                     <label for="tarjeta-pres-dia">Día de Cargo General (1 al 31, opcional):</label>
                     <div class="calc-input-adornment" style="max-width: 140px;">
                         <span class="calc-adornment-prefix">Día</span>
-                        <input type="number" id="tarjeta-pres-dia" min="1" max="31" placeholder="Ej. 14" class="input-calc calc-has-prefix">
+                        <input type="number" id="tarjeta-pres-dia" min="1" max="31" placeholder="14" class="input-calc calc-has-prefix-dia">
                     </div>
                     <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-display-block" style="margin-top: 4px;">Día del mes programado para este cargo. Si tienes sub-períodos, puedes asignar un día a cada quincena o semana abajo.</small>
                 </div>
@@ -1852,6 +2005,57 @@
     </div>
 
     <!-- ============================================== -->
+    <!-- MODAL: SOLICITAR ACCESO / FINANZAS CLOUD       -->
+    <!-- ============================================== -->
+    <div id="modal-solicitar-acceso" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-solicitar-acceso-titulo" onclick="if(event.target === this) cerrarModalSolicitarAcceso()">
+        <div class="modal-card modal-access-card" style="max-width: 540px; width: 94%;">
+            <div class="modal-header">
+                <div class="s-display-flex s-align-items-center s-gap-10px">
+                    <div class="kpi-icon-pill gold" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(197, 160, 89, 0.15); color: var(--gold-color);">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                    </div>
+                    <div>
+                        <h3 id="modal-solicitar-acceso-titulo" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-color);">Comenzar con Finanzas <span style="color: var(--gold-color);">Cloud</span></h3>
+                        <div style="font-size: 0.78rem; color: var(--text-muted);">$50 MXN / mes · Servidor dedicado &amp; Bóveda SQLite WAL</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="cerrarModalSolicitarAcceso()" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px 24px; line-height: 1.6;">
+                <div style="background: var(--gold-subtle); border: 1px solid var(--gold-border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--gold-color); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">Tu suscripción institucional incluye:</div>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 0.84rem; color: var(--text-color); display: flex; flex-direction: column; gap: 6px;">
+                        <li>Base de datos SQLite independiente y dedicada físicamente por usuario.</li>
+                        <li>Servicio de correos y códigos de acceso OTP gestionado sin configuraciones externas.</li>
+                        <li>Respaldos continuos en la nube, actualizaciones y cifrado de grado bancario.</li>
+                        <li>Acompañamiento guiado y soporte técnico directo.</li>
+                    </ul>
+                </div>
+                <div style="background: var(--surface-subtle); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px 16px; margin-bottom: 18px; text-align: center;">
+                    <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.12); color: var(--gold-color); margin-bottom: 10px;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <h4 style="margin: 0 0 6px 0; font-size: 1rem; font-weight: 700; color: var(--text-color);">Registro y Altas Próximamente</h4>
+                    <p style="margin: 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
+                        El sistema automatizado de altas para nuevas cuentas de Finanzas Cloud ($50 MXN/mes) estará disponible muy pronto. Actualmente la plataforma opera en fase privada por invitación para garantizar el aislamiento físico y rendimiento óptimo de las bóvedas.
+                    </p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button type="button" class="btn-primary btn-block" onclick="cerrarModalSolicitarAcceso(); if(window.mostrarToast) window.mostrarToast('¡Próximamente disponible! El registro automatizado abrirá pronto.', 'info');" style="text-align: center; padding: 12px; font-weight: 700; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Entendido / Próximamente</span>
+                    </button>
+                </div>
+                <div style="text-align: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-muted);">
+                    ¿Ya cuentas con tu usuario y contraseña asignados?
+                    <a href="javascript:void(0)" onclick="cerrarModalSolicitarAcceso(); mostrarVistaLogin();" style="color: var(--gold-color); font-weight: 600; text-decoration: underline; margin-left: 4px;">Ingresa a tu cuenta aquí</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
     <!-- MODAL 7: MARCO LEGAL, TÉRMINOS Y PRIVACIDAD    -->
     <!-- ============================================== -->
     <div id="modal-legal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-legal-titulo" onclick="if(event.target === this) cerrarModalLegal()">
@@ -2000,7 +2204,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261026_mov_lote_v2"></script>
+    <script type="module" src="/static/js/main.js?v=20261026_pres_v5"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

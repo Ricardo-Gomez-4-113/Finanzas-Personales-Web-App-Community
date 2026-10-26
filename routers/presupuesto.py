@@ -36,6 +36,7 @@ class SubperiodoItem(BaseModel):
 class ConfigPresupuestoUpdate(BaseModel):
     ingreso_base: float = Field(..., ge=0, le=1e12, description="Monto del ingreso fijo por periodo")
     frecuencia: Literal['semanal', 'quincenal', 'mensual'] = Field(..., description="Frecuencia del ingreso")
+    dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes de cobro del ingreso fijo")
     subdivision_tipo: Optional[Literal['ninguna', 'quincenas', 'semanas', 'personalizada']] = 'ninguna'
     subdivision_config: Optional[List[SubperiodoItem]] = None
 
@@ -92,12 +93,13 @@ def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
     row = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     if not row:
         cursor.execute("""
-            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, subdivision_tipo, subdivision_config)
-            VALUES (1, 0.0, 'mensual', 'ninguna', '[]')
+            INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, dia_pago, subdivision_tipo, subdivision_config)
+            VALUES (1, 0.0, 'mensual', NULL, 'ninguna', '[]')
         """)
         return {
             "ingreso_base": 0.0,
             "frecuencia": "mensual",
+            "dia_pago": None,
             "subdivision_tipo": "ninguna",
             "subdivision_config": [],
             "actualizado_en": None
@@ -113,6 +115,7 @@ def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
 
     frecuencia = d.get("frecuencia") or "mensual"
     ingreso_base = float(d.get("ingreso_base", 0.0))
+    dia_pago = d.get("dia_pago")
 
     if sub_tipo in ('quincenas', 'semanas') and not parsed_config:
         parsed_config = generar_subperiodos_default(frecuencia, sub_tipo)
@@ -122,6 +125,7 @@ def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
     return {
         "ingreso_base": ingreso_base,
         "frecuencia": frecuencia,
+        "dia_pago": dia_pago,
         "subdivision_tipo": sub_tipo,
         "subdivision_config": subperiodos_con_monto,
         "actualizado_en": d.get("actualizado_en")
@@ -211,11 +215,20 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
     else:
         config_list = generar_subperiodos_default(frecuencia_nueva, sub_tipo)
 
+    dia_pago = req.dia_pago
+    if req.dia_pago is not None:
+        try:
+            dia_pago = int(req.dia_pago)
+            if dia_pago < 1 or dia_pago > 31:
+                dia_pago = None
+        except (ValueError, TypeError):
+            dia_pago = None
+
     cursor.execute("""
         UPDATE presupuesto_config
-        SET ingreso_base = ?, frecuencia = ?, subdivision_tipo = ?, subdivision_config = ?, actualizado_en = CURRENT_TIMESTAMP
+        SET ingreso_base = ?, frecuencia = ?, dia_pago = ?, subdivision_tipo = ?, subdivision_config = ?, actualizado_en = CURRENT_TIMESTAMP
         WHERE id = 1
-    """, (ingreso_nuevo, frecuencia_nueva, sub_tipo, json.dumps(config_list)))
+    """, (ingreso_nuevo, frecuencia_nueva, dia_pago, sub_tipo, json.dumps(config_list)))
 
     # Recalcular los montos de las tarjetas según sus porcentajes
     filas = cursor.execute("SELECT id, porcentaje FROM presupuesto_tarjetas").fetchall()

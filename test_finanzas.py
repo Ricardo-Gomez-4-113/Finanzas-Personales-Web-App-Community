@@ -338,9 +338,37 @@ def test_migracion_v9_distribucion_subperiodos():
 def test_migracion_v10_dia_pago():
     conn = nueva_bd()
     v = conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 10, v
+    assert v >= 10, v
     cols = [col[1] for col in conn.execute("PRAGMA table_info(presupuesto_tarjetas)").fetchall()]
     assert "dia_pago" in cols
+
+
+def test_migracion_v11_dia_pago_config():
+    conn = nueva_bd()
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    assert v == 11, v
+    cols = [col[1] for col in conn.execute("PRAGMA table_info(presupuesto_config)").fetchall()]
+    assert "dia_pago" in cols
+
+
+def test_exportar_presupuesto_con_dia_pago_configurado():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = nueva_bd()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'mensual', dia_pago = 15 WHERE id = 1")
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
+    rec = conn.execute("SELECT descripcion, tipo, monto, frecuencia, dia, proxima_fecha FROM recurrentes WHERE tipo = 'ingreso'").fetchone()
+    assert rec is not None
+    assert rec["monto"] == 25000.0
+    assert rec["dia"] == 15
+    assert rec["proxima_fecha"] == "2026-10-15"
+
+    # Si la fecha base ya pasó el día 15, proxima_fecha debe ser el 15 del mes siguiente
+    res2 = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    rec2 = conn.execute("SELECT dia, proxima_fecha FROM recurrentes WHERE tipo = 'ingreso'").fetchone()
+    assert rec2["dia"] == 15
+    assert rec2["proxima_fecha"] == "2026-11-15"
 
 
 def test_distribucion_tarjeta_asimetrica():
@@ -1181,6 +1209,7 @@ if __name__ == '__main__':
     test_migracion_v8_indice_unico()
     test_migracion_v9_distribucion_subperiodos()
     test_migracion_v10_dia_pago()
+    test_migracion_v11_dia_pago_config()
     test_distribucion_tarjeta_asimetrica()
     test_calcular_distribucion_tarjeta_asimetrica_recalcula_si_monto_cambia()
     test_materializar_ingreso_no_afecta_apartado()
@@ -1203,6 +1232,7 @@ if __name__ == '__main__':
     test_presupuesto_tarjeta_dia_pago_y_subperiodos()
     test_exportar_presupuesto_no_duplica_msi_y_respeta_dias()
     test_exportar_presupuesto_dia_segundo_subperiodo()
+    test_exportar_presupuesto_con_dia_pago_configurado()
     test_eliminacion_transacciones_individual_y_lote()
     print('OK')
 

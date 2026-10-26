@@ -972,9 +972,15 @@ def exportar_presupuesto_a_fijos_core(
     Garantiza que pasen con la misma periodicidad definida en el presupuesto (mensual, quincenal, semanal).
     """
     hoy = fecha_base or ahora_local().date()
-    cfg = cursor.execute("SELECT ingreso_base, frecuencia FROM presupuesto_config WHERE id = 1").fetchone()
+    cfg = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     frecuencia = (cfg["frecuencia"] if cfg else "mensual")
     ingreso_base = float(cfg["ingreso_base"] if cfg else 0.0)
+    dia_pago_ingreso = None
+    try:
+        if cfg and "dia_pago" in cfg.keys() and cfg["dia_pago"] is not None:
+            dia_pago_ingreso = int(cfg["dia_pago"])
+    except Exception:
+        pass
 
     creados = 0
     actualizados = 0
@@ -983,7 +989,23 @@ def exportar_presupuesto_a_fijos_core(
     # 1. Exportar Ingreso Base (Nómina) si se solicitó y es > 0
     if incluir_ingreso and ingreso_base > 0:
         cat_ingreso = resolver_categoria_por_nombre(cursor, "Nómina", tipo="ingreso")
-        proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+        if dia_pago_ingreso is not None:
+            dia_fijo = dia_pago_ingreso
+            if frecuencia == 'mensual':
+                max_d_mes = ultimo_dia_mes(hoy.year, hoy.month)
+                if hoy.day <= dia_pago_ingreso:
+                    proxima = date(hoy.year, hoy.month, min(dia_pago_ingreso, max_d_mes))
+                else:
+                    anio, mes = (hoy.year + 1, 1) if hoy.month == 12 else (hoy.year, hoy.month + 1)
+                    proxima = date(anio, mes, min(dia_pago_ingreso, ultimo_dia_mes(anio, mes)))
+            elif frecuencia == 'quincenal':
+                proxima = primera_fecha_quincenal(hoy)
+            else:
+                proxima = hoy
+        else:
+            proxima = primera_fecha_quincenal(hoy) if frecuencia == 'quincenal' else hoy
+            dia_fijo = proxima.day
+
         existente = cursor.execute(
             "SELECT id FROM recurrentes WHERE tipo = 'ingreso' AND (LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%') LIMIT 1"
         ).fetchone()
@@ -993,14 +1015,14 @@ def exportar_presupuesto_a_fijos_core(
                 UPDATE recurrentes
                 SET monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?, activo = 1
                 WHERE id = ?
-            """, (round(ingreso_base, 2), frecuencia, proxima.day, proxima.isoformat(), existente["id"]))
+            """, (round(ingreso_base, 2), frecuencia, dia_fijo, proxima.isoformat(), existente["id"]))
             actualizados += 1
             detalles.append({"descripcion": "Nómina / Ingreso Fijo", "monto": ingreso_base, "frecuencia": frecuencia, "accion": "actualizado"})
         elif not existente:
             cursor.execute("""
                 INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, activo)
                 VALUES ('Nómina Fija (Presupuesto)', 'ingreso', ?, ?, ?, ?, ?, 1)
-            """, (round(ingreso_base, 2), frecuencia, proxima.day, proxima.isoformat(), cat_ingreso))
+            """, (round(ingreso_base, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_ingreso))
             creados += 1
             detalles.append({"descripcion": "Nómina Fija (Presupuesto)", "monto": ingreso_base, "frecuencia": frecuencia, "accion": "creado"})
 
