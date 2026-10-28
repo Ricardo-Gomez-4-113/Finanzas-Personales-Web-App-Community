@@ -561,7 +561,7 @@ export function abrirModalExportarPresupuesto() {
 
     const badgeFrec = document.getElementById('exportar-frecuencia-badge');
     if (badgeFrec) {
-        badgeFrec.textContent = (FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia || 'MENSUAL').toUpperCase();
+        badgeFrec.textContent = FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia || 'Mensual';
     }
 
     const boxIngreso = document.getElementById('exportar-pres-ingreso-box');
@@ -681,9 +681,6 @@ export async function ejecutarExportarPresupuesto() {
         const chkIngreso = document.getElementById('chk-exportar-ingreso');
         const incluir_ingreso = chkIngreso ? chkIngreso.checked : true;
 
-        const chkActualizar = document.getElementById('chk-exportar-actualizar');
-        const actualizar_existentes = chkActualizar ? chkActualizar.checked : true;
-
         const selInicio = document.getElementById('exportar-inicio-cargos');
         const inicio_cargos = selInicio ? selInicio.value : 'natural';
         let fecha_base = null;
@@ -710,7 +707,6 @@ export async function ejecutarExportarPresupuesto() {
             body: JSON.stringify({
                 tarjetas_ids,
                 incluir_ingreso,
-                actualizar_existentes,
                 inicio_cargos,
                 fecha_base
             })

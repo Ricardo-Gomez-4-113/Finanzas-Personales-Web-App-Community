@@ -1161,16 +1161,38 @@ def calcular_fecha_inicio_exportacion(
     return hoy_d
 
 
+NOMINA_PRESUPUESTO = "Nómina Fija (Presupuesto)"
+
+
+def _fijos_del_presupuesto(cursor: sqlite3.Cursor) -> list:
+    """Fijos que el presupuesto administra: tarjetas (no MSI) y la nómina que él crea.
+    Los fijos que el usuario creó a mano nunca entran aquí."""
+    return cursor.execute(
+        """
+        SELECT * FROM recurrentes
+        WHERE (tipo = 'gasto' AND presupuesto_tarjeta_id IS NOT NULL AND total_cuotas IS NULL)
+           OR (tipo = 'ingreso' AND descripcion = ?)
+        ORDER BY id ASC
+        """,
+        (NOMINA_PRESUPUESTO,),
+    ).fetchall()
+
+
 def exportar_presupuesto_a_fijos_core(
     cursor: sqlite3.Cursor,
     tarjetas_ids: list = None,
     incluir_ingreso: bool = True,
-    actualizar_existentes: bool = True,
     fecha_base: date = None
 ) -> dict:
     """
-    Exporta las tarjetas del presupuesto a gastos fijos periódicos (`recurrentes`).
-    Garantiza que pasen con la periodicidad adecuada y respetando sub-períodos independientes.
+    Sincroniza los fijos del presupuesto con el presupuesto actual. Es una sustitución completa:
+    - Cada tarjeta exportada y la nómina quedan con los datos actuales (monto, frecuencia, día, categoría).
+    - Un fijo del presupuesto que ya no corresponde (tarjeta desmarcada, monto en cero, nómina
+      desmarcada, subperiodo eliminado) se desactiva. No se borra: así sus movimientos ya
+      generados conservan el enlace y la materialización no duplica cargos.
+    - Las compras a meses (MSI) ligadas a una tarjeta no se tocan; mientras existan, esa tarjeta
+      no genera fijo, como antes.
+    - Los fijos creados a mano, incluida una nómina propia, no se modifican.
     """
     hoy = fecha_base or ahora_local().date()
     if cursor.connection and not cursor.connection.row_factory:
@@ -1185,8 +1207,6 @@ def exportar_presupuesto_a_fijos_core(
     except Exception:
         pass
 
-    creados = 0
-    actualizados = 0
     detalles = []
 
     def _calc_proxima_fecha(dia_n: Optional[int], freq: str, hoy_d: date) -> tuple[int, date]:
@@ -1216,32 +1236,17 @@ def exportar_presupuesto_a_fijos_core(
             dia_f = prox.day
         return dia_f, prox
 
-    # 1. Exportar Ingreso Base (Nómina) si se solicitó y es > 0
+    # 1. Estado deseado: lo que el presupuesto debe tener como fijos hoy
+    deseados = []
     if incluir_ingreso and ingreso_base > 0:
         cat_ingreso = resolver_categoria_por_nombre(cursor, "Nómina", tipo="ingreso")
         dia_fijo, proxima = _calc_proxima_fecha(dia_pago_ingreso, frecuencia, hoy)
+        deseados.append({
+            "tarjeta_id": None, "tipo": "ingreso", "descripcion": NOMINA_PRESUPUESTO,
+            "monto": round(ingreso_base, 2), "frecuencia": frecuencia, "dia": dia_fijo,
+            "proxima": proxima, "categoria_id": cat_ingreso, "apartado_id": None,
+        })
 
-        existente = cursor.execute(
-            "SELECT id FROM recurrentes WHERE tipo = 'ingreso' AND (LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%') LIMIT 1"
-        ).fetchone()
-
-        if existente and actualizar_existentes:
-            cursor.execute("""
-                UPDATE recurrentes
-                SET monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?, activo = 1
-                WHERE id = ?
-            """, (round(ingreso_base, 2), frecuencia, dia_fijo, proxima.isoformat(), existente["id"]))
-            actualizados += 1
-            detalles.append({"descripcion": "Nómina / Ingreso Fijo", "monto": ingreso_base, "frecuencia": frecuencia, "accion": "actualizado"})
-        elif not existente:
-            cursor.execute("""
-                INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, activo)
-                VALUES ('Nómina Fija (Presupuesto)', 'ingreso', ?, ?, ?, ?, ?, 1)
-            """, (round(ingreso_base, 2), frecuencia, dia_fijo, proxima.isoformat(), cat_ingreso))
-            creados += 1
-            detalles.append({"descripcion": "Nómina Fija (Presupuesto)", "monto": ingreso_base, "frecuencia": frecuencia, "accion": "creado"})
-
-    # 2. Exportar Tarjetas de Gasto
     tarjetas_query = "SELECT * FROM presupuesto_tarjetas"
     if tarjetas_ids:
         placeholders = ",".join("?" for _ in tarjetas_ids)
@@ -1255,12 +1260,29 @@ def exportar_presupuesto_a_fijos_core(
         if monto_tarjeta <= 0:
             continue
         nombre = t["nombre"].strip()
+        tarjeta_id = t["id"]
+
+        # Una compra a meses activa con el mismo nombre (o ligada a la tarjeta) cubre la tarjeta:
+        # no se exporta fijo para no duplicar el cargo.
+        nombre_limpio = re.sub(r'\s*\((?:msi|meses sin intereses)\)', '', nombre, flags=re.IGNORECASE).strip()
+        msi_vigente = cursor.execute("""
+            SELECT 1 FROM recurrentes
+            WHERE tipo = 'gasto' AND total_cuotas IS NOT NULL AND activo = 1 AND (
+                presupuesto_tarjeta_id = ?
+                OR LOWER(TRIM(REPLACE(REPLACE(descripcion, ' (MSI)', ''), ' (msi)', ''))) = LOWER(?)
+                OR LOWER(TRIM(descripcion)) = LOWER(?)
+                OR LOWER(TRIM(descripcion)) LIKE LOWER(?)
+            )
+            LIMIT 1
+        """, (tarjeta_id, nombre_limpio, nombre, f"{nombre_limpio} (%")).fetchone()
+        if msi_vigente:
+            detalles.append({"descripcion": nombre, "monto": monto_tarjeta, "frecuencia": frecuencia, "accion": "ignorado_msi"})
+            continue
+
         cat_id = resolver_categoria_por_nombre(cursor, f"{nombre} {t['notas'] or ''}", tipo="gasto")
         ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
         apartado_id = ap["id"] if ap else None
-        tarjeta_id = t["id"]
 
-        # Parsear distribucion_subperiodos si existe
         sub_list = None
         if "distribucion_subperiodos" in t.keys() and t["distribucion_subperiodos"]:
             try:
@@ -1269,12 +1291,11 @@ def exportar_presupuesto_a_fijos_core(
                     sub_list = raw
             except Exception:
                 sub_list = None
-
         sub_positivos = [sp for sp in (sub_list or []) if float(sp.get("monto", 0.0) or 0.0) > 0]
 
+        items = []
         if len(sub_positivos) > 1:
-            # Caso A: Tarjeta dividida en múltiples sub-períodos (ej. Transporte con $2,000 en Día 1 y $2,000 en Día 16)
-            items_a_exportar = []
+            # Tarjeta dividida en subperiodos: un fijo mensual por subperiodo
             for idx_sp, sp in enumerate(sub_positivos):
                 s_monto = round(float(sp["monto"]), 2)
                 s_dia = int(sp["dia"]) if sp.get("dia") is not None else (int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None)
@@ -1284,18 +1305,10 @@ def exportar_presupuesto_a_fijos_core(
                     else:
                         s_dia = idx_sp + 1
                 s_nombre = sp.get("nombre") or f"Sub-{idx_sp + 1}"
-                s_desc = f"{nombre} ({s_nombre})"
-                s_frec = 'mensual'
-                dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
-                items_a_exportar.append({
-                    "descripcion": s_desc,
-                    "monto": s_monto,
-                    "frecuencia": s_frec,
-                    "dia": dia_f,
-                    "proxima": prox_f
-                })
+                dia_f, prox_f = _calc_proxima_fecha(s_dia, 'mensual', hoy)
+                items.append({"descripcion": f"{nombre} ({s_nombre})", "monto": s_monto,
+                              "frecuencia": 'mensual', "dia": dia_f, "proxima": prox_f})
         else:
-            # Caso B: Tarjeta única o con un solo sub-período activo (ej. Tarjeta NU en Día 30)
             if len(sub_positivos) == 1:
                 sp = sub_positivos[0]
                 s_monto = round(float(sp["monto"]), 2)
@@ -1303,75 +1316,78 @@ def exportar_presupuesto_a_fijos_core(
             else:
                 s_monto = round(monto_tarjeta, 2)
                 s_dia = int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None
-
             s_frec = frecuencia
             if s_dia is not None and frecuencia in ('mensual', 'quincenal'):
                 s_frec = 'mensual'
-
             dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
-            items_a_exportar = [{
-                "descripcion": nombre,
-                "monto": s_monto,
-                "frecuencia": s_frec,
-                "dia": dia_f,
-                "proxima": prox_f
-            }]
+            items.append({"descripcion": nombre, "monto": s_monto, "frecuencia": s_frec, "dia": dia_f, "proxima": prox_f})
 
-        # Buscar recurrentes existentes vinculados a esta tarjeta o con descripción coincidente
-        nombre_limpio = re.sub(r'\s*\((?:msi|meses sin intereses)\)', '', nombre, flags=re.IGNORECASE).strip()
-        recs_existentes = cursor.execute("""
-            SELECT * FROM recurrentes
-            WHERE tipo = 'gasto' AND (
-                presupuesto_tarjeta_id = ?
-                OR LOWER(TRIM(descripcion)) = LOWER(?)
-                OR LOWER(TRIM(descripcion)) = LOWER(?)
-                OR LOWER(TRIM(REPLACE(REPLACE(descripcion, ' (MSI)', ''), ' (msi)', ''))) = LOWER(?)
-                OR LOWER(TRIM(descripcion)) LIKE LOWER(?)
-            )
-            ORDER BY id ASC
-        """, (tarjeta_id, nombre, nombre_limpio, nombre_limpio, f"{nombre} (%")).fetchall()
+        for itm in items:
+            deseados.append({
+                "tarjeta_id": tarjeta_id, "tipo": "gasto", "descripcion": itm["descripcion"],
+                "monto": itm["monto"], "frecuencia": itm["frecuencia"], "dia": itm["dia"],
+                "proxima": itm["proxima"], "categoria_id": cat_id, "apartado_id": apartado_id,
+            })
 
-        for idx_it, itm in enumerate(items_a_exportar):
-            existente = recs_existentes[idx_it] if idx_it < len(recs_existentes) else None
-            if existente:
-                if existente["total_cuotas"] is not None:
-                    # Preservar compra a meses (MSI)
-                    if actualizar_existentes and itm["dia"] is not None:
-                        cursor.execute("UPDATE recurrentes SET dia = ?, presupuesto_tarjeta_id = ? WHERE id = ?", (itm["dia"], tarjeta_id, existente["id"]))
-                    detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "ignorado_msi"})
-                    continue
+    # 2. Emparejar lo deseado con los fijos ya administrados: primero por descripción exacta,
+    #    luego reutilizando el fijo de la misma tarjeta (renombrada o con otro subperiodo).
+    libres = _fijos_del_presupuesto(cursor)
+    emparejados = []
+    pendientes = []
+    for item in deseados:
+        fila = next((r for r in libres
+                     if r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]
+                     and r["descripcion"] == item["descripcion"]), None)
+        if fila is not None:
+            libres.remove(fila)
+            emparejados.append((item, fila))
+        else:
+            pendientes.append(item)
+    for item in pendientes:
+        fila = next((r for r in libres
+                     if r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]), None)
+        if fila is not None:
+            libres.remove(fila)
+        emparejados.append((item, fila))
 
-                if actualizar_existentes:
-                    cursor.execute("""
-                        UPDATE recurrentes
-                        SET descripcion = ?, monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?,
-                            categoria_id = ?, apartado_id = COALESCE(?, apartado_id), presupuesto_tarjeta_id = ?, activo = 1
-                        WHERE id = ?
-                    """, (itm["descripcion"], itm["monto"], itm["frecuencia"], itm["dia"], itm["proxima"].isoformat(), cat_id, apartado_id, tarjeta_id, existente["id"]))
-                    actualizados += 1
-                    detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "actualizado"})
-            else:
-                cursor.execute("""
-                    INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
-                    VALUES (?, 'gasto', ?, ?, ?, ?, ?, ?, ?, 1)
-                """, (itm["descripcion"], itm["monto"], itm["frecuencia"], itm["dia"], itm["proxima"].isoformat(), cat_id, apartado_id, tarjeta_id))
-                creados += 1
-                detalles.append({"descripcion": itm["descripcion"], "monto": itm["monto"], "frecuencia": itm["frecuencia"], "accion": "creado"})
+    creados = actualizados = desactivados = 0
+    for item, fila in emparejados:
+        valores = (item["descripcion"], item["tipo"], item["monto"], item["frecuencia"], item["dia"],
+                   item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"])
+        if fila is not None:
+            cursor.execute("""
+                UPDATE recurrentes
+                SET descripcion = ?, tipo = ?, monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?,
+                    categoria_id = ?, apartado_id = ?, presupuesto_tarjeta_id = ?, activo = 1
+                WHERE id = ?
+            """, valores + (fila["id"],))
+            actualizados += 1
+            accion = "actualizado"
+        else:
+            cursor.execute("""
+                INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
+                                         categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, valores)
+            creados += 1
+            accion = "creado"
+        detalles.append({"descripcion": item["descripcion"], "monto": item["monto"], "frecuencia": item["frecuencia"], "accion": accion})
 
-        # Si había más recurrentes previos que items a exportar, desactivar sobrantes
-        if len(recs_existentes) > len(items_a_exportar):
-            for sobrante in recs_existentes[len(items_a_exportar):]:
-                if sobrante["total_cuotas"] is None:
-                    cursor.execute("UPDATE recurrentes SET activo = 0 WHERE id = ?", (sobrante["id"],))
+    # 3. Lo que sobra ya no corresponde al presupuesto: se desactiva (conserva su historial)
+    for sobrante in libres:
+        cursor.execute("UPDATE recurrentes SET activo = 0 WHERE id = ?", (sobrante["id"],))
+        desactivados += 1
+        detalles.append({"descripcion": sobrante["descripcion"], "monto": float(sobrante["monto"]),
+                         "frecuencia": sobrante["frecuencia"], "accion": "desactivado"})
 
     return {
         "frecuencia": frecuencia,
         "creados": creados,
         "actualizados": actualizados,
+        "desactivados": desactivados,
         "total_procesados": creados + actualizados,
         "detalles": detalles
     }
-
 
 
 

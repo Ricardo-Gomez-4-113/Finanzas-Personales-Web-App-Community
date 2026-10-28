@@ -81,7 +81,6 @@ class ImportarFijosRequest(BaseModel):
 class ExportarFijosRequest(BaseModel):
     tarjetas_ids: Optional[List[int]] = None
     incluir_ingreso: bool = True
-    actualizar_existentes: bool = True
     inicio_cargos: Optional[Literal['natural', 'siguiente_quincena', 'proximo_mes', 'personalizada']] = 'natural'
     fecha_base: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
@@ -306,7 +305,6 @@ def exportar_presupuesto_a_fijos(
         cursor=cursor,
         tarjetas_ids=req.tarjetas_ids,
         incluir_ingreso=req.incluir_ingreso,
-        actualizar_existentes=req.actualizar_existentes,
         fecha_base=fecha_inicio_efectiva
     )
     materializadas = materializar_recurrentes(conn, hoy_local)
@@ -479,6 +477,12 @@ def eliminar_tarjeta(tarjeta_id: int, conn: sqlite3.Connection = Depends(get_ten
     if not cursor.execute("SELECT 1 FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,)).fetchone():
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada.")
 
+    # Los fijos de la tarjeta dejan de cobrarse antes de borrarla; al borrarla, el enlace queda en NULL
+    # y ya no podrían encontrarse para desactivarlos después.
+    cursor.execute(
+        "UPDATE recurrentes SET activo = 0 WHERE presupuesto_tarjeta_id = ? AND total_cuotas IS NULL",
+        (tarjeta_id,),
+    )
     cursor.execute("DELETE FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,))
     conn.commit()
     return {"mensaje": "Tarjeta eliminada con éxito."}

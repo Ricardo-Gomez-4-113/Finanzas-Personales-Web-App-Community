@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=c940776061';
+import { cargarRecurrentes } from './recurrentes.js?v=58b34ef191';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=c940776061';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=58b34ef191';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
