@@ -1381,6 +1381,76 @@ def valor_rendimiento(capital: float, tasa_anual: float, fecha_base: date, hoy: 
     return round(capital * (1 + tasa_anual / 100 / 365) ** dias, 2)
 
 
+def _inicio_periodo(fin: date, frecuencia: str) -> date:
+    """Fecha de cobro anterior a `fin` para un ingreso de la frecuencia dada."""
+    if frecuencia == 'semanal':
+        return fin - timedelta(days=7)
+    if frecuencia == 'quincenal':
+        if fin.day <= 15:
+            anio, mes = (fin.year - 1, 12) if fin.month == 1 else (fin.year, fin.month - 1)
+            return date(anio, mes, ultimo_dia_mes(anio, mes))
+        return date(fin.year, fin.month, 15)
+    anio, mes = (fin.year - 1, 12) if fin.month == 1 else (fin.year, fin.month - 1)
+    return date(anio, mes, min(fin.day, ultimo_dia_mes(anio, mes)))
+
+
+def calcular_periodo_actual(conn: sqlite3.Connection, hoy: date, balance: float) -> Dict[str, Any]:
+    """
+    Periodo de cobro en curso: del último cobro al siguiente ingreso fijo activo.
+    Sin ingreso fijo, el periodo es el mes calendario. Lista los fijos y cuotas MSI que caen
+    entre mañana y el próximo cobro (inclusive) y calcula cuánto queda libre del balance actual.
+    """
+    filas = conn.execute("SELECT * FROM recurrentes WHERE activo = 1").fetchall()
+    vigentes = [r for r in filas if not (r["total_cuotas"] is not None and int(r["cuotas_generadas"]) >= int(r["total_cuotas"]))]
+    ingresos = sorted(
+        (r for r in vigentes if r["tipo"] == 'ingreso' and r["proxima_fecha"]),
+        key=lambda r: r["proxima_fecha"],
+    )
+    if ingresos:
+        cobro = ingresos[0]
+        fin = max(date.fromisoformat(cobro["proxima_fecha"]), hoy)
+        inicio = min(_inicio_periodo(fin, cobro["frecuencia"]), hoy)
+        cobro_info = {"descripcion": cobro["descripcion"], "monto": round(float(cobro["monto"]), 2), "frecuencia": cobro["frecuencia"]}
+    else:
+        inicio = date(hoy.year, hoy.month, 1)
+        fin = date(hoy.year, hoy.month, ultimo_dia_mes(hoy.year, hoy.month))
+        cobro_info = None
+
+    eventos = []
+    for r in vigentes:
+        if r["tipo"] != 'gasto' or not r["proxima_fecha"]:
+            continue
+        fecha = date.fromisoformat(r["proxima_fecha"])
+        restantes = None
+        if r["total_cuotas"] is not None:
+            restantes = int(r["total_cuotas"]) - int(r["cuotas_generadas"])
+        while fecha <= fin and (restantes is None or restantes > 0):
+            if fecha > hoy:
+                eventos.append({
+                    "fecha": fecha.isoformat(),
+                    "descripcion": r["descripcion"],
+                    "monto": round(float(r["monto"]), 2),
+                    "es_msi": r["total_cuotas"] is not None,
+                })
+            fecha = siguiente_fecha(fecha, r["frecuencia"], r["dia"])
+            if restantes is not None:
+                restantes -= 1
+    eventos.sort(key=lambda e: (e["fecha"], e["descripcion"]))
+    comprometido = round(sum(e["monto"] for e in eventos), 2)
+    return {
+        "inicio": inicio.isoformat(),
+        "fin": fin.isoformat(),
+        "hoy": hoy.isoformat(),
+        "dias_totales": max(1, (fin - inicio).days),
+        "dias_restantes": max(0, (fin - hoy).days),
+        "cobro": cobro_info,
+        "eventos": eventos,
+        "disponible": round(balance, 2),
+        "comprometido": comprometido,
+        "libre": round(balance - comprometido, 2),
+    }
+
+
 def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: float, hoy: date) -> Dict[str, Any]:
     """
     Resumen patrimonial en la moneda base.
@@ -1479,4 +1549,15 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         },
         "patrimonio_sin_rendimiento": round(patrimonio_sin_rendimiento, 2),
         "patrimonio_neto": round(patrimonio, 2),
+        "periodo": _periodo_en_moneda(calcular_periodo_actual(conn, hoy, balance), conv),
     }
+
+
+def _periodo_en_moneda(periodo: Dict[str, Any], conv) -> Dict[str, Any]:
+    for clave in ("disponible", "comprometido", "libre"):
+        periodo[clave] = round(conv(periodo[clave]), 2)
+    for e in periodo["eventos"]:
+        e["monto"] = round(conv(e["monto"]), 2)
+    if periodo["cobro"]:
+        periodo["cobro"]["monto"] = round(conv(periodo["cobro"]["monto"]), 2)
+    return periodo

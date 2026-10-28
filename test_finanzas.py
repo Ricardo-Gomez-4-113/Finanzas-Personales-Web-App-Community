@@ -89,6 +89,7 @@ from finanzas_core import (
     mensualizar,
     convertir_frecuencias,
     convertir_de_mensual,
+    calcular_periodo_actual,
 )
 
 
@@ -1789,6 +1790,33 @@ def test_msi_monto_no_divisible_suma_exacta():
     assert deuda_pendiente(conn.execute("SELECT * FROM recurrentes").fetchone()) == 0.0
 
 
+def test_periodo_actual_quincena_eventos_y_libre():
+    conn = nueva_bd()
+    hoy = date(2026, 10, 20)
+    insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'quincenal', None, date(2026, 10, 31))
+    insertar_recurrente(conn, "Netflix", 'gasto', 299, 'mensual', 25, date(2026, 10, 25))
+    insertar_recurrente(conn, "Renta", 'gasto', 9500, 'mensual', 1, date(2026, 11, 1))  # fuera del periodo
+    insertar_recurrente(conn, "Clases", 'gasto', 200, 'semanal', None, date(2026, 10, 21))  # 21 y 28
+    insertar_recurrente(conn, "Tablet", 'gasto', 500, 'mensual', 22, date(2026, 10, 22), total=3, monto_total=1500)
+    conn.execute("UPDATE recurrentes SET cuotas_generadas = 2 WHERE descripcion = 'Tablet'")  # queda 1 cuota
+    p = calcular_periodo_actual(conn, hoy, 5000.0)
+    assert (p["inicio"], p["fin"], p["dias_restantes"], p["dias_totales"]) == ("2026-10-15", "2026-10-31", 11, 16), p
+    assert p["cobro"]["descripcion"] == "Nómina", p
+    assert [(e["fecha"], e["descripcion"]) for e in p["eventos"]] == [
+        ("2026-10-21", "Clases"), ("2026-10-22", "Tablet"), ("2026-10-25", "Netflix"), ("2026-10-28", "Clases")], p["eventos"]
+    assert p["comprometido"] == 1199.0 and p["libre"] == 3801.0, p
+    # Cobro de la primera quincena: el periodo arranca el fin del mes anterior.
+    conn.execute("UPDATE recurrentes SET proxima_fecha = '2026-03-15' WHERE descripcion = 'Nómina'")
+    p = calcular_periodo_actual(conn, date(2026, 3, 2), 0.0)
+    assert (p["inicio"], p["fin"]) == ("2026-02-28", "2026-03-15"), p
+
+
+def test_periodo_actual_sin_ingreso_fijo_usa_mes_calendario():
+    conn = nueva_bd()
+    p = calcular_periodo_actual(conn, date(2028, 2, 10), 1000.0)
+    assert (p["inicio"], p["fin"], p["cobro"], p["libre"]) == ("2028-02-01", "2028-02-29", None, 1000.0), p
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1859,6 +1887,8 @@ if __name__ == '__main__':
     test_frecuencias_ida_y_vuelta()
     test_convertir_y_rendimiento_casos_borde()
     test_msi_monto_no_divisible_suma_exacta()
+    test_periodo_actual_quincena_eventos_y_libre()
+    test_periodo_actual_sin_ingreso_fijo_usa_mes_calendario()
     print('OK')
 
 
