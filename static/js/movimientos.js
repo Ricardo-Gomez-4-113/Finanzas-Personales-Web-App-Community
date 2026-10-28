@@ -310,7 +310,7 @@ export async function eliminarTransaccion(id, forzar = false) {
 
     let pregunta = "¿Eliminar este movimiento?";
     if (advertencias.length > 0) {
-        pregunta = `⚠️ Advertencia:\n${advertencias.join('\n')}\n\n${pregunta}`;
+        pregunta = `Advertencia:\n${advertencias.join('\n')}\n\n${pregunta}`;
     }
 
     if (!forzar && !confirm(pregunta)) return;
@@ -360,7 +360,7 @@ export async function eliminarMovimientosLote(forzar = false) {
 
     let pregunta = `¿Deseas eliminar los ${ids.length} movimientos seleccionados?`;
     if (advertencias.length > 0) {
-        pregunta = `⚠️ Advertencia previa:\n${advertencias.join('\n')}\n\n${pregunta}`;
+        pregunta = `Advertencia previa:\n${advertencias.join('\n')}\n\n${pregunta}`;
     }
 
     if (!forzar && !confirm(pregunta)) return;
@@ -411,7 +411,7 @@ export async function vaciarTodosLosMovimientos(forzar = false) {
         advertencias.push(`• ${ligadosFijo} movimiento(s) correspondientes a fijos o MSI (se ajustarán sus cuotas generadas).`);
     }
 
-    let pregunta = `⚠️ ACCIÓN IRREVERSIBLE: Se eliminarán TODOS los ${items.length} movimientos registrados.`;
+    let pregunta = `ACCIÓN IRREVERSIBLE: Se eliminarán TODOS los ${items.length} movimientos registrados.`;
     if (advertencias.length > 0) {
         pregunta += `\n\n${advertencias.join('\n')}`;
     }
