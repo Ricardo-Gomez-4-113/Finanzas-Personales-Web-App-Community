@@ -91,6 +91,7 @@ from finanzas_core import (
     convertir_de_mensual,
     calcular_periodo_actual,
     resumen_mensual_core,
+    revertir_movimiento_apartado,
 )
 
 
@@ -1212,14 +1213,14 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 700.0
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t1,)).fetchone()[0] == 0
 
-    # 2. Movimiento ligado a meta / apartado (retiro / ingreso): si se elimina el retiro, NO vuelve a la meta
+    # 2. Movimiento ligado a meta / apartado (retiro / ingreso): al borrar el retiro, el dinero vuelve a la meta
     cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 200.0, 'ingreso', 1)")
     id_t2 = cur.lastrowid
     conn.commit()
 
     eliminar_transaccion(id_t2, conn)
     # El retiro se borra, pero el dinero no regresa a la meta: se mantiene en 700.0
-    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 700.0
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 900.0
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t2,)).fetchone()[0] == 0
 
     # 3. Movimiento ligado a recurrente / MSI terminado
@@ -1265,8 +1266,8 @@ def test_eliminacion_transacciones_individual_y_lote():
     res_lote = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_batch_1, id_batch_2]), conn)
     assert res_lote["eliminados"] == 2
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id IN (?, ?)", (id_batch_1, id_batch_2)).fetchone()[0] == 0
-    # Apartado descuenta 100: 700 - 100 = 600
-    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 600.0
+    # Apartado descuenta 100: 900 - 100 = 800
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 800.0
     # Recurrente cuotas decrementa a 1
     assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 1
 
@@ -1934,14 +1935,63 @@ def test_saldo_de_apartados_coincide_con_sus_movimientos():
         if rnd.random() < 0.6 or guardado < monto:
             conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'gasto', 1, 'dep', ?)", (monto, aid))
             conn.execute("UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?", (monto, aid))
-        else:
+        elif rnd.random() < 0.5:
             conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'ingreso', 1, 'ret', ?)", (monto, aid))
             conn.execute("UPDATE apartados SET monto_actual = monto_actual - ? WHERE id = ?", (monto, aid))
+        else:
+            # Borrar un movimiento de la meta (depósito o retiro) al azar: el saldo debe seguir cuadrando
+            mov = conn.execute("SELECT id, tipo, monto FROM transacciones WHERE apartado_id = ? ORDER BY RANDOM() LIMIT 1", (aid,)).fetchone()
+            if mov:
+                conn.execute("DELETE FROM transacciones WHERE id = ?", (mov["id"],))
+                revertir_movimiento_apartado(conn.cursor(), aid, mov["tipo"], mov["monto"])
         conn.commit()
     for aid in (1, 2):
         guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
         movimientos = conn.execute("SELECT COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE -monto END), 0) FROM transacciones WHERE apartado_id = ?", (aid,)).fetchone()[0]
         assert abs(guardado - movimientos) < 0.01, (aid, guardado, movimientos)
+
+
+def test_msi_saldo_y_prorrateo_se_mantienen():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Laptop", 'gasto', 2000, 'mensual', 10, date(2026, 1, 10), total=12, monto_total=24000)
+    materializar_recurrentes(conn, date(2026, 3, 15))
+    fila = conn.execute("SELECT * FROM recurrentes").fetchone()
+    assert fila["cuotas_generadas"] == 3 and deuda_pendiente(fila) == 18000.0
+    # Cambiar el total re-prorratea y la última cuota absorbe el redondeo
+    conn.execute("UPDATE recurrentes SET monto_total = 25000 WHERE id = 1")
+    conn.commit()
+    materializar_recurrentes(conn, date(2026, 12, 31))
+    assert round(conn.execute("SELECT SUM(monto) FROM transacciones").fetchone()[0], 2) == 25000.0
+
+
+def test_quincenal_cae_en_15_y_fin_de_mes():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Gym", 'gasto', 300, 'quincenal', None, date(2026, 10, 15))
+    assert materializar_recurrentes(conn, date(2026, 10, 31)) == 2
+    fechas = [r[0] for r in conn.execute("SELECT fecha FROM transacciones ORDER BY fecha")]
+    assert fechas == ["2026-10-15", "2026-10-31"], fechas
+
+
+def test_conciliacion_resumen_historial_y_periodo():
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 28500, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 1500, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 4500, 'gasto', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 4500 WHERE id = 1")
+    conn.commit()
+    hoy = date(2026, 10, 20)
+    r = calcular_resumen(conn, 'MXN', 18, hoy)
+    mes = resumen_mensual_core(conn)[0]
+    per = calcular_periodo_actual(conn, hoy, r["balance"])
+    # Disponible = todo lo que entró menos todo lo que salió, incluido lo guardado en metas
+    assert r["balance"] == 28500 - 1500 - 4500 == 22500.0, r["balance"]
+    assert r["mes_actual"]["gastos"] == mes["gastos"] == 1500.0
+    assert r["mes_actual"]["ingresos"] == mes["ingresos"] == 28500.0
+    assert r["apartados"] == 4500.0 and r["patrimonio_neto"] == 4500.0
+    assert per["disponible"] == r["balance"], per
+    # Lo guardado en metas más lo disponible es el efectivo total: 22,500 + 4,500 = 27,000
+    assert r["balance"] + r["apartados"] == 27000.0
 
 
 if __name__ == '__main__':
@@ -2023,6 +2073,9 @@ if __name__ == '__main__':
     test_export_no_duplica_cargo_ya_registrado()
     test_resumen_mensual_excluye_movimientos_de_apartados()
     test_saldo_de_apartados_coincide_con_sus_movimientos()
+    test_msi_saldo_y_prorrateo_se_mantienen()
+    test_quincenal_cae_en_15_y_fin_de_mes()
+    test_conciliacion_resumen_historial_y_periodo()
     print('OK')
 
 

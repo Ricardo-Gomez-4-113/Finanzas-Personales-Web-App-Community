@@ -16,6 +16,7 @@ from finanzas_core import (
     calcular_resumen,
     resumen_mensual_core,
     deficit_al_eliminar_lote,
+    revertir_movimiento_apartado,
     convertir,
     materializar_recurrentes,
     validar_saldo_disponible_fecha,
@@ -123,16 +124,8 @@ def eliminar_transaccion(
     # Si está vinculado a un apartado de ahorro / meta
     # Si es gasto (depósito/ahorro): se descuenta de la meta.
     # Si es ingreso (retiro de ahorro): NO se reincorpora a la meta (el dinero sacado no vuelve a la meta).
-    if trans["apartado_id"] is not None and trans["tipo"] == 'gasto':
-        ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (trans["apartado_id"],)).fetchone()
-        if ap:
-            monto_actual = float(ap["monto_actual"])
-            monto_trans = float(trans["monto"])
-            nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
-            cursor.execute(
-                "UPDATE apartados SET monto_actual = ? WHERE id = ?",
-                (nuevo_monto, trans["apartado_id"])
-            )
+    if trans["apartado_id"] is not None:
+        revertir_movimiento_apartado(cursor, trans["apartado_id"], trans["tipo"], trans["monto"])
 
     # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
     if trans["recurrente_id"] is not None:
@@ -193,16 +186,8 @@ def eliminar_transacciones_lote(
 
     # Procesar ajustes en una transacción SQL atómica
     for t in transacciones:
-        if t["apartado_id"] is not None and t["tipo"] == 'gasto':
-            ap = cursor.execute("SELECT * FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
-            if ap:
-                monto_actual = float(ap["monto_actual"])
-                monto_trans = float(t["monto"])
-                nuevo_monto = max(0.0, round(monto_actual - monto_trans, 2))
-                cursor.execute(
-                    "UPDATE apartados SET monto_actual = ? WHERE id = ?",
-                    (nuevo_monto, t["apartado_id"])
-                )
+        if t["apartado_id"] is not None:
+            revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
 
         if t["recurrente_id"] is not None:
             rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (t["recurrente_id"],)).fetchone()

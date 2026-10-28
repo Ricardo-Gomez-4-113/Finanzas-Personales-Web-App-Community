@@ -1418,6 +1418,16 @@ def resumen_mensual_core(conn: sqlite3.Connection) -> list:
     return [dict(f) for f in filas]
 
 
+def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo: str, monto: float) -> None:
+    """Deshace en el saldo de una meta un movimiento que se borra. Un depósito (gasto) se resta de la
+    meta; un retiro (ingreso) vuelve a sumarse. Así el saldo guardado sigue igual a sus movimientos."""
+    delta = -float(monto) if tipo == 'gasto' else float(monto)
+    cursor.execute(
+        "UPDATE apartados SET monto_actual = MAX(0.0, ROUND(monto_actual + ?, 2)) WHERE id = ?",
+        (delta, apartado_id),
+    )
+
+
 def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
     """Simula borrar `transacciones` y devuelve (déficit, fecha) del primer día con saldo negativo,
     o None si el saldo nunca baja de cero. No deja cambios: todo corre dentro de un savepoint."""
@@ -1430,11 +1440,8 @@ def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
     cursor.execute("SAVEPOINT sim_lote")
     try:
         for t in transacciones:
-            if t["apartado_id"] is not None and t["tipo"] == 'gasto':
-                ap = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
-                if ap:
-                    nuevo_m = max(0.0, round(float(ap["monto_actual"]) - float(t["monto"]), 2))
-                    cursor.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (nuevo_m, t["apartado_id"]))
+            if t["apartado_id"] is not None:
+                revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
         cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
 
         tot_ap = obtener_total_apartados(cursor)

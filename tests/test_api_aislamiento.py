@@ -216,6 +216,19 @@ def test_login_bloquea_tras_5_fallos(client):
     assert client.post("/auth/login", json={"username": "bruteforce", "password": PASS}).status_code == 429
 
 
+def test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha):
+    assert client.post("/api/transacciones", json=dict(MOV, tipo="ingreso", monto=5000.0, descripcion="ingreso-meta"), headers=ha).status_code in (200, 201)
+    client.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 18000}, headers=ha)
+    aid = next(a["id"] for a in client.get("/api/apartados", headers=ha).json() if a["nombre"] == "Viaje")
+    assert client.post(f"/api/apartados/{aid}/movimiento", json={"monto": 1000, "accion": "depositar"}, headers=ha).status_code == 200
+    assert client.post(f"/api/apartados/{aid}/movimiento", json={"monto": 300, "accion": "retirar"}, headers=ha).status_code == 200
+    retiro = next(t for t in client.get("/api/transacciones", headers=ha).json() if t["apartado_id"] == aid and t["tipo"] == "ingreso")
+    assert client.delete(f"/api/transacciones/{retiro['id']}", headers=ha).status_code == 200
+    saldo = next(a["monto_actual"] for a in client.get("/api/apartados", headers=ha).json() if a["id"] == aid)
+    # El retiro se deshace: el dinero vuelve a la meta
+    assert saldo == 1000.0, saldo
+
+
 if __name__ == "__main__":
     with TestClient(app) as client:
         ua, ub = _crear_usuario("usuario_a"), _crear_usuario("usuario_b")
@@ -232,6 +245,7 @@ if __name__ == "__main__":
         test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)
         test_restore_solo_afecta_al_propio_tenant(client, ha, hb)
         test_health_publico_y_sin_datos_de_usuarios(client)
+        test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)
         test_login_bloquea_tras_5_fallos(client)
     shutil.rmtree(TMP, ignore_errors=True)
     print("OK")
