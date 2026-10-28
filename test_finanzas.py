@@ -1830,7 +1830,7 @@ def _activos(conn):
     return {r["descripcion"]: r["monto"] for r in conn.execute("SELECT descripcion, monto FROM recurrentes WHERE activo = 1")}
 
 
-def test_export_sustituye_todo_y_desactiva_lo_que_sobra():
+def test_export_sobrescribe_todo_y_borra_lo_que_sobra():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = _presupuesto_para_export()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
@@ -1841,9 +1841,8 @@ def test_export_sustituye_todo_y_desactiva_lo_que_sobra():
     res = exportar_presupuesto_a_fijos_core(conn.cursor(), tarjetas_ids=[1], fecha_base=date(2026, 10, 20))
     conn.commit()
     assert _activos(conn) == {"Nómina Fija (Presupuesto)": 9000.0, "Transporte": 2200.0}, _activos(conn)
-    assert res["desactivados"] == 1 and res["actualizados"] == 2 and res["creados"] == 0, res
-    # El fijo desactivado conserva su fila (y sus movimientos), no se borra
-    assert conn.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Dentista'").fetchone()[0] == 1
+    assert res["eliminados"] == 1 and res["actualizados"] == 2 and res["creados"] == 0, res
+    assert conn.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Dentista'").fetchone()[0] == 0
 
 
 def test_export_no_toca_fijos_creados_a_mano():
@@ -1887,6 +1886,21 @@ def test_fijos_de_tarjeta_borrada_dejan_de_cobrarse():
     conn.execute("DELETE FROM presupuesto_tarjetas WHERE id = ?", (tid,))
     conn.commit()
     assert "Dentista" not in _activos(conn), _activos(conn)
+
+
+def test_export_no_duplica_cargo_ya_registrado():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _presupuesto_para_export()
+    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 15))
+    conn.commit()
+    materializar_recurrentes(conn, date(2026, 10, 15))
+    # Se sobrescribe todo: el fijo viejo se borra y el nuevo debe saltar el cargo ya registrado
+    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 15))
+    conn.commit()
+    materializar_recurrentes(conn, date(2026, 10, 15))
+    cargos = conn.execute("SELECT COUNT(*) FROM transacciones WHERE descripcion = 'Transporte' AND fecha = '2026-10-15'").fetchone()[0]
+    assert cargos == 1, cargos
+    assert _activos(conn)["Transporte"] == 2000.0
 
 
 if __name__ == '__main__':
@@ -1961,10 +1975,11 @@ if __name__ == '__main__':
     test_msi_monto_no_divisible_suma_exacta()
     test_periodo_actual_quincena_eventos_y_libre()
     test_periodo_actual_sin_ingreso_fijo_usa_mes_calendario()
-    test_export_sustituye_todo_y_desactiva_lo_que_sobra()
+    test_export_sobrescribe_todo_y_borra_lo_que_sobra()
     test_export_no_toca_fijos_creados_a_mano()
     test_export_renombrar_tarjeta_reutiliza_fijo_sin_duplicar_cargo()
     test_fijos_de_tarjeta_borrada_dejan_de_cobrarse()
+    test_export_no_duplica_cargo_ya_registrado()
     print('OK')
 
 

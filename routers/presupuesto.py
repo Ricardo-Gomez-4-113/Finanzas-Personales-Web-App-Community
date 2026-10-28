@@ -477,10 +477,9 @@ def eliminar_tarjeta(tarjeta_id: int, conn: sqlite3.Connection = Depends(get_ten
     if not cursor.execute("SELECT 1 FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,)).fetchone():
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada.")
 
-    # Los fijos de la tarjeta dejan de cobrarse antes de borrarla; al borrarla, el enlace queda en NULL
-    # y ya no podrían encontrarse para desactivarlos después.
+    # Sus fijos se borran junto con la tarjeta (los movimientos ya generados se conservan)
     cursor.execute(
-        "UPDATE recurrentes SET activo = 0 WHERE presupuesto_tarjeta_id = ? AND total_cuotas IS NULL",
+        "DELETE FROM recurrentes WHERE presupuesto_tarjeta_id = ? AND total_cuotas IS NULL",
         (tarjeta_id,),
     )
     cursor.execute("DELETE FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,))

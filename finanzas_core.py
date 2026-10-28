@@ -1178,6 +1178,17 @@ def _fijos_del_presupuesto(cursor: sqlite3.Cursor) -> list:
     ).fetchall()
 
 
+def _sin_cargo_previo(cursor: sqlite3.Cursor, item: dict) -> date:
+    """Primera fecha >= la propuesta sin un movimiento ya registrado con el mismo nombre."""
+    prox = item["proxima"]
+    while cursor.execute(
+        "SELECT 1 FROM transacciones WHERE descripcion = ? AND fecha = ? AND tipo = ? LIMIT 1",
+        (item["descripcion"], prox.isoformat(), item["tipo"]),
+    ).fetchone():
+        prox = siguiente_fecha(prox, item["frecuencia"], item["dia"])
+    return prox
+
+
 def exportar_presupuesto_a_fijos_core(
     cursor: sqlite3.Cursor,
     tarjetas_ids: list = None,
@@ -1185,11 +1196,11 @@ def exportar_presupuesto_a_fijos_core(
     fecha_base: date = None
 ) -> dict:
     """
-    Sincroniza los fijos del presupuesto con el presupuesto actual. Es una sustitución completa:
-    - Cada tarjeta exportada y la nómina quedan con los datos actuales (monto, frecuencia, día, categoría).
-    - Un fijo del presupuesto que ya no corresponde (tarjeta desmarcada, monto en cero, nómina
-      desmarcada, subperiodo eliminado) se desactiva. No se borra: así sus movimientos ya
-      generados conservan el enlace y la materialización no duplica cargos.
+    Sobrescribe todo: los fijos del presupuesto se dejan exactamente como el presupuesto actual
+    (tarjetas marcadas, nómina, montos, frecuencia, día, categoría). Lo que ya no corresponde
+    (tarjeta desmarcada, monto en cero, nómina desmarcada, subperiodo eliminado) se borra.
+    Sus movimientos ya generados se conservan, sin enlace a un fijo. Para no duplicar un cargo
+    que ya existe, un fijo nuevo salta cualquier fecha que ya tenga un movimiento con el mismo nombre.
     - Las compras a meses (MSI) ligadas a una tarjeta no se tocan; mientras existan, esa tarjeta
       no genera fijo, como antes.
     - Los fijos creados a mano, incluida una nómina propia, no se modifican.
@@ -1350,8 +1361,9 @@ def exportar_presupuesto_a_fijos_core(
             libres.remove(fila)
         emparejados.append((item, fila))
 
-    creados = actualizados = desactivados = 0
+    creados = actualizados = eliminados = 0
     for item, fila in emparejados:
+        item["proxima"] = _sin_cargo_previo(cursor, item)
         valores = (item["descripcion"], item["tipo"], item["monto"], item["frecuencia"], item["dia"],
                    item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"])
         if fila is not None:
@@ -1373,18 +1385,18 @@ def exportar_presupuesto_a_fijos_core(
             accion = "creado"
         detalles.append({"descripcion": item["descripcion"], "monto": item["monto"], "frecuencia": item["frecuencia"], "accion": accion})
 
-    # 3. Lo que sobra ya no corresponde al presupuesto: se desactiva (conserva su historial)
+    # 3. Lo que sobra ya no corresponde al presupuesto: se borra
     for sobrante in libres:
-        cursor.execute("UPDATE recurrentes SET activo = 0 WHERE id = ?", (sobrante["id"],))
-        desactivados += 1
+        cursor.execute("DELETE FROM recurrentes WHERE id = ?", (sobrante["id"],))
+        eliminados += 1
         detalles.append({"descripcion": sobrante["descripcion"], "monto": float(sobrante["monto"]),
-                         "frecuencia": sobrante["frecuencia"], "accion": "desactivado"})
+                         "frecuencia": sobrante["frecuencia"], "accion": "eliminado"})
 
     return {
         "frecuencia": frecuencia,
         "creados": creados,
         "actualizados": actualizados,
-        "desactivados": desactivados,
+        "eliminados": eliminados,
         "total_procesados": creados + actualizados,
         "detalles": detalles
     }

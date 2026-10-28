@@ -701,6 +701,12 @@ export async function ejecutarExportarPresupuesto() {
             return;
         }
 
+        const advertencia = 'Al exportar se sobrescribe todo: los fijos del presupuesto actuales se borran y se reemplazan por lo que marcaste.\n\nTus fijos propios y las compras a meses no se tocan.\n\n¿Continuar?';
+        if (!confirm(advertencia)) {
+            if (btn) btn.disabled = false;
+            return;
+        }
+
         const res = await apiFetch('/api/presupuesto/exportar-a-fijos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
