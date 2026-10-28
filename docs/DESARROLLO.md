@@ -26,6 +26,12 @@ python3 test_finanzas.py   # solo la lógica financiera, rápido y sin Docker
 
 Todo cambio en `finanzas_core.py` lleva su caso en `test_finanzas.py`.
 
+Cómo funcionan las suites:
+- Cada archivo corre **todas** sus pruebas aunque una falle, y al final muestra cuáles fallaron. El código de salida es 1 si hubo fallos.
+- Para agregar una prueba basta con escribir una función `test_...`: el ejecutor la descubre sola (`tests/ejecutor.py`).
+- Las pruebas de API necesitan fixtures (cliente, usuarios, tokens), así que se registran a mano en `tests/test_api_aislamiento.py`. Si olvidas registrar una, el ejecutor falla y lo indica.
+- Las pruebas de navegador abren su propio contexto e inician sesión; no dependen de otras pruebas. Esperan condiciones concretas, no tiempos fijos.
+
 ## Reglas que se verifican solas
 
 `./scripts/verificar_reglas.sh` (también lo corre `run_tests.sh`) falla si:

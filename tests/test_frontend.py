@@ -86,70 +86,90 @@ def test_login_incorrecto_muestra_error(navegador, base):
     page.close()
 
 
-def test_flujo_completo(navegador, base, nombre_vp, viewport):
+def _contexto(navegador, viewport):
+    """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
     page = ctx.new_page()
     errores = []
     page.on("pageerror", lambda e: errores.append(f"pageerror: {e}"))
     # Solo errores propios: recursos externos (fuentes, CDN) pueden fallar sin internet.
     page.on("console", lambda m: errores.append(f"console: {m.text}") if m.type == "error" and "Failed to load resource" not in m.text else None)
-
-    _login(page, base)
-    _sin_desbordamiento(page, f"{nombre_vp}/inicio")
-
-    for tab in PESTANAS:
-        # Clic por JS: en móvil el botón vive en el sidebar colapsado, fuera de la pantalla.
-        page.evaluate(f"document.querySelector('[data-tab=\"{tab}\"]').click()")
-        page.wait_for_timeout(400)
-        _sin_desbordamiento(page, f"{nombre_vp}/{tab}")
-
-    assert not errores, f"{nombre_vp}: errores de JS\n" + "\n".join(errores)
-    return ctx, page
+    return ctx, page, errores
 
 
-def test_registrar_ingreso_y_modal_accesible(page, base):
-    page.evaluate("document.querySelector('[data-tab=\"tab-movimientos\"]').click()")
-    page.fill("#fecha", time.strftime("%Y-%m-%d"))
-    page.select_option("#tipo", "ingreso")
-    page.fill("#monto", "1234.56")
-    page.fill("#descripcion", "ingreso-desde-playwright")
-    opciones = page.locator("#categoria option").evaluate_all("os => os.map(o => o.value).filter(v => v)")
-    if opciones:
-        page.select_option("#categoria", opciones[0])
-    page.click("#transaccion-form [type=submit]")
-    page.wait_for_selector("text=ingreso-desde-playwright", timeout=10000)
+def _recorrer_app(navegador, base, nombre_vp, viewport):
+    ctx, page, errores = _contexto(navegador, viewport)
+    try:
+        _login(page, base)
+        _sin_desbordamiento(page, f"{nombre_vp}/inicio")
+        for tab in PESTANAS:
+            # Clic por JS: en móvil el botón vive en el sidebar colapsado, fuera de la pantalla.
+            page.evaluate(f"document.querySelector('[data-tab=\"{tab}\"]').click()")
+            page.wait_for_selector(f"#{tab}.active")
+            _sin_desbordamiento(page, f"{nombre_vp}/{tab}")
+        assert not errores, f"{nombre_vp}: errores de JS\n" + "\n".join(errores)
+    finally:
+        ctx.close()
 
-    editar = page.locator(".btn-editar").first
-    editar.click()
-    page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
-    page.wait_for_timeout(300)
-    assert page.evaluate("document.getElementById('modal-editar-transaccion').contains(document.activeElement)"), \
-        "al abrir el modal el foco debe quedar dentro"
-    for _ in range(30):
-        page.keyboard.press("Tab")
-    assert page.evaluate("document.getElementById('modal-editar-transaccion').contains(document.activeElement)"), \
-        "Tab no debe sacar el foco del modal"
-    page.keyboard.press("Escape")
-    page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
-    assert page.evaluate("document.activeElement && document.activeElement.classList.contains('btn-editar')"), \
-        "al cerrar, el foco debe volver al botón que abrió el modal"
+
+def test_recorrido_pestanas_laptop(navegador, base):
+    _recorrer_app(navegador, base, "laptop", VIEWPORTS["laptop"])
+
+
+def test_recorrido_pestanas_movil(navegador, base):
+    _recorrer_app(navegador, base, "movil", VIEWPORTS["movil"])
+
+
+def test_registrar_ingreso_y_modal_accesible(navegador, base):
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.evaluate("document.querySelector('[data-tab=\"tab-movimientos\"]').click()")
+        page.wait_for_selector("#tab-movimientos.active")
+        page.fill("#fecha", time.strftime("%Y-%m-%d"))
+        page.select_option("#tipo", "ingreso")
+        page.fill("#monto", "1234.56")
+        page.fill("#descripcion", "ingreso-desde-playwright")
+        opciones = page.locator("#categoria option").evaluate_all("os => os.map(o => o.value).filter(v => v)")
+        if opciones:
+            page.select_option("#categoria", opciones[0])
+        page.click("#transaccion-form [type=submit]")
+        page.wait_for_selector("text=ingreso-desde-playwright", timeout=10000)
+
+        page.locator(".btn-editar").first.click()
+        page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
+        # El foco entra al modal de forma asíncrona: esperamos a que quede dentro, no un tiempo fijo.
+        page.wait_for_function("document.getElementById('modal-editar-transaccion').contains(document.activeElement)")
+        for _ in range(30):
+            page.keyboard.press("Tab")
+            assert page.evaluate("document.getElementById('modal-editar-transaccion').contains(document.activeElement)"), \
+                "Tab no debe sacar el foco del modal"
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
+        page.wait_for_function("document.activeElement && document.activeElement.classList.contains('btn-editar')")
+        assert not errores, "errores de JS:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
+    from ejecutor import ejecutar, verificar_cobertura
     proc, base = _arrancar_servidor()
     try:
         # Tras el arranque: el servidor ya creó la base maestra en TMP/data.
         master_db.create_user_entry(USUARIO, security.hash_password(CLAVE), email=f"{USUARIO}@test.local")
         with sync_playwright() as p:
             navegador = p.chromium.launch()
-            test_login_incorrecto_muestra_error(navegador, base)
-            for nombre_vp, vp in VIEWPORTS.items():
-                ctx, page = test_flujo_completo(navegador, base, nombre_vp, vp)
-                if nombre_vp == "laptop":
-                    test_registrar_ingreso_y_modal_accesible(page, base)
-                ctx.close()
+            registradas = [
+                (test_login_incorrecto_muestra_error, lambda: test_login_incorrecto_muestra_error(navegador, base)),
+                (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
+                (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
+                (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
+            ]
+            codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
     finally:
         proc.terminate()
         shutil.rmtree(TMP, ignore_errors=True)
-    print("OK")
+    sys.exit(codigo)

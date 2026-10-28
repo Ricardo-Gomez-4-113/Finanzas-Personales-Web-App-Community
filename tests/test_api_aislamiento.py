@@ -230,22 +230,30 @@ def test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha):
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from ejecutor import ejecutar, verificar_cobertura
+
+    # Orden importante: una prueba desactiva un usuario y otra agota los intentos de login.
     with TestClient(app) as client:
         ua, ub = _crear_usuario("usuario_a"), _crear_usuario("usuario_b")
         ha, hb = _login(client, "usuario_a"), _login(client, "usuario_b")
         hadmin = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
-        test_usuario_no_ve_ni_modifica_datos_de_otro(client, ua, ub, ha, hb)
-        test_claims_forjados_en_jwt_no_cruzan_tenants(client, ua, ub, ha)
-        test_tokens_invalidos_rechazados(client, ua)
-        test_rbac_admin(client, ha, hadmin)
-        test_usuario_desactivado_pierde_acceso_inmediato(client)
-        test_todas_las_rutas_api_y_admin_exigen_token(client)
-        test_exportar_presupuesto_con_fecha_base_no_da_500(client, ha)
-        test_jwt_alg_none_y_algoritmos_ajenos_rechazados(client, ua)
-        test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)
-        test_restore_solo_afecta_al_propio_tenant(client, ha, hb)
-        test_health_publico_y_sin_datos_de_usuarios(client)
-        test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)
-        test_login_bloquea_tras_5_fallos(client)
+        registradas = [
+            (test_usuario_no_ve_ni_modifica_datos_de_otro, lambda: test_usuario_no_ve_ni_modifica_datos_de_otro(client, ua, ub, ha, hb)),
+            (test_claims_forjados_en_jwt_no_cruzan_tenants, lambda: test_claims_forjados_en_jwt_no_cruzan_tenants(client, ua, ub, ha)),
+            (test_tokens_invalidos_rechazados, lambda: test_tokens_invalidos_rechazados(client, ua)),
+            (test_rbac_admin, lambda: test_rbac_admin(client, ha, hadmin)),
+            (test_usuario_desactivado_pierde_acceso_inmediato, lambda: test_usuario_desactivado_pierde_acceso_inmediato(client)),
+            (test_todas_las_rutas_api_y_admin_exigen_token, lambda: test_todas_las_rutas_api_y_admin_exigen_token(client)),
+            (test_exportar_presupuesto_con_fecha_base_no_da_500, lambda: test_exportar_presupuesto_con_fecha_base_no_da_500(client, ha)),
+            (test_jwt_alg_none_y_algoritmos_ajenos_rechazados, lambda: test_jwt_alg_none_y_algoritmos_ajenos_rechazados(client, ua)),
+            (test_restore_rechaza_archivos_malos_sin_tocar_datos, lambda: test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)),
+            (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
+            (test_health_publico_y_sin_datos_de_usuarios, lambda: test_health_publico_y_sin_datos_de_usuarios(client)),
+            (test_borrar_retiro_de_meta_devuelve_el_dinero, lambda: test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)),
+            (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
+        ]
+        pruebas = verificar_cobertura(sys.modules[__name__], registradas)
+        codigo = ejecutar(pruebas, "test_api_aislamiento")
     shutil.rmtree(TMP, ignore_errors=True)
-    print("OK")
+    sys.exit(codigo)

@@ -140,8 +140,6 @@ def test_bd_nueva_no_genera_respaldo():
 
 
 if __name__ == "__main__":
-    test_bd_vacia_llega_a_la_version_actual_e_idempotente()
-    test_actualizar_desde_cada_version_conserva_datos()
-    test_respaldo_previo_a_migrar_y_rotacion()
-    test_bd_nueva_no_genera_respaldo()
-    print("OK")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from ejecutor import ejecutar_modulo
+    sys.exit(ejecutar_modulo(sys.modules[__name__], "test_migraciones"))

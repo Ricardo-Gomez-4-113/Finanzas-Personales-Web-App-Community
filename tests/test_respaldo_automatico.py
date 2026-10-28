@@ -61,6 +61,6 @@ def test_respaldo_corrupto_no_deja_carpeta_a_medias():
 
 
 if __name__ == "__main__":
-    test_respaldo_restaurable_y_rotacion()
-    test_respaldo_corrupto_no_deja_carpeta_a_medias()
-    print("OK")
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from ejecutor import ejecutar_modulo
+    sys.exit(ejecutar_modulo(sys.modules[__name__], "test_respaldo_automatico"))
