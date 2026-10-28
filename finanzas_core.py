@@ -204,6 +204,64 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
     return insertadas
 
 
+def saltar_recurrente_core(
+    cursor: sqlite3.Cursor,
+    recurrente_id: int,
+    contabilizar_cuota: bool = False,
+    hoy: Optional[date] = None
+) -> dict:
+    """
+    Avanza la próxima fecha de un recurrente al siguiente ciclo sin generar movimiento en transacciones.
+    Para compras a meses (MSI):
+      - contabilizar_cuota=True: incrementa cuotas_generadas (computa como pagada por fuera) y desactiva si se alcanza el total.
+      - contabilizar_cuota=False: solo aplaza la fecha manteniendo las cuotas generadas intactas.
+    """
+    hoy_ref = hoy or ahora_local().date()
+    fila = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (recurrente_id,)).fetchone()
+    if not fila:
+        raise ValueError("El gasto o ingreso recurrente no existe.")
+    if not fila["activo"]:
+        raise ValueError("No se puede saltar el pago de un recurrente inactivo o pausado.")
+
+    prox_actual = date.fromisoformat(fila["proxima_fecha"])
+    frecuencia = fila["frecuencia"]
+    dia = fila["dia"]
+    total_cuotas = fila["total_cuotas"]
+    cuotas_generadas = int(fila["cuotas_generadas"] or 0)
+
+    nueva_fecha = siguiente_fecha(prox_actual, frecuencia, dia)
+    while nueva_fecha <= hoy_ref:
+        nueva_fecha = siguiente_fecha(nueva_fecha, frecuencia, dia)
+
+    activo = 1
+    if total_cuotas is not None:
+        if contabilizar_cuota:
+            cuotas_generadas += 1
+            if cuotas_generadas >= total_cuotas:
+                activo = 0
+        else:
+            activo = 1
+    else:
+        activo = 1
+
+    cursor.execute(
+        "UPDATE recurrentes SET proxima_fecha = ?, cuotas_generadas = ?, activo = ? WHERE id = ?",
+        (nueva_fecha.isoformat(), cuotas_generadas, activo, recurrente_id)
+    )
+
+    return {
+        "id": recurrente_id,
+        "descripcion": fila["descripcion"],
+        "fecha_anterior": prox_actual.isoformat(),
+        "nueva_proxima_fecha": nueva_fecha.isoformat(),
+        "cuotas_generadas": cuotas_generadas,
+        "total_cuotas": total_cuotas,
+        "activo": bool(activo),
+        "es_msi": total_cuotas is not None,
+        "cuota_contabilizada": bool(contabilizar_cuota if total_cuotas is not None else False)
+    }
+
+
 def deuda_pendiente(fila) -> float:
     """Saldo MSI pendiente de un recurrente. 0 si no es MSI o ya terminó."""
     total = fila["total_cuotas"]
@@ -1045,6 +1103,38 @@ def resolver_categoria_por_nombre(cursor: sqlite3.Cursor, texto: str, tipo: str 
             if "servicio" in f["nombre"].lower() or "vivienda" in f["nombre"].lower():
                 return f["id"]
     return filas[0]["id"]
+
+
+def calcular_fecha_inicio_exportacion(
+    inicio_cargos: str = 'natural',
+    fecha_base_custom: Optional[date] = None,
+    hoy: Optional[date] = None
+) -> date:
+    """
+    Calcula la fecha de corte/inicio para la exportación de presupuesto a gastos fijos.
+    Permite evitar cobros retroactivos de fechas ya pasadas en el mes:
+      - 'natural': parte desde hoy.
+      - 'siguiente_quincena': si hoy <= 15, arranca el día 16; si hoy > 15, arranca el día 1 del próximo mes.
+      - 'proximo_mes': arranca el día 1 del próximo mes.
+      - 'personalizada': utiliza fecha_base_custom.
+    """
+    hoy_d = hoy or ahora_local().date()
+    if inicio_cargos == 'personalizada' and fecha_base_custom:
+        return fecha_base_custom
+    if fecha_base_custom and inicio_cargos not in ('siguiente_quincena', 'proximo_mes', 'natural'):
+        return fecha_base_custom
+
+    if inicio_cargos == 'proximo_mes':
+        anio, mes = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
+        return date(anio, mes, 1)
+
+    if inicio_cargos == 'siguiente_quincena':
+        if hoy_d.day <= 15:
+            return date(hoy_d.year, hoy_d.month, 16)
+        anio, mes = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
+        return date(anio, mes, 1)
+
+    return hoy_d
 
 
 def exportar_presupuesto_a_fijos_core(

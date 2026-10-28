@@ -104,6 +104,8 @@ def eliminar_transaccion(
     if isinstance(forzar, sqlite3.Connection):
         conn = forzar
         forzar = False
+    elif not isinstance(forzar, bool):
+        forzar = bool(getattr(forzar, 'default', False))
 
     cursor = conn.cursor()
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (id_transaccion,)).fetchone()

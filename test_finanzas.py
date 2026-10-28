@@ -1387,6 +1387,324 @@ def test_quincena_cortes_dias_estandar_15_y_fin_de_mes():
     assert v5["ingreso_ventana"] == 18751.08
 
 
+def test_calcular_fecha_inicio_exportacion():
+    from finanzas_core import calcular_fecha_inicio_exportacion
+    # Natural: hoy
+    assert calcular_fecha_inicio_exportacion('natural', hoy=date(2026, 10, 28)) == date(2026, 10, 28)
+    # Próximo mes
+    assert calcular_fecha_inicio_exportacion('proximo_mes', hoy=date(2026, 10, 28)) == date(2026, 11, 1)
+    # Próximo mes en diciembre (cambio de año)
+    assert calcular_fecha_inicio_exportacion('proximo_mes', hoy=date(2026, 12, 15)) == date(2027, 1, 1)
+    # Siguiente quincena cuando hoy <= 15
+    assert calcular_fecha_inicio_exportacion('siguiente_quincena', hoy=date(2026, 10, 10)) == date(2026, 10, 16)
+    # Siguiente quincena cuando hoy > 15
+    assert calcular_fecha_inicio_exportacion('siguiente_quincena', hoy=date(2026, 10, 20)) == date(2026, 11, 1)
+    # Personalizada
+    assert calcular_fecha_inicio_exportacion('personalizada', fecha_base_custom=date(2026, 11, 20), hoy=date(2026, 10, 28)) == date(2026, 11, 20)
+
+
+def test_saltar_recurrente_gasto_fijo():
+    from finanzas_core import saltar_recurrente_core
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Internet Casa', 'gasto', 650.0, 'quincenal', 15, '2026-10-15', 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    # Saltar el pago de la 1ra quincena (15 oct)
+    res = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=False, hoy=date(2026, 10, 10))
+    conn.commit()
+
+    assert res["nueva_proxima_fecha"] == '2026-10-31'
+    assert res["activo"] is True
+    # Verificar que NO se crearon transacciones
+    txs = cur.execute("SELECT * FROM transacciones WHERE recurrente_id = ?", (rec_id,)).fetchall()
+    assert len(txs) == 0
+
+    # Saltar el pago de la 2da quincena (31 oct)
+    res2 = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=False, hoy=date(2026, 10, 10))
+    conn.commit()
+    assert res2["nueva_proxima_fecha"] == '2026-11-15'
+    assert res2["cuotas_generadas"] == 0
+
+
+def test_saltar_recurrente_msi_contabilizar_cuota():
+    from finanzas_core import saltar_recurrente_core, deuda_pendiente
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
+        VALUES ('Laptop MSI', 'gasto', 1000.0, 'mensual', 15, '2026-10-15', 3, 0, 3000.0, 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    # Cuota 1 marcada como pagada por fuera
+    res1 = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=True, hoy=date(2026, 10, 10))
+    conn.commit()
+    assert res1["cuotas_generadas"] == 1
+    assert res1["nueva_proxima_fecha"] == '2026-11-15'
+    assert res1["activo"] is True
+
+    fila1 = cur.execute("SELECT * FROM recurrentes WHERE id = ?", (rec_id,)).fetchone()
+    assert deuda_pendiente(fila1) == 2000.0
+
+    # Cuota 2 marcada como pagada por fuera
+    res2 = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=True, hoy=date(2026, 10, 10))
+    conn.commit()
+    assert res2["cuotas_generadas"] == 2
+    assert res2["nueva_proxima_fecha"] == '2026-12-15'
+    assert res2["activo"] is True
+
+    fila2 = cur.execute("SELECT * FROM recurrentes WHERE id = ?", (rec_id,)).fetchone()
+    assert deuda_pendiente(fila2) == 1000.0
+
+    # Cuota 3 final: debe liquidar y desactivar (activo=0)
+    res3 = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=True, hoy=date(2026, 10, 10))
+    conn.commit()
+    assert res3["cuotas_generadas"] == 3
+    assert res3["activo"] is False
+
+    fila3 = cur.execute("SELECT * FROM recurrentes WHERE id = ?", (rec_id,)).fetchone()
+    assert deuda_pendiente(fila3) == 0.0
+    assert fila3["activo"] == 0
+
+    # Transacciones nunca se insertaron
+    txs = cur.execute("SELECT * FROM transacciones WHERE recurrente_id = ?", (rec_id,)).fetchall()
+    assert len(txs) == 0
+
+
+def test_saltar_recurrente_msi_solo_aplazar():
+    from finanzas_core import saltar_recurrente_core, deuda_pendiente
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
+        VALUES ('Celular MSI', 'gasto', 800.0, 'mensual', 20, '2026-10-20', 6, 1, 4800.0, 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    # Aplazar fecha sin contabilizar cuota
+    res = saltar_recurrente_core(cur, rec_id, contabilizar_cuota=False, hoy=date(2026, 10, 10))
+    conn.commit()
+
+    assert res["cuotas_generadas"] == 1
+    assert res["nueva_proxima_fecha"] == '2026-11-20'
+    assert res["activo"] is True
+
+    fila = cur.execute("SELECT * FROM recurrentes WHERE id = ?", (rec_id,)).fetchone()
+    assert fila["cuotas_generadas"] == 1
+    assert deuda_pendiente(fila) == 4000.0
+
+
+def test_saltar_recurrente_inactivo_falla():
+    from finanzas_core import saltar_recurrente_core
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Gasto Pausado', 'gasto', 300.0, 'mensual', 5, '2026-11-05', 0)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    try:
+        saltar_recurrente_core(cur, rec_id, contabilizar_cuota=False)
+        assert False, "Debió lanzar ValueError por recurrente inactivo"
+    except ValueError as e:
+        assert "no está activo" in str(e).lower() or "inactivo" in str(e).lower()
+
+
+def test_exportar_presupuesto_con_inicio_proximo_mes_evita_materializacion():
+    from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes, calcular_fecha_inicio_exportacion
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
+        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 5000.0, 15)
+    """)
+    conn.commit()
+
+    hoy = date(2026, 10, 20)
+    fecha_inicio = calcular_fecha_inicio_exportacion('proximo_mes', hoy=hoy)
+    assert fecha_inicio == date(2026, 11, 1)
+
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=fecha_inicio)
+    conn.commit()
+
+    # Verificar que los recurrentes tienen fecha en noviembre
+    recs = cur.execute("SELECT * FROM recurrentes WHERE activo = 1").fetchall()
+    assert len(recs) >= 2  # Nómina + Supermercado
+    for r in recs:
+        assert date.fromisoformat(r["proxima_fecha"]) >= date(2026, 11, 1)
+
+    # Materializar en fecha de hoy (20 oct) NO debe generar ningún cobro retroactivo
+    mat = materializar_recurrentes(conn, hoy)
+    assert mat == 0
+    txs = cur.execute("SELECT * FROM transacciones").fetchall()
+    assert len(txs) == 0
+
+
+def test_exportar_presupuesto_con_inicio_siguiente_quincena():
+    from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes, calcular_fecha_inicio_exportacion
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 30000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    # Tarjeta dividida: Q1 día 1 ($2,000) y Q2 día 16 ($2,000)
+    sub = [
+        {"id": "q1", "nombre": "Q1", "monto": 2000.0, "porcentaje": 50.0, "dia": 1},
+        {"id": "q2", "nombre": "Q2", "monto": 2000.0, "porcentaje": 50.0, "dia": 16}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, distribucion_subperiodos)
+        VALUES ('Gastos Servicios', 'zap', 'amber', 13.33, 4000.0, ?)
+    """, (json.dumps(sub),))
+    conn.commit()
+
+    # Usuario empezó el 10 de octubre y elige 'siguiente_quincena'
+    hoy = date(2026, 10, 10)
+    fecha_inicio = calcular_fecha_inicio_exportacion('siguiente_quincena', hoy=hoy)
+    assert fecha_inicio == date(2026, 10, 16)
+
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=fecha_inicio)
+    conn.commit()
+
+    # Q1 del día 1 ya no se cobra en octubre; pasa directamente a noviembre
+    q1 = cur.execute("SELECT * FROM recurrentes WHERE descripcion LIKE '%(Q1)%'").fetchone()
+    assert q1 is not None
+    assert q1["proxima_fecha"] == '2026-11-01'
+
+    # Q2 del día 16 queda para el 16 de octubre
+    q2 = cur.execute("SELECT * FROM recurrentes WHERE descripcion LIKE '%(Q2)%'").fetchone()
+    assert q2 is not None
+    assert q2["proxima_fecha"] == '2026-10-16'
+
+    # Hoy es 10 de octubre: ninguna se materializa
+    mat = materializar_recurrentes(conn, hoy)
+    assert mat == 0
+    txs = cur.execute("SELECT * FROM transacciones").fetchall()
+    assert len(txs) == 0
+
+
+def test_endpoint_saltar_recurrente():
+    from routers.recurrentes import saltar_recurrente, SaltarPagoRequest
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
+        VALUES ('Laptop MSI', 'gasto', 1000.0, 'mensual', 15, '2026-10-15', 3, 0, 3000.0, 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    req = SaltarPagoRequest(contabilizar_cuota=True)
+    res = saltar_recurrente(rec_id, req, conn)
+    assert res["cuotas_generadas"] == 1
+    assert res["deuda_pendiente"] == 2000.0
+    assert "detalle_salto" in res
+    assert res["detalle_salto"]["cuota_contabilizada"] is True
+
+
+def test_endpoint_exportar_presupuesto_diferido():
+    from routers.presupuesto import exportar_presupuesto_a_fijos, ExportarFijosRequest
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
+        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 5000.0, 15)
+    """)
+    conn.commit()
+
+    req = ExportarFijosRequest(inicio_cargos='proximo_mes')
+    res = exportar_presupuesto_a_fijos(req, conn)
+    assert res["inicio_cargos_modo"] == 'proximo_mes'
+    assert res["total_procesados"] >= 2
+    assert "fecha_inicio_cargos" in res
+
+
+def test_endpoint_saltar_recurrente_sin_body_y_con_conexion_directa():
+    from routers.recurrentes import saltar_recurrente
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Luz CFE', 'gasto', 400.0, 'mensual', 15, '2026-10-15', 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    # Llamada pasando solo id y conn (sin SaltarPagoRequest)
+    res = saltar_recurrente(rec_id, conn)
+    assert res["proxima_fecha"] == '2026-11-15'
+    assert res["activo"] == 1
+
+
+def test_endpoint_saltar_recurrente_no_encontrado_404():
+    from routers.recurrentes import saltar_recurrente
+    conn = nueva_bd()
+    try:
+        saltar_recurrente(99999, conn)
+        assert False, "Debió fallar con 404 por recurrente inexistente"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 404
+
+
+def test_saltar_recurrente_ingreso_fijo():
+    from finanzas_core import saltar_recurrente_core
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Nómina Quincenal', 'ingreso', 12000.0, 'quincenal', 15, '2026-10-15', 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+
+    res = saltar_recurrente_core(cur, rec_id, hoy=date(2026, 10, 10))
+    conn.commit()
+    assert res["nueva_proxima_fecha"] == '2026-10-31'
+    assert res["activo"] is True
+    txs = cur.execute("SELECT * FROM transacciones WHERE recurrente_id = ?", (rec_id,)).fetchall()
+    assert len(txs) == 0
+
+
+def test_exportar_presupuesto_subperiodos_asimetricos_febrero():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 30000.0, frecuencia = 'mensual' WHERE id = 1")
+    sub = [
+        {"id": "sp1", "nombre": "Semana 1", "monto": 1000.0, "porcentaje": 25.0, "dia": 1},
+        {"id": "sp2", "nombre": "Semana 2", "monto": 1000.0, "porcentaje": 25.0, "dia": 15},
+        {"id": "sp3", "nombre": "Semana 3", "monto": 1000.0, "porcentaje": 25.0, "dia": 31}
+    ]
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, distribucion_subperiodos)
+        VALUES ('Super Asimétrico', 'shopping-cart', 'emerald', 10.0, 3000.0, ?)
+    """, (json.dumps(sub),))
+    conn.commit()
+
+    # Exportar el 10 de febrero de año no bisiesto (2027)
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2027, 2, 10))
+    conn.commit()
+
+    recs = cur.execute('SELECT descripcion, dia, proxima_fecha FROM recurrentes WHERE descripcion LIKE "%Super Asimétrico%" ORDER BY id ASC').fetchall()
+    assert len(recs) == 3
+    # sp1 (dia 1) pasa a marzo porque 10 feb > 1 feb
+    assert recs[0]["proxima_fecha"] == '2027-03-01'
+    # sp2 (dia 15) queda para el 15 de feb
+    assert recs[1]["proxima_fecha"] == '2027-02-15'
+    # sp3 (dia 31) se ancla al último día de febrero (28 de feb) sin reventar
+    assert recs[2]["dia"] == 31
+    assert recs[2]["proxima_fecha"] == '2027-02-28'
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1438,6 +1756,19 @@ if __name__ == '__main__':
     test_listar_transacciones_incluye_metadata_presupuesto()
     test_sincronizacion_config_presupuesto_con_recurrentes()
     test_quincena_cortes_dias_estandar_15_y_fin_de_mes()
+    test_calcular_fecha_inicio_exportacion()
+    test_saltar_recurrente_gasto_fijo()
+    test_saltar_recurrente_msi_contabilizar_cuota()
+    test_saltar_recurrente_msi_solo_aplazar()
+    test_saltar_recurrente_inactivo_falla()
+    test_exportar_presupuesto_con_inicio_proximo_mes_evita_materializacion()
+    test_exportar_presupuesto_con_inicio_siguiente_quincena()
+    test_endpoint_saltar_recurrente()
+    test_endpoint_exportar_presupuesto_diferido()
+    test_endpoint_saltar_recurrente_sin_body_y_con_conexion_directa()
+    test_endpoint_saltar_recurrente_no_encontrado_404()
+    test_saltar_recurrente_ingreso_fijo()
+    test_exportar_presupuesto_subperiodos_asimetricos_febrero()
     print('OK')
 
 

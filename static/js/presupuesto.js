@@ -616,12 +616,53 @@ export function abrirModalExportarPresupuesto() {
         }
     }
 
+    // Configurar selector de fecha de inicio de cargos
+    const selInicio = document.getElementById('exportar-inicio-cargos');
+    const boxCustom = document.getElementById('box-exportar-fecha-custom');
+    const inputCustom = document.getElementById('exportar-fecha-personalizada');
+    if (selInicio) selInicio.value = 'natural';
+    if (boxCustom) boxCustom.classList.add('hidden');
+
+    const dHoy = new Date();
+    const hoyIso = `${dHoy.getFullYear()}-${String(dHoy.getMonth() + 1).padStart(2, '0')}-${String(dHoy.getDate()).padStart(2, '0')}`;
+    if (inputCustom) inputCustom.value = hoyIso;
+
+    const mesesAbr = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const diaHoy = dHoy.getDate();
+    let sigQuincenaStr = '';
+    if (diaHoy <= 15) {
+        sigQuincenaStr = `16 de ${mesesAbr[dHoy.getMonth()]}`;
+    } else {
+        const proxMesIdx = (dHoy.getMonth() + 1) % 12;
+        sigQuincenaStr = `1 de ${mesesAbr[proxMesIdx]}`;
+    }
+    const proxMesIdx = (dHoy.getMonth() + 1) % 12;
+    const proxMesStr = `1 de ${mesesAbr[proxMesIdx]}`;
+
+    const optNat = document.getElementById('opt-exportar-natural');
+    if (optNat) optNat.textContent = `Próxima fecha natural (desde hoy, ${diaHoy} de ${mesesAbr[dHoy.getMonth()]})`;
+    const optQuincena = document.getElementById('opt-exportar-sig-quincena');
+    if (optQuincena) optQuincena.textContent = `A partir de la siguiente quincena (${sigQuincenaStr})`;
+    const optMes = document.getElementById('opt-exportar-prox-mes');
+    if (optMes) optMes.textContent = `A partir del 1er día del próximo mes (${proxMesStr})`;
+
     modal.classList.remove('hidden');
 }
 
 export function cerrarModalExportarPresupuesto() {
     const modal = document.getElementById('modal-exportar-presupuesto');
     if (modal) modal.classList.add('hidden');
+}
+
+export function cambiarInicioCargosExportar(val) {
+    const boxCustom = document.getElementById('box-exportar-fecha-custom');
+    if (boxCustom) {
+        if (val === 'personalizada') {
+            boxCustom.classList.remove('hidden');
+        } else {
+            boxCustom.classList.add('hidden');
+        }
+    }
 }
 
 export function toggleSeleccionarTodosExportar() {
@@ -643,6 +684,18 @@ export async function ejecutarExportarPresupuesto() {
         const chkActualizar = document.getElementById('chk-exportar-actualizar');
         const actualizar_existentes = chkActualizar ? chkActualizar.checked : true;
 
+        const selInicio = document.getElementById('exportar-inicio-cargos');
+        const inicio_cargos = selInicio ? selInicio.value : 'natural';
+        let fecha_base = null;
+        if (inicio_cargos === 'personalizada') {
+            const inputFecha = document.getElementById('exportar-fecha-personalizada');
+            fecha_base = inputFecha ? inputFecha.value : null;
+            if (!fecha_base) {
+                toast('Por favor selecciona una fecha base personalizada.', 'error');
+                return;
+            }
+        }
+
         const checkboxes = document.querySelectorAll('.chk-item-exportar:checked');
         const tarjetas_ids = Array.from(checkboxes).map(c => parseInt(c.dataset.id, 10));
 
@@ -657,7 +710,9 @@ export async function ejecutarExportarPresupuesto() {
             body: JSON.stringify({
                 tarjetas_ids,
                 incluir_ingreso,
-                actualizar_existentes
+                actualizar_existentes,
+                inicio_cargos,
+                fecha_base
             })
         });
 
@@ -669,7 +724,10 @@ export async function ejecutarExportarPresupuesto() {
 
         const data = await res.json();
         cerrarModalExportarPresupuesto();
-        toast(`Exportación exitosa: ${data.total_procesados} movimientos/fijos sincronizados con periodicidad ${data.frecuencia}.`, 'ok');
+        const matTxt = data.transacciones_materializadas > 0
+            ? ` (${data.transacciones_materializadas} generados hoy)`
+            : ` (próximos cobros a partir del ${data.fecha_inicio_cargos})`;
+        toast(`Exportación exitosa: ${data.total_procesados} movimientos/fijos sincronizados${matTxt}.`, 'ok');
 
         if (typeof window.cargarRecurrentes === 'function') {
             window.cargarRecurrentes();
@@ -1228,6 +1286,7 @@ Object.assign(window, {
     aplicarPlantillaPresupuesto,
     abrirModalExportarPresupuesto,
     cerrarModalExportarPresupuesto,
+    cambiarInicioCargosExportar,
     toggleSeleccionarTodosExportar,
     ejecutarExportarPresupuesto,
     cerrarBannerFijosPresupuesto,

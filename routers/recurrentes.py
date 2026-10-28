@@ -14,12 +14,17 @@ from finanzas_core import (
     mensualizar,
     primera_fecha_quincenal,
     proxima_fecha_vigente,
+    saltar_recurrente_core,
     validar_sustentabilidad_gasto_fijo,
 )
 from routers.movimientos import validar_categoria
 from security import get_tenant_db
 
 router = APIRouter()
+
+
+class SaltarPagoRequest(BaseModel):
+    contabilizar_cuota: bool = False
 
 
 class RecurrenteCreate(BaseModel):
@@ -324,3 +329,39 @@ def eliminar_recurrente(recurrente_id: int, conn: sqlite3.Connection = Depends(g
     cursor.execute("DELETE FROM recurrentes WHERE id = ?", (recurrente_id,))
     conn.commit()
     return {"mensaje": "Registro eliminado. Los movimientos ya generados se conservaron."}
+
+
+@router.post("/api/recurrentes/{recurrente_id}/saltar", summary="Saltar próximo ciclo de pago")
+def saltar_recurrente(
+    recurrente_id: int,
+    req: Optional[SaltarPagoRequest] = None,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    if isinstance(req, sqlite3.Connection):
+        conn = req
+        req = None
+    contabilizar = req.contabilizar_cuota if req else False
+    cursor = conn.cursor()
+    fila_pre = cursor.execute("SELECT id FROM recurrentes WHERE id = ?", (recurrente_id,)).fetchone()
+    if not fila_pre:
+        raise HTTPException(status_code=404, detail="Gasto o ingreso recurrente no encontrado.")
+    try:
+        info = saltar_recurrente_core(cursor, recurrente_id, contabilizar_cuota=contabilizar, hoy=ahora_local().date())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    conn.commit()
+
+    fila = cursor.execute("""
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+        FROM recurrentes r
+        LEFT JOIN apartados a ON a.id = r.apartado_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
+        WHERE r.id = ?
+    """, (recurrente_id,)).fetchone()
+    if not fila:
+        raise HTTPException(status_code=404, detail="El recurrente no fue encontrado tras la actualización.")
+
+    res = _serializar(fila)
+    res["detalle_salto"] = info
+    return res
+

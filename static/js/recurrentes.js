@@ -169,7 +169,7 @@ function renderListaMsi(items) {
     items.forEach(r => {
         const card = document.createElement('div');
         card.className = 'rec-item';
-        const terminado = r.cuotas_generadas >= r.total_cuotas;
+        const terminado = (r.cuotas_generadas >= r.total_cuotas) || !r.activo;
         card.innerHTML = `
             <div class="rec-item-head">
                 <strong>${escapeHTML(r.descripcion)}</strong>
@@ -182,6 +182,7 @@ function renderListaMsi(items) {
             </div>
             <div class="rec-item-actions">
                 <button type="button" class="btn-secondary btn-sm" data-accion="editar" data-id="${r.id}">Editar</button>
+                ${!terminado ? `<button type="button" class="btn-secondary btn-sm" data-accion="saltar" data-id="${r.id}" title="Saltar próximo cobro (${escapeHTML(r.proxima_fecha)})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 3px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Saltar pago</button>` : ''}
                 <button type="button" class="btn-secondary btn-sm" data-accion="eliminar" data-id="${r.id}">Eliminar</button>
             </div>`;
         card.querySelector('.progress-bar-fill').style.width = `${Math.min(100, r.progreso_pct || 0)}%`;
@@ -218,11 +219,66 @@ function renderListaFijos(items) {
             </div>
             <div class="rec-item-actions">
                 <button type="button" class="btn-secondary btn-sm" data-accion="editar" data-id="${r.id}">Editar</button>
+                ${r.activo ? `<button type="button" class="btn-secondary btn-sm" data-accion="saltar" data-id="${r.id}" title="Saltar próximo ciclo (${escapeHTML(r.proxima_fecha)})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 3px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Saltar pago</button>` : ''}
                 <button type="button" class="btn-secondary btn-sm" data-accion="${r.activo ? 'pausar' : 'reanudar'}" data-id="${r.id}">${r.activo ? 'Pausar' : 'Reanudar'}</button>
                 <button type="button" class="btn-secondary btn-sm" data-accion="eliminar" data-id="${r.id}">Eliminar</button>
             </div>`;
         cont.appendChild(card);
     });
+}
+
+let recurrenteSeleccionadoParaSaltar = null;
+
+export function abrirModalSaltarMsi(r) {
+    recurrenteSeleccionadoParaSaltar = r;
+    const modal = document.getElementById('modal-saltar-msi');
+    if (!modal) return;
+    const desc = document.getElementById('modal-saltar-msi-desc');
+    const txtPagada = document.getElementById('modal-saltar-msi-pagada-txt');
+    const proximaCuotaNum = (r.cuotas_generadas || 0) + 1;
+    if (desc) {
+        desc.innerHTML = `¿Cómo deseas proceder con el cobro de <strong>${escapeHTML(r.descripcion)}</strong> programado para el <strong>${escapeHTML(r.proxima_fecha)}</strong>?`;
+    }
+    if (txtPagada) {
+        txtPagada.textContent = `Computa la cuota ${proximaCuotaNum} de ${r.total_cuotas} como liquidada fuera de la app y posterga la fecha al siguiente mes sin generar cobro en tus movimientos.`;
+    }
+    modal.classList.remove('hidden');
+}
+
+export function cerrarModalSaltarMsi() {
+    const modal = document.getElementById('modal-saltar-msi');
+    if (modal) modal.classList.add('hidden');
+    recurrenteSeleccionadoParaSaltar = null;
+}
+
+export async function ejecutarSaltarRecurrente(id, contabilizar_cuota = false) {
+    try {
+        const res = await apiFetch(`/api/recurrentes/${id}/saltar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contabilizar_cuota })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            toast(err.detail || 'No se pudo saltar el pago.', 'error');
+            return;
+        }
+        const data = await res.json();
+        const nuevaFecha = data.proxima_fecha;
+        if (data.es_msi && contabilizar_cuota) {
+            if (data.cuotas_generadas >= data.total_cuotas) {
+                toast(`¡Compra liquidada! Cuota ${data.cuotas_generadas}/${data.total_cuotas} registrada por fuera.`, 'ok');
+            } else {
+                toast(`Cuota ${data.cuotas_generadas}/${data.total_cuotas} marcada como pagada. Próximo cobro: ${nuevaFecha}`, 'ok');
+            }
+        } else {
+            toast(`Pago saltado con éxito. Próximo ciclo: ${nuevaFecha}`, 'ok');
+        }
+        recargar();
+    } catch (e) {
+        console.error('Error al saltar pago:', e);
+        toast('Error de red al saltar el pago.', 'error');
+    }
 }
 
 async function accionRecurrente(e) {
@@ -232,6 +288,20 @@ async function accionRecurrente(e) {
     const accion = btn.dataset.accion;
     if (accion === 'editar') {
         abrirModalEditarRecurrente(id);
+        return;
+    }
+    if (accion === 'saltar') {
+        const item = (estado.cache.recurrentes || []).find(r => r.id === parseInt(id, 10));
+        if (!item) return;
+        if (item.es_msi) {
+            abrirModalSaltarMsi(item);
+        } else {
+            const textoTipo = item.tipo === 'ingreso' ? 'el próximo ingreso' : 'el próximo pago';
+            const pregunta = `¿Saltar ${textoTipo} de "${item.descripcion}" (${item.proxima_fecha})?\n\nLa fecha avanzará al siguiente período (${FRECUENCIA_TXT[item.frecuencia] || item.frecuencia}) sin registrar movimientos en tus cuentas.`;
+            if (confirm(pregunta)) {
+                ejecutarSaltarRecurrente(id, false);
+            }
+        }
         return;
     }
     if (accion === 'eliminar') {
@@ -543,12 +613,36 @@ export function inicializarRecurrentes() {
     const fecha = document.getElementById('rec-fecha');
     restaurarFechaHoy();
     actualizarVistaModo();
+
+    const btnPagada = document.getElementById('btn-saltar-msi-pagada');
+    if (btnPagada) {
+        btnPagada.addEventListener('click', () => {
+            if (recurrenteSeleccionadoParaSaltar) {
+                const id = recurrenteSeleccionadoParaSaltar.id;
+                cerrarModalSaltarMsi();
+                ejecutarSaltarRecurrente(id, true);
+            }
+        });
+    }
+    const btnAplazar = document.getElementById('btn-saltar-msi-aplazar');
+    if (btnAplazar) {
+        btnAplazar.addEventListener('click', () => {
+            if (recurrenteSeleccionadoParaSaltar) {
+                const id = recurrenteSeleccionadoParaSaltar.id;
+                cerrarModalSaltarMsi();
+                ejecutarSaltarRecurrente(id, false);
+            }
+        });
+    }
 }
 
 Object.assign(window, {
     abrirModalEditarRecurrente,
     cerrarModalEditarRecurrente,
-    guardarEdicionRecurrente
+    guardarEdicionRecurrente,
+    abrirModalSaltarMsi,
+    cerrarModalSaltarMsi,
+    ejecutarSaltarRecurrente
 });
 
 inicializarRecurrentes();

@@ -14,6 +14,7 @@ from finanzas_core import (
     sugerir_icono_color,
     detectar_fijos_recurrentes_core as detectar_fijos_recurrentes,
     sincronizar_fijos_presupuesto_core,
+    calcular_fecha_inicio_exportacion,
     exportar_presupuesto_a_fijos_core,
     materializar_recurrentes,
     ahora_local,
@@ -80,6 +81,8 @@ class ExportarFijosRequest(BaseModel):
     tarjetas_ids: Optional[List[int]] = None
     incluir_ingreso: bool = True
     actualizar_existentes: bool = True
+    inicio_cargos: Optional[Literal['natural', 'siguiente_quincena', 'proximo_mes', 'personalizada']] = 'natural'
+    fecha_base: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 # -----------------------------------------------------------------------------
@@ -278,19 +281,38 @@ def exportar_presupuesto_a_fijos(
     req: Optional[ExportarFijosRequest] = None,
     conn: sqlite3.Connection = Depends(get_tenant_db)
 ):
+    if isinstance(req, sqlite3.Connection):
+        conn = req
+        req = None
     if req is None:
         req = ExportarFijosRequest()
     cursor = conn.cursor()
+    hoy_local = ahora_local().date()
+    fecha_base_custom = None
+    if req.fecha_base:
+        try:
+            fecha_base_custom = date.fromisoformat(req.fecha_base)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="La fecha base especificada no es válida.")
+
+    fecha_inicio_efectiva = calcular_fecha_inicio_exportacion(
+        inicio_cargos=req.inicio_cargos or 'natural',
+        fecha_base_custom=fecha_base_custom,
+        hoy=hoy_local
+    )
+
     res = exportar_presupuesto_a_fijos_core(
         cursor=cursor,
         tarjetas_ids=req.tarjetas_ids,
         incluir_ingreso=req.incluir_ingreso,
-        actualizar_existentes=req.actualizar_existentes
+        actualizar_existentes=req.actualizar_existentes,
+        fecha_base=fecha_inicio_efectiva
     )
-    hoy = ahora_local().date()
-    materializadas = materializar_recurrentes(conn, hoy)
+    materializadas = materializar_recurrentes(conn, hoy_local)
     conn.commit()
     res["transacciones_materializadas"] = materializadas
+    res["fecha_inicio_cargos"] = fecha_inicio_efectiva.isoformat()
+    res["inicio_cargos_modo"] = req.inicio_cargos or 'natural'
     return res
 
 

@@ -42,10 +42,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261026_pres_v7">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261026_pres_v7">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261026_pres_v7">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261026_pres_v7">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20261028_saltar_v2">
+    <link rel="stylesheet" href="/static/css/layout.css?v=20261028_saltar_v2">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=20261028_saltar_v2">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=20261028_saltar_v2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -1905,6 +1905,26 @@
                     <span class="pnl-badge badge-success">Ingreso</span>
                 </div>
 
+                <!-- Selector Inicio de Cargos (Evitar cobros retroactivos) -->
+                <div class="pres-import-item-row" style="padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
+                    <label for="exportar-inicio-cargos" style="display: block; font-weight: 600; font-size: 0.88rem; color: var(--text-main); margin-bottom: 6px;">
+                        ¿A partir de cuándo comenzar los cargos?
+                    </label>
+                    <select id="exportar-inicio-cargos" class="form-control" style="width: 100%; margin-bottom: 6px;" onchange="window.cambiarInicioCargosExportar(this.value)">
+                        <option value="natural" id="opt-exportar-natural">Próxima fecha natural (según calendario)</option>
+                        <option value="siguiente_quincena" id="opt-exportar-sig-quincena">A partir de la siguiente quincena</option>
+                        <option value="proximo_mes" id="opt-exportar-prox-mes">A partir del 1er día del próximo mes</option>
+                        <option value="personalizada">Fecha de inicio personalizada...</option>
+                    </select>
+                    <div id="box-exportar-fecha-custom" class="hidden" style="margin-top: 8px;">
+                        <label for="exportar-fecha-personalizada" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Fecha base para programar:</label>
+                        <input type="date" id="exportar-fecha-personalizada" class="form-control" style="width: 100%;">
+                    </div>
+                    <div id="exportar-inicio-ayuda" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; margin-top: 4px;">
+                        Evita cargos de quincenas o fechas ya transcurridas si empezaste a usar la app a mitad de mes.
+                    </div>
+                </div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tarjetas de Gasto a Exportar</span>
                     <button type="button" id="btn-toggle-todos-exportar" class="btn-sm btn-ghost" onclick="toggleSeleccionarTodosExportar()">Deseleccionar todos</button>
@@ -1926,6 +1946,48 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     <span>Confirmar y Exportar</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL: SALTAR PAGO DE COMPRA A MESES (MSI)     -->
+    <!-- ============================================== -->
+    <div id="modal-saltar-msi" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-saltar-msi-titulo" onclick="if(event.target === this) cerrarModalSaltarMsi()">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="modal-saltar-msi-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                    <span>Saltar Pago de Compra a Meses</span>
+                </h3>
+                <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalSaltarMsi()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-saltar-msi-desc" class="modal-instruction" style="margin-bottom: 16px;">
+                    Selecciona cómo deseas registrar este salto en tu compra a meses.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button type="button" id="btn-saltar-msi-pagada" class="btn-secondary" style="text-align: left; padding: 12px; height: auto; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-radius: 8px;">
+                        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                            <span>Marcar como pagada por fuera</span>
+                            <span class="pnl-badge badge-success">Recomendado</span>
+                        </div>
+                        <div id="modal-saltar-msi-pagada-txt" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                            Computa esta cuota como pagada fuera de la app (avanza al siguiente número de cuota) y posterga la fecha al siguiente mes sin crear movimiento de gasto.
+                        </div>
+                    </button>
+                    <button type="button" id="btn-saltar-msi-aplazar" class="btn-secondary" style="text-align: left; padding: 12px; height: auto; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-radius: 8px;">
+                        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">
+                            Solo postergar fecha (aplazada)
+                        </div>
+                        <div id="modal-saltar-msi-aplazar-txt" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                            Mantiene el número de cuotas pendientes y únicamente pospone la fecha de cobro al próximo mes.
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn-secondary" onclick="cerrarModalSaltarMsi()">Cancelar</button>
             </div>
         </div>
     </div>
@@ -2205,7 +2267,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261026_pres_v8"></script>
+    <script type="module" src="/static/js/main.js?v=20261028_saltar_v2"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
