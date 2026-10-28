@@ -83,6 +83,12 @@ from finanzas_core import (
     validar_limite_cargos_ventana,
     calcular_distribucion_tarjeta_asimetrica,
     exportar_presupuesto_a_fijos_core,
+    repartir_en_centavos,
+    calcular_distribucion_subperiodos,
+    proxima_fecha_vigente,
+    mensualizar,
+    convertir_frecuencias,
+    convertir_de_mensual,
 )
 
 
@@ -1705,6 +1711,84 @@ def test_exportar_presupuesto_subperiodos_asimetricos_febrero():
     assert recs[2]["proxima_fecha"] == '2027-02-28'
 
 
+def test_repartir_en_centavos_cuadra_siempre():
+    import random
+    rnd = random.Random(7)
+    configs = [[25] * 4, [50, 50], [33.33, 33.33, 33.34], [10, 20, 70], [100], [0, 100]]
+    for _ in range(2000):
+        total = round(rnd.uniform(0.01, 99999), 2)
+        for pcts in configs:
+            montos = repartir_en_centavos(total, pcts)
+            assert round(sum(montos), 2) == total, (total, pcts, montos)
+            for m, p in zip(montos, pcts):
+                assert abs(m - total * p / 100) <= 0.01 + 1e-9, (total, pcts, montos)
+    assert repartir_en_centavos(100.03, [25] * 4) == [25.01, 25.01, 25.01, 25.0]
+    assert repartir_en_centavos(10, [0, 100]) == [0.0, 10.0]
+    assert repartir_en_centavos(10, []) == []
+    # Si no suman 100 no se fuerza el total: cada parte se redondea por separado (mitad hacia arriba).
+    assert repartir_en_centavos(2.01, [50]) == [1.01]
+
+
+def test_distribucion_subperiodos_y_tarjeta_cuadran_al_centavo():
+    sps = [{"id": f"s{i}", "nombre": f"Semana {i}", "porcentaje": 25.0} for i in range(1, 5)]
+    d = calcular_distribucion_subperiodos(100.03, sps)
+    assert round(sum(x["monto"] for x in d), 2) == 100.03, d
+    assert [x["id"] for x in d] == ["s1", "s2", "s3", "s4"]
+    # Tarjeta asimétrica cuyo monto cambió: se reescala y sigue cuadrando.
+    custom = [{"id": "q1", "monto": 333.33}, {"id": "q2", "monto": 666.67}]
+    d = calcular_distribucion_tarjeta_asimetrica(1000.01, [], json.dumps(custom))
+    assert round(sum(x["monto"] for x in d), 2) == 1000.01, d
+    custom = [{"id": "q1", "monto": 1, "porcentaje": 50}, {"id": "q2", "monto": 1, "porcentaje": 50}]
+    d = calcular_distribucion_tarjeta_asimetrica(1000.01, [], custom)
+    assert round(sum(x["monto"] for x in d), 2) == 1000.01, d
+
+
+def test_fechas_bisiesto_y_cambio_de_anio():
+    assert siguiente_fecha(date(2028, 2, 15), 'quincenal', None) == date(2028, 2, 29)
+    assert siguiente_fecha(date(2028, 2, 29), 'quincenal', None) == date(2028, 3, 15)
+    assert siguiente_fecha(date(2027, 2, 15), 'quincenal', None) == date(2027, 2, 28)
+    assert siguiente_fecha(date(2026, 12, 31), 'quincenal', None) == date(2027, 1, 15)
+    assert siguiente_fecha(date(2026, 12, 20), 'quincenal', None) == date(2026, 12, 31)
+    assert siguiente_fecha(date(2026, 12, 31), 'mensual', 31) == date(2027, 1, 31)
+    assert siguiente_fecha(date(2028, 1, 29), 'mensual', 29) == date(2028, 2, 29)
+    assert siguiente_fecha(date(2027, 1, 29), 'mensual', 29) == date(2027, 2, 28)
+    assert siguiente_fecha(date(2026, 12, 28), 'semanal', None) == date(2027, 1, 4)
+    # Ya vigente: no avanza. Vencida: salta hasta la primera >= hoy.
+    assert proxima_fecha_vigente(date(2026, 5, 10), 'mensual', 10, date(2026, 5, 10)) == date(2026, 5, 10)
+    assert proxima_fecha_vigente(date(2026, 1, 31), 'mensual', 31, date(2026, 4, 1)) == date(2026, 4, 30)
+
+
+def test_frecuencias_ida_y_vuelta():
+    assert mensualizar(100, 'semanal') == 433.33
+    assert mensualizar(1500, 'quincenal') == 3000
+    eq = convertir_frecuencias(100, 'semanal')
+    assert eq["mensual"] == 433.33 and eq["semanal"] == 100.0, eq
+    assert abs(eq["quincenal"] - 433.33 / 2) <= 0.005 + 1e-9, eq  # float: 216.665 puede quedar en .66 o .67
+    for frec in ('mensual', 'quincenal', 'semanal'):
+        for monto in (0.01, 99.99, 1234.56, 50000):
+            vuelta = convertir_de_mensual(mensualizar(monto, frec), frec)
+            assert abs(vuelta - monto) <= 0.01, (frec, monto, vuelta)
+
+
+def test_convertir_y_rendimiento_casos_borde():
+    assert convertir(100, 'usd', 'mxn', 18) == 1800
+    assert convertir(100, 'EUR', 'MXN', 18) == 100
+    assert convertir(100, 'MXN', 'USD', 0) == 100
+    d = date(2026, 1, 1)
+    assert valor_rendimiento(10000, 10, d, d - timedelta(days=30)) == 10000
+    assert valor_rendimiento(10000, 0, d, d + timedelta(days=365)) == 10000
+
+
+def test_msi_monto_no_divisible_suma_exacta():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Tablet", 'gasto', 333.33, 'mensual', 5, date(2026, 1, 5), total=3, monto_total=1000)
+    assert materializar_recurrentes(conn, date(2026, 12, 1)) == 3
+    montos = [r["monto"] for r in conn.execute("SELECT monto FROM transacciones ORDER BY fecha")]
+    assert round(sum(montos), 2) == 1000.00, montos
+    assert montos[-1] == 333.34, montos
+    assert deuda_pendiente(conn.execute("SELECT * FROM recurrentes").fetchone()) == 0.0
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1769,6 +1853,12 @@ if __name__ == '__main__':
     test_endpoint_saltar_recurrente_no_encontrado_404()
     test_saltar_recurrente_ingreso_fijo()
     test_exportar_presupuesto_subperiodos_asimetricos_febrero()
+    test_repartir_en_centavos_cuadra_siempre()
+    test_distribucion_subperiodos_y_tarjeta_cuadran_al_centavo()
+    test_fechas_bisiesto_y_cambio_de_anio()
+    test_frecuencias_ida_y_vuelta()
+    test_convertir_y_rendimiento_casos_borde()
+    test_msi_monto_no_divisible_suma_exacta()
     print('OK')
 
 

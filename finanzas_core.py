@@ -9,6 +9,7 @@ Reúne los cálculos que antes estaban duplicados en main.py y export_service.py
 
 import calendar
 from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import json
 import re
 import sqlite3
@@ -324,13 +325,29 @@ def generar_subperiodos_default(frecuencia: str, subdivision_tipo: str) -> list:
     return []
 
 
+def repartir_en_centavos(monto_total: float, porcentajes: list) -> list:
+    """Reparte un monto según porcentajes. Si suman 100, los montos suman exactamente el total:
+    se trabaja en centavos enteros y los sobrantes van a los residuos mayores (ningún centavo se pierde)."""
+    centavos = int((Decimal(str(monto_total)) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    pesos = [Decimal(str(p)) for p in porcentajes]
+    if not pesos:
+        return []
+    if abs(sum(pesos) - 100) > Decimal("0.01"):
+        return [float((Decimal(centavos) * p / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP) / 100) for p in pesos]
+    exactos = [Decimal(centavos) * p / sum(pesos) for p in pesos]
+    base = [int(e) for e in exactos]
+    sobrante = centavos - sum(base)
+    for i in sorted(range(len(pesos)), key=lambda i: exactos[i] - base[i], reverse=True)[:sobrante]:
+        base[i] += 1
+    return [c / 100 for c in base]
+
+
 def calcular_distribucion_subperiodos(monto_total: float, subperiodos: list) -> list:
     """Calcula el monto asignado a cada sub-periodo en base a su porcentaje."""
     res = []
-    total = float(monto_total)
-    for sp in subperiodos:
-        pct = float(sp.get("porcentaje", 0.0))
-        monto_sp = round(total * (pct / 100.0), 2)
+    pcts = [float(sp.get("porcentaje", 0.0)) for sp in subperiodos]
+    montos = repartir_en_centavos(monto_total, pcts)
+    for sp, pct, monto_sp in zip(subperiodos, pcts, montos):
         res.append({
             "id": sp.get("id"),
             "nombre": sp.get("nombre"),
@@ -357,14 +374,21 @@ def calcular_distribucion_tarjeta_asimetrica(
                         custom[idx]["nombre"] = sp_cfg.get("nombre", custom[idx].get("nombre"))
                 total = float(monto_total)
                 suma_montos = sum(float(sp.get("monto", 0.0)) for sp in custom)
-                if abs(suma_montos - total) > 0.01:
-                    for sp in custom:
-                        if "porcentaje" in sp and sp["porcentaje"] is not None:
-                            sp["monto"] = round(total * (float(sp["porcentaje"]) / 100.0), 2)
-                        elif suma_montos > 0:
-                            ratio = float(sp.get("monto", 0.0)) / suma_montos
-                            sp["monto"] = round(total * ratio, 2)
-                            sp["porcentaje"] = round(ratio * 100.0, 1)
+                if round(suma_montos, 2) != round(total, 2):
+                    if all(sp.get("porcentaje") is not None for sp in custom):
+                        montos = repartir_en_centavos(total, [float(sp["porcentaje"]) for sp in custom])
+                        for sp, m in zip(custom, montos):
+                            sp["monto"] = m
+                    elif suma_montos > 0:
+                        ratios = [float(sp.get("monto", 0.0)) / suma_montos for sp in custom]
+                        montos = repartir_en_centavos(total, [r * 100.0 for r in ratios])
+                        for sp, r, m in zip(custom, ratios, montos):
+                            sp["monto"] = m
+                            sp["porcentaje"] = round(r * 100.0, 1)
+                    else:
+                        for sp in custom:
+                            if sp.get("porcentaje") is not None:
+                                sp["monto"] = repartir_en_centavos(total, [float(sp["porcentaje"])])[0]
                 for sp in custom:
                     if float(sp.get("monto", 0.0) or 0.0) <= 0:
                         sp["dia"] = None
