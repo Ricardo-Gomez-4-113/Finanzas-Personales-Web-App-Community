@@ -129,23 +129,23 @@
 .acciones-apartado button:first-of-type {
   background-color: var(--success-subtle);
   color: var(--success-text);
-  border: 1px solid rgba(21, 128, 61, 0.25);
+  border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .acciones-apartado button:first-of-type:hover {
   background-color: var(--success-color);
-  color: #ffffff;
+  color: var(--panel-bg);
 }
 
 .acciones-apartado button:last-of-type {
   background-color: var(--danger-subtle);
   color: var(--danger-text);
-  border: 1px solid rgba(190, 18, 60, 0.25);
+  border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
 }
 
 .acciones-apartado button:last-of-type:hover {
   background-color: var(--danger-color);
-  color: #ffffff;
+  color: var(--panel-bg);
 }
 
 /* --- ESTILOS DE INVERSIONES Y ASSET ALLOCATION (FASE 7) --- */
@@ -181,7 +181,7 @@
 .btn-sync {
     background-color: var(--primary-subtle);
     color: var(--primary-color);
-    border: 1px solid rgba(0, 143, 93, 0.25);
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
     width: auto;
     margin: 0;
     height: 32px;
@@ -202,15 +202,15 @@
 
 .btn-sync:hover {
     background-color: var(--primary-color);
-    color: #ffffff;
+    color: var(--panel-bg);
     border-color: var(--primary-color);
     transform: translateY(-1px);
 }
 
 [data-theme="dark"] .btn-sync:hover {
-    background-color: #FFFFFF;
-    border-color: #FFFFFF;
-    color: #000000;
+    background-color: var(--primary-color);
+    border-color: var(--gold-color);
+    color: var(--primary-text);
 }
 
 .cards-inversiones .inv-card {
@@ -290,7 +290,7 @@
     width: auto;
     margin: 0;
     background-color: var(--accent-color);
-    color: #ffffff;
+    color: var(--panel-bg);
     height: 36px;
     padding: 0 14px;
     font-size: 0.82rem;
@@ -390,8 +390,8 @@
 }
 
 [data-theme="dark"] .hero-networth {
-    background: #0D0D0E;
-    border: 1px solid #242427;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
 }
 
 .hero-networth::before {
@@ -401,7 +401,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #FFFFFF 0%, #22C55E 50%, #A3E635 100%);
+    background: linear-gradient(90deg, var(--panel-bg) 0%, var(--success-color) 50%, var(--success-color) 100%);
 }
 
 .networth-header {
@@ -416,7 +416,7 @@
     font-weight: 700;
     color: var(--gold-color);
     letter-spacing: 1.2px;
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .networth-header h2 {
@@ -547,15 +547,15 @@
 }
 
 [data-theme="dark"] .gbm-action-btn {
-    background: #161618;
-    border-color: #242427;
-    color: #FFFFFF;
+    background: var(--surface-level2);
+    border-color: var(--border-color);
+    color: var(--text-color);
 }
 
 [data-theme="dark"] .gbm-action-btn:hover {
-    background: #242427;
-    border-color: #45454B;
-    color: #FFFFFF;
+    background: var(--border-color);
+    border-color: var(--border-focus);
+    color: var(--text-color);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
@@ -700,7 +700,7 @@
 
 .sugerencia-item:hover,
 .sugerencia-item.activa {
-    background-color: rgba(52, 152, 219, 0.12);
+    background-color: color-mix(in srgb, var(--cyan-color) 12%, transparent);
 }
 
 .sugerencia-info {
@@ -732,7 +732,7 @@
     color: var(--gold-color);
     border: 1px solid var(--gold-border);
     font-weight: 600;
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .ticker-highlight {
@@ -852,7 +852,7 @@
 .card-kpi h3 {
     font-size: 0.72rem;
     color: var(--text-muted);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.5px;
     margin: 0 0 4px 0;
 }
@@ -874,19 +874,19 @@
     border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .badge-status-active {
     background-color: var(--success-subtle);
     color: var(--success-text);
-    border: 1px solid rgba(21, 128, 61, 0.25);
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .badge-status-inactive {
     background-color: var(--danger-subtle);
     color: var(--danger-text);
-    border: 1px solid rgba(190, 18, 60, 0.25);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
 }
 
 .btn-status-toggle {
@@ -913,7 +913,7 @@
 
 .btn-delete-user {
     background: transparent;
-    border: 1px solid rgba(190, 18, 60, 0.35);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 35%, transparent);
     color: var(--danger-text);
     height: 26px;
     padding: 0 8px;
@@ -1585,8 +1585,8 @@
 
 .btn-legal-tab.active {
     color: var(--gold-color);
-    background: rgba(197, 160, 89, 0.12);
-    border: 1px solid rgba(197, 160, 89, 0.25);
+    background: color-mix(in srgb, var(--gold-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--gold-color) 25%, transparent);
 }
 
 .modal-legal-scroll {
@@ -1640,11 +1640,11 @@
     align-items: center;
     gap: 6px;
     padding: 4px 10px;
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.25);
+    background: color-mix(in srgb, var(--success-color) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
     border-radius: 20px;
     font-size: 0.75rem;
-    color: #22c55e;
+    color: var(--success-color);
     font-weight: 600;
     margin-bottom: 14px;
 }
@@ -1690,7 +1690,7 @@
     padding: 7px 14px;
     font-size: 0.82rem;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--panel-bg);
     background: var(--danger-color);
     border: 1px solid var(--danger-color);
     border-radius: 6px;
@@ -1778,7 +1778,8 @@
 }
 
 .user-id-chip {
-    font-family: monospace;
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
     font-size: 0.78rem;
     color: var(--text-muted);
     font-weight: 600;
@@ -1804,7 +1805,7 @@
     border-radius: 50%;
     background: var(--gold-subtle);
     color: var(--gold-color);
-    border: 1px solid rgba(197, 160, 89, 0.35);
+    border: 1px solid color-mix(in srgb, var(--gold-color) 35%, transparent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1857,20 +1858,20 @@
     border-radius: 12px;
     font-size: 0.72rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.02em;
 }
 
 .badge-status-active {
-    background-color: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background-color: color-mix(in srgb, var(--success-color) 15%, transparent);
+    color: var(--success-color);
+    border: 1px solid color-mix(in srgb, var(--success-color) 30%, transparent);
 }
 
 .badge-status-suspended {
-    background-color: rgba(190, 18, 60, 0.12);
+    background-color: color-mix(in srgb, var(--danger-color) 12%, transparent);
     color: var(--danger-text);
-    border: 1px solid rgba(190, 18, 60, 0.25);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
 }
 
 /* Columna Creado & Acceso */
@@ -1971,28 +1972,28 @@
 }
 
 .btn-status-suspend {
-    color: #f59e0b;
+    color: var(--warning-color);
 }
 
 .btn-status-suspend:hover {
-    background-color: rgba(245, 158, 11, 0.12);
-    border-color: #f59e0b;
-    color: #f59e0b;
+    background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+    border-color: var(--warning-color);
+    color: var(--warning-color);
 }
 
 .btn-status-activate {
-    color: #22c55e;
+    color: var(--success-color);
 }
 
 .btn-status-activate:hover {
-    background-color: rgba(34, 197, 94, 0.12);
-    border-color: #22c55e;
-    color: #22c55e;
+    background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+    border-color: var(--success-color);
+    color: var(--success-color);
 }
 
 .btn-delete-user {
     color: var(--danger-text);
-    border-color: rgba(190, 18, 60, 0.3);
+    border-color: color-mix(in srgb, var(--danger-color) 30%, transparent);
 }
 
 .btn-delete-user:hover {
@@ -2115,7 +2116,7 @@
 .calc-presets-label {
     font-size: 0.78rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.05em;
     color: var(--text-muted);
     white-space: nowrap;
@@ -2153,7 +2154,7 @@
     background: var(--gold-subtle);
     color: var(--gold-color);
     border-color: var(--gold-color);
-    box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.22);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold-color) 22%, transparent);
     font-weight: 700;
 }
 
@@ -2194,7 +2195,7 @@
     font-weight: 700;
     color: var(--text-muted);
     letter-spacing: 0.05em;
-    text-transform: uppercase;
+    text-transform: none;
     pointer-events: none;
     z-index: 2;
     background: var(--panel-bg);
@@ -2254,7 +2255,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .select-calc:focus {
     outline: none;
     border-color: var(--gold-color);
-    box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.16);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold-color) 16%, transparent);
 }
 
 /* Barra de Acciones y Botones */
@@ -2277,13 +2278,13 @@ input[type="number"].subperiodo-editor-input-pct {
     font-weight: 700;
     border-radius: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(197, 160, 89, 0.28);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--gold-color) 28%, transparent);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-calc-action:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(197, 160, 89, 0.38);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--gold-color) 38%, transparent);
 }
 
 .btn-calc-action:active {
@@ -2316,15 +2317,15 @@ input[type="number"].subperiodo-editor-input-pct {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--success-color, #22c55e);
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    background: var(--success-color, var(--success-color));
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 70%, transparent);
     animation: pulseDot 2.2s infinite cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 @keyframes pulseDot {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 70%, transparent); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px color-mix(in srgb, var(--success-color) 0%, transparent); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 0%, transparent); }
 }
 
 /* Tarjetas de Resultados (Summary Cards) */
@@ -2349,7 +2350,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .card-calc:hover {
     transform: translateY(-2px);
-    border-color: rgba(197, 160, 89, 0.45);
+    border-color: color-mix(in srgb, var(--gold-color) 45%, transparent);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -2372,27 +2373,27 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .card-calc-dia .card-calc-icon {
-    background: rgba(59, 130, 246, 0.12);
-    color: #3b82f6;
-    border-color: rgba(59, 130, 246, 0.25);
+    background: color-mix(in srgb, var(--cyan-color) 12%, transparent);
+    color: var(--cyan-color);
+    border-color: color-mix(in srgb, var(--cyan-color) 25%, transparent);
 }
 
 .card-calc-mes .card-calc-icon {
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.25);
+    background: color-mix(in srgb, var(--success-color) 12%, transparent);
+    color: var(--success-color);
+    border-color: color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .card-calc-anio .card-calc-icon {
     background: var(--gold-subtle);
     color: var(--gold-color);
-    border-color: rgba(197, 160, 89, 0.35);
+    border-color: color-mix(in srgb, var(--gold-color) 35%, transparent);
 }
 
 .card-calc-badge {
     font-size: 0.72rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.05em;
     padding: 3px 10px;
     border-radius: 14px;
@@ -2412,7 +2413,7 @@ input[type="number"].subperiodo-editor-input-pct {
     font-size: 0.84rem;
     font-weight: 600;
     color: var(--text-muted);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.03em;
 }
 
@@ -2452,7 +2453,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .calc-total-highlight {
     padding-top: 4px;
     font-size: 0.85rem;
-    border-top: 1px solid rgba(197, 160, 89, 0.15);
+    border-top: 1px solid color-mix(in srgb, var(--gold-color) 15%, transparent);
 }
 
 .calc-total-highlight strong.calc-total-val {
@@ -2468,8 +2469,8 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 @keyframes calcPulseHighlight {
-    0% { transform: scale(0.99); box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.4); }
-    50% { transform: scale(1.015); box-shadow: 0 0 0 6px rgba(197, 160, 89, 0.15); }
+    0% { transform: scale(0.99); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold-color) 40%, transparent); }
+    50% { transform: scale(1.015); box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold-color) 15%, transparent); }
     100% { transform: scale(1); box-shadow: var(--card-shadow); }
 }
 
@@ -2520,7 +2521,7 @@ input[type="number"].subperiodo-editor-input-pct {
     color: var(--text-muted);
     font-size: 0.75rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--border-color);
 }
@@ -2546,7 +2547,8 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .calc-col-dias {
-    font-family: monospace;
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
     font-size: 0.8rem;
     color: var(--text-muted);
     background: var(--bg-color);
@@ -2705,7 +2707,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .btn-subdiv-gear:hover {
-    background: rgba(197, 160, 89, 0.15);
+    background: color-mix(in srgb, var(--gold-color) 15%, transparent);
     border-color: var(--gold-color);
 }
 
@@ -2752,7 +2754,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .pres-kpi-title {
     font-size: 0.78rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.04em;
     color: var(--text-muted);
 }
@@ -2778,7 +2780,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .pres-val-gold { color: var(--gold-color); }
 .pres-val-success { color: var(--success-text); }
-.pres-val-inv { color: var(--success-color, #22c55e); }
+.pres-val-inv { color: var(--success-color, var(--success-color)); }
 
 .badge-gold {
     background: var(--gold-subtle);
@@ -2787,15 +2789,15 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .badge-success {
-    background: var(--success-subtle, rgba(34, 197, 94, 0.12));
-    color: var(--success-color, #22c55e);
-    border: 1px solid rgba(34, 197, 94, 0.25);
+    background: var(--success-subtle, color-mix(in srgb, var(--success-color) 12%, transparent));
+    color: var(--success-color, var(--success-color));
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .badge-danger {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: color-mix(in srgb, var(--danger-color) 12%, transparent);
+    color: var(--danger-color);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
 }
 
 /* Barra Visual Segmentada (100% Allocation Track) */
@@ -2827,7 +2829,7 @@ input[type="number"].subperiodo-editor-input-pct {
     font-size: 0.76rem;
     font-weight: 700;
     color: var(--text-muted);
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .btn-chip-tpl {
@@ -2873,7 +2875,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-slice-libre {
-    background: repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.2) 6px, transparent 6px, transparent 12px);
+    background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--success-color) 20%, transparent), color-mix(in srgb, var(--success-color) 20%, transparent) 6px, transparent 6px, transparent 12px);
 }
 
 .pres-alloc-legend {
@@ -2899,30 +2901,30 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 /* Colores de Presupuesto */
-.pres-color-gold { background: #c5a059 !important; }
-.pres-color-blue { background: #3b82f6 !important; }
-.pres-color-emerald { background: #10b981 !important; }
-.pres-color-purple { background: #8b5cf6 !important; }
-.pres-color-amber { background: #f59e0b !important; }
-.pres-color-cyan { background: #06b6d4 !important; }
-.pres-color-rose { background: #f43f5e !important; }
-.pres-color-libre { background: rgba(16, 185, 129, 0.5) !important; }
+.pres-color-gold { background: var(--gold-color) !important; }
+.pres-color-blue { background: var(--cyan-color) !important; }
+.pres-color-emerald { background: var(--success-color) !important; }
+.pres-color-purple { background: var(--gold-color) !important; }
+.pres-color-amber { background: var(--warning-color) !important; }
+.pres-color-cyan { background: var(--cyan-color) !important; }
+.pres-color-rose { background: var(--danger-color) !important; }
+.pres-color-libre { background: color-mix(in srgb, var(--success-color) 50%, transparent) !important; }
 
-.pres-icon-gold { background: rgba(197, 160, 89, 0.15); color: #c5a059; border: 1px solid rgba(197, 160, 89, 0.3); }
-.pres-icon-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
-.pres-icon-emerald { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.pres-icon-purple { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
-.pres-icon-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.pres-icon-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3); }
-.pres-icon-rose { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+.pres-icon-gold { background: color-mix(in srgb, var(--gold-color) 15%, transparent); color: var(--gold-color); border: 1px solid color-mix(in srgb, var(--gold-color) 30%, transparent); }
+.pres-icon-blue { background: color-mix(in srgb, var(--cyan-color) 15%, transparent); color: var(--cyan-color); border: 1px solid color-mix(in srgb, var(--cyan-color) 30%, transparent); }
+.pres-icon-emerald { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); border: 1px solid color-mix(in srgb, var(--success-color) 30%, transparent); }
+.pres-icon-purple { background: color-mix(in srgb, var(--gold-color) 15%, transparent); color: var(--gold-color); border: 1px solid color-mix(in srgb, var(--gold-color) 30%, transparent); }
+.pres-icon-amber { background: color-mix(in srgb, var(--warning-color) 15%, transparent); color: var(--warning-color); border: 1px solid color-mix(in srgb, var(--warning-color) 30%, transparent); }
+.pres-icon-cyan { background: color-mix(in srgb, var(--cyan-color) 15%, transparent); color: var(--cyan-color); border: 1px solid color-mix(in srgb, var(--cyan-color) 30%, transparent); }
+.pres-icon-rose { background: color-mix(in srgb, var(--danger-color) 15%, transparent); color: var(--danger-color); border: 1px solid color-mix(in srgb, var(--danger-color) 30%, transparent); }
 
-.pres-badge-gold { background: rgba(197, 160, 89, 0.15); color: #c5a059; border: 1px solid rgba(197, 160, 89, 0.3); }
-.pres-badge-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
-.pres-badge-emerald { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.pres-badge-purple { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
-.pres-badge-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.pres-badge-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3); }
-.pres-badge-rose { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+.pres-badge-gold { background: color-mix(in srgb, var(--gold-color) 15%, transparent); color: var(--gold-color); border: 1px solid color-mix(in srgb, var(--gold-color) 30%, transparent); }
+.pres-badge-blue { background: color-mix(in srgb, var(--cyan-color) 15%, transparent); color: var(--cyan-color); border: 1px solid color-mix(in srgb, var(--cyan-color) 30%, transparent); }
+.pres-badge-emerald { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); border: 1px solid color-mix(in srgb, var(--success-color) 30%, transparent); }
+.pres-badge-purple { background: color-mix(in srgb, var(--gold-color) 15%, transparent); color: var(--gold-color); border: 1px solid color-mix(in srgb, var(--gold-color) 30%, transparent); }
+.pres-badge-amber { background: color-mix(in srgb, var(--warning-color) 15%, transparent); color: var(--warning-color); border: 1px solid color-mix(in srgb, var(--warning-color) 30%, transparent); }
+.pres-badge-cyan { background: color-mix(in srgb, var(--cyan-color) 15%, transparent); color: var(--cyan-color); border: 1px solid color-mix(in srgb, var(--cyan-color) 30%, transparent); }
+.pres-badge-rose { background: color-mix(in srgb, var(--danger-color) 15%, transparent); color: var(--danger-color); border: 1px solid color-mix(in srgb, var(--danger-color) 30%, transparent); }
 
 /* Barra de Chips Sugeridos */
 .pres-suggested-bar {
@@ -2940,7 +2942,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .pres-suggested-label {
     font-size: 0.78rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.05em;
     color: var(--text-muted);
     white-space: nowrap;
@@ -2997,39 +2999,39 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-card-accent-gold {
-    border-top: 3.5px solid #c5a059;
-    background: linear-gradient(180deg, rgba(197, 160, 89, 0.12) 0%, var(--panel-bg) 60%);
+    border-top: 3.5px solid var(--gold-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--gold-color) 12%, transparent) 0%, var(--panel-bg) 60%);
     border-color: var(--gold-border);
 }
 .pres-card-accent-blue {
-    border-top: 3.5px solid #3b82f6;
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(59, 130, 246, 0.35);
+    border-top: 3.5px solid var(--cyan-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cyan-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--cyan-color) 35%, transparent);
 }
 .pres-card-accent-emerald {
-    border-top: 3.5px solid #10b981;
-    background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(16, 185, 129, 0.35);
+    border-top: 3.5px solid var(--success-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--success-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--success-color) 35%, transparent);
 }
 .pres-card-accent-purple {
-    border-top: 3.5px solid #8b5cf6;
-    background: linear-gradient(180deg, rgba(139, 92, 246, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(139, 92, 246, 0.35);
+    border-top: 3.5px solid var(--gold-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--gold-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--gold-color) 35%, transparent);
 }
 .pres-card-accent-amber {
-    border-top: 3.5px solid #f59e0b;
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(245, 158, 11, 0.35);
+    border-top: 3.5px solid var(--warning-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--warning-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--warning-color) 35%, transparent);
 }
 .pres-card-accent-cyan {
-    border-top: 3.5px solid #06b6d4;
-    background: linear-gradient(180deg, rgba(6, 182, 212, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(6, 182, 212, 0.35);
+    border-top: 3.5px solid var(--cyan-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cyan-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--cyan-color) 35%, transparent);
 }
 .pres-card-accent-rose {
-    border-top: 3.5px solid #f43f5e;
-    background: linear-gradient(180deg, rgba(244, 63, 94, 0.12) 0%, var(--panel-bg) 60%);
-    border-color: rgba(244, 63, 94, 0.35);
+    border-top: 3.5px solid var(--danger-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--danger-color) 12%, transparent) 0%, var(--panel-bg) 60%);
+    border-color: color-mix(in srgb, var(--danger-color) 35%, transparent);
 }
 
 .pres-card-header {
@@ -3099,8 +3101,8 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .btn-icon-del:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger-color);
+    background: color-mix(in srgb, var(--danger-color) 12%, transparent);
 }
 
 .pres-card-metric-block {
@@ -3252,7 +3254,7 @@ input[type="number"].subperiodo-editor-input-pct {
     gap: 6px;
     font-size: 0.8rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.05em;
     color: var(--text-muted);
 }
@@ -3280,16 +3282,16 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .pres-subperiodo-pill:hover {
     background: rgba(255, 255, 255, 0.09);
-    border-color: rgba(197, 160, 89, 0.4);
+    border-color: color-mix(in srgb, var(--gold-color) 40%, transparent);
     color: var(--gold-color);
 }
 
 .pres-subperiodo-pill.active {
     background: var(--gold-color);
-    color: #000000;
+    color: var(--panel-bg);
     font-weight: 700;
     border-color: var(--gold-color);
-    box-shadow: 0 2px 10px rgba(34, 197, 94, 0.25);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .pres-subperiodo-info-badge {
@@ -3373,9 +3375,9 @@ input[type="number"].subperiodo-editor-input-pct {
     flex: 2;
     padding: 8px 12px;
     border-radius: 8px;
-    background: var(--input-bg, #161618);
-    border: 1px solid var(--border-color, #242427);
-    color: var(--text-color, #ffffff);
+    background: var(--input-bg, var(--surface-level2));
+    border: 1px solid var(--border-color, var(--border-color));
+    color: var(--text-color, var(--text-color));
     font-size: 0.88rem;
 }
 
@@ -3384,9 +3386,9 @@ input[type="number"].subperiodo-editor-input-pct {
     height: 38px;
     padding: 8px 36px 8px 10px !important;
     border-radius: 8px;
-    background: var(--input-bg, #161618);
-    border: 1px solid var(--border-color, #242427);
-    color: var(--text-color, #ffffff);
+    background: var(--input-bg, var(--surface-level2));
+    border: 1px solid var(--border-color, var(--border-color));
+    color: var(--text-color, var(--text-color));
     font-size: 0.88rem;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -3397,9 +3399,9 @@ input[type="number"].subperiodo-editor-input-pct {
     width: 32px;
     height: 32px;
     border-radius: 6px;
-    border: 1px solid var(--border-color, #242427);
+    border: 1px solid var(--border-color, var(--border-color));
     background: transparent;
-    color: #ef4444;
+    color: var(--danger-color);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -3409,8 +3411,8 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .btn-remove-subperiodo:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: #ef4444;
+    background: color-mix(in srgb, var(--danger-color) 15%, transparent);
+    border-color: var(--danger-color);
 }
 
 .subperiodos-editor-actions {
@@ -3419,7 +3421,7 @@ input[type="number"].subperiodo-editor-input-pct {
     align-items: center;
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px solid var(--border-color, #242427);
+    border-top: 1px solid var(--border-color, var(--border-color));
 }
 
 

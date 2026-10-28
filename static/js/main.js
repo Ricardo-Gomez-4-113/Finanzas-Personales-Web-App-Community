@@ -6,13 +6,13 @@ import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
-import { actualizarGrafica, actualizarGraficaCategorias, renderProximos } from './dashboard.js';
+import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=9c41c314cf';
+import { cargarRecurrentes } from './recurrentes.js?v=c940776061';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=9c41c314cf';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=c940776061';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
@@ -62,6 +62,8 @@ export async function cargarDatos() {
             });
         }
 
+        renderPeriodo(dataResumen.periodo);
+
         // Tarjetas del mes
         const mes = dataResumen.mes_actual || { ingresos: 0, gastos: 0, ahorro: 0 };
         setTxt('lbl-dash-mes-ingresos', fmt(mes.ingresos));
@@ -93,8 +95,12 @@ export async function cargarDatos() {
                 dataMensual.forEach(m => {
                     const div = document.createElement('div');
                     div.className = 'monthly-card';
+                    const [anio, numMes] = String(m.mes).split('-').map(Number);
+                    const nombreMes = anio && numMes
+                        ? new Intl.DateTimeFormat('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(anio, numMes - 1, 1))).replace('.', '')
+                        : m.mes;
                     div.innerHTML = `
-                        <div><strong>${m.mes}</strong></div>
+                        <div><strong>${escapeHTML(nombreMes)}</strong></div>
                         <div class="monthly-info">
                             <span style="color: var(--success-text);">+${fmt(m.ingresos)}</span>
                             <span style="color: var(--danger-text);">-${fmt(m.gastos)}</span>

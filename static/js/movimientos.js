@@ -13,6 +13,16 @@ const NUEVA_CATEGORIA = '__nueva__';
 // 5. CARGA DE DATOS FINANCIEROS DEL TENANT ACTIVO
 // =============================================================================
 
+// "28 oct" para el año en curso, "28 oct 2025" para años anteriores.
+function fechaTabla(iso) {
+    if (!iso) return '-';
+    const d = new Date(`${iso}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return iso;
+    const opciones = { day: 'numeric', month: 'short', timeZone: 'UTC' };
+    if (d.getUTCFullYear() !== new Date().getFullYear()) opciones.year = 'numeric';
+    return new Intl.DateTimeFormat('es-MX', opciones).format(d).replace('.', '');
+}
+
 export function obtenerFechaLocalISO() {
     const d = new Date();
     const year = d.getFullYear();
@@ -154,14 +164,14 @@ export function renderTablaMovimientos() {
             <td style="text-align: center;">
                 <input type="checkbox" class="chk-mov-item" value="${t.id}" data-id="${t.id}" aria-label="Seleccionar movimiento">
             </td>
-            <td>${escapeHTML(t.fecha)}</td>
+            <td class="td-fecha" title="${escapeHTML(t.fecha)}">${escapeHTML(fechaTabla(t.fecha))}</td>
             <td>${escapeHTML(t.descripcion || '-')} ${badgesMovimiento(t)}</td>
             <td>${escapeHTML(t.categoria || 'Sin categoría')}</td>
-            <td class="${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${escapeHTML(t.tipo.toUpperCase())}</td>
-            <td>${fmt(t.monto)}</td>
+            <td class="td-tipo">${t.tipo === 'gasto' ? 'Gasto' : 'Ingreso'}</td>
+            <td class="td-monto ${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${t.tipo === 'gasto' ? '−' : '+'}${fmt(t.monto)}</td>
             <td class="col-acciones">
-                <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditarTransaccionPorId(${t.id})" title="Editar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-                <button type="button" class="btn-accion btn-eliminar" onclick="eliminarTransaccion(${t.id})" title="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditarTransaccionPorId(${t.id})" title="Editar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+                <button type="button" class="btn-accion btn-eliminar" onclick="eliminarTransaccion(${t.id})" title="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -478,7 +488,7 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
                 <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: #22d3ee; display: inline-flex; align-items: center; gap: 5px;">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                             Tarjeta de Presupuesto: ${escapeHTML(itemCompleto.tarjeta_nombre || 'Dividida')}
                         </span>
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">

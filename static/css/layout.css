@@ -76,7 +76,7 @@
 
 .finora-logo-svg {
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--gold-color) 25%, transparent);
     transition: transform 0.2s ease;
 }
 
@@ -110,9 +110,9 @@
 }
 
 [data-theme="dark"] .brand-badge {
-    background: rgba(34, 197, 94, 0.12);
-    color: #A3E635;
-    border: 1px solid rgba(163, 230, 53, 0.25);
+    background: color-mix(in srgb, var(--success-color) 12%, transparent);
+    color: var(--success-color);
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .btn-sidebar-collapse {
@@ -187,10 +187,10 @@
 }
 
 [data-theme="dark"] .sidebar-nav .tab-btn.active {
-    background: #161618;
-    color: #FFFFFF;
-    border: 1px solid #242427;
-    border-left: 3.5px solid #FFFFFF;
+    background: var(--surface-level2);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-left: 3.5px solid var(--gold-color);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 3px 0 8px rgba(255, 255, 255, 0.05);
 }
 
@@ -240,9 +240,9 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #22c55e;
+    background-color: var(--success-color);
     flex-shrink: 0;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--success-color) 70%, transparent);
     animation: status-pulse 2s infinite ease-in-out;
 }
 
@@ -500,7 +500,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 
 .btn-user-trigger:hover {
     border-color: var(--gold-color);
-    box-shadow: 0 2px 8px rgba(15, 28, 63, 0.08);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--text-color) 8%, transparent);
 }
 
 .user-avatar-badge {
@@ -595,7 +595,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 .dropdown-role-pill {
     font-size: 0.7rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     padding: 2px 6px;
     border-radius: 10px;
     width: fit-content;
@@ -685,7 +685,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 
 .btn-danger-outline:hover {
     background: var(--danger-color);
-    color: #ffffff;
+    color: var(--panel-bg);
 }
 
 /* Área de Contenido Principal */
@@ -707,9 +707,9 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 
 .tab-btn.active {
     background-color: var(--primary-color);
-    color: #ffffff;
+    color: var(--panel-bg);
     border-color: var(--primary-color);
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--gold-color) 30%, transparent);
 }
 
 /* Control de Visibilidad de Pestañas */
@@ -784,7 +784,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
     margin-top: 15px;
     padding: 10px 14px;
     background-color: var(--danger-subtle);
-    border: 1px solid rgba(190, 18, 60, 0.25);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
     color: var(--danger-text);
     border-radius: 8px;
     font-size: 0.88rem;
@@ -819,14 +819,14 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
     border-radius: 10px;
     font-size: 0.72rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     margin-left: 4px;
 }
 
 .badge-role-admin {
     background-color: var(--danger-subtle);
     color: var(--danger-text);
-    border: 1px solid rgba(190, 18, 60, 0.2);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 20%, transparent);
 }
 
 .badge-role-user {
@@ -837,7 +837,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 .btn-logout {
     background-color: transparent;
     color: var(--danger-text);
-    border: 1px solid rgba(190, 18, 60, 0.35);
+    border: 1px solid color-mix(in srgb, var(--danger-color) 35%, transparent);
     height: 32px;
     padding: 0 10px;
     border-radius: 6px;

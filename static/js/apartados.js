@@ -37,22 +37,28 @@ export async function cargarApartados() {
             if (item.tipo === 'meta') {
                 const porcentaje = Math.min(item.porcentaje || 0, 100);
                 contenidoMeta = `
-                    <p style="margin: 5px 0;"><small>Meta: ${fmt(item.meta_monto)} (${item.porcentaje}%)</small></p>
-                    <div class="progress-bar-bg">
+                    <div class="apartado-meta">
+                        <span>${item.porcentaje}% de ${fmt(item.meta_monto)}</span>
+                        <span>Faltan ${fmt(Math.max(0, item.meta_monto - item.monto_actual))}</span>
+                    </div>
+                    <div class="progress-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${porcentaje}" aria-label="Avance de ${escapeHTML(item.nombre)}">
                         <div class="progress-bar-fill" style="width: ${porcentaje}%;"></div>
                     </div>
                 `;
             }
 
             card.innerHTML = `
-                <button type="button" class="btn-eliminar-apartado" onclick="eliminarApartado(${item.id})" title="Eliminar">×</button>
-                <h3 style="margin: 0 20px 8px 0;">${escapeHTML(item.nombre)} <small style="font-weight: normal; font-size: 0.8rem;">(${escapeHTML(item.tipo)})</small></h3>
-                <p style="margin: 5px 0;"><strong>Saldo:</strong> ${fmt(item.monto_actual)}</p>
+                <button type="button" class="btn-eliminar-apartado" onclick="eliminarApartado(${item.id})" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">×</button>
+                <div class="apartado-cabecera">
+                    <h3 class="apartado-nombre">${escapeHTML(item.nombre)}</h3>
+                    <span class="badge-tag ${item.tipo === 'meta' ? 'badge-fijo' : ''}">${item.tipo === 'meta' ? 'Meta' : 'Sobre libre'}</span>
+                </div>
+                <p class="apartado-saldo">${fmt(item.monto_actual)}</p>
                 ${contenidoMeta}
                 <div class="acciones-apartado">
                     <input type="number" id="monto-acc-${item.id}" step="0.01" min="0.01" placeholder="Monto">
-                    <button type="button" onclick="realizarMovimiento(${item.id}, 'depositar')">+</button>
-                    <button type="button" onclick="realizarMovimiento(${item.id}, 'retirar')">-</button>
+                    <button type="button" class="btn-secondary" onclick="realizarMovimiento(${item.id}, 'depositar')">Depositar</button>
+                    <button type="button" class="btn-secondary" onclick="realizarMovimiento(${item.id}, 'retirar')">Retirar</button>
                 </div>
             `;
             contenedor.appendChild(card);

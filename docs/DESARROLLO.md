@@ -35,6 +35,13 @@ Todo cambio en `finanzas_core.py` lleva su caso en `test_finanzas.py`.
 - los `?v=` no coinciden con el contenido actual;
 - en Community existe algún archivo de la landing.
 
+## Diseño de la interfaz
+
+- `static/css/tokens.css`: paleta (oscuro obsidiana y champán, claro porcelana y tinta), tipografías (`--font-ui` Hanken Grotesk, `--font-num` Fraunces), radios y sombras. Todo color sale de aquí.
+- `static/css/tema.css`: capa de componentes que se carga al final; sus reglas llevan prefijo `:root` para ganar a las anteriores sin `!important`.
+- Las gráficas leen sus colores de los tokens (`colorVar`) y se redibujan al cambiar de tema.
+- Textos en tipo oración; cifras en Fraunces con `tabular-nums`; íconos SVG con `stroke-width` 1.8.
+
 ## Cache-busting
 
 No se editan los `?v=` a mano. Después de tocar CSS o JS:

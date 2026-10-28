@@ -18,7 +18,7 @@
     <meta name="keywords" content="finanzas personales, gestión patrimonial, software financiero México, control de gastos, presupuesto por sobres, portafolio de inversiones, seguimiento de acciones y ETFs, finanzas cloud, SQLite multi-tenant, patrimonio neto MXN USD, RGM Labs">
     <meta name="author" content="RGM Labs">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#0F1318">
     <link rel="canonical" href="https://finanzas.rgmlabs.org/">
 
     <!-- Open Graph / Facebook / WhatsApp / LinkedIn -->
@@ -36,16 +36,17 @@
     <meta name="twitter:description" content="El estándar institucional para tu patrimonio personal. Control de caja, sobres de ahorro y cotizaciones bursátiles en vivo con aislamiento físico SQLite.">
 
     <!-- Favicon SVG Finanzas Cloud Sovereign Wealth -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23000000' stroke='%23242427' stroke-width='1.5'/><path d='M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z' fill='%23ffffff'/><circle cx='16' cy='14' r='2.2' fill='%2322c55e'/></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%230F1318' stroke='%23C9B37E' stroke-width='1.5'/><path d='M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z' fill='%23ECE7DC'/><circle cx='16' cy='14' r='2.2' fill='%23C9B37E'/></svg>">
     <link rel="alternate icon" href="/static/favicon.svg" type="image/svg+xml">
-    <!-- Google Fonts: Plus Jakarta Sans -->
+    <!-- Google Fonts: Hanken Grotesk (interfaz) + Fraunces (cifras) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=9c41c314cf">
-    <link rel="stylesheet" href="/static/css/layout.css?v=9c41c314cf">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=9c41c314cf">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=9c41c314cf">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=c940776061">
+    <link rel="stylesheet" href="/static/css/layout.css?v=c940776061">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=c940776061">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=c940776061">
+    <link rel="stylesheet" href="/static/css/tema.css?v=c940776061">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -185,23 +186,23 @@
             <div class="login-brand">
                 <div class="login-logo-wrap">
                     <svg class="finora-logo-svg finora-logo-lg" width="56" height="56" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="32" height="32" rx="10" fill="url(#finora-grad-login)" stroke="#424ee0" stroke-opacity="0.35" stroke-width="1"/>
+                        <rect width="32" height="32" rx="10" fill="url(#finora-grad-login)" stroke="#C9B37E" stroke-opacity="0.55" stroke-width="1"/>
                         <path d="M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z" fill="url(#finora-gold-login)"/>
-                        <circle cx="16" cy="14" r="2.2" fill="#10b981"/>
+                        <circle cx="16" cy="14" r="2.2" fill="#0F1318"/>
                         <defs>
                             <linearGradient id="finora-grad-login" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                                <stop stop-color="#090e1a"/>
-                                <stop offset="1" stop-color="#141f35"/>
+                                <stop stop-color="#141920"/>
+                                <stop offset="1" stop-color="#0F1318"/>
                             </linearGradient>
                             <linearGradient id="finora-gold-login" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                                <stop stop-color="#828bf6"/>
-                                <stop offset="1" stop-color="#424ee0"/>
+                                <stop stop-color="#E3D3A8"/>
+                                <stop offset="1" stop-color="#B09A64"/>
                             </linearGradient>
                         </defs>
                     </svg>
                 </div>
-                <h2>Finanzas <span style="color: var(--gold-color);">Cloud</span></h2>
-                <p>Monitoreo Patrimonial y Finanzas Personales</p>
+                <h2>Finanzas Cloud</h2>
+                <p>Monitoreo patrimonial y finanzas personales</p>
             </div>
             <form id="form-login" onsubmit="iniciarSesion(event)">
                 <div class="form-group">
@@ -215,12 +216,12 @@
                 <div class="login-options-row" style="display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 14px;">
                     <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" class="link-forgot-password" style="font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500;">¿Olvidaste tu contraseña?</a>
                 </div>
-                <button type="submit" id="btn-login-submit" class="btn-primary btn-block">Ingresar a la Plataforma</button>
+                <button type="submit" id="btn-login-submit" class="btn-primary btn-block">Ingresar a la plataforma</button>
                 <div id="login-error" class="login-error-msg hidden"></div>
             </form>
             <div style="text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color);">
                 <a href="/" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease;">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     <span>Volver a la página principal</span>
                 </a>
                 <p style="font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0 0; line-height: 1.4;">
@@ -242,23 +243,23 @@
                 <div class="sidebar-brand s-cursor-pointer" onclick="mostrarVistaLanding()" title="Ir a la página de presentación">
                     <div class="brand-logo-wrap">
                         <svg class="finora-logo-svg" width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="32" height="32" rx="9" fill="url(#finora-grad-side)" stroke="#424ee0" stroke-opacity="0.35" stroke-width="1"/>
+                            <rect width="32" height="32" rx="9" fill="url(#finora-grad-side)" stroke="#C9B37E" stroke-opacity="0.55" stroke-width="1"/>
                             <path d="M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z" fill="url(#finora-gold-side)"/>
-                            <circle cx="16" cy="14" r="2" fill="#10b981"/>
+                            <circle cx="16" cy="14" r="2" fill="#0F1318"/>
                             <defs>
                                 <linearGradient id="finora-grad-side" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                                    <stop stop-color="#090e1a"/>
-                                    <stop offset="1" stop-color="#141f35"/>
+                                    <stop stop-color="#141920"/>
+                                    <stop offset="1" stop-color="#0F1318"/>
                                 </linearGradient>
                                 <linearGradient id="finora-gold-side" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                                    <stop stop-color="#828bf6"/>
-                                    <stop offset="1" stop-color="#424ee0"/>
+                                    <stop stop-color="#E3D3A8"/>
+                                    <stop offset="1" stop-color="#B09A64"/>
                                 </linearGradient>
                             </defs>
                         </svg>
                     </div>
                     <div class="brand-text-wrap">
-                        <span class="brand-title">Finanzas <span class="s-color-var-gold-color">Cloud</span></span>
+                        <span class="brand-title">Finanzas Cloud</span>
                     </div>
                 </div>
                 <button type="button" id="btn-sidebar-collapse" class="btn-sidebar-collapse" onclick="toggleSidebar()" title="Colapsar / Expandir panel lateral">
@@ -272,19 +273,19 @@
             <nav class="sidebar-nav">
                 <button type="button" class="tab-btn active" data-tab="tab-dashboard" title="Resumen General y Patrimonio">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                     </span>
                     <span class="nav-label">Resumen</span>
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-movimientos" title="Movimientos, Fijos y Compras a Meses">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                     </span>
-                    <span class="nav-label">Movimientos y Fijos</span>
+                    <span class="nav-label">Movimientos y fijos</span>
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-presupuesto" title="Organizador de Presupuesto por Tarjetas">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
                             <path d="M22 12A10 10 0 0 0 12 2v10z"/>
                         </svg>
@@ -293,31 +294,31 @@
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-apartados" title="Metas de Ahorro y Sobres">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                     </span>
                     <span class="nav-label">Metas</span>
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-inversiones" title="Portafolio de Inversiones">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                     </span>
                     <span class="nav-label">Inversiones</span>
                 </button>
                 <button type="button" class="tab-btn" data-tab="tab-calculadora-rf" title="Calculadora de Renta Fija">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="4" y="2" width="16" height="20" rx="2"/>
                             <line x1="8" y1="6" x2="16" y2="6"/>
                             <line x1="16" y1="14" x2="16" y2="18"/>
                             <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
                         </svg>
                     </span>
-                    <span class="nav-label">Calculadora Renta Fija</span>
+                    <span class="nav-label">Calculadora renta fija</span>
                 </button>
                 <!-- Pestaña exclusiva para rol admin -->
                 <button type="button" class="tab-btn tab-btn-admin hidden" id="btn-tab-admin" data-tab="tab-admin" title="Panel de Administración del Sistema">
                     <span class="nav-icon">
-                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     </span>
                     <span class="nav-label">Admin</span>
                 </button>
@@ -349,7 +350,7 @@
                 <div class="topbar-right">
                     <!-- Selector de Divisa Global -->
                     <div class="topbar-currency-wrap">
-                        <label for="select-moneda-global" class="sr-only">Moneda Base</label>
+                        <label for="select-moneda-global" class="sr-only">Moneda base</label>
                         <select id="select-moneda-global" class="select-moneda-topbar" onchange="cambiarMonedaGlobal(this.value)" title="Cambiar moneda base de visualización">
                             <option value="MXN" selected>MXN ($)</option>
                             <option value="USD">USD ($)</option>
@@ -359,7 +360,7 @@
 
                     <!-- Botón Modo Privacidad / Discreción (Estilo Copilot & Monarch) -->
                     <button type="button" id="btn-toggle-privacidad" class="btn-topbar-privacy" onclick="toggleModoPrivacidad()" title="Modo Discreción: Ocultar o mostrar cifras sensibles">
-                        <svg class="ui-svg-icon" id="icon-privacy" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="ui-svg-icon" id="icon-privacy" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
@@ -368,7 +369,7 @@
                     <div id="user-menu-wrapper" class="user-menu-container">
                         <button type="button" id="btn-user-menu-trigger" class="btn-user-trigger" onclick="toggleUserDropdown(event)" aria-haspopup="true" aria-expanded="false" title="Opciones de usuario">
                             <span class="user-avatar-badge">
-                                <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             </span>
                             <span class="user-trigger-info">
                                 <strong id="lbl-username">usuario</strong>
@@ -381,7 +382,7 @@
                         <div id="user-dropdown-menu" class="user-dropdown-popover hidden">
                             <div class="dropdown-header-profile">
                                 <div class="dropdown-avatar-circle">
-                                    <svg class="ui-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    <svg class="ui-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 </div>
                                 <div class="dropdown-header-info">
                                     <strong id="dropdown-user-name">usuario</strong>
@@ -395,15 +396,15 @@
                             <div class="dropdown-action-list">
                                 <button type="button" class="dropdown-action-btn" onclick="abrirModalEditarMiPerfil(); cerrarUserDropdown();">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     </span>
-                                    <span>Mi Perfil</span>
+                                    <span>Mi perfil</span>
                                 </button>
                                 <button type="button" id="btn-modo" class="dropdown-action-btn btn-theme" onclick="toggleModoOscuro();">
                                     <span class="action-icon" id="icon-modo-oscuro">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                                     </span>
-                                    <span id="lbl-modo-oscuro">Modo Oscuro</span>
+                                    <span id="lbl-modo-oscuro">Modo oscuro</span>
                                 </button>
                             </div>
 
@@ -412,21 +413,21 @@
                             <div class="dropdown-action-list">
                                 <button type="button" class="dropdown-action-btn btn-export" onclick="exportarExcel(); cerrarUserDropdown();" title="Descargar reporte completo en Excel con gráficas">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
                                     </span>
                                     <span>Exportar Excel</span>
                                 </button>
                                 <button type="button" class="dropdown-action-btn btn-backup" onclick="descargarBackup(); cerrarUserDropdown();" title="Descargar copia de seguridad de tu base de datos individual">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                     </span>
-                                    <span>Descargar Respaldo</span>
+                                    <span>Descargar respaldo</span>
                                 </button>
                                 <button type="button" class="dropdown-action-btn btn-restore" onclick="solicitarImportarBackup(); cerrarUserDropdown();" title="Restaurar base de datos individual desde una copia de seguridad">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                                     </span>
-                                    <span>Restaurar Base de Datos</span>
+                                    <span>Restaurar base de datos</span>
                                 </button>
                                 <input type="file" id="input-restore-db" accept=".db,.sqlite,.sqlite3" onchange="procesarArchivoBackup(event)" class="hidden">
                             </div>
@@ -436,21 +437,21 @@
                             <div class="dropdown-action-list">
                                 <button type="button" class="dropdown-action-btn" onclick="mostrarVistaLanding(); cerrarUserDropdown();" title="Ver la página de presentación de Finanzas Cloud">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                                     </span>
-                                    <span>Ver Presentación</span>
+                                    <span>Ver presentación</span>
                                 </button>
                                 <button type="button" id="btn-dropdown-eliminar-cuenta" class="dropdown-action-btn dropdown-btn-danger hidden" onclick="solicitarEliminarMiCuenta(); cerrarUserDropdown();" title="Eliminar definitivamente tu cuenta y datos">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                     </span>
-                                    <span>Eliminar Mi Cuenta</span>
+                                    <span>Eliminar mi cuenta</span>
                                 </button>
                                 <button type="button" class="dropdown-action-btn dropdown-btn-logout btn-logout" onclick="logoutUsuario();" title="Cerrar sesión actual">
                                     <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                                     </span>
-                                    <span>Cerrar Sesión</span>
+                                    <span>Cerrar sesión</span>
                                 </button>
                             </div>
                         </div>
@@ -465,23 +466,43 @@
         <!-- PESTAÑA 1: DASHBOARD GENERAL Y PATRIMONIO NETO -->
         <!-- ============================================== -->
         <section id="tab-dashboard" class="tab-content active">
+            <div id="periodo-hero" class="periodo-hero" aria-labelledby="periodo-titulo">
+                <div class="periodo-cabecera">
+                    <div class="periodo-cifra">
+                        <h2 id="periodo-titulo" class="periodo-titulo">Libre hasta tu próximo cobro</h2>
+                        <p id="periodo-libre" class="periodo-libre">$0.00</p>
+                    </div>
+                    <dl class="periodo-desglose">
+                        <div><dt>Disponible hoy</dt><dd id="periodo-disponible">$0.00</dd></div>
+                        <div><dt>Cargos fijos por venir</dt><dd id="periodo-comprometido">$0.00</dd></div>
+                        <div><dt>Faltan</dt><dd id="periodo-dias">0 días</dd></div>
+                    </dl>
+                </div>
+                <div class="periodo-linea" aria-hidden="true">
+                    <div class="periodo-extremo"><span id="periodo-inicio"></span><small>Último cobro</small></div>
+                    <div id="periodo-pista" class="periodo-pista"><span class="periodo-avance"></span><span class="periodo-hoy" title="Hoy"></span></div>
+                    <div class="periodo-extremo periodo-extremo-fin"><span id="periodo-fin"></span><small id="periodo-cobro"></small></div>
+                </div>
+                <ul id="periodo-eventos" class="periodo-eventos" aria-label="Cargos fijos antes del próximo cobro"></ul>
+            </div>
+
             <div class="hero-networth">
                 <div class="networth-header">
-                    <small>PATRIMONIO TOTAL (METAS + INVERSIONES)</small>
+                    <small>Patrimonio (metas e inversiones)</small>
                     <h2 id="lbl-dash-patrimonio">$0.00</h2>
                 </div>
                 <div class="networth-breakdown">
                     <div class="breakdown-item">
                         <span class="breakdown-dot dot-apartados"></span>
                         <div class="breakdown-info">
-                            <small>En Metas / Apartados</small>
+                            <small>En metas y apartados</small>
                             <strong id="lbl-dash-apartados">$0.00</strong>
                         </div>
                     </div>
                     <div class="breakdown-item">
                         <span class="breakdown-dot dot-inversiones"></span>
                         <div class="breakdown-info">
-                            <small>Portafolio de Inversión</small>
+                            <small>Portafolio de inversión</small>
                             <strong id="lbl-dash-inversiones">$0.00</strong>
                         </div>
                     </div>
@@ -499,37 +520,17 @@
                 </div>
             </div>
 
-            <!-- Barra de Acciones Rápidas (Organización de Portafolio & Patrimonio) -->
-            <div class="gbm-quick-actions" aria-label="Acciones rápidas de portafolio y patrimonio">
-                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-movimientos')" title="Registrar un nuevo movimiento de caja">
-                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    <span>Registrar Operación</span>
-                </button>
-                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-inversiones')" title="Gestionar activos bursátiles e instrumentos">
-                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    <span>Portafolio Bursátil</span>
-                </button>
-                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-presupuesto')" title="Planificar gastos fijos y quincenas">
-                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span>Presupuesto & Metas</span>
-                </button>
-                <button type="button" class="gbm-action-btn" onclick="cambiarPestana('tab-calculadora-rf')" title="Simular rendimientos de Renta Fija (CETES / Pagarés)">
-                    <svg class="action-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                    <span>Calculadora Renta Fija</span>
-                </button>
-            </div>
-
             <div class="cards">
                 <div class="card ingresos">
-                    <h3>Ingresos del Mes</h3>
+                    <h3>Ingresos del mes</h3>
                     <p id="lbl-dash-mes-ingresos">$0.00</p>
                 </div>
                 <div class="card gastos">
-                    <h3>Gastos del Mes</h3>
+                    <h3>Gastos del mes</h3>
                     <p id="lbl-dash-mes-gastos">$0.00</p>
                 </div>
                 <div class="card balance">
-                    <h3>Rendimiento Inversiones</h3>
+                    <h3>Rendimiento de inversiones</h3>
                     <p id="lbl-dash-pnl">$0.00</p>
                 </div>
             </div>
@@ -537,8 +538,8 @@
             <div class="dashboard-grid">
                 <div class="panel">
                     <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                        <span>Comportamiento Mensual (Ingresos vs Gastos)</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <span>Ingresos y gastos por mes</span>
                     </h2>
                     <div class="chart-container">
                         <canvas id="graficaFinanzas"></canvas>
@@ -547,8 +548,8 @@
 
                 <div class="panel">
                     <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        <span>Historial por Mes</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span>Historial mensual</span>
                     </h2>
                     <div id="lista-resumen-mensual"></div>
                 </div>
@@ -556,16 +557,16 @@
             <div class="dashboard-grid">
                 <div class="panel">
                     <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>Próximos Movimientos</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <span>Próximos fijos</span>
                     </h2>
                     <div id="lista-proximos"></div>
                 </div>
 
                 <div class="panel">
                     <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                        <span>Gastos por Categoría (mes actual)</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                        <span>Gastos del mes por categoría</span>
                     </h2>
                     <div class="chart-container-dona">
                         <canvas id="graficaCategorias"></canvas>
@@ -586,22 +587,22 @@
                 <span id="lbl-gastos" class="hidden"></span>
 
                 <div class="card ingresos">
-                    <h3>Ingreso Fijo Mensual</h3>
+                    <h3>Ingreso fijo mensual</h3>
                     <p id="lbl-rec-ingreso">$0.00</p>
                     <small class="card-subtext">Nóminas recurrentes</small>
                 </div>
                 <div class="card gastos">
-                    <h3>Gastos Normales (Mes)</h3>
+                    <h3>Gastos normales (mes)</h3>
                     <p id="lbl-rec-gastos-normales">$0.00</p>
                     <small class="card-subtext">Variables del día a día</small>
                 </div>
                 <div class="card gastos">
-                    <h3>Gastos Fijos + MSI Mensual</h3>
+                    <h3>Gastos fijos + MSI mensual</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
                     <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
                 </div>
                 <div class="card balance">
-                    <h3>Libre al Mes</h3>
+                    <h3>Libre al mes</h3>
                     <p id="lbl-rec-libre">$0.00</p>
                     <small class="card-subtext">Remanente tras fijos, MSI y normales</small>
                 </div>
@@ -610,12 +611,12 @@
             <!-- Navegación por sub-pestañas -->
             <div class="subtabs-nav" role="tablist">
                 <button type="button" id="btn-subtab-historial" class="subtab-btn active" onclick="cambiarSubtabMovimientos('historial')">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                    <span>Historial de Movimientos</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    <span>Historial de movimientos</span>
                 </button>
                 <button type="button" id="btn-subtab-fijos" class="subtab-btn" onclick="cambiarSubtabMovimientos('fijos')">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                    <span>Fijos y Compras a Meses</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                    <span>Fijos y compras a meses</span>
                 </button>
             </div>
 
@@ -624,17 +625,17 @@
                 <div class="dashboard-grid dashboard-grid-movimientos">
                     <div class="panel">
                         <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                            <span>Registrar / Quitar Movimiento</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <span>Registrar / quitar movimiento</span>
                         </h2>
                         <form id="transaccion-form">
                             <div class="form-row-2col">
                                 <div class="form-group">
-                                    <label for="fecha">Fecha:</label>
+                                    <label for="fecha">Fecha</label>
                                     <input type="date" id="fecha" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="tipo">Tipo:</label>
+                                    <label for="tipo">Tipo</label>
                                     <select id="tipo">
                                         <option value="gasto">Gasto</option>
                                         <option value="ingreso">Ingreso</option>
@@ -642,22 +643,22 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="monto">Monto ($):</label>
+                                <label for="monto">Monto ($)</label>
                                 <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
-                                <label for="descripcion">Descripción:</label>
+                                <label for="descripcion">Descripción</label>
                                 <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
                             </div>
                             <div class="form-group">
-                                <label for="categoria">Categoría:</label>
+                                <label for="categoria">Categoría</label>
                                 <select id="categoria"></select>
                             </div>
-                            <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" onclick="cambiarSubtabMovimientos('fijos')">Ir a Fijos y MSI</button></p>
+                            <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" onclick="cambiarSubtabMovimientos('fijos')">Ir a fijos y MSI</button></p>
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary">
-                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                    <span>Guardar Transacción</span>
+                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                    <span>Guardar transacción</span>
                                 </button>
                             </div>
                         </form>
@@ -666,8 +667,8 @@
 
                     <div class="panel">
                         <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            <span>Todos los Movimientos</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span>Todos los movimientos</span>
                         </h2>
                         <div class="filtros-movimientos">
                             <input type="month" id="filtro-mes" aria-label="Filtrar por mes">
@@ -687,11 +688,11 @@
                             </div>
                             <div class="barra-lote-acciones">
                                 <button type="button" id="btn-eliminar-lote-mov" class="btn-danger-solid">
-                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                     <span>Eliminar seleccionados</span>
                                 </button>
                                 <button type="button" id="btn-vaciar-todos-mov" class="btn-danger-outline">
-                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                     <span>Vaciar todos los movimientos</span>
                                 </button>
                             </div>
@@ -723,7 +724,7 @@
                 <div class="dashboard-grid dashboard-grid-movimientos">
                     <div class="panel">
                         <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                             <span>Agregar fijo o compra a meses</span>
                         </h2>
                         <div class="segmented" role="radiogroup" aria-label="Tipo de registro">
@@ -733,17 +734,17 @@
                         </div>
                         <form id="form-recurrente">
                             <div class="form-group">
-                                <label for="rec-desc">Descripción:</label>
+                                <label for="rec-desc">Descripción</label>
                                 <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
                             </div>
                             <div id="rec-campos-fijo">
                                 <div class="form-row-2col">
                                     <div class="form-group">
-                                        <label for="rec-monto">Monto por pago ($):</label>
+                                        <label for="rec-monto">Monto por pago ($)</label>
                                         <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
                                     </div>
                                     <div class="form-group">
-                                        <label for="rec-frecuencia">Frecuencia:</label>
+                                        <label for="rec-frecuencia">Frecuencia</label>
                                         <select id="rec-frecuencia">
                                             <option value="mensual">Mensual</option>
                                             <option value="quincenal">Quincenal</option>
@@ -755,11 +756,11 @@
                             <div id="rec-campos-msi" class="hidden">
                                 <div class="form-row-2col">
                                     <div class="form-group">
-                                        <label for="rec-total">Monto total ($):</label>
+                                        <label for="rec-total">Monto total ($)</label>
                                         <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
                                     </div>
                                     <div class="form-group">
-                                        <label for="rec-meses">Meses:</label>
+                                        <label for="rec-meses">Meses</label>
                                         <select id="rec-meses">
                                             <option value="3">3</option>
                                             <option value="6">6</option>
@@ -772,24 +773,24 @@
                                     </div>
                                 </div>
                                 <div class="form-group hidden" id="rec-meses-otro-wrap">
-                                    <label for="rec-meses-otro">Número de meses (2 a 60):</label>
+                                    <label for="rec-meses-otro">Número de meses (2 a 60)</label>
                                     <input type="number" min="2" max="60" step="1" id="rec-meses-otro">
                                 </div>
                                 <p class="hint-text" id="rec-preview"></p>
                             </div>
                             <div class="form-row-2col">
                                 <div class="form-group">
-                                    <label for="rec-fecha">Fecha del primer pago:</label>
+                                    <label for="rec-fecha">Fecha del primer pago</label>
                                     <input type="date" id="rec-fecha" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="rec-categoria">Categoría:</label>
+                                    <label for="rec-categoria">Categoría</label>
                                     <select id="rec-categoria"></select>
                                 </div>
                             </div>
                             <div class="form-group" id="rec-apartado-group">
                                 <label for="rec-apartado-id">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                                     Aportar automáticamente a una meta (opcional):
                                 </label>
                                 <select id="rec-apartado-id">
@@ -807,12 +808,12 @@
 
                     <div class="panel">
                         <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                             <span>Compras a meses</span>
                         </h2>
                         <div id="lista-msi"></div>
                         <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                             <span>Ingresos y gastos fijos</span>
                         </h2>
                         <div id="lista-fijos"></div>
@@ -832,22 +833,22 @@
                 <div class="panel-header pres-header">
                     <div>
                         <h2 class="panel-heading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
                                 <path d="M22 12A10 10 0 0 0 12 2v10z"/>
                             </svg>
-                            <span>Organizador de Presupuesto</span>
+                            <span>Organizador de presupuesto</span>
                         </h2>
                         <p class="panel-subtitle">Define la frecuencia de tus ingresos y divídelos en tarjetas por porcentaje ($ ⇄ %) para saber exactamente a dónde va tu dinero.</p>
                     </div>
                     <div class="pres-header-actions">
                         <button type="button" class="btn-primary" onclick="abrirModalCrearTarjeta()">
-                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            <span>+ Nueva Tarjeta</span>
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span>Nueva tarjeta</span>
                         </button>
                         <button type="button" id="btn-exportar-pres-fijos" class="btn-secondary" title="Exportar presupuesto a Movimientos y Fijos con la misma periodicidad" onclick="abrirModalExportarPresupuesto()">
-                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            <span>Exportar a Movimientos y Fijos</span>
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Exportar a movimientos y fijos</span>
                         </button>
                     </div>
                 </div>
@@ -857,7 +858,7 @@
                     <form id="form-presupuesto-config">
                         <div class="pres-config-row">
                             <div class="form-group pres-fg-monto">
-                                <label for="pres-ingreso-base">Ingreso Fijo Base:</label>
+                                <label for="pres-ingreso-base">Ingreso fijo base</label>
                                 <div class="calc-input-adornment">
                                     <span class="calc-adornment-prefix">$</span>
                                     <input type="number" id="pres-ingreso-base" min="0" step="any" placeholder="0.00" class="input-calc calc-has-prefix calc-has-suffix" required>
@@ -865,37 +866,37 @@
                                 </div>
                             </div>
                             <div class="form-group pres-fg-frec">
-                                <label for="pres-frecuencia">Frecuencia de Pago:</label>
+                                <label for="pres-frecuencia">Frecuencia de pago</label>
                                 <select id="pres-frecuencia" class="select-calc">
-                                    <option value="quincenal">Quincenal (Cada 15 días)</option>
-                                    <option value="mensual" selected>Mensual (Cada mes)</option>
-                                    <option value="semanal">Semanal (Cada semana)</option>
+                                    <option value="quincenal">Quincenal (cada 15 días)</option>
+                                    <option value="mensual" selected>Mensual (cada mes)</option>
+                                    <option value="semanal">Semanal (cada semana)</option>
                                 </select>
                             </div>
                             <div class="form-group pres-fg-dia" id="wrap-pres-dia-pago">
-                                <label for="pres-ingreso-dia">Día de Cobro:</label>
+                                <label for="pres-ingreso-dia">Día de cobro</label>
                                 <div class="calc-input-adornment">
                                     <span class="calc-adornment-prefix">Día</span>
                                     <input type="number" id="pres-ingreso-dia" min="1" max="31" placeholder="15" class="input-calc calc-has-prefix-dia" title="Día del mes de cobro del ingreso fijo (1 a 31)">
                                 </div>
                             </div>
                             <div class="form-group pres-fg-subdiv" id="wrap-pres-subdivision">
-                                <label for="pres-subdivision-tipo">Dividir Presupuesto en:</label>
+                                <label for="pres-subdivision-tipo">Dividir presupuesto en</label>
                                 <div class="pres-subdiv-input-group">
                                     <select id="pres-subdivision-tipo" class="select-calc">
-                                        <option value="ninguna">Sin división (Periodo completo)</option>
+                                        <option value="ninguna">Sin división (periodo completo)</option>
                                         <option value="quincenas">2 Quincenas</option>
                                         <option value="semanas">4 Semanas</option>
                                         <option value="personalizada">Personalizada</option>
                                     </select>
                                     <button type="button" id="btn-custom-subdivision" class="btn-subdiv-gear hidden" title="Ajustar porcentajes de sub-periodos" onclick="abrirModalSubdivisionPersonalizada()">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                                     </button>
                                 </div>
                             </div>
                             <div class="form-group pres-fg-btn">
                                 <button type="submit" class="btn-primary btn-calc-action">
-                                    <span>Guardar Ingreso</span>
+                                    <span>Guardar ingreso</span>
                                 </button>
                             </div>
                         </div>
@@ -907,7 +908,7 @@
                 <div class="cards pres-cards-kpi">
                     <div class="card pres-kpi-card">
                         <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Ingreso del Periodo</span>
+                            <span class="pres-kpi-title">Ingreso del periodo</span>
                             <span class="pres-kpi-tag" id="lbl-pres-kpi-ingreso-sub">MENSUAL</span>
                         </div>
                         <p class="pres-kpi-val" id="lbl-pres-kpi-ingreso">$0.00</p>
@@ -915,7 +916,7 @@
 
                     <div class="card pres-kpi-card">
                         <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Total Asignado</span>
+                            <span class="pres-kpi-title">Total asignado</span>
                             <span id="badge-pres-asignado" class="pnl-badge badge-gold">0.0% del total</span>
                         </div>
                         <p class="pres-kpi-val pres-val-gold" id="lbl-pres-kpi-asignado">$0.00</p>
@@ -923,7 +924,7 @@
 
                     <div class="card pres-kpi-card">
                         <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Disponible por Asignar</span>
+                            <span class="pres-kpi-title">Disponible por asignar</span>
                             <span id="badge-pres-disponible" class="pnl-badge badge-success">100.0% libre</span>
                         </div>
                         <p class="pres-kpi-val pres-val-success" id="lbl-pres-kpi-disponible">$0.00</p>
@@ -931,7 +932,7 @@
 
                     <div class="card pres-kpi-card">
                         <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Inversión / Ahorro</span>
+                            <span class="pres-kpi-title">Inversión / ahorro</span>
                             <span id="badge-pres-inv" class="pnl-badge badge-success">0.0%</span>
                         </div>
                         <p class="pres-kpi-val pres-val-inv" id="lbl-pres-kpi-inv">$0.00</p>
@@ -942,13 +943,13 @@
                 <div class="pres-alloc-section">
                     <div class="pres-alloc-header">
                         <h3 class="panel-subheading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                            <span>Distribución del Ingreso (100%)</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                            <span>Distribución del ingreso (100%)</span>
                         </h3>
                         <div class="pres-templates-wrap">
                             <span class="pres-templates-label">Plantillas:</span>
                             <button type="button" class="btn-chip-tpl" onclick="aplicarPlantillaPresupuesto('50-30-20')">Regla 50 / 30 / 20</button>
-                            <button type="button" class="btn-chip-tpl" onclick="aplicarPlantillaPresupuesto('inversionista')">Perfil Inversionista</button>
+                            <button type="button" class="btn-chip-tpl" onclick="aplicarPlantillaPresupuesto('inversionista')">Perfil inversionista</button>
                         </div>
                     </div>
                     <div class="pres-alloc-track-wrap">
@@ -961,11 +962,11 @@
                 <div class="pres-suggested-bar">
                     <span class="pres-suggested-label">Opciones sugeridas para agregar:</span>
                     <div class="pres-chips-wrap">
-                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Gastos Fijos', 'home', 'blue', 'Renta, despensa y servicios esenciales', 50)">+ Gastos Fijos</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Gastos Fijos', 'home', 'blue', 'Renta, despensa y servicios esenciales', 50)">+ Gastos fijos</button>
                         <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Inversión en ETFs', 'trending-up', 'emerald', 'VOO, QQQ, Fibras y bolsa', 20)">+ Inversión en ETFs</button>
-                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Fondo Renta Fija / CETES', 'shield', 'gold', 'CETES, Nu, pagarés y fondo de emergencia', 10)">+ Renta Fija / CETES</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Fondo Renta Fija / CETES', 'shield', 'gold', 'CETES, Nu, pagarés y fondo de emergencia', 10)">+ Renta fija / CETES</button>
                         <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Compras a Meses (MSI)', 'credit-card', 'amber', 'Tarjetas de crédito y mensualidades', 10)">+ Pagos MSI</button>
-                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Ocio y Estilo de Vida', 'smile', 'purple', 'Salidas, entretenimiento y gustos', 10)">+ Ocio y Gustos</button>
+                        <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Ocio y Estilo de Vida', 'smile', 'purple', 'Salidas, entretenimiento y gustos', 10)">+ Ocio y gustos</button>
                         <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta(); aplicarPresetChip('Educación y Cursos', 'book', 'cyan', 'Libros, cursos y desarrollo profesional', 5)">+ Educación</button>
                         <button type="button" class="pres-chip" onclick="abrirModalCrearTarjeta()">+ Personalizada</button>
                     </div>
@@ -975,8 +976,8 @@
                 <div id="pres-subperiodos-bar" class="pres-subperiodos-nav hidden">
                     <div class="pres-subperiodos-nav-left">
                         <span class="pres-subperiodos-title">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            <span>Vista por Periodo:</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            <span>Vista por periodo:</span>
                         </span>
                         <div class="pres-subperiodos-pills" id="pres-subperiodos-pills"></div>
                     </div>
@@ -997,17 +998,17 @@
                 <div class="apartados-header-wrap">
                     <div>
                         <h2 class="panel-heading s-text-align-left s-margin-0-0-5px-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                            <span>Sobres de Ahorro y Metas</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                            <span>Sobres de ahorro y metas</span>
                         </h2>
                         <p class="s-margin-0 s-color-var-text-muted s-font-size-0-9rem">Organiza tu dinero para objetivos específicos y fondos de emergencia.</p>
                     </div>
                     <div class="apartados-header-actions">
                         <div class="apartado-total-pill">
-                            <small>Total Ahorrado: </small>
+                            <small>Total ahorrado: </small>
                             <strong id="lbl-apartados-total-acum">$0.00</strong>
                         </div>
-                        <button type="button" class="btn-primary" onclick="abrirModalCrearApartado()">+ Crear Apartado</button>
+                        <button type="button" class="btn-primary" onclick="abrirModalCrearApartado()">+ Crear apartado</button>
                     </div>
                 </div>
 
@@ -1023,16 +1024,16 @@
                 <div class="inversiones-header">
                     <div class="inversiones-header-title-wrap">
                         <h2 class="panel-heading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-                            <span>Portafolio de Inversiones (ETFs & Acciones)</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                            <span>Portafolio de inversiones (ETFs & acciones)</span>
                         </h2>
                         <p class="s-margin-5px-0-0-0 s-color-var-text-muted s-font-size-0-9rem">Monitoreo de rendimientos, cotizaciones en vivo y distribución de activos.</p>
                     </div>
                     <div class="inversiones-header-actions">
                         <span id="badge-tasa-inversiones" class="badge-tasa">1 USD ≈ $18.40 MXN</span>
                         <button type="button" id="btn-sync-precios" class="btn-sync" onclick="sincronizarPrecios()">
-                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                            <span>Actualizar Cotizaciones</span>
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            <span>Actualizar cotizaciones</span>
                         </button>
                     </div>
                 </div>
@@ -1057,15 +1058,15 @@
                     
                     <div class="inversiones-col-form">
                         <form id="form-inversion" class="card-form">
-                            <h3 class="s-margin-top-0 s-margin-bottom-12px s-font-size-1rem s-color-var-text-color">+ Registrar Posición</h3>
+                            <h3 class="s-margin-top-0 s-margin-bottom-12px s-font-size-1rem s-color-var-text-color">Registrar posición</h3>
                             
                             <div class="form-group">
-                                <label for="inv-ticker">Ticker (ej. VOO, QQQ, WALMEX.MX):</label>
+                                <label for="inv-ticker">Ticker (ej. VOO, QQQ, WALMEX.MX)</label>
                                 <div class="ticker-autocomplete-container">
                                     <div class="input-group-search">
                                         <input type="text" id="inv-ticker" placeholder="Escribe para buscar (ej. VOO)" required autocomplete="off" class="s-text-transform-uppercase">
                                         <button type="button" class="btn-search-ticker" onclick="buscarCotizacionTicker()" title="Consultar precio en tiempo real">
-                                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                                             <span>Cotizar</span>
                                         </button>
                                     </div>
@@ -1074,21 +1075,21 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="inv-moneda">Moneda del Activo:</label>
+                                <label for="inv-moneda">Moneda del activo</label>
                                 <select id="inv-moneda">
-                                    <option value="USD">USD (Dólares - Se convierte a MXN)</option>
-                                    <option value="MXN">MXN (Pesos Mexicanos - Sin multiplicar)</option>
+                                    <option value="USD">USD (dólares - se convierte a MXN)</option>
+                                    <option value="MXN">MXN (pesos mexicanos - sin multiplicar)</option>
                                 </select>
                                 <small class="s-color-var-text-muted s-font-size-0-78rem">Si compras en USD se multiplica por el tipo de cambio; si es en MXN se suma directo.</small>
                             </div>
 
                             <div class="form-row-2col">
                                 <div class="form-group">
-                                    <label for="inv-cantidad">Cantidad:</label>
+                                    <label for="inv-cantidad">Cantidad</label>
                                     <input type="number" step="0.0001" min="0.0001" id="inv-cantidad" placeholder="1.0" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="inv-precio-promedio">Precio Compra:</label>
+                                    <label for="inv-precio-promedio">Precio compra</label>
                                     <input type="number" step="0.01" min="0.01" id="inv-precio-promedio" placeholder="0.00" required>
                                 </div>
                             </div>
@@ -1100,8 +1101,8 @@
 
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary">
-                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                    <span>Guardar Activo</span>
+                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                    <span>Guardar activo</span>
                                 </button>
                             </div>
                         </form>
@@ -1111,8 +1112,8 @@
                         <div class="dona-wrapper">
                             <div class="dona-header">
                                 <h3 class="s-margin-0 s-font-size-1rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
-                                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
-                                    <span>Asignación de Activos (% Peso)</span>
+                                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+                                    <span>Asignación de activos (% peso)</span>
                                 </h3>
                                 <p class="s-margin-3px-0-0-0 s-color-var-text-muted s-font-size-0-8rem">Distribución porcentual por valor de mercado actual.</p>
                             </div>
@@ -1132,8 +1133,8 @@
                 <!-- Fila Inferior: Tabla de Posiciones a Ancho Completo -->
                 <div class="inversiones-tabla-section">
                     <h3 class="s-margin-16px-0-10px-0 s-font-size-1-05rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                        <span>Mis Posiciones (ETFs & Acciones)</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <span>Mis posiciones (ETFs & acciones)</span>
                     </h3>
                     <div class="table-responsive">
                         <table>
@@ -1142,8 +1143,8 @@
                                     <th>Ticker</th>
                                     <th>Moneda</th>
                                     <th>Títulos</th>
-                                    <th>P. Promedio</th>
-                                    <th>P. Actual</th>
+                                    <th>P. promedio</th>
+                                    <th>P. actual</th>
                                     <th>Valor Total (<span class="lbl-moneda-base">MXN</span>)</th>
                                     <th>PnL (<span class="lbl-moneda-base">MXN</span> / %)</th>
                                     <th>Peso %</th>
@@ -1167,13 +1168,13 @@
                 <div class="panel-header calc-header">
                     <div>
                         <h2 class="panel-heading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="4" y="2" width="16" height="20" rx="2"/>
                                 <line x1="8" y1="6" x2="16" y2="6"/>
                                 <line x1="16" y1="14" x2="16" y2="18"/>
                                 <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
                             </svg>
-                            <span>Calculadora de Renta Fija</span>
+                            <span>Calculadora de renta fija</span>
                         </h2>
                         <p class="panel-subtitle">Simulador financiero de rendimientos para CETES, pagarés bancarios, cuentas a la vista y SOFIPOs.</p>
                     </div>
@@ -1186,8 +1187,8 @@
                         <span class="calc-presets-label">Tasas de referencia rápida:</span>
                         <div class="calc-chips-wrap">
                             <button type="button" class="calc-chip" data-tasa="10.50" data-base="365">CETES 28d (10.50%)</button>
-                            <button type="button" class="calc-chip" data-tasa="11.00" data-base="365">Pagaré Bancario (11.00%)</button>
-                            <button type="button" class="calc-chip" data-tasa="13.00" data-base="360">SOFIPO / Cajita (13.00%)</button>
+                            <button type="button" class="calc-chip" data-tasa="11.00" data-base="365">Pagaré bancario (11.00%)</button>
+                            <button type="button" class="calc-chip" data-tasa="13.00" data-base="360">SOFIPO / cajita (13.00%)</button>
                             <button type="button" class="calc-chip" data-tasa="13.50" data-base="360">Nu / Ualá (13.50%)</button>
                         </div>
                     </div>
@@ -1195,7 +1196,7 @@
                     <form id="form-calc-rf" onsubmit="event.preventDefault();">
                         <div class="form-row-3col">
                             <div class="form-group">
-                                <label for="calc-rf-monto">Monto a Invertir:</label>
+                                <label for="calc-rf-monto">Monto a invertir</label>
                                 <div class="calc-input-adornment">
                                     <span class="calc-adornment-prefix">$</span>
                                     <input type="number" id="calc-rf-monto" min="0" step="any" placeholder="10,000" value="10000" class="input-calc calc-has-prefix calc-has-suffix" required>
@@ -1203,17 +1204,17 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="calc-rf-tasa">Tasa Anual Bruta:</label>
+                                <label for="calc-rf-tasa">Tasa anual bruta</label>
                                 <div class="calc-input-adornment">
                                     <input type="number" id="calc-rf-tasa" min="0" max="100" step="0.01" placeholder="11.50" value="11.50" class="input-calc calc-has-suffix" required>
                                     <span class="calc-adornment-suffix">%</span>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="calc-rf-base">Base de Días Anual:</label>
+                                <label for="calc-rf-base">Base de días anual</label>
                                 <select id="calc-rf-base" class="select-calc">
-                                    <option value="365" selected>365 días (Año natural — CETES / Bancos)</option>
-                                    <option value="360">360 días (Año comercial — SOFIPOs / Fintechs)</option>
+                                    <option value="365" selected>365 días (año natural — CETES / bancos)</option>
+                                    <option value="360">360 días (año comercial — SOFIPOs / Fintechs)</option>
                                 </select>
                             </div>
                         </div>
@@ -1221,16 +1222,16 @@
                         <!-- Barra de Acciones con Botón de Cálculo -->
                         <div class="calc-actions-row">
                             <button type="submit" id="btn-calcular-rf" class="btn-primary btn-calc-action">
-                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="4" y="2" width="16" height="20" rx="2"/>
                                     <line x1="8" y1="6" x2="16" y2="6"/>
                                     <line x1="16" y1="14" x2="16" y2="18"/>
                                     <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>
                                 </svg>
-                                <span>Calcular Rendimientos</span>
+                                <span>Calcular rendimientos</span>
                             </button>
                             <button type="button" id="btn-reset-calc-rf" class="btn-secondary btn-calc-reset" title="Restablecer a valores iniciales">
-                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                                     <path d="M3 3v5h5"/>
                                 </svg>
@@ -1250,13 +1251,13 @@
                     <div class="card card-calc card-calc-dia">
                         <div class="card-calc-top">
                             <span class="card-calc-icon">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
                                 </svg>
                             </span>
                             <span class="card-calc-badge">1 Día</span>
                         </div>
-                        <h3>Ganancia por Día</h3>
+                        <h3>Ganancia por día</h3>
                         <p class="calc-rend-val" id="calc-rf-res-dia">$0.00</p>
                         <div class="calc-total-card">
                             <div class="calc-total-line">
@@ -1274,13 +1275,13 @@
                     <div class="card card-calc card-calc-mes">
                         <div class="card-calc-top">
                             <span class="card-calc-icon">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                                 </svg>
                             </span>
-                            <span class="card-calc-badge">30 Días (Promedio)</span>
+                            <span class="card-calc-badge">30 Días (promedio)</span>
                         </div>
-                        <h3>Ganancia por Mes</h3>
+                        <h3>Ganancia por mes</h3>
                         <p class="calc-rend-val" id="calc-rf-res-mes">$0.00</p>
                         <div class="calc-total-card">
                             <div class="calc-total-line">
@@ -1298,13 +1299,13 @@
                     <div class="card card-calc card-calc-anio">
                         <div class="card-calc-top">
                             <span class="card-calc-icon">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
                                 </svg>
                             </span>
-                            <span class="card-calc-badge card-badge-gold">1 Año Completo</span>
+                            <span class="card-calc-badge card-badge-gold">1 Año completo</span>
                         </div>
-                        <h3>Ganancia por Año</h3>
+                        <h3>Ganancia por año</h3>
                         <p class="calc-rend-val" id="calc-rf-res-anio">$0.00</p>
                         <div class="calc-total-card">
                             <div class="calc-total-line">
@@ -1323,10 +1324,10 @@
                 <div class="calc-table-section">
                     <div class="calc-table-header">
                         <h3 class="panel-subheading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
                             </svg>
-                            <span>Proyección por Plazos Financieros Frecuentes</span>
+                            <span>Proyección por plazos financieros frecuentes</span>
                         </h3>
                         <small class="calc-table-sub">Rendimiento estimado antes de retenciones ISR aplicable.</small>
                     </div>
@@ -1334,10 +1335,10 @@
                         <table class="table-calc-plazos">
                             <thead>
                                 <tr>
-                                    <th>Plazo / Instrumento</th>
+                                    <th>Plazo / instrumento</th>
                                     <th class="s-text-align-center">Días</th>
-                                    <th class="s-text-align-right">Ganancia Bruta</th>
-                                    <th class="s-text-align-right">Monto Final Estimado</th>
+                                    <th class="s-text-align-right">Ganancia bruta</th>
+                                    <th class="s-text-align-right">Monto final estimado</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-calc-rf-plazos">
@@ -1349,7 +1350,7 @@
 
                 <!-- Nota informativa institucional -->
                 <div class="calc-info-note">
-                    <svg class="ui-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="ui-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
                     <span><strong>Nota metodológica:</strong> Los rendimientos mostrados son cálculos brutos matemáticos basados en interés simple anualizado. Para instrumentos bancarios y CETES la base común es de 365 días; algunas SOFIPOs y Fintechs calculan sobre año comercial de 360 días. No incluye retenciones provisionales de ISR ni comisiones de intermediarios.</span>
@@ -1365,22 +1366,22 @@
                 <div class="admin-header-wrap">
                     <div>
                         <h2 class="panel-heading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            <span>Panel de Administración Multi-Tenant</span>
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span>Panel de administración multi-Tenant</span>
                         </h2>
                         <p class="s-margin-5px-0-0-0 s-color-var-text-muted s-font-size-0-9rem">
                             Control de acceso, aislamiento de bases de datos por usuario y auditoría global.
                         </p>
                     </div>
-                    <button type="button" class="btn-primary" onclick="abrirModalCrearUsuario()">+ Crear Usuario</button>
+                    <button type="button" class="btn-primary" onclick="abrirModalCrearUsuario()">+ Crear usuario</button>
                 </div>
 
                 <!-- Banner de advertencia si el correo no está configurado -->
                 <div id="admin-banner-email-warning" class="alert-warning-banner hidden">
                     <div class="s-display-flex s-justify-content-space-between s-align-items-center s-gap-14px s-flex-wrap-wrap">
                         <div class="s-display-flex s-gap-10px s-align-items-flex-start s-flex-1 s-min-width-260px">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="s-flex-shrink-0 s-margin-top-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            <span><strong>Aviso de Correo (Modo Autónomo):</strong> El servicio de correo no está configurado en el archivo <code>.env</code> (falta <code>RESEND_API_KEY</code> o <code>SMTP</code>). La plataforma opera normalmente sin envíos de correo. Puedes gestionar o restablecer contraseñas manualmente desde la tabla de abajo.</span>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" class="s-flex-shrink-0 s-margin-top-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span><strong>Aviso de correo (modo autónomo):</strong> El servicio de correo no está configurado en el archivo <code>.env</code> (falta <code>RESEND_API_KEY</code> o <code>SMTP</code>). La plataforma opera normalmente sin envíos de correo. Puedes gestionar o restablecer contraseñas manualmente desde la tabla de abajo.</span>
                         </div>
                         <button type="button" class="btn-warning-dismiss" onclick="aceptarAvisoCorreoAdmin()">
                             Aceptar
@@ -1391,19 +1392,19 @@
                 <!-- Tarjetas Rápidas de Métricas (KPIs de Administración) -->
                 <div class="cards cards-admin">
                     <div class="card card-kpi">
-                        <h3>Total Usuarios</h3>
+                        <h3>Total usuarios</h3>
                         <p id="lbl-kpi-total-users">0</p>
                     </div>
                     <div class="card card-kpi">
-                        <h3>Activos Hoy / 7 Días</h3>
+                        <h3>Activos hoy / 7 días</h3>
                         <p><span id="lbl-kpi-active-today">0</span> <small class="s-font-size-0-85rem s-color-var-text-muted">/ <span id="lbl-kpi-active-7d">0</span> (7d)</small></p>
                     </div>
                     <div class="card card-kpi">
-                        <h3>Usuarios Inactivos</h3>
+                        <h3>Usuarios inactivos</h3>
                         <p id="lbl-kpi-inactive" class="s-color-var-danger-color">0</p>
                     </div>
                     <div class="card card-kpi">
-                        <h3>Almacenamiento Total</h3>
+                        <h3>Almacenamiento total</h3>
                         <p id="lbl-kpi-disk-total">0.0 KB</p>
                     </div>
                 </div>
@@ -1411,8 +1412,8 @@
                 <!-- Tabla de Gestión de Usuarios y Tenants -->
                 <div class="admin-table-wrap">
                     <h3 class="panel-subheading s-margin-top-14px s-margin-bottom-8px s-font-size-1rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        <span>Directorio de Usuarios y Tenants</span>
+                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>Directorio de usuarios y tenants</span>
                     </h3>
                     <div class="table-responsive admin-table-responsive">
                         <table class="table-admin-users" id="tabla-usuarios-admin-full">
@@ -1420,11 +1421,11 @@
                                 <tr>
                                     <th class="th-user-id">ID</th>
                                     <th class="th-user-name">Usuario</th>
-                                    <th class="th-user-email">Correo Electrónico</th>
+                                    <th class="th-user-email">Correo electrónico</th>
                                     <th class="th-user-role">Rol</th>
                                     <th class="th-user-status">Estado</th>
                                     <th class="th-user-created">Creado</th>
-                                    <th class="th-user-access">Último Acceso</th>
+                                    <th class="th-user-access">Último acceso</th>
                                     <th class="th-user-logins">Logins</th>
                                     <th class="th-user-size">Peso BD</th>
                                     <th class="th-user-actions">Acciones</th>
@@ -1449,7 +1450,7 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-editar-inversion-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     <span>Editar Posición: <span id="modal-edit-ticker" class="ticker-highlight"></span></span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalEditarInversion()">&times;</button>
@@ -1458,7 +1459,7 @@
                 <input type="hidden" id="modal-edit-id">
                 
                 <div class="form-group">
-                    <label for="modal-edit-cantidad">Cantidad (Títulos / Unidades):</label>
+                    <label for="modal-edit-cantidad">Cantidad (títulos / unidades)</label>
                     <input type="number" step="0.0001" min="0.0001" id="modal-edit-cantidad" required>
                 </div>
 
@@ -1470,8 +1471,8 @@
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalEditarInversion()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span>Guardar Cambios</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar cambios</span>
                     </button>
                 </div>
             </form>
@@ -1485,8 +1486,8 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-editar-transaccion-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    <span>Editar Movimiento</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <span>Editar movimiento</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalEditarTransaccion()">&times;</button>
             </div>
@@ -1496,11 +1497,11 @@
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="modal-edit-trans-fecha">Fecha:</label>
+                        <label for="modal-edit-trans-fecha">Fecha</label>
                         <input type="date" id="modal-edit-trans-fecha" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-edit-trans-tipo">Tipo:</label>
+                        <label for="modal-edit-trans-tipo">Tipo</label>
                         <select id="modal-edit-trans-tipo" required>
                             <option value="gasto">Gasto</option>
                             <option value="ingreso">Ingreso</option>
@@ -1509,25 +1510,25 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="modal-edit-trans-monto">Monto ($):</label>
+                    <label for="modal-edit-trans-monto">Monto ($)</label>
                     <input type="number" step="0.01" min="0.01" id="modal-edit-trans-monto" placeholder="0.00" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="modal-edit-trans-categoria">Categoría:</label>
+                    <label for="modal-edit-trans-categoria">Categoría</label>
                     <select id="modal-edit-trans-categoria"></select>
                 </div>
 
                 <div class="form-group">
-                    <label for="modal-edit-trans-desc">Descripción:</label>
+                    <label for="modal-edit-trans-desc">Descripción</label>
                     <input type="text" id="modal-edit-trans-desc" placeholder="Ej. Supermercado, Nómina...">
                 </div>
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalEditarTransaccion()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span>Guardar Cambios</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar cambios</span>
                     </button>
                 </div>
             </form>
@@ -1541,8 +1542,8 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-editar-recurrente-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span id="modal-editar-recurrente-titulo-txt">Editar Fijo / Compra a Meses</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span id="modal-editar-recurrente-titulo-txt">Editar fijo / compra a meses</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalEditarRecurrente()">&times;</button>
             </div>
@@ -1551,25 +1552,25 @@
                 <div id="modal-edit-rec-subperiodos-info" class="hidden"></div>
 
                 <div class="form-group">
-                    <label for="modal-edit-rec-desc">Descripción:</label>
+                    <label for="modal-edit-rec-desc">Descripción</label>
                     <input type="text" id="modal-edit-rec-desc" required placeholder="Ej. Renta, Nómina, Netflix...">
                 </div>
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="modal-edit-rec-monto">Monto ($):</label>
+                        <label for="modal-edit-rec-monto">Monto ($)</label>
                         <input type="number" step="0.01" min="0.01" id="modal-edit-rec-monto" placeholder="0.00" required>
                         <small id="modal-edit-rec-monto-hint" class="hint-text hidden">En compras a meses la cuota mensual no se puede alterar.</small>
                     </div>
                     <div class="form-group">
-                        <label for="modal-edit-rec-fecha">Próxima Fecha de Cargo:</label>
+                        <label for="modal-edit-rec-fecha">Próxima fecha de cargo</label>
                         <input type="date" id="modal-edit-rec-fecha" required>
                     </div>
                 </div>
 
                 <div class="form-row-2col">
                     <div class="form-group" id="modal-edit-rec-frecuencia-wrap">
-                        <label for="modal-edit-rec-frecuencia">Frecuencia / Periodicidad:</label>
+                        <label for="modal-edit-rec-frecuencia">Frecuencia / periodicidad</label>
                         <select id="modal-edit-rec-frecuencia">
                             <option value="quincenal">Quincenal (días 15 y último)</option>
                             <option value="mensual">Mensual (mismo día)</option>
@@ -1578,21 +1579,21 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="modal-edit-rec-categoria">Categoría:</label>
+                        <label for="modal-edit-rec-categoria">Categoría</label>
                         <select id="modal-edit-rec-categoria" required></select>
                     </div>
                 </div>
 
                 <div class="form-group" id="modal-edit-rec-apartado-wrap">
-                    <label for="modal-edit-rec-apartado">Vincular a Sobre / Meta (Opcional):</label>
+                    <label for="modal-edit-rec-apartado">Vincular a sobre / meta (opcional)</label>
                     <select id="modal-edit-rec-apartado"></select>
                 </div>
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalEditarRecurrente()">Cancelar</button>
                     <button type="submit" id="btn-modal-edit-rec-guardar" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span>Guardar Cambios</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar cambios</span>
                     </button>
                 </div>
             </form>
@@ -1606,38 +1607,38 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-crear-usuario-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                    <span>Crear Nuevo Usuario Tenant</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    <span>Crear nuevo usuario tenant</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalCrearUsuario()">&times;</button>
             </div>
             <form id="form-crear-usuario" onsubmit="guardarNuevoUsuario(event)">
                 <div class="form-group">
-                    <label for="nuevo-user-username">Nombre de Usuario:</label>
+                    <label for="nuevo-user-username">Nombre de usuario</label>
                     <input type="text" id="nuevo-user-username" required minlength="3" maxlength="50" placeholder="Ej. ricardo, contador, analista" autocomplete="off" pattern="^[a-zA-Z0-9_-]+$">
                 </div>
                 <div class="form-group">
-                    <label for="nuevo-user-email">Correo Electrónico (Opcional):</label>
+                    <label for="nuevo-user-email">Correo electrónico (opcional)</label>
                     <input type="email" id="nuevo-user-email" placeholder="ejemplo@gmail.com" autocomplete="email">
                     <small class="s-color-var-text-muted s-font-size-0-8rem">Permite recuperar contraseña en caso de olvido.</small>
                 </div>
                 <div class="form-group">
-                    <label for="nuevo-user-password">Contraseña:</label>
+                    <label for="nuevo-user-password">Contraseña</label>
                     <input type="password" id="nuevo-user-password" required minlength="4" placeholder="Mínimo 4 caracteres">
                 </div>
                 <div class="form-group">
-                    <label for="nuevo-user-role">Rol de Acceso:</label>
+                    <label for="nuevo-user-role">Rol de acceso</label>
                     <select id="nuevo-user-role">
-                        <option value="user" selected>Usuario Estándar (Solo su base de datos)</option>
-                        <option value="admin">Administrador (Acceso total y gestión)</option>
+                        <option value="user" selected>Usuario estándar (solo su base de datos)</option>
+                        <option value="admin">Administrador (acceso total y gestión)</option>
                     </select>
                     <small class="s-color-var-text-muted s-font-size-0-8rem">Se aprovisionará automáticamente un archivo SQLite independiente para este usuario.</small>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalCrearUsuario()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                        <span>Crear Usuario</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                        <span>Crear usuario</span>
                     </button>
                 </div>
             </form>
@@ -1651,7 +1652,7 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-editar-usuario-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     <span>Editar Usuario: <span id="lbl-edit-user-title" class="ticker-highlight"></span></span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalEditarUsuario()">&times;</button>
@@ -1660,35 +1661,35 @@
                 <input type="hidden" id="edit-user-id">
                 
                 <div class="form-group">
-                    <label for="edit-user-username">Nombre de Usuario:</label>
+                    <label for="edit-user-username">Nombre de usuario</label>
                     <input type="text" id="edit-user-username" required minlength="3" placeholder="Nuevo nombre de usuario" autocomplete="off" pattern="^[a-zA-Z0-9_-]+$">
                 </div>
 
                 <div class="form-group">
-                    <label for="edit-user-email">Correo Electrónico:</label>
+                    <label for="edit-user-email">Correo electrónico</label>
                     <input type="email" id="edit-user-email" placeholder="ejemplo@gmail.com" autocomplete="email">
                     <small class="s-color-var-text-muted s-font-size-0-8rem">Utilizado para recibir códigos de recuperación de contraseña.</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="edit-user-password">Nueva Contraseña:</label>
+                    <label for="edit-user-password">Nueva contraseña</label>
                     <input type="password" id="edit-user-password" minlength="4" placeholder="Dejar en blanco para no cambiar">
                     <small class="s-color-var-text-muted s-font-size-0-8rem">Solo escribe una contraseña si deseas actualizarla (mínimo 4 caracteres).</small>
                 </div>
                 
                 <div class="form-group" id="group-edit-user-role">
-                    <label for="edit-user-role">Rol de Acceso:</label>
+                    <label for="edit-user-role">Rol de acceso</label>
                     <select id="edit-user-role">
-                        <option value="user">Usuario Estándar (Solo su base de datos)</option>
-                        <option value="admin">Administrador (Acceso total y gestión)</option>
+                        <option value="user">Usuario estándar (solo su base de datos)</option>
+                        <option value="admin">Administrador (acceso total y gestión)</option>
                     </select>
                 </div>
                 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalEditarUsuario()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span>Guardar Cambios</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar cambios</span>
                     </button>
                 </div>
             </form>
@@ -1703,8 +1704,8 @@
                         </div>
                     </div>
                     <button type="button" class="btn-danger-outline" onclick="solicitarEliminarMiCuenta()">
-                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                        <span>Eliminar Mi Cuenta</span>
+                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        <span>Eliminar mi cuenta</span>
                     </button>
                 </div>
             </div>
@@ -1718,35 +1719,35 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-crear-apartado-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                    <span>Crear Nuevo Apartado / Meta</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                    <span>Crear nuevo apartado / meta</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalCrearApartado()">&times;</button>
             </div>
             <form id="form-apartado" onsubmit="guardarNuevoApartado(event)">
                 <div class="form-group">
-                    <label for="nombre-apartado">Nombre del Apartado:</label>
+                    <label for="nombre-apartado">Nombre del apartado</label>
                     <input type="text" id="nombre-apartado" placeholder="Ej. Fondo de Emergencia, Vacaciones" required autocomplete="off">
                 </div>
 
                 <div class="form-group">
-                    <label for="tipo-apartado">Tipo de Sobre:</label>
+                    <label for="tipo-apartado">Tipo de sobre</label>
                     <select id="tipo-apartado" onchange="toggleMetaInput()">
-                        <option value="libre">Sobre Libre (Sin límite)</option>
-                        <option value="meta">Meta de Ahorro (Con objetivo fijo)</option>
+                        <option value="libre">Sobre libre (sin límite)</option>
+                        <option value="meta">Meta de ahorro (con objetivo fijo)</option>
                     </select>
                 </div>
 
                 <div class="form-group hidden" id="group-meta-monto">
-                    <label for="meta-monto">Monto Objetivo Meta ($):</label>
+                    <label for="meta-monto">Monto objetivo meta ($)</label>
                     <input type="number" id="meta-monto" step="0.01" min="1" placeholder="Ej. 10000">
                 </div>
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalCrearApartado()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                        <span>Crear Apartado</span>
+                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        <span>Crear apartado</span>
                     </button>
                 </div>
             </form>
@@ -1760,27 +1761,27 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-tarjeta-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                    <span>Nueva Tarjeta de Presupuesto</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                    <span>Nueva tarjeta de presupuesto</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalTarjetaPresupuesto()">&times;</button>
             </div>
             <form id="form-tarjeta-presupuesto">
                 <div class="form-group">
-                    <label for="tarjeta-pres-nombre">Nombre de la Tarjeta:</label>
+                    <label for="tarjeta-pres-nombre">Nombre de la tarjeta</label>
                     <input type="text" id="tarjeta-pres-nombre" placeholder="Ej. Gastos Fijos, Inversión en ETFs, Ocio" required autocomplete="off">
                 </div>
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="tarjeta-pres-monto">Monto Asignado ($):</label>
+                        <label for="tarjeta-pres-monto">Monto asignado ($)</label>
                         <div class="calc-input-adornment">
                             <span class="calc-adornment-prefix">$</span>
                             <input type="number" id="tarjeta-pres-monto" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="tarjeta-pres-pct">Porcentaje (% del ingreso):</label>
+                        <label for="tarjeta-pres-pct">Porcentaje (% del ingreso)</label>
                         <div class="calc-input-adornment">
                             <input type="number" id="tarjeta-pres-pct" step="0.1" min="0" max="100" placeholder="0.0" class="input-calc calc-has-suffix">
                             <span class="calc-adornment-suffix">%</span>
@@ -1791,40 +1792,40 @@
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="tarjeta-pres-icono">Icono:</label>
+                        <label for="tarjeta-pres-icono">Icono</label>
                         <select id="tarjeta-pres-icono">
-                            <option value="wallet">Billetera / General</option>
-                            <option value="home">Casa / Gastos Fijos</option>
-                            <option value="trending-up">Gráfica / Inversión ETFs</option>
-                            <option value="shield">Escudo / Renta Fija & Fondo</option>
-                            <option value="credit-card">Tarjeta / MSI & Deudas</option>
-                            <option value="smile">Sonrisa / Ocio & Gustos</option>
-                            <option value="book">Libro / Educación</option>
-                            <option value="heart">Salud / Bienestar</option>
-                            <option value="shopping-bag">Bolsa / Compras</option>
+                            <option value="wallet">Billetera / general</option>
+                            <option value="home">Casa / gastos fijos</option>
+                            <option value="trending-up">Gráfica / inversión ETFs</option>
+                            <option value="shield">Escudo / renta fija & fondo</option>
+                            <option value="credit-card">Tarjeta / MSI & deudas</option>
+                            <option value="smile">Sonrisa / ocio & gustos</option>
+                            <option value="book">Libro / educación</option>
+                            <option value="heart">Salud / bienestar</option>
+                            <option value="shopping-bag">Bolsa / compras</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="tarjeta-pres-color">Color de Énfasis:</label>
+                        <label for="tarjeta-pres-color">Color de énfasis</label>
                         <select id="tarjeta-pres-color">
                             <option value="gold">Dorado (Finanzas)</option>
-                            <option value="blue">Azul (Esencial / Fijo)</option>
-                            <option value="emerald">Verde Esmeralda (Inversión)</option>
-                            <option value="purple">Morado (Ocio & Estilo)</option>
-                            <option value="amber">Ámbar (Deuda / Advertencia)</option>
-                            <option value="cyan">Cian (Educación & Metas)</option>
-                            <option value="rose">Rosa (Personal)</option>
+                            <option value="blue">Azul (esencial / fijo)</option>
+                            <option value="emerald">Verde esmeralda (inversión)</option>
+                            <option value="purple">Morado (ocio & estilo)</option>
+                            <option value="amber">Ámbar (deuda / advertencia)</option>
+                            <option value="cyan">Cian (educación & metas)</option>
+                            <option value="rose">Rosa (personal)</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="tarjeta-pres-notas">Notas o descripción (opcional):</label>
+                    <label for="tarjeta-pres-notas">Notas o descripción (opcional)</label>
                     <input type="text" id="tarjeta-pres-notas" placeholder="Ej. VOO, QQQ, Renta, Luz..." autocomplete="off">
                 </div>
 
                 <div class="form-group">
-                    <label for="tarjeta-pres-dia">Día de Cargo General (1 al 31, opcional):</label>
+                    <label for="tarjeta-pres-dia">Día de cargo general (1 al 31, opcional)</label>
                     <div class="calc-input-adornment" style="max-width: 140px;">
                         <span class="calc-adornment-prefix">Día</span>
                         <input type="number" id="tarjeta-pres-dia" min="1" max="31" placeholder="14" class="input-calc calc-has-prefix-dia">
@@ -1833,7 +1834,7 @@
                 </div>
 
                 <div id="tarjeta-pres-subdivision-wrapper" class="form-group hidden" style="margin-top: 10px; padding: 10px; background: var(--surface-subtle); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <label style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; display: block;">Asignación y Fechas por Sub-período (Opcional):</label>
+                    <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block;">Asignación y fechas por sub-período (opcional)</label>
                     <small style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 8px;">Distribuye libremente montos y selecciona en qué fecha o día (1 al 31) se hace cada cargo dentro de esta tarjeta.</small>
                     <div id="tarjeta-pres-subdivision-items"></div>
                 </div>
@@ -1841,7 +1842,7 @@
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalTarjetaPresupuesto()">Cancelar</button>
                     <button type="submit" class="btn-primary">
-                        <span>Guardar Tarjeta</span>
+                        <span>Guardar tarjeta</span>
                     </button>
                 </div>
             </form>
@@ -1855,8 +1856,8 @@
         <div class="modal-card modal-subdiv-card">
             <div class="modal-header">
                 <h3 id="modal-subdiv-title" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Configurar División del Presupuesto</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Configurar división del presupuesto</span>
                 </h3>
                 <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalSubdivisionPersonalizada()">&times;</button>
             </div>
@@ -1864,14 +1865,14 @@
                 <p class="modal-instruction">Ajusta los porcentajes (%) de cada sub-periodo respecto al ingreso total. La suma debe sumar exactamente <strong>100%</strong>.</p>
                 <div id="lista-subperiodos-editor" class="subperiodos-editor-list"></div>
                 <div class="subperiodos-editor-actions">
-                    <button type="button" class="btn-sm btn-secondary" onclick="agregarPeriodoEditor()">+ Añadir Periodo</button>
+                    <button type="button" class="btn-sm btn-secondary" onclick="agregarPeriodoEditor()">+ Añadir periodo</button>
                     <button type="button" class="btn-sm btn-ghost" onclick="equilibrarPeriodosEditor()">Equitativo (=)</button>
                     <span id="subperiodos-suma-badge" class="pnl-badge badge-gold">Suma: 100%</span>
                 </div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="cerrarModalSubdivisionPersonalizada()">Cancelar</button>
-                <button type="button" class="btn-primary" onclick="guardarSubdivisionPersonalizada()">Guardar y Aplicar</button>
+                <button type="button" class="btn-primary" onclick="guardarSubdivisionPersonalizada()">Guardar y aplicar</button>
             </div>
         </div>
     </div>
@@ -1883,8 +1884,8 @@
         <div class="modal-card modal-subdiv-card">
             <div class="modal-header">
                 <h3 id="modal-exportar-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span>Exportar Presupuesto a Movimientos y Fijos</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Exportar presupuesto a movimientos y fijos</span>
                 </h3>
                 <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalExportarPresupuesto()">&times;</button>
             </div>
@@ -1917,7 +1918,7 @@
                         <option value="personalizada">Fecha de inicio personalizada...</option>
                     </select>
                     <div id="box-exportar-fecha-custom" class="hidden" style="margin-top: 8px;">
-                        <label for="exportar-fecha-personalizada" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Fecha base para programar:</label>
+                        <label for="exportar-fecha-personalizada" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Fecha base para programar</label>
                         <input type="date" id="exportar-fecha-personalizada" class="form-control" style="width: 100%;">
                     </div>
                     <div id="exportar-inicio-ayuda" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; margin-top: 4px;">
@@ -1926,7 +1927,7 @@
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Tarjetas de Gasto a Exportar</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Tarjetas de gasto a exportar</span>
                     <button type="button" id="btn-toggle-todos-exportar" class="btn-sm btn-ghost" onclick="toggleSeleccionarTodosExportar()">Deseleccionar todos</button>
                 </div>
 
@@ -1943,8 +1944,8 @@
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="cerrarModalExportarPresupuesto()">Cancelar</button>
                 <button type="button" id="btn-confirmar-exportar-pres" class="btn-primary" onclick="ejecutarExportarPresupuesto()">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>Confirmar y Exportar</span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Confirmar y exportar</span>
                 </button>
             </div>
         </div>
@@ -1957,8 +1958,8 @@
         <div class="modal-card" style="max-width: 480px;">
             <div class="modal-header">
                 <h3 id="modal-saltar-msi-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-                    <span>Saltar Pago de Compra a Meses</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                    <span>Saltar pago de compra a meses</span>
                 </h3>
                 <button type="button" class="btn-modal-close" aria-label="Cerrar modal" onclick="cerrarModalSaltarMsi()">&times;</button>
             </div>
@@ -1999,8 +2000,8 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-recuperar-password-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    <span>Recuperar Contraseña</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Recuperar contraseña</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalRecuperarPassword()">&times;</button>
             </div>
@@ -2008,9 +2009,9 @@
             <!-- Alerta informativa si el servicio de correo no está configurado -->
             <div id="alerta-email-no-configurado" class="card-unconfigured-email hidden">
                 <div class="unconfigured-icon-wrap">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 </div>
-                <h4>Servicio de Correo No Configurado</h4>
+                <h4>Servicio de correo no configurado</h4>
                 <p class="s-margin-0-0-10px-0 s-font-size-0-86rem s-color-var-text-color s-line-height-1-5">
                     En esta instalación el envío de correos no está configurado en el archivo <code>.env</code>, por lo que no es posible enviar correos automáticos para recuperar contraseñas.
                 </p>
@@ -2029,13 +2030,13 @@
                     <span class="s-display-block s-margin-top-6px s-font-size-0-78rem s-color-var-gold-color">Límite de seguridad: Máximo 2 intentos de recuperación por usuario cada 24 horas.</span>
                 </p>
                 <div class="form-group">
-                    <label for="recuperar-identifier">Usuario o Correo:</label>
+                    <label for="recuperar-identifier">Usuario o correo</label>
                     <input type="text" id="recuperar-identifier" required placeholder="Tu nombre de usuario o correo" autocomplete="username">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="cerrarModalRecuperarPassword()">Cancelar</button>
                     <button type="submit" id="btn-enviar-codigo" class="btn-primary">
-                        <span>Enviar Código</span>
+                        <span>Enviar código</span>
                     </button>
                 </div>
             </form>
@@ -2046,21 +2047,21 @@
                     Hemos enviado un código a tu correo. Revisa también tu carpeta de Spam. Cuentas con un máximo de <strong>2 intentos</strong> para validar el código.
                 </div>
                 <div class="form-group">
-                    <label for="recuperar-codigo">Código de 6 dígitos:</label>
+                    <label for="recuperar-codigo">Código de 6 dígitos</label>
                     <input type="text" id="recuperar-codigo" required maxlength="6" pattern="^[0-9]{6}$" placeholder="Ej. 123456" class="s-letter-spacing-4px s-font-weight-bold s-font-family-monospace s-font-size-1-1rem s-text-align-center">
                 </div>
                 <div class="form-group">
-                    <label for="recuperar-nuevo-password">Nueva Contraseña:</label>
+                    <label for="recuperar-nuevo-password">Nueva contraseña</label>
                     <input type="password" id="recuperar-nuevo-password" required minlength="4" placeholder="Mínimo 4 caracteres">
                 </div>
                 <div class="form-group">
-                    <label for="recuperar-confirmar-password">Confirmar Contraseña:</label>
+                    <label for="recuperar-confirmar-password">Confirmar contraseña</label>
                     <input type="password" id="recuperar-confirmar-password" required minlength="4" placeholder="Repite la contraseña">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="volverAPaso1Recuperacion()">Volver</button>
                     <button type="submit" id="btn-confirmar-reset" class="btn-primary">
-                        <span>Restablecer Contraseña</span>
+                        <span>Restablecer contraseña</span>
                     </button>
                 </div>
             </form>
@@ -2075,10 +2076,10 @@
             <div class="modal-header">
                 <div class="s-display-flex s-align-items-center s-gap-10px">
                     <div class="kpi-icon-pill gold" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(197, 160, 89, 0.15); color: var(--gold-color);">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
                     </div>
                     <div>
-                        <h3 id="modal-solicitar-acceso-titulo" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-color);">Comenzar con Finanzas <span style="color: var(--gold-color);">Cloud</span></h3>
+                        <h3 id="modal-solicitar-acceso-titulo" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-color);">Comenzar con Finanzas Cloud</h3>
                         <div style="font-size: 0.78rem; color: var(--text-muted);">$50 MXN / mes · Servidor dedicado &amp; Bóveda SQLite WAL</div>
                     </div>
                 </div>
@@ -2086,7 +2087,7 @@
             </div>
             <div class="modal-body" style="padding: 20px 24px; line-height: 1.6;">
                 <div style="background: var(--gold-subtle); border: 1px solid var(--gold-border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
-                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--gold-color); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">Tu suscripción institucional incluye:</div>
+                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--gold-color); margin-bottom: 8px;">Tu suscripción institucional incluye:</div>
                     <ul style="margin: 0; padding-left: 18px; font-size: 0.84rem; color: var(--text-color); display: flex; flex-direction: column; gap: 6px;">
                         <li>Base de datos SQLite independiente y dedicada físicamente por usuario.</li>
                         <li>Servicio de correos y códigos de acceso OTP gestionado sin configuraciones externas.</li>
@@ -2096,9 +2097,9 @@
                 </div>
                 <div style="background: var(--surface-subtle); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px 16px; margin-bottom: 18px; text-align: center;">
                     <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.12); color: var(--gold-color); margin-bottom: 10px;">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     </div>
-                    <h4 style="margin: 0 0 6px 0; font-size: 1rem; font-weight: 700; color: var(--text-color);">Registro y Altas Próximamente</h4>
+                    <h4 style="margin: 0 0 6px 0; font-size: 1rem; font-weight: 700; color: var(--text-color);">Registro y altas próximamente</h4>
                     <p style="margin: 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
                         El sistema automatizado de altas para nuevas cuentas de Finanzas Cloud ($50 MXN/mes) estará disponible muy pronto. Actualmente la plataforma opera en fase privada por invitación para garantizar el aislamiento físico y rendimiento óptimo de las bóvedas.
                     </p>
@@ -2106,8 +2107,8 @@
 
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <button type="button" class="btn-primary btn-block" onclick="cerrarModalSolicitarAcceso(); if(window.mostrarToast) window.mostrarToast('¡Próximamente disponible! El registro automatizado abrirá pronto.', 'info');" style="text-align: center; padding: 12px; font-weight: 700; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        <span>Entendido / Próximamente</span>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Entendido / próximamente</span>
                     </button>
                 </div>
                 <div style="text-align: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-muted);">
@@ -2125,8 +2126,8 @@
         <div class="modal-card modal-legal-card">
             <div class="modal-header">
                 <h3 id="modal-legal-titulo" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Marco Legal & Soberanía de Datos — Finanzas Cloud</span>
+                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Marco legal & soberanía de datos — Finanzas Cloud</span>
                 </h3>
                 <button type="button" class="btn-modal-close" onclick="cerrarModalLegal()">&times;</button>
             </div>
@@ -2134,13 +2135,13 @@
             <!-- Selector de Pestañas Legales -->
             <div class="modal-legal-tabs">
                 <button type="button" id="btn-tab-legal-terminos" class="btn-legal-tab active" onclick="cambiarTabLegal('terminos')">
-                    Términos y Condiciones
+                    Términos y condiciones
                 </button>
                 <button type="button" id="btn-tab-legal-privacidad" class="btn-legal-tab" onclick="cambiarTabLegal('privacidad')">
-                    Aviso de Privacidad
+                    Aviso de privacidad
                 </button>
                 <button type="button" id="btn-tab-legal-disclaimer" class="btn-legal-tab" onclick="cambiarTabLegal('disclaimer')">
-                    Deslinde Financiero
+                    Deslinde financiero
                 </button>
             </div>
 
@@ -2151,14 +2152,14 @@
                 <div id="panel-legal-terminos" class="legal-content-panel">
                     <div class="legal-badge-pill">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                        <span>Vigente a partir de Octubre 2026 • Versión 1.0</span>
+                        <span>Vigente a partir de octubre 2026 • versión 1.0</span>
                     </div>
 
                     <div class="s-margin-14px-0-16px-0 s-padding-12px-14px s-background-var-primary-subtle s-border-1px-solid-var-border-color s-border-radius-8px s-font-size-0-84rem s-color-var-text-color s-line-height-1-5">
-                        <strong>Aviso Legal:</strong> Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
+                        <strong>Aviso legal:</strong> Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </div>
 
-                    <h4>1. Naturaleza y Objeto del Servicio</h4>
+                    <h4>1. Naturaleza y objeto del servicio</h4>
                     <p>
                         <strong>Finanzas Cloud</strong> es una solución de software orientada a la inteligencia financiera personal, consolidación cuantitativa de patrimonio, presupuestación por el método de sobres y seguimiento de inversiones multimoneda (MXN/USD). El acceso y uso de la plataforma implican la aceptación plena e incondicional de los presentes Términos y Condiciones.
                     </p>
@@ -2166,27 +2167,27 @@
                         Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </p>
 
-                    <h4>2. Soberanía Tecnológica y Aislamiento Físico</h4>
+                    <h4>2. Soberanía tecnológica y aislamiento físico</h4>
                     <p>
                         A diferencia de plataformas comerciales convencionales, Finanzas Cloud implementa una arquitectura <em>Multi-Tenant Hermética</em>. Cada usuario cuenta con su propio repositorio de base de datos SQLite físicamente independiente en el servidor. Tus movimientos contables, saldos, categorías y portafolios de inversión residen de forma aislada, garantizando que ninguna otra cuenta u organización tenga visibilidad sobre tus activos.
                     </p>
 
-                    <h4>3. Propiedad y Portabilidad Incondicional</h4>
+                    <h4>3. Propiedad y portabilidad incondicional</h4>
                     <p>
                         El usuario es el único y exclusivo propietario de los datos financieros registrados. Finanzas Cloud garantiza el derecho de portabilidad permanente: puedes exportar en cualquier momento tu historial en hojas de cálculo Excel (<code>.xlsx</code>) o descargar una copia de seguridad íntegra de tu base de datos física (<code>.db</code>) en un solo clic, sin ningún tipo de retención forzosa (<em>Zero Vendor Lock-in</em>).
                     </p>
 
-                    <h4>4. Responsabilidad y Custodia de Credenciales</h4>
+                    <h4>4. Responsabilidad y custodia de credenciales</h4>
                     <p>
                         El usuario es responsable exclusivo de resguardar la confidencialidad de su nombre de usuario, contraseña maestra y el control de su cuenta de correo electrónico vinculada para la recepción de códigos de seguridad de un solo uso (OTP). Cualquier movimiento o modificación realizada bajo credenciales válidas se considerará efectuada por el titular.
                     </p>
 
-                    <h4>5. Disponibilidad y Responsabilidad del Software</h4>
+                    <h4>5. Disponibilidad y responsabilidad del software</h4>
                     <p>
                         Finanzas Cloud provee sus herramientas bajo el principio de buena fe técnica. Si bien implementamos estándares de cifrado criptográfico rigurosos y respaldos directos, el software se entrega "tal cual" (<em>as is</em>). El usuario es incentivado a descargar periódicamente respaldos de su base de datos local para su custodia personal.
                     </p>
 
-                    <h4>6. Deslinde de Marca e Independencia</h4>
+                    <h4>6. Deslinde de marca e independencia</h4>
                     <p>
                         Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </p>
@@ -2196,35 +2197,35 @@
                 <div id="panel-legal-privacidad" class="legal-content-panel hidden">
                     <div class="legal-badge-pill">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <span>Cumplimiento con Estándares de Privacidad y LFPDPPP</span>
+                        <span>Cumplimiento con estándares de privacidad y LFPDPPP</span>
                     </div>
 
-                    <h4>1. Responsable del Tratamiento de Datos</h4>
+                    <h4>1. Responsable del tratamiento de datos</h4>
                     <p>
                         Finanzas Cloud actúa como responsable técnico de la infraestructura de almacenamiento y procesamiento de la plataforma de gestión patrimonial privada.
                     </p>
 
-                    <h4>2. Datos Personales Recabados</h4>
+                    <h4>2. Datos personales recabados</h4>
                     <p>Para la operación del servicio se solicitan únicamente:</p>
                     <ul>
-                        <li><strong>Identificadores de Cuenta:</strong> Nombre de usuario, contraseña cifrada mediante hash criptográfico unilateral y correo electrónico para notificaciones de seguridad.</li>
-                        <li><strong>Registros Financieros Voluntarios:</strong> Movimientos de flujo de efectivo, presupuestos por apartados y títulos bursátiles registrados por el propio usuario.</li>
+                        <li><strong>Identificadores de cuenta:</strong> Nombre de usuario, contraseña cifrada mediante hash criptográfico unilateral y correo electrónico para notificaciones de seguridad.</li>
+                        <li><strong>Registros financieros voluntarios:</strong> Movimientos de flujo de efectivo, presupuestos por apartados y títulos bursátiles registrados por el propio usuario.</li>
                     </ul>
 
-                    <h4>3. Finalidad Estricta y Cero Monetización</h4>
+                    <h4>3. Finalidad estricta y cero monetización</h4>
                     <p>
                         Tus datos se utilizan <strong>exclusivamente</strong> para permitirte autenticarte en el sistema, calcular balances cuantitativos en pantalla y enviarte códigos temporales de restablecimiento.
                     </p>
                     <p>
-                        <strong>Política de Cero Venta de Datos:</strong> Finanzas Cloud <strong>no vende, no comercializa, no transfiere ni cede</strong> ningún dato personal ni financiero a agencias de publicidad, corredores de datos (<em>data brokers</em>), instituciones de crédito ni terceros bajo ninguna circunstancia.
+                        <strong>Política de cero venta de datos:</strong> Finanzas Cloud <strong>no vende, no comercializa, no transfiere ni cede</strong> ningún dato personal ni financiero a agencias de publicidad, corredores de datos (<em>data brokers</em>), instituciones de crédito ni terceros bajo ninguna circunstancia.
                     </p>
 
-                    <h4>4. Cifrado y Medidas de Seguridad</h4>
+                    <h4>4. Cifrado y medidas de seguridad</h4>
                     <p>
                         Las contraseñas se almacenan mediante funciones de derivación de claves de alta resistencia (Bcrypt). El intercambio de solicitudes autenticadas se realiza a través de tokens JWT firmados criptográficamente con tiempo de expiración corto, y los códigos de recuperación por correo expiran automáticamente en 15 minutos.
                     </p>
 
-                    <h4>5. Ejercicio de Derechos ARCO</h4>
+                    <h4>5. Ejercicio de derechos ARCO</h4>
                     <p>
                         Puedes ejercer en cualquier momento tus derechos de Acceso, Rectificación, Cancelación y Oposición modificando tus datos desde la sección <em>Mi Perfil</em> o solicitando a la administración la purga absoluta y borrado definitivo de tu archivo de base de datos individual del servidor.
                     </p>
@@ -2234,10 +2235,10 @@
                 <div id="panel-legal-disclaimer" class="legal-content-panel hidden">
                     <div class="legal-badge-pill s-color-var-warning-color s-background-rgba-245-158-11-0-2 s-border-color-rgba-245-158-11-0-25">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                        <span>Aviso de Deslinde Legal & Financiero</span>
+                        <span>Aviso de deslinde legal & financiero</span>
                     </div>
 
-                    <h4>1. No Constituye Asesoría Financiera</h4>
+                    <h4>1. No constituye asesoría financiera</h4>
                     <p>
                         Finanzas Cloud es una herramienta de software para fines estrictamente informativos, de organización y seguimiento administrativo personal. <strong>No constituye una casa de bolsa, entidad de ahorro, banco, asesor de inversión ni intermediario financiero regulado.</strong>
                     </p>
@@ -2245,12 +2246,12 @@
                         Ningún contenido, cálculo de rendimiento, gráfica de distribución o indicador mostrado en la aplicación debe interpretarse como una recomendación de inversión, compra, venta o asesoramiento fiscal o contable.
                     </p>
 
-                    <h4>2. Fuentes de Mercado y Tipos de Cambio</h4>
+                    <h4>2. Fuentes de mercado y tipos de cambio</h4>
                     <p>
                         Las tasas de cotización (USD/MXN, EUR) y valores de activos bursátiles provienen de APIs públicas de referencia y son provistas a título indicativo para simulación cuantitativa. Finanzas Cloud no garantiza su exactitud en tiempo real ni se hace responsable por variaciones cambiarias en transacciones externas.
                     </p>
 
-                    <h4>3. Autonomía y Decisiones Patrimoniales</h4>
+                    <h4>3. Autonomía y decisiones patrimoniales</h4>
                     <p>
                         El usuario reconoce que cualquier decisión financiera, asignación de capital o compra de instrumentos de inversión es de su exclusiva responsabilidad y riesgo.
                     </p>
@@ -2260,14 +2261,14 @@
 
             <div class="modal-actions s-margin-top-18px s-border-top-1px-solid-var-border-color s-padding-top-14px">
                 <button type="button" class="btn-primary s-min-width-140px" onclick="cerrarModalLegal()">
-                    <span>Entendido y Cerrar</span>
+                    <span>Entendido y cerrar</span>
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=9c41c314cf"></script>
+    <script type="module" src="/static/js/main.js?v=c940776061"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

@@ -8,6 +8,7 @@ import { cargarRecurrentes } from './recurrentes.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { cargarPresupuesto, cerrarModalTarjetaPresupuesto } from './presupuesto.js';
 import { cargarInversiones } from './inversiones.js';
+import { repintarGraficas } from './dashboard.js';
 
 
 // =============================================================================
@@ -20,8 +21,8 @@ export function actualizarIconosModoOscuro(esOscuro) {
     const btn = document.getElementById('btn-modo');
     if (iconModo) {
         iconModo.innerHTML = esOscuro
-            ? `<svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
-            : `<svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+            ? `<svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+            : `<svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
     }
     if (lblModo) lblModo.textContent = esOscuro ? 'Modo Claro' : 'Modo Oscuro';
     if (btn) btn.setAttribute('title', esOscuro ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro');
@@ -40,25 +41,13 @@ export function toggleModoOscuro() {
         localStorage.setItem('theme', 'light');
         actualizarIconosModoOscuro(false);
     }
-    if (window.Chart) {
-        Chart.defaults.color = nuevoTemaOscuro ? '#FFFFFF' : '#0A0A0A';
-    }
-    if (estado.graficas.barras) actualizarColoresGrafica();
-    if (estado.graficas.dona) actualizarColoresDona();
-    if (estado.graficas.categorias) {
-        const textColor = nuevoTemaOscuro ? '#FFFFFF' : '#0A0A0A';
-        if (estado.graficas.categorias.options && estado.graficas.categorias.options.plugins && estado.graficas.categorias.options.plugins.legend) {
-            estado.graficas.categorias.options.plugins.legend.labels.color = textColor;
-        }
-        if (estado.graficas.categorias.data && estado.graficas.categorias.data.datasets && estado.graficas.categorias.data.datasets[0]) {
-            estado.graficas.categorias.data.datasets[0].borderColor = nuevoTemaOscuro ? '#0D0D0E' : '#ffffff';
-        }
-        estado.graficas.categorias.update();
-    }
+    // Las gráficas leen sus colores de tokens.css: basta con volver a dibujarlas.
+    repintarGraficas();
+    if (estado.graficas.dona) cargarInversiones();
 }
 
 
-// Inicialización de tema guardado (por defecto oscuro Monochrome Ledger)
+// Inicialización de tema guardado (por defecto oscuro)
 export const temaGuardado = localStorage.getItem('theme');
 
 const prefiereOscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
@@ -74,46 +63,8 @@ if (inicialOscuro) {
 }
 
 if (window.Chart) {
-    Chart.defaults.color = inicialOscuro ? '#FFFFFF' : '#0A0A0A';
-}
-
-
-export function actualizarColoresGrafica() {
-    if (!estado.graficas.barras) return;
-    const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
-    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
-
-    if (window.Chart) Chart.defaults.color = textColor;
-    if (estado.graficas.barras.options && estado.graficas.barras.options.scales) {
-        if (estado.graficas.barras.options.scales.x) {
-            estado.graficas.barras.options.scales.x.ticks.color = textColor;
-            estado.graficas.barras.options.scales.x.grid.color = gridColor;
-        }
-        if (estado.graficas.barras.options.scales.y) {
-            estado.graficas.barras.options.scales.y.ticks.color = textColor;
-            estado.graficas.barras.options.scales.y.grid.color = gridColor;
-        }
-    }
-    if (estado.graficas.barras.options && estado.graficas.barras.options.plugins && estado.graficas.barras.options.plugins.legend) {
-        estado.graficas.barras.options.plugins.legend.labels.color = textColor;
-    }
-    estado.graficas.barras.update();
-}
-
-
-export function actualizarColoresDona() {
-    if (!estado.graficas.dona) return;
-    const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
-    if (window.Chart) Chart.defaults.color = textColor;
-    if (estado.graficas.dona.options && estado.graficas.dona.options.plugins && estado.graficas.dona.options.plugins.legend) {
-        estado.graficas.dona.options.plugins.legend.labels.color = textColor;
-    }
-    if (estado.graficas.dona.data && estado.graficas.dona.data.datasets && estado.graficas.dona.data.datasets[0]) {
-        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
-    }
-    estado.graficas.dona.update();
+    // Los colores de cada gráfica salen de tokens.css (ver dashboard.js); aquí solo la fuente base.
+    Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim() || 'sans-serif';
 }
 
 
@@ -201,11 +152,11 @@ export function cambiarPestana(tabId) {
     // Actualizar título dinámico en la barra superior (topbar)
     const titulosMap = {
         'tab-dashboard': 'Resumen',
-        'tab-movimientos': 'Movimientos y Fijos',
-        'tab-apartados': 'Metas de Ahorro',
-        'tab-presupuesto': 'Organizador de Presupuesto',
+        'tab-movimientos': 'Movimientos y fijos',
+        'tab-apartados': 'Metas de ahorro',
+        'tab-presupuesto': 'Presupuesto',
         'tab-inversiones': 'Inversiones',
-        'tab-calculadora-rf': 'Calculadora Renta Fija',
+        'tab-calculadora-rf': 'Calculadora de renta fija',
         'tab-admin': 'Administración'
     };
     const lblTitulo = document.getElementById('topbar-section-title');

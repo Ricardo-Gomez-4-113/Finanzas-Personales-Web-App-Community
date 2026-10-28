@@ -2,7 +2,7 @@
  * static/js/inversiones.js - Posiciones bursátiles, dona de asignación, buscador y sincronización.
  */
 
-import { actualizarIndicadorTasa, apiFetch, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
+import { actualizarIndicadorTasa, apiFetch, colorVar, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
 
 
 export async function cargarInversiones() {
@@ -69,8 +69,8 @@ export async function cargarInversiones() {
                         <td class="${clasePnl}">${signoPosMonto}${fmt(Math.abs(pos.pnl))} (${signoPos}${pos.pnl_porcentaje.toFixed(2)}%)</td>
                         <td><span class="badge-peso">${pos.peso_porcentaje.toFixed(1)}%</span></td>
                         <td class="col-acciones">
-                            <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditarInversionPorId(${pos.id})" title="Editar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-                            <button type="button" class="btn-accion btn-eliminar" onclick="eliminarInversion(${pos.id})" title="Eliminar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditarInversionPorId(${pos.id})" title="Editar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+                            <button type="button" class="btn-accion btn-eliminar" onclick="eliminarInversion(${pos.id})" title="Eliminar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -121,17 +121,17 @@ export const pluginDonaPorcentajes = {
             }
 
             const pctText = `${pct.toFixed(1)}%`;
-            ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+            ctx.font = `600 12px ${getComputedStyle(document.body).fontFamily}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
             // Borde oscuro grueso para alto contraste sobre cualquier color
             ctx.lineWidth = 2.5;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.strokeStyle = 'rgba(15, 19, 24, 0.8)';
             ctx.strokeText(pctText, posX, posY);
 
             // Relleno blanco brillante
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#F6F2EA';
             ctx.fillText(pctText, posX, posY);
         });
         ctx.restore();
@@ -145,7 +145,7 @@ export function actualizarGraficaDona(posiciones) {
 
     const noDataMsg = document.getElementById('dona-sin-datos');
     const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
+    const textColor = colorVar('--chart-text');
 
     if (!posiciones || posiciones.length === 0) {
         if (noDataMsg) noDataMsg.classList.remove('hidden');
@@ -160,18 +160,7 @@ export function actualizarGraficaDona(posiciones) {
     if (noDataMsg) noDataMsg.classList.add('hidden');
     canvas.classList.remove('hidden');
 
-    const paleta = [
-        '#22c55e', // Alpine Emerald / High-Yield & Liquidity
-        '#a3e635', // Alpine Lime / Core Growth
-        '#06b6d4', // Cyan / Sovereign & Global Markets
-        '#3b82f6', // Sapphire / Equities & ETFs
-        '#8b5cf6', // Violet / Tech & Innovation
-        '#f59e0b', // Amber / Real Estate & Commodities
-        '#ec4899', // Rose / Venture & Growth
-        '#64748b', // Slate / Fixed Income & Treasury
-        '#14b8a6', // Teal / Sustainable ESG
-        '#d97706'  // Bronze / Infrastructure
-    ];
+    const paleta = [1, 2, 3, 4, 5, 6, 7, 8].map(i => colorVar(`--cat-${i}`));
 
     const labels = posiciones.map(p => p.ticker);
     const dataValores = posiciones.map(p => p.valor_actual);
@@ -191,7 +180,7 @@ export function actualizarGraficaDona(posiciones) {
         }, 0);
 
         const modoOscuroActivo = document.documentElement.getAttribute('data-theme') === 'dark';
-        const colorEtiqueta = modoOscuroActivo ? '#FFFFFF' : '#0A0A0A';
+        const colorEtiqueta = colorVar('--text-color');
 
         return data.labels.map((label, i) => {
             const val = Number(dataset.data[i] || 0);
@@ -201,7 +190,7 @@ export function actualizarGraficaDona(posiciones) {
             return {
                 text: `${label} (${pct}%)`,
                 fillStyle: bg,
-                strokeStyle: dataset.borderColor || (modoOscuroActivo ? '#0D0D0E' : '#ffffff'),
+                strokeStyle: dataset.borderColor || colorVar('--panel-bg'),
                 lineWidth: 1,
                 hidden: isHidden,
                 index: i,
@@ -214,7 +203,7 @@ export function actualizarGraficaDona(posiciones) {
         estado.graficas.dona.data.labels = labels;
         estado.graficas.dona.data.datasets[0].data = dataValores;
         estado.graficas.dona.data.datasets[0].backgroundColor = colores;
-        estado.graficas.dona.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
+        estado.graficas.dona.data.datasets[0].borderColor = colorVar('--panel-bg');
         estado.graficas.dona.options.plugins.legend.position = legendPos;
         estado.graficas.dona.options.plugins.legend.labels.color = textColor;
         estado.graficas.dona.options.plugins.legend.labels.generateLabels = funcionGenerarEtiquetas;
@@ -228,7 +217,7 @@ export function actualizarGraficaDona(posiciones) {
                     data: dataValores,
                     backgroundColor: colores,
                     borderWidth: 2,
-                    borderColor: esOscuro ? '#0D0D0E' : '#ffffff'
+                    borderColor: colorVar('--panel-bg')
                 }]
             },
             options: {

@@ -5,14 +5,36 @@
 import { colorVar, escapeHTML, estado, fmt } from './core.js';
 
 
+// Colores y tipografía de las gráficas salen de tokens.css para seguir el tema activo.
+function estiloGraficas() {
+    return {
+        texto: colorVar('--chart-text'),
+        rejilla: colorVar('--chart-grid'),
+        ingreso: colorVar('--chart-ingreso'),
+        gasto: colorVar('--chart-gasto'),
+        fondo: colorVar('--panel-bg'),
+        categorias: [1, 2, 3, 4, 5, 6, 7, 8].map(i => colorVar(`--cat-${i}`)),
+        fuente: { family: getComputedStyle(document.body).fontFamily, size: 12 },
+    };
+}
+
+// Últimos datos dibujados: permiten repintar al cambiar de tema sin volver a pedirlos.
+let ultimoMensual = null;
+let ultimasCategorias = null;
+
+export function repintarGraficas() {
+    ['barras', 'categorias'].forEach(k => {
+        if (estado.graficas[k]) { estado.graficas[k].destroy(); estado.graficas[k] = null; }
+    });
+    if (ultimoMensual) actualizarGrafica(ultimoMensual);
+    if (ultimasCategorias) actualizarGraficaCategorias(ultimasCategorias);
+}
+
 export function actualizarGrafica(dataMensual) {
+    ultimoMensual = dataMensual;
     const canvas = document.getElementById('graficaFinanzas');
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
-    const gridColor = esOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
-    
+    const e = estiloGraficas();
     const meses = dataMensual.map(m => m.mes);
     const ingresos = dataMensual.map(m => m.ingresos);
     const gastos = dataMensual.map(m => m.gastos);
@@ -21,56 +43,40 @@ export function actualizarGrafica(dataMensual) {
         estado.graficas.barras.data.labels = meses;
         estado.graficas.barras.data.datasets[0].data = ingresos;
         estado.graficas.barras.data.datasets[1].data = gastos;
-        if (estado.graficas.barras.options && estado.graficas.barras.options.scales) {
-            if (estado.graficas.barras.options.scales.x) {
-                estado.graficas.barras.options.scales.x.ticks.color = textColor;
-                estado.graficas.barras.options.scales.x.grid.color = gridColor;
-            }
-            if (estado.graficas.barras.options.scales.y) {
-                estado.graficas.barras.options.scales.y.ticks.color = textColor;
-                estado.graficas.barras.options.scales.y.grid.color = gridColor;
-            }
-        }
-        if (estado.graficas.barras.options && estado.graficas.barras.options.plugins && estado.graficas.barras.options.plugins.legend) {
-            estado.graficas.barras.options.plugins.legend.labels.color = textColor;
-        }
         estado.graficas.barras.update();
-    } else {
-        estado.graficas.barras = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: meses,
-                datasets: [
-                    {
-                        label: 'Ingresos',
-                        data: ingresos,
-                        backgroundColor: 'rgba(34, 197, 94, 0.75)',
-                        borderColor: colorVar('--accent-color'),
-                        borderWidth: 1,
-                        borderRadius: 6
-                    },
-                    {
-                        label: 'Gastos',
-                        data: gastos,
-                        backgroundColor: 'rgba(239, 68, 68, 0.75)',
-                        borderColor: colorVar('--danger-color'),
-                        borderWidth: 1,
-                        borderRadius: 6
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
-                    y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } }
-                },
-                plugins: {
-                    legend: { labels: { color: textColor } }
-                }
-            }
-        });
+        return;
     }
+    const serie = (label, data, color) => ({
+        label, data,
+        backgroundColor: color + 'D9',
+        hoverBackgroundColor: color,
+        borderWidth: 0,
+        borderRadius: 4,
+        borderSkipped: 'bottom',
+        maxBarThickness: 22,
+        categoryPercentage: 0.62,
+        barPercentage: 0.82,
+    });
+    estado.graficas.barras = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels: meses, datasets: [serie('Ingresos', ingresos, e.ingreso), serie('Gastos', gastos, e.gasto)] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: e.texto, font: e.fuente }, grid: { display: false }, border: { color: e.rejilla } },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: e.texto, font: e.fuente, maxTicksLimit: 5, callback: v => fmt(v).replace(/\.00$/, '') },
+                    grid: { color: e.rejilla }, border: { display: false },
+                },
+            },
+            plugins: {
+                legend: { align: 'end', labels: { color: e.texto, font: e.fuente, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 } },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } },
+            },
+        },
+    });
 }
 
 
@@ -78,9 +84,8 @@ export function actualizarGrafica(dataMensual) {
 // 5.3 GASTO POR CATEGORÍA (dona) Y PRÓXIMOS MOVIMIENTOS
 // =============================================================================
 
-const PALETA_CATEGORIAS = ['#22c55e', '#a3e635', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#64748b', '#10b981', '#14b8a6'];
-
 export function actualizarGraficaCategorias(data) {
+    ultimasCategorias = data;
     const canvas = document.getElementById('graficaCategorias');
     const vacio = document.getElementById('categorias-sin-datos');
     if (!canvas) return;
@@ -97,42 +102,90 @@ export function actualizarGraficaCategorias(data) {
     if (vacio) vacio.classList.add('hidden');
     canvas.classList.remove('hidden');
 
+    const e = estiloGraficas();
     const labels = cats.map(c => c.categoria);
     const valores = cats.map(c => c.total);
-    const colores = labels.map((_, i) => PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]);
-    const esOscuro = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = esOscuro ? '#FFFFFF' : '#0A0A0A';
+    const colores = labels.map((_, i) => e.categorias[i % e.categorias.length]);
 
     if (estado.graficas.categorias) {
         estado.graficas.categorias.data.labels = labels;
         estado.graficas.categorias.data.datasets[0].data = valores;
         estado.graficas.categorias.data.datasets[0].backgroundColor = colores;
-        estado.graficas.categorias.data.datasets[0].borderColor = esOscuro ? '#0D0D0E' : '#ffffff';
-        estado.graficas.categorias.options.plugins.legend.labels.color = textColor;
         estado.graficas.categorias.update();
         return;
     }
     estado.graficas.categorias = new Chart(canvas.getContext('2d'), {
         type: 'doughnut',
-        data: {
-            labels,
-            datasets: [{
-                data: valores,
-                backgroundColor: colores,
-                borderWidth: 1,
-                borderColor: esOscuro ? '#0D0D0E' : '#ffffff'
-            }]
-        },
+        data: { labels, datasets: [{ data: valores, backgroundColor: colores, borderWidth: 2, borderColor: e.fondo, hoverOffset: 4 }] },
         options: {
             responsive: true,
-            cutout: '62%',
+            maintainAspectRatio: false,
+            cutout: '68%',
             plugins: {
-                legend: { position: 'right', labels: { color: textColor } },
-                tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.parsed)}` } }
-            }
-        }
+                legend: { position: 'right', labels: { color: e.texto, font: e.fuente, boxWidth: 10, boxHeight: 10, padding: 12 } },
+                tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.parsed)}` } },
+            },
+        },
     });
 }
+
+
+// =============================================================================
+// 5.4 PERIODO DE COBRO EN CURSO (línea de tiempo del Resumen)
+// =============================================================================
+
+const fechaCorta = iso => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    .format(new Date(`${iso}T00:00:00Z`)).replace('.', '');
+const fechaLarga = iso => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+    .format(new Date(`${iso}T00:00:00Z`));
+const diasEntre = (a, b) => Math.round((new Date(`${b}T00:00:00Z`) - new Date(`${a}T00:00:00Z`)) / 86400000);
+
+export function renderPeriodo(p) {
+    const raiz = document.getElementById('periodo-hero');
+    if (!raiz || !p) return;
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    set('periodo-titulo', p.cobro ? `Libre hasta tu cobro del ${fechaLarga(p.fin)}` : `Libre hasta el ${fechaLarga(p.fin)}`);
+    set('periodo-libre', fmt(p.libre));
+    set('periodo-disponible', fmt(p.disponible));
+    set('periodo-comprometido', fmt(p.comprometido));
+    set('periodo-dias', p.dias_restantes === 0 ? 'Hoy' : p.dias_restantes === 1 ? '1 día' : `${p.dias_restantes} días`);
+    set('periodo-inicio', fechaCorta(p.inicio));
+    set('periodo-fin', fechaCorta(p.fin));
+    set('periodo-cobro', p.cobro ? p.cobro.descripcion : 'Fin de mes');
+    raiz.classList.toggle('periodo-en-riesgo', p.libre < 0);
+
+    const pos = iso => Math.min(100, Math.max(0, (diasEntre(p.inicio, iso) / p.dias_totales) * 100));
+    const pista = document.getElementById('periodo-pista');
+    if (pista) {
+        pista.style.setProperty('--avance', `${pos(p.hoy)}%`);
+        pista.querySelectorAll('.periodo-marca').forEach(n => n.remove());
+        // Agrupa cargos del mismo día en una sola marca.
+        const porDia = {};
+        p.eventos.forEach(ev => { (porDia[ev.fecha] = porDia[ev.fecha] || []).push(ev); });
+        Object.entries(porDia).forEach(([fecha, evs]) => {
+            const m = document.createElement('span');
+            m.className = 'periodo-marca';
+            m.style.left = `${pos(fecha)}%`;
+            m.title = `${fechaCorta(fecha)}: ` + evs.map(ev => `${ev.descripcion} ${fmt(ev.monto)}`).join(', ');
+            pista.appendChild(m);
+        });
+    }
+
+    const lista = document.getElementById('periodo-eventos');
+    if (lista) {
+        if (p.eventos.length === 0) {
+            lista.innerHTML = `<li class="periodo-vacio">No hay cargos fijos antes de ${p.cobro ? 'tu próximo cobro' : 'fin de mes'}.</li>`;
+        } else {
+            lista.innerHTML = p.eventos.map(ev => `<li>
+                <span class="periodo-ev-fecha">${escapeHTML(fechaCorta(ev.fecha))}</span>
+                <span class="periodo-ev-desc">${escapeHTML(ev.descripcion)}${ev.es_msi ? ' <span class="badge-tag badge-msi">MSI</span>' : ''}</span>
+                <span class="periodo-ev-monto">−${fmt(ev.monto)}</span>
+            </li>`).join('');
+        }
+    }
+}
+
 
 export function renderProximos() {
     const cont = document.getElementById('lista-proximos');
