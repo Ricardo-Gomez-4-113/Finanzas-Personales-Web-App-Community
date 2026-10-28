@@ -24,7 +24,7 @@ import master_db
 from security import (
     hash_password
 )
-from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto
+from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,6 +81,7 @@ app.include_router(inversiones.router)
 app.include_router(respaldo.router)
 app.include_router(recurrentes.router)
 app.include_router(presupuesto.router)
+app.include_router(salud.router)
 
 @app.exception_handler(sqlite3.OperationalError)
 async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):

@@ -201,6 +201,14 @@ def test_restore_solo_afecta_al_propio_tenant(client, ha, hb):
     assert client.post("/api/restore", files={"file": ("x.db", respaldo_b, "application/octet-stream")}).status_code == 401
 
 
+def test_health_publico_y_sin_datos_de_usuarios(client):
+    r = client.get("/health")
+    assert r.status_code == 200, r.text
+    assert set(r.json()) == {"status", "base_maestra", "respaldo", "horas_desde_respaldo"}, r.json()
+    assert r.json()["base_maestra"] == "ok"
+    assert "usuario_a" not in r.text and "secreto" not in r.text
+
+
 def test_login_bloquea_tras_5_fallos(client):
     _crear_usuario("bruteforce")
     codigos = [client.post("/auth/login", json={"username": "bruteforce", "password": "mal"}).status_code for _ in range(6)]
@@ -223,6 +231,7 @@ if __name__ == "__main__":
         test_jwt_alg_none_y_algoritmos_ajenos_rechazados(client, ua)
         test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)
         test_restore_solo_afecta_al_propio_tenant(client, ha, hb)
+        test_health_publico_y_sin_datos_de_usuarios(client)
         test_login_bloquea_tras_5_fallos(client)
     shutil.rmtree(TMP, ignore_errors=True)
     print("OK")
