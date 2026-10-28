@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import os
+import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 
@@ -36,11 +37,14 @@ async def lifespan(app: FastAPI):
     """
     ensure_tenant_directories()
     # Clave inicial de respaldo si no hay usuarios en master.db
-    admin_default_pass = os.environ.get("DEFAULT_ADMIN_PASSWORD", "admin123")
+    admin_default_pass = os.environ.get("DEFAULT_ADMIN_PASSWORD") or secrets.token_urlsafe(12)
+    clave_generada = not os.environ.get("DEFAULT_ADMIN_PASSWORD")
     admin_default_hash = hash_password(admin_default_pass)
     migrado = master_db.seed_default_admin_and_migrate(admin_default_hash)
     if migrado:
         print(f"[STARTUP] Base de datos maestra inicializada. Administrador creado: {migrado['username']} (db: {migrado['db_name']})")
+        if clave_generada:
+            print(f"[STARTUP] DEFAULT_ADMIN_PASSWORD no definida: clave temporal del admin = {admin_default_pass} (cámbiala al iniciar sesión)")
     else:
         print("[STARTUP] Base de datos maestra lista y verificada.")
 
