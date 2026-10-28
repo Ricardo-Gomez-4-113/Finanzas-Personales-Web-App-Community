@@ -643,21 +643,21 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 }
 
 .dropdown-action-btn.dropdown-btn-logout {
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .dropdown-action-btn.dropdown-btn-logout:hover {
     background-color: var(--danger-subtle);
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .dropdown-action-btn.dropdown-btn-danger {
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .dropdown-action-btn.dropdown-btn-danger:hover {
     background-color: var(--danger-subtle);
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .danger-zone-box {
@@ -672,7 +672,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
     padding: 7px 14px;
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--danger-color);
+    color: var(--danger-text);
     background: transparent;
     border: 1px solid var(--danger-color);
     border-radius: 6px;
@@ -785,7 +785,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
     padding: 10px 14px;
     background-color: var(--danger-subtle);
     border: 1px solid rgba(190, 18, 60, 0.25);
-    color: var(--danger-color);
+    color: var(--danger-text);
     border-radius: 8px;
     font-size: 0.88rem;
     text-align: center;
@@ -825,7 +825,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 
 .badge-role-admin {
     background-color: var(--danger-subtle);
-    color: var(--danger-color);
+    color: var(--danger-text);
     border: 1px solid rgba(190, 18, 60, 0.2);
 }
 
@@ -836,7 +836,7 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 
 .btn-logout {
     background-color: transparent;
-    color: var(--danger-color);
+    color: var(--danger-text);
     border: 1px solid rgba(190, 18, 60, 0.35);
     height: 32px;
     padding: 0 10px;

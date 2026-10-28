@@ -190,7 +190,7 @@ if (formTrans) {
         const montoVal = parseFloat(document.getElementById('monto').value);
         if (isNaN(montoVal) || montoVal <= 0) {
             if (mensajeDiv) {
-                mensajeDiv.style.color = 'var(--danger-color)';
+                mensajeDiv.style.color = 'var(--danger-text)';
                 mensajeDiv.textContent = 'Ingresa un monto válido mayor a 0.';
             }
             return;
@@ -219,7 +219,7 @@ if (formTrans) {
 
             if (response.ok) {
                 if (mensajeDiv) {
-                    mensajeDiv.style.color = 'var(--success-color)';
+                    mensajeDiv.style.color = 'var(--success-text)';
                     mensajeDiv.textContent = '¡Movimiento guardado!';
                 }
                 formTrans.reset();
@@ -233,13 +233,13 @@ if (formTrans) {
                     errText = formatErrorDetail(err.detail, errText);
                 } catch (_) {}
                 if (mensajeDiv) {
-                    mensajeDiv.style.color = 'var(--danger-color)';
+                    mensajeDiv.style.color = 'var(--danger-text)';
                     mensajeDiv.textContent = errText;
                 }
             }
         } catch (error) {
             if (mensajeDiv) {
-                mensajeDiv.style.color = 'var(--danger-color)';
+                mensajeDiv.style.color = 'var(--danger-text)';
                 mensajeDiv.textContent = 'Error de conexión.';
             }
         } finally {

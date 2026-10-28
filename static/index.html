@@ -42,10 +42,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=20261028_sin_emoji_v1">
-    <link rel="stylesheet" href="/static/css/layout.css?v=20261028_sin_emoji_v1">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=20261028_sin_emoji_v1">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=20261028_sin_emoji_v1">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=9c41c314cf">
+    <link rel="stylesheet" href="/static/css/layout.css?v=9c41c314cf">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=9c41c314cf">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=9c41c314cf">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -216,7 +216,7 @@
                     <a href="javascript:void(0)" onclick="abrirModalRecuperarPassword()" class="link-forgot-password" style="font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500;">¿Olvidaste tu contraseña?</a>
                 </div>
                 <button type="submit" id="btn-login-submit" class="btn-primary btn-block">Ingresar a la Plataforma</button>
-                <div id="login-error" class="login-error-msg" style="display: none;"></div>
+                <div id="login-error" class="login-error-msg hidden"></div>
             </form>
             <div style="text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color);">
                 <a href="/" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease;">
@@ -232,7 +232,7 @@
         </div>
     </div>
 
-    <div id="vista-app" class="app-layout hidden" style="display: none;">
+    <div id="vista-app" class="app-layout hidden">
         <!-- Fondo oscurecido para versión móvil al abrir el panel lateral -->
         <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="cerrarSidebarMobile()"></div>
 
@@ -2267,7 +2267,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=20261028_sin_emoji_v1"></script>
+    <script type="module" src="/static/js/main.js?v=9c41c314cf"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

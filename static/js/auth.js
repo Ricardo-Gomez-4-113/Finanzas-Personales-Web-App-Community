@@ -178,7 +178,7 @@ export async function iniciarSesion(e) {
     if (!username || !password) return;
 
     btnSubmit.disabled = true;
-    btnSubmit.textContent = '⏳ Verificando credenciales...';
+    btnSubmit.textContent = 'Verificando credenciales...';
     if (loginError) loginError.classList.add('hidden');
 
     try {

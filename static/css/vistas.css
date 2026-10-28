@@ -86,7 +86,7 @@
 }
 
 .btn-eliminar-apartado:hover {
-    color: var(--danger-color);
+    color: var(--danger-text);
     background-color: transparent;
     transform: scale(1.1);
 }
@@ -128,7 +128,7 @@
 
 .acciones-apartado button:first-of-type {
   background-color: var(--success-subtle);
-  color: var(--success-color);
+  color: var(--success-text);
   border: 1px solid rgba(21, 128, 61, 0.25);
 }
 
@@ -139,7 +139,7 @@
 
 .acciones-apartado button:last-of-type {
   background-color: var(--danger-subtle);
-  color: var(--danger-color);
+  color: var(--danger-text);
   border: 1px solid rgba(190, 18, 60, 0.25);
 }
 
@@ -349,12 +349,12 @@
 }
 
 .pnl-positivo {
-    color: var(--success-color) !important;
+    color: var(--success-text) !important;
     font-weight: bold;
 }
 
 .pnl-negativo {
-    color: var(--danger-color) !important;
+    color: var(--danger-text) !important;
     font-weight: bold;
 }
 
@@ -748,7 +748,7 @@
     border: 1px solid var(--warning-border);
     border-radius: 8px;
     font-size: 0.85rem;
-    color: var(--warning-color);
+    color: var(--warning-text);
     line-height: 1.5;
 }
 
@@ -758,7 +758,7 @@
     font-size: 0.82rem;
     font-weight: 600;
     border: 1px solid var(--warning-border);
-    color: var(--warning-color);
+    color: var(--warning-text);
     background: var(--warning-subtle);
     cursor: pointer;
     border-radius: 6px;
@@ -780,7 +780,7 @@
 
 .card-unconfigured-email h4 {
     margin: 0 0 8px 0;
-    color: var(--warning-color);
+    color: var(--warning-text);
     font-size: 0.98rem;
     font-weight: 700;
 }
@@ -795,7 +795,7 @@
     align-items: center;
     justify-content: center;
     margin: 0 auto 12px auto;
-    color: var(--warning-color);
+    color: var(--warning-text);
 }
 
 /* ========================================================== */
@@ -879,13 +879,13 @@
 
 .badge-status-active {
     background-color: var(--success-subtle);
-    color: var(--success-color);
+    color: var(--success-text);
     border: 1px solid rgba(21, 128, 61, 0.25);
 }
 
 .badge-status-inactive {
     background-color: var(--danger-subtle);
-    color: var(--danger-color);
+    color: var(--danger-text);
     border: 1px solid rgba(190, 18, 60, 0.25);
 }
 
@@ -914,7 +914,7 @@
 .btn-delete-user {
     background: transparent;
     border: 1px solid rgba(190, 18, 60, 0.35);
-    color: var(--danger-color);
+    color: var(--danger-text);
     height: 26px;
     padding: 0 8px;
     border-radius: 5px;
@@ -1740,7 +1740,7 @@
 .networth-sin { color: var(--text-muted) !important; font-size: 1.25rem; }
 .dot-rendimiento { background-color: var(--gold-color); }
 .dot-deuda { background-color: var(--danger-color); }
-.breakdown-debt strong { color: var(--danger-color); }
+.breakdown-debt strong { color: var(--danger-text); }
 .alloc-bar-rendimiento { background-color: var(--gold-color); opacity: 0.7; }
 .section-subtitle { margin: 16px 0 6px 0; font-size: 1.05rem; color: var(--text-color); }
 .cuentas-rend-section .rend-form { margin-bottom: 8px; }
@@ -1869,7 +1869,7 @@
 
 .badge-status-suspended {
     background-color: rgba(190, 18, 60, 0.12);
-    color: var(--danger-color);
+    color: var(--danger-text);
     border: 1px solid rgba(190, 18, 60, 0.25);
 }
 
@@ -1991,14 +1991,14 @@
 }
 
 .btn-delete-user {
-    color: var(--danger-color);
+    color: var(--danger-text);
     border-color: rgba(190, 18, 60, 0.3);
 }
 
 .btn-delete-user:hover {
     background-color: var(--danger-subtle);
     border-color: var(--danger-color);
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .btn-delete-user.btn-disabled {
@@ -2419,7 +2419,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .calc-rend-val {
     font-size: 1.85rem;
     font-weight: 800;
-    color: var(--success-color);
+    color: var(--success-text);
     font-variant-numeric: tabular-nums;
     margin: 0 0 16px 0;
     line-height: 1.15;
@@ -2558,7 +2558,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .calc-td-ganancia {
     font-weight: 700;
-    color: var(--success-color);
+    color: var(--success-text);
 }
 
 .calc-td-total {
@@ -2777,7 +2777,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-val-gold { color: var(--gold-color); }
-.pres-val-success { color: var(--success-color); }
+.pres-val-success { color: var(--success-text); }
 .pres-val-inv { color: var(--success-color, #22c55e); }
 
 .badge-gold {

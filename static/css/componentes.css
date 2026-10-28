@@ -138,15 +138,15 @@ body {
 }
 
 .card.balance p {
-    color: var(--success-color);
+    color: var(--success-text);
 }
 
 .card.ingresos p {
-    color: var(--success-color);
+    color: var(--success-text);
 }
 
 .card.gastos p {
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 .card.card-fijos-msi p {
@@ -169,15 +169,15 @@ body {
     background: rgba(239, 68, 68, 0.04);
 }
 .card.card-deficit p {
-    color: var(--danger-color) !important;
+    color: var(--danger-text) !important;
 }
 .card.card-deficit .card-subtext {
-    color: var(--danger-color) !important;
+    color: var(--danger-text) !important;
     font-weight: 600;
 }
 
 .preview-warning {
-    color: var(--danger-color);
+    color: var(--danger-text);
     font-weight: 600;
     display: inline-flex;
     align-items: center;
@@ -478,7 +478,7 @@ form > button[type="submit"]:active,
 
 .btn-eliminar {
     background-color: rgba(190, 18, 60, 0.08);
-    color: var(--danger-color);
+    color: var(--danger-text);
     border: 1px solid rgba(190, 18, 60, 0.2);
     height: 26px;
     padding: 0 8px;
@@ -583,12 +583,12 @@ table td,
 [data-theme="dark"] .card.balance p,
 [data-theme="dark"] .card.ingresos p,
 [data-theme="dark"] .text-ingreso {
-    color: var(--success-color);
+    color: var(--success-text);
 }
 
 [data-theme="dark"] .card.gastos p,
 [data-theme="dark"] .text-gasto {
-    color: var(--danger-color);
+    color: var(--danger-text);
 }
 
 #mensaje { margin-top: 15px; text-align: center; font-weight: 600; font-size: 0.9rem; }
@@ -615,9 +615,9 @@ tbody tr:hover {
     background-color: var(--primary-subtle);
 }
 
-.text-gasto { color: var(--danger-color); font-weight: 700; }
+.text-gasto { color: var(--danger-text); font-weight: 700; }
 
-.text-ingreso { color: var(--success-color); font-weight: 700; }
+.text-ingreso { color: var(--success-text); font-weight: 700; }
 
 .table-responsive {
     max-height: 460px;
@@ -724,7 +724,7 @@ tbody tr:hover {
 }
 
 .btn-modal-close:hover {
-    color: var(--danger-color);
+    color: var(--danger-text);
     background: transparent;
     box-shadow: none;
 }
@@ -826,7 +826,7 @@ tbody tr:hover {
 }
 .badge-ahorro {
     background: var(--success-subtle);
-    color: var(--success-color);
+    color: var(--success-text);
     border: 1px solid rgba(16, 185, 129, 0.35);
 }
 .badge-presupuesto {
@@ -867,11 +867,11 @@ tbody tr:hover {
 .s-border-color-rgba-245-158-11-0-25 { border-color: rgba(245, 158, 11, 0.25); }
 .s-border-radius-8px { border-radius: 8px; }
 .s-border-top-1px-solid-var-border-color { border-top: 1px solid var(--border-color); }
-.s-color-var-danger-color { color: var(--danger-color); }
+.s-color-var-danger-color { color: var(--danger-text); }
 .s-color-var-gold-color { color: var(--gold-color); }
 .s-color-var-text-color { color: var(--text-color); }
 .s-color-var-text-muted { color: var(--text-muted); }
-.s-color-var-warning-color { color: var(--warning-color); }
+.s-color-var-warning-color { color: var(--warning-text); }
 .s-cursor-pointer { cursor: pointer; }
 .s-display-block { display: block; }
 .s-display-flex { display: flex; }

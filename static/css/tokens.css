@@ -58,6 +58,10 @@
     --warning-color: #f59e0b;
     --warning-subtle: rgba(245, 158, 11, 0.10);
     --warning-border: rgba(245, 158, 11, 0.30);
+    /* Texto semántico con contraste WCAG AA (>= 4.5:1) sobre superficies claras */
+    --success-text: #166534;
+    --danger-text: #b91c1c;
+    --warning-text: #92400e;
 
     /* Indigo y Cyan complementarios sobrios */
     --indigo-color: #22c55e;
@@ -77,6 +81,10 @@
 
 /* Modo Oscuro: Monochrome Ledger & Alpine Cyber */
 [data-theme="dark"] {
+    /* En oscuro los colores base ya cumplen AA como texto */
+    --success-text: var(--success-color);
+    --danger-text: var(--danger-color);
+    --warning-text: var(--warning-color);
     /* Canvas Base: #000000 (Negro absoluto OLED) */
     --bg-color: #000000;
 

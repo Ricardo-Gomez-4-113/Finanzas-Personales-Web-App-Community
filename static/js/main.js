@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=20261028_saltar_v2';
+import { cargarRecurrentes } from './recurrentes.js?v=9c41c314cf';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
-import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
+import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=20261028_saltar_v2';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=9c41c314cf';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 
 
@@ -96,8 +96,8 @@ export async function cargarDatos() {
                     div.innerHTML = `
                         <div><strong>${m.mes}</strong></div>
                         <div class="monthly-info">
-                            <span style="color: var(--success-color);">+${fmt(m.ingresos)}</span>
-                            <span style="color: var(--danger-color);">-${fmt(m.gastos)}</span>
+                            <span style="color: var(--success-text);">+${fmt(m.ingresos)}</span>
+                            <span style="color: var(--danger-text);">-${fmt(m.gastos)}</span>
                         </div>
                     `;
                     contenedorMensual.appendChild(div);
@@ -194,6 +194,7 @@ document.addEventListener('sesion-expirada', (e) => cerrarSesionLimpia(e.detail)
 
 inicializarTabs();
 inicializarFab();
+inicializarAccesibilidadModales();
 
 inicializarEstadoSidebar();
 

@@ -350,7 +350,7 @@ export async function buscarCotizacionTicker() {
     const inputActual = document.getElementById('inv-precio-actual');
     const btn = document.querySelector('.btn-search-ticker');
     const textoOriginal = btn.textContent;
-    btn.textContent = '⏳ Buscando...';
+    btn.textContent = 'Buscando...';
     btn.disabled = true;
 
     try {

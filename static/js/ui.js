@@ -419,3 +419,63 @@ export function inicializarFab() {
     });
 }
 
+
+
+// =============================================================================
+// ACCESIBILIDAD DE MODALES: foco inicial, Tab atrapado dentro y foco de regreso al cerrar
+// =============================================================================
+
+const SELECTOR_ENFOCABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function enfocablesVisibles(contenedor) {
+    return [...contenedor.querySelectorAll(SELECTOR_ENFOCABLE)].filter(el => el.offsetParent !== null);
+}
+
+function modalAbiertoSuperior() {
+    const abiertos = [...document.querySelectorAll('.modal-overlay[role="dialog"]:not(.hidden)')];
+    return abiertos[abiertos.length - 1] || null;
+}
+
+export function inicializarAccesibilidadModales() {
+    const origenFoco = new WeakMap();
+    const observador = new MutationObserver(cambios => {
+        for (const { target } of cambios) {
+            const abierto = !target.classList.contains('hidden');
+            if (abierto && !origenFoco.has(target)) {
+                origenFoco.set(target, document.activeElement);
+                // Tras el render del modal: si su propio código no enfocó nada dentro, enfocar el primer control.
+                setTimeout(() => {
+                    if (!target.contains(document.activeElement)) {
+                        const primero = enfocablesVisibles(target).find(el => !el.classList.contains('modal-close')) || enfocablesVisibles(target)[0];
+                        if (primero) primero.focus();
+                    }
+                }, 100);
+            } else if (!abierto && origenFoco.has(target)) {
+                const previo = origenFoco.get(target);
+                origenFoco.delete(target);
+                if (previo && document.contains(previo) && typeof previo.focus === 'function') previo.focus();
+            }
+        }
+    });
+    document.querySelectorAll('.modal-overlay[role="dialog"]').forEach(m => observador.observe(m, { attributes: true, attributeFilter: ['class'] }));
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const modal = modalAbiertoSuperior();
+        if (!modal) return;
+        const enfocables = enfocablesVisibles(modal);
+        if (enfocables.length === 0) return;
+        const primero = enfocables[0];
+        const ultimo = enfocables[enfocables.length - 1];
+        if (!modal.contains(document.activeElement)) {
+            e.preventDefault();
+            primero.focus();
+        } else if (e.shiftKey && document.activeElement === primero) {
+            e.preventDefault();
+            ultimo.focus();
+        } else if (!e.shiftKey && document.activeElement === ultimo) {
+            e.preventDefault();
+            primero.focus();
+        }
+    });
+}
