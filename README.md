@@ -11,7 +11,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * **Backend:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11) con inyección dinámica de dependencias.
 * **Seguridad & Auth:** [PyJWT](https://pyjwt.readthedocs.io/) (Firma de tokens HS256) y [bcrypt](https://pypi.org/project/bcrypt/) (Hashing seguro con salt automático).
 * **Base de Datos Dual (Multi-Tenant):** [SQLite](https://www.sqlite.org/) con modo WAL (`PRAGMA journal_mode=WAL;`):
-  * **Master DB:** `data/master.db` (Control de usuarios, roles, estado y métricas de acceso).
+  * **Master DB:** `data/auth_master.db` (Control de usuarios, roles, estado y métricas de acceso).
   * **Tenant DBs:** `data/tenants/user_{id}.db` (Bases de datos independientes y 100% aisladas para cada usuario).
 * **Frontend:** HTML5, CSS3 Moderno (Variables CSS & Modo Oscuro), JavaScript (Vanilla ES6+ SPA) y cliente interceptor `apiFetch`.
 * **Visualización de Datos:** [Chart.js](https://www.chartjs.org/) (Gráficas de barras mensuales y dona de asignación de activos).
@@ -29,7 +29,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 
 ### 2. 🔐 Autenticación JWT y Guardias de Sesión
 * **Inicio de Sesión Seguro:** Endpoint `POST /auth/login` con validación de contraseña mediante bcrypt y verificación de cuenta activa (`is_active == 1`).
-* **Auditoría de Actividad:** Cada inicio de sesión exitoso actualiza en `master.db` la fecha/hora de `last_login` e incrementa el contador `login_count`.
+* **Auditoría de Actividad:** Cada inicio de sesión exitoso actualiza en `auth_master.db` la fecha/hora de `last_login` e incrementa el contador `login_count`.
 * **Interceptor Automático (`apiFetch`):** Todas las peticiones del Frontend adjuntan la cabecera `Authorization: Bearer <token>`. Si el token expira o el usuario es suspendido, el sistema redirige automáticamente al login.
 * **Purga Limpia de Sesión (Logout):** Al cerrar sesión o cambiar de cuenta, el cliente destruye las instancias de Chart.js, purga la memoria y limpia el DOM para garantizar que ningún dato quede visible en caché para el siguiente usuario.
 
@@ -71,7 +71,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 
 ### 7. 📑 Exportación a Excel y Respaldos Aislados
 * **Excel con Gráfica Nativa de Pastel:** Descarga el reporte contable del tenant activo con Asset Allocation en formato `.xlsx`.
-* **Copia de Seguridad por Usuario:** Botón directo para descargar el archivo `.db` propio del usuario en sesión.
+* **Copia de Seguridad por Usuario:** Botón directo para descargar el archivo `.db` propio del usuario en sesión o restaurarlo. La restauración valida cabecera, integridad y esquema, rechaza archivos dañados o ajenos sin tocar los datos actuales y guarda una copia `.bak` antes de reemplazar.
 
 ---
 
@@ -80,6 +80,17 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * **Compras a meses:** el balance baja al vencer cada cuota; el patrimonio neto resta la deuda pendiente.
 * **Cuentas con rendimiento:** saldos con tasa anual fija (interés diario compuesto). No modifican el balance disponible; aportar, retirar o cambiar la tasa capitaliza el saldo actual.
 * **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del mes por categoría.
+* **Saltar pagos:** un fijo puede saltarse una vez y una cuota MSI puede contabilizarse o aplazarse.
+
+### 9. 🧮 Presupuesto por Subperiodos
+* Tarjetas de presupuesto por categoría con reparto por quincenas o semanas (simétrico o personalizado).
+* Los repartos se calculan en centavos: la suma de los subperiodos siempre coincide exactamente con el total.
+* Exportación del presupuesto a gastos fijos con fecha de inicio configurable.
+
+### 10. 🩺 Respaldo Automático y Monitoreo
+* **Respaldo nocturno:** `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/`, verifica cada copia y conserva 14 días.
+* **Respaldo previo a migrar:** antes de actualizar el esquema de un tenant se guarda una copia en `data/backups_premigracion/`.
+* **`/health`:** estado de la base maestra y antigüedad del último respaldo; lo usa el `healthcheck` de Docker.
 
 ---
 
@@ -95,24 +106,30 @@ Finanzas-Personales-Web-App-Community/
 │   ├── recurrentes.py   # Fijos y compras a meses (MSI)
 │   ├── apartados.py     # Sobres y metas de ahorro
 │   ├── inversiones.py   # Posiciones bursátiles, cuentas con rendimiento y tipos de cambio
-│   └── respaldo.py      # Respaldo, restauración y exportación a Excel
+│   ├── presupuesto.py   # Presupuesto por tarjetas y subperiodos, exportación a fijos
+│   ├── respaldo.py      # Respaldo, restauración y exportación a Excel
+│   └── salud.py         # Endpoint /health para Docker y monitoreo
 ├── finanzas_core.py     # Lógica financiera pura: conversión, resumen, recurrentes, MSI y rendimiento
 ├── mercado.py           # Cotizaciones de Yahoo Finance y tipos de cambio (en paralelo, con caché)
-├── database.py          # Esquema por tenant, migraciones versionadas (v1–v4) y conexión por petición
+├── database.py          # Esquema por tenant, migraciones versionadas (v1–v12) y conexión por petición
 ├── master_db.py         # Base maestra (usuarios, OTP y estadísticas admin)
 ├── security.py          # bcrypt, JWT, dependencias verify_token/verify_admin y freno anti fuerza bruta
 ├── export_service.py    # Reporte Excel (.xlsx) con hojas de resumen, movimientos, inversiones, fijos y rendimientos
 ├── email_service.py     # Correos transaccionales (API o SMTP)
 ├── test_finanzas.py     # Pruebas de la lógica financiera (sin dependencias)
-├── requirements.txt     # Dependencias (fastapi, uvicorn, pydantic, openpyxl, bcrypt, pyjwt)
+├── tests/               # Pruebas en Docker: API, aislamiento, migraciones, respaldo y navegador (Playwright)
+├── scripts/             # respaldo_automatico, migrar_todos, cache_bust y verificar_reglas
+├── docs/DESARROLLO.md   # Guía de desarrollo, pruebas y mantenimiento
+├── requirements.txt     # Dependencias con versiones fijas (fastapi, uvicorn, pydantic, openpyxl, bcrypt, pyjwt)
 ├── Dockerfile           # Imagen Docker basada en python:3.11-slim (sin --reload)
-├── docker-compose.yml   # Compose con ./data montado (puerto 8002 → 8001)
+├── docker-compose.yml   # Compose con ./data montado (puerto 8002 → 8001) y healthcheck
 ├── .env.example         # Variables de entorno (JWT y correo)
 ├── README.md            # Documentación del proyecto
 ├── LICENSE              # GNU General Public License v3.0 (GPLv3)
 ├── data/                # Almacenamiento local (ignorado en git)
 │   ├── auth_master.db   # Base maestra de usuarios
-│   └── tenants/         # Una base SQLite por usuario (user_1.db, user_2.db...)
+│   ├── tenants/         # Una base SQLite por usuario (user_1.db, user_2.db...)
+│   └── backups/         # Respaldos automáticos con rotación
 └── static/
     ├── index.html       # SPA: login, pestañas y modales
     ├── css/             # tokens.css, componentes.css, layout.css, vistas.css
@@ -166,12 +183,18 @@ Finanzas-Personales-Web-App-Community/
    > ```
    > Tras cambiar código en Docker, vuelve a construir con `docker compose up -d --build`.
 
+5. **Programar el respaldo nocturno (recomendado):** agrega al crontab del host (`crontab -e`):
+   ```cron
+   0 3 * * * docker exec finanzas-community python3 scripts/respaldo_automatico.py
+   ```
+   Mientras no exista un respaldo de las últimas 26 horas, `/health` reportará `"respaldo": "vencido"`.
+
 ### 🔑 Credenciales Iniciales por Defecto
 
 Al arrancar por primera vez, el sistema crea automáticamente el usuario Administrador y migra los datos preexistentes:
 
 * **Usuario:** `admin`
-* **Contraseña:** `admin123`
+* **Contraseña:** la que definas en `DEFAULT_ADMIN_PASSWORD` dentro de `.env`. Si no la defines, se genera una clave temporal aleatoria y se imprime una sola vez en los logs (`docker logs finanzas-community`); cámbiala al iniciar sesión.
 * **Rol:** `admin`
 
 > [!TIP]
@@ -216,6 +239,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `PATCH` | `/auth/profile` | `verify_token` | Permite al usuario activo modificar su nombre de usuario o contraseña |
 | `POST` | `/auth/forgot-password` | Público | Genera y envía código de 6 dígitos por email (máximo 2 intentos por usuario en 24h) |
 | `POST` | `/auth/reset-password` | Público | Valida código y actualiza clave (máximo 2 intentos fallidos antes de cancelarlo) |
+| `DELETE` | `/auth/delete-account` | `verify_token` | Elimina la cuenta propia y su base de datos |
 
 ### Administración (Exclusivo Admin)
 | Método | Endpoint | Seguridad | Descripción |
@@ -236,6 +260,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `POST` | `/api/transacciones` | `verify_token` | Registrar movimiento (la categoría debe existir) |
 | `PUT` | `/api/transacciones/{id}` | `verify_token` | Editar movimiento (las cuotas MSI y los ahorros de apartado no se editan aquí) |
 | `DELETE` | `/api/transacciones/{id}` | `verify_token` | Eliminar movimiento (mismas restricciones que la edición) |
+| `POST` | `/api/transacciones/eliminar-lote` | `verify_token` | Eliminar varios movimientos a la vez |
 | `GET` | `/api/categorias` | `verify_token` | Listar categorías de gasto e ingreso |
 | `POST` | `/api/categorias` | `verify_token` | Crear categoría (nombre único por tipo) |
 | `GET` | `/api/gastos-por-categoria` | `verify_token` | Gasto del mes por categoría (`?mes=YYYY-MM&moneda_base=`), sin movimientos de apartados |
@@ -243,6 +268,11 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `POST` | `/api/recurrentes` | `verify_token` | Crear fijo o compra a meses (`meses` + `monto_total`) |
 | `PATCH` | `/api/recurrentes/{id}` | `verify_token` | Editar descripción, monto (solo fijos), categoría o pausar/reanudar |
 | `DELETE` | `/api/recurrentes/{id}` | `verify_token` | Eliminar registro; los movimientos ya generados se conservan |
+| `POST` | `/api/recurrentes/{id}/saltar` | `verify_token` | Saltar un pago o aplazar una cuota MSI |
+| `GET` | `/api/presupuesto` | `verify_token` | Presupuesto con tarjetas y repartos por subperiodo |
+| `PUT` | `/api/presupuesto/config` | `verify_token` | Configurar ingreso base, frecuencia y subdivisión |
+| `POST` / `PATCH` / `DELETE` | `/api/presupuesto/tarjetas[/{id}]` | `verify_token` | Crear, editar o eliminar tarjetas de presupuesto |
+| `POST` | `/api/presupuesto/exportar-a-fijos` | `verify_token` | Convertir el presupuesto en gastos fijos |
 | `GET` | `/api/rendimiento` | `verify_token` | Cuentas con rendimiento: valor actual, interés y ganancia mensual |
 | `POST` | `/api/rendimiento` | `verify_token` | Crear cuenta con rendimiento |
 | `POST` | `/api/rendimiento/{id}/movimiento` | `verify_token` | Aportar o retirar (capitaliza el saldo; no toca el balance) |
@@ -262,6 +292,12 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `GET` | `/api/tipo-cambio` | `verify_token` | Tipos de cambio vigentes con caché |
 | `GET` | `/api/exportar-excel` | `verify_token` | Descarga de reporte Excel del tenant (incluye hojas de fijos y rendimientos) |
 | `GET` | `/api/backup` | `verify_token` | Descarga de la base de datos SQLite del tenant |
+| `POST` | `/api/restore` | `verify_token` | Restaurar la base del tenant desde un `.db` (máx. 50 MB, validado) |
+
+### Monitoreo
+| Método | Endpoint | Seguridad | Descripción |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Público | Estado de la base maestra y del último respaldo (503 si la base no responde). No expone datos de usuarios |
 
 ---
 
@@ -281,13 +317,21 @@ uvicorn main:app --reload --port 8001
 
 > `.env.test` solo contiene valores de desarrollo. Nunca lo uses en producción; el archivo real de producción es `.env` (no se versiona).
 
-## 🧪 Pruebas
+## ✅ Pruebas
 
 ```bash
-python3 test_finanzas.py   # imprime OK si la lógica financiera cumple los casos base
+python3 test_finanzas.py   # lógica financiera: rápido, sin Docker ni dependencias
+./tests/run_tests.sh       # todo en Docker: reglas, finanzas, migraciones, respaldo y API
+./tests/run_frontend.sh    # navegador real (Playwright): login, pestañas, desbordamiento y foco en modales
 ```
 
-Las pruebas usan solo la biblioteca estándar (sin pytest) y una base SQLite en memoria.
+Las pruebas en Docker corren en contenedores efímeros: no tocan tu instancia ni la carpeta `data/`. Cubren aislamiento entre usuarios, tokens JWT manipulados (incluido `alg: none`), permisos de admin, límite de intentos de login, restauración con archivos dañados y la cadena completa de migraciones.
+
+### Contribuir
+* Toda lógica de dinero, fechas o repartos va en `finanzas_core.py`, con su caso en `test_finanzas.py`.
+* Después de cambiar CSS o JS ejecuta `python3 scripts/cache_bust.py` (actualiza los `?v=`); `./scripts/verificar_reglas.sh` revisa que no falte.
+* La UI usa micro-SVG en lugar de emojis y los colores de texto de estado vienen de `--success-text`, `--danger-text` y `--warning-text`.
+* Guía completa en [`docs/DESARROLLO.md`](docs/DESARROLLO.md).
 
 ---
 

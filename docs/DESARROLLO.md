@@ -59,9 +59,9 @@ Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (l
 - Se programa con cron, por ejemplo: `0 3 * * * docker exec <contenedor> python3 scripts/respaldo_automatico.py`.
 - `/health` reporta `"respaldo": "vencido"` si el último tiene más de 26 horas, y responde 503 si la base maestra no responde. El `healthcheck` de `docker-compose.yml` usa ese endpoint.
 
-## Sincronizar SaaS y Community
+## Sincronizar SaaS y Community (mantenedores)
 
-Los cambios comunes se hacen en el repo SaaS y se propagan con:
+La edición Community comparte el núcleo con una edición privada. Los cambios comunes se hacen en la privada y se propagan con `scripts/sync.sh`, que solo existe ahí:
 
 ```bash
 ./scripts/sync.sh            # simula y lista qué copiaría
