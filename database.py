@@ -16,6 +16,7 @@ Este módulo implementa:
 import os
 import sqlite3
 import threading
+from datetime import datetime
 from typing import Tuple, Optional
 
 # =============================================================================
@@ -416,6 +417,33 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
 _tenants_migrados = set()
 _lock_migraciones = threading.Lock()
 
+PREMIGRACION_DIR = os.path.join(DATA_DIR, "backups_premigracion")
+PREMIGRACION_CONSERVAR = 3
+
+
+def respaldar_antes_de_migrar(conn: sqlite3.Connection, db_path: str) -> Optional[str]:
+    """Copia consistente del tenant antes de subir su esquema. Solo si ya tiene datos (user_version > 0)
+    y está desactualizado. Conserva los últimos PREMIGRACION_CONSERVAR respaldos por tenant."""
+    version = conn.execute("PRAGMA user_version;").fetchone()[0]
+    if version <= 0 or version >= CURRENT_TENANT_SCHEMA_VERSION:
+        return None
+    os.makedirs(PREMIGRACION_DIR, exist_ok=True)
+    base = os.path.splitext(os.path.basename(db_path))[0]
+    sello = datetime.now().strftime("%Y%m%d_%H%M%S")
+    destino = os.path.join(PREMIGRACION_DIR, f"{base}.v{version}.{sello}.bak")
+    respaldo = sqlite3.connect(destino)
+    try:
+        conn.backup(respaldo)
+    finally:
+        respaldo.close()
+    previos = sorted(
+        (os.path.join(PREMIGRACION_DIR, f) for f in os.listdir(PREMIGRACION_DIR) if f.startswith(f"{base}.v")),
+        key=os.path.getmtime,
+    )
+    for viejo in previos[:-PREMIGRACION_CONSERVAR]:
+        os.remove(viejo)
+    return destino
+
 
 def get_tenant_conn(db_name_or_path: str) -> sqlite3.Connection:
     """Abre una conexión nueva por petición. Las migraciones corren una sola vez por proceso y tenant."""
@@ -427,6 +455,7 @@ def get_tenant_conn(db_name_or_path: str) -> sqlite3.Connection:
     if db_path not in _tenants_migrados:
         with _lock_migraciones:
             if db_path not in _tenants_migrados:
+                respaldar_antes_de_migrar(conn, db_path)
                 apply_lazy_migrations(conn)
                 _tenants_migrados.add(db_path)
     return conn
