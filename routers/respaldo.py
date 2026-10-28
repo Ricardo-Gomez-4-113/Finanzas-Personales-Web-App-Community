@@ -114,11 +114,23 @@ async def restaurar_backup(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="El archivo no corresponde a un respaldo válido de la aplicación de finanzas."
                 )
+        except sqlite3.DatabaseError:
+            # Cabecera válida pero páginas ilegibles (archivo truncado o basura): es un 400, no un 500.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El archivo proporcionado no es una base de datos SQLite válida o está dañado."
+            )
         finally:
             test_conn.close()
 
         # 3. Aplicar migraciones defensivas a la BD temporal
-        init_tenant_db(tmp_path)
+        try:
+            init_tenant_db(tmp_path)
+        except sqlite3.DatabaseError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El respaldo no se pudo migrar al esquema actual de la aplicación."
+            )
 
         # 4. Copia de seguridad automática preventiva de la BD actual
         db_name = current_user.get("db_name", "user_1.db")
