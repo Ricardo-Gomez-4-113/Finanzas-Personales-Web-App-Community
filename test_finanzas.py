@@ -90,6 +90,7 @@ from finanzas_core import (
     convertir_frecuencias,
     convertir_de_mensual,
     calcular_periodo_actual,
+    resumen_mensual_core,
 )
 
 
@@ -1903,6 +1904,46 @@ def test_export_no_duplica_cargo_ya_registrado():
     assert _activos(conn)["Transporte"] == 2000.0
 
 
+def test_resumen_mensual_excluye_movimientos_de_apartados():
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 28500, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 1500, 'gasto')")
+    # Depósito a meta (gasto ligado a apartado) y retiro (ingreso ligado): no son gasto ni ingreso del mes
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 4500, 'gasto', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-07', 500, 'ingreso', 1)")
+    conn.commit()
+    mes = resumen_mensual_core(conn)
+    assert mes == [{"mes": "2026-10", "ingresos": 28500.0, "gastos": 1500.0}], mes
+    # Coincide con el mes actual que usa el Resumen
+    r = calcular_resumen(conn, 'MXN', 18, date(2026, 10, 31))
+    assert r["mes_actual"]["gastos"] == mes[0]["gastos"] and r["mes_actual"]["ingresos"] == mes[0]["ingresos"], r["mes_actual"]
+
+
+def test_saldo_de_apartados_coincide_con_sus_movimientos():
+    import random
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('A', 'libre', 0)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('B', 'libre', 0)")
+    conn.commit()
+    rnd = random.Random(3)
+    for _ in range(400):
+        aid = rnd.choice([1, 2])
+        monto = round(rnd.uniform(1, 300), 2)
+        guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
+        if rnd.random() < 0.6 or guardado < monto:
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'gasto', 1, 'dep', ?)", (monto, aid))
+            conn.execute("UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?", (monto, aid))
+        else:
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'ingreso', 1, 'ret', ?)", (monto, aid))
+            conn.execute("UPDATE apartados SET monto_actual = monto_actual - ? WHERE id = ?", (monto, aid))
+        conn.commit()
+    for aid in (1, 2):
+        guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
+        movimientos = conn.execute("SELECT COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE -monto END), 0) FROM transacciones WHERE apartado_id = ?", (aid,)).fetchone()[0]
+        assert abs(guardado - movimientos) < 0.01, (aid, guardado, movimientos)
+
+
 if __name__ == '__main__':
     test_convertir()
     test_calcular_resumen()
@@ -1980,6 +2021,8 @@ if __name__ == '__main__':
     test_export_renombrar_tarjeta_reutiliza_fijo_sin_duplicar_cargo()
     test_fijos_de_tarjeta_borrada_dejan_de_cobrarse()
     test_export_no_duplica_cargo_ya_registrado()
+    test_resumen_mensual_excluye_movimientos_de_apartados()
+    test_saldo_de_apartados_coincide_con_sus_movimientos()
     print('OK')
 
 

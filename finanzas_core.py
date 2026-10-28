@@ -1403,6 +1403,68 @@ def exportar_presupuesto_a_fijos_core(
 
 
 
+def resumen_mensual_core(conn: sqlite3.Connection) -> list:
+    """Ingresos y gastos por mes, sin movimientos de apartados (depósitos y retiros de metas
+    no son ingreso ni gasto real). Misma regla que `mes_actual` en calcular_resumen."""
+    filas = conn.execute("""
+        SELECT strftime('%Y-%m', fecha) AS mes,
+               COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) AS ingresos,
+               COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE 0 END), 0) AS gastos
+        FROM transacciones
+        WHERE apartado_id IS NULL
+        GROUP BY mes
+        ORDER BY mes DESC
+    """).fetchall()
+    return [dict(f) for f in filas]
+
+
+def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
+    """Simula borrar `transacciones` y devuelve (déficit, fecha) del primer día con saldo negativo,
+    o None si el saldo nunca baja de cero. No deja cambios: todo corre dentro de un savepoint."""
+    ingresos_externos = [t for t in transacciones if t["tipo"] == 'ingreso' and t["apartado_id"] is None]
+    if not ingresos_externos:
+        return None
+    ids_set = tuple(t["id"] for t in transacciones)
+    placeholders_sim = ",".join("?" for _ in ids_set)
+    t_min = min(t["fecha"] for t in ingresos_externos)
+    cursor.execute("SAVEPOINT sim_lote")
+    try:
+        for t in transacciones:
+            if t["apartado_id"] is not None and t["tipo"] == 'gasto':
+                ap = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
+                if ap:
+                    nuevo_m = max(0.0, round(float(ap["monto_actual"]) - float(t["monto"]), 2))
+                    cursor.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (nuevo_m, t["apartado_id"]))
+        cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
+
+        tot_ap = obtener_total_apartados(cursor)
+        row_prev = cursor.execute("""
+            SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+            FROM transacciones
+            WHERE fecha < ? AND apartado_id IS NULL
+        """, (t_min,)).fetchone()
+        saldo_corriente = float(row_prev[0]) - tot_ap
+
+        filas_saldo = cursor.execute("""
+            SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+            FROM transacciones
+            WHERE fecha >= ? AND apartado_id IS NULL
+            GROUP BY fecha
+            ORDER BY fecha ASC
+        """, (t_min,)).fetchall()
+        deltas_por_fecha = {row["fecha"]: float(row["delta"]) for row in filas_saldo}
+        deltas_por_fecha.setdefault(t_min, 0.0)
+
+        for f in sorted(deltas_por_fecha.keys()):
+            saldo_corriente += deltas_por_fecha[f]
+            if saldo_corriente < -0.001:
+                return abs(saldo_corriente), f
+        return None
+    finally:
+        cursor.execute("ROLLBACK TO sim_lote")
+        cursor.execute("RELEASE sim_lote")
+
+
 def valor_rendimiento(capital: float, tasa_anual: float, fecha_base: date, hoy: date) -> float:
     """Valor de una cuenta con interés diario compuesto desde fecha_base."""
     dias = max(0, (hoy - fecha_base).days)

@@ -35,6 +35,24 @@ Todo cambio en `finanzas_core.py` lleva su caso en `test_finanzas.py`.
 - los `?v=` no coinciden con el contenido actual;
 - en Community existe algún archivo de la landing.
 
+## Cifras financieras: qué significa cada una
+
+Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, es un error.
+
+| Cifra | Dónde se ve | Cálculo |
+|---|---|---|
+| Disponible (balance) | Resumen, periodo de cobro | Suma de ingresos menos gastos de **todas** las transacciones (incluye depósitos y retiros de metas, que mueven dinero hacia y desde el ahorro). |
+| Dinero en metas | Resumen, Metas | Suma de `monto_actual` de los apartados; coincide con depósitos menos retiros de sus movimientos. |
+| Patrimonio | Resumen | Metas + valor de inversiones. |
+| Ingresos / gastos del mes | Resumen, historial mensual | Solo transacciones **sin** apartado. Los depósitos a metas no son gasto. |
+| Gastos normales del mes | Movimientos y fijos | Gastos del mes sin fijos ni cuotas MSI. |
+| Compromiso mensual | Movimientos y fijos | Fijos activos mensualizados más cuotas MSI mensuales. |
+| Libre al mes | Movimientos y fijos | Ingreso fijo mensual menos compromiso menos gastos normales del mes. |
+| Libre hasta el cobro | Resumen (periodo) | Disponible menos cargos fijos y cuotas MSI entre mañana y el siguiente cobro. |
+| Deuda MSI | Movimientos y fijos | Monto total pendiente de cada compra a meses. |
+
+Reglas que las pruebas vigilan: el historial mensual y el Resumen usan la misma regla de movimientos de apartados, y el `monto_actual` de cada apartado debe coincidir con sus movimientos.
+
 ## Diseño de la interfaz
 
 - `static/css/tokens.css`: paleta (oscuro obsidiana y champán, claro porcelana y tinta), tipografías (`--font-ui` Hanken Grotesk, `--font-num` Fraunces), radios y sombras. Todo color sale de aquí.

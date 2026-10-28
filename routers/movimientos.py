@@ -14,6 +14,8 @@ import sqlite3
 from finanzas_core import (
     ahora_local,
     calcular_resumen,
+    resumen_mensual_core,
+    deficit_al_eliminar_lote,
     convertir,
     materializar_recurrentes,
     validar_saldo_disponible_fecha,
@@ -177,57 +179,10 @@ def eliminar_transacciones_lote(
         return {"mensaje": "No se encontraron movimientos para eliminar", "eliminados": 0}
 
     # Validación de déficit si no es forzado y no es vaciado total
-    ingresos_externos = [t for t in transacciones if t["tipo"] == 'ingreso' and t["apartado_id"] is None]
-    if not req.forzar and not req.todos and ingresos_externos:
-        ids_set = tuple(t["id"] for t in transacciones)
-        placeholders_sim = ",".join("?" for _ in ids_set)
-        t_min = min(t["fecha"] for t in ingresos_externos)
-        cursor.execute("SAVEPOINT sim_lote")
-        try:
-            for t in transacciones:
-                if t["apartado_id"] is not None and t["tipo"] == 'gasto':
-                    ap = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
-                    if ap:
-                        m_act = float(ap["monto_actual"])
-                        m_t = float(t["monto"])
-                        nuevo_m = max(0.0, round(m_act - m_t, 2))
-                        cursor.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (nuevo_m, t["apartado_id"]))
-            cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
-            
-            tot_ap = obtener_total_apartados(cursor)
-
-            row_prev = cursor.execute("""
-                SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
-                FROM transacciones
-                WHERE fecha < ? AND apartado_id IS NULL
-            """, (t_min,)).fetchone()
-            saldo_corriente = float(row_prev[0]) - tot_ap
-
-            filas_saldo = cursor.execute("""
-                SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
-                FROM transacciones
-                WHERE fecha >= ? AND apartado_id IS NULL
-                GROUP BY fecha
-                ORDER BY fecha ASC
-            """, (t_min,)).fetchall()
-
-            deltas_por_fecha = {row["fecha"]: float(row["delta"]) for row in filas_saldo}
-            if t_min not in deltas_por_fecha:
-                deltas_por_fecha[t_min] = 0.0
-
-            deficit_encontrado = None
-            fecha_deficit = None
-            for f in sorted(deltas_por_fecha.keys()):
-                saldo_corriente += deltas_por_fecha[f]
-                if saldo_corriente < -0.001:
-                    deficit_encontrado = abs(saldo_corriente)
-                    fecha_deficit = f
-                    break
-        finally:
-            cursor.execute("ROLLBACK TO sim_lote")
-            cursor.execute("RELEASE sim_lote")
-            
-        if deficit_encontrado is not None:
+    if not req.forzar and not req.todos:
+        deficit = deficit_al_eliminar_lote(cursor, transacciones)
+        if deficit is not None:
+            deficit_encontrado, fecha_deficit = deficit
             raise HTTPException(
                 status_code=422,
                 detail=(
@@ -330,17 +285,7 @@ def obtener_resumen(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends
 
 @router.get("/api/resumen-mensual", summary="Historial agrupado por mes")
 def resumen_mensual(conn: sqlite3.Connection = Depends(get_tenant_db)):
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT strftime('%Y-%m', fecha) as mes,
-               SUM(CASE WHEN tipo='ingreso' THEN monto ELSE 0 END) as ingresos,
-               SUM(CASE WHEN tipo='gasto' THEN monto ELSE 0 END) as gastos
-        FROM transacciones
-        GROUP BY mes
-        ORDER BY mes DESC
-    """)
-    filas = cursor.fetchall()
-    return [dict(fila) for fila in filas]
+    return resumen_mensual_core(conn)
 
 @router.get("/api/transacciones", summary="Listar todas las transacciones del tenant")
 def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):
