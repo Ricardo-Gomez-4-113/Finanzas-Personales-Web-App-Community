@@ -82,56 +82,17 @@ function renderizarVistaPresupuesto(data) {
         }
     }
 
-    // 2. KPI de resumen (suma de todos los pagos) y bloques de pago con su distribución
-    renderKPIs(data);
+    // 2. Totales del plan en una línea y bloques de pago con su distribución
+    renderTotales(res);
     renderPagos(data);
 }
 
-function esInversion(nombre) {
-    const n = nombre.toLowerCase();
-    return ['inversión', 'inversion', 'etf', 'ahorro', 'cetes', 'fondo', 'renta fija'].some(p => n.includes(p));
-}
-
-// Los KPI suman todos los pagos activos: cada uno tiene su propio ingreso
-function renderKPIs(data) {
-    const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    const cfg = data.config;
-    const res = data.resumen;
-    const pagos = (data.unidades || []).filter(u => u.activa).length;
-    const ingreso = res.ingreso_total;
-    const asignado = res.total_asignado_monto;
-    const pctAsignado = ingreso > 0 ? (asignado / ingreso) * 100 : 0;
-    const pctDisponible = Math.max(0, 100 - pctAsignado);
-
-    setEl('lbl-pres-kpi-ingreso', fmt(ingreso));
-    setEl('lbl-pres-kpi-ingreso-sub', `${(cfg.frecuencia || '').toUpperCase()} · ${pagos} ${pagos === 1 ? 'pago' : 'pagos'}`);
-
-    setEl('lbl-pres-kpi-asignado', fmt(asignado));
-    const badgeAsig = document.getElementById('badge-pres-asignado');
-    if (badgeAsig) {
-        badgeAsig.textContent = `${pctAsignado.toFixed(1)}% del ingreso`;
-        badgeAsig.className = `pnl-badge ${res.excedido ? 'badge-danger' : 'badge-gold'}`;
-    }
-
-    setEl('lbl-pres-kpi-disponible', fmt(res.disponible_monto));
-    const badgeDisp = document.getElementById('badge-pres-disponible');
-    if (badgeDisp) {
-        if (res.excedido) {
-            badgeDisp.textContent = 'Algún pago está excedido';
-            badgeDisp.className = 'pnl-badge badge-danger';
-        } else {
-            badgeDisp.textContent = `${pctDisponible.toFixed(1)}% sin asignar`;
-            badgeDisp.className = 'pnl-badge badge-success';
-        }
-    }
-
-    const inversion = data.tarjetas.reduce((acc, t) => acc + (esInversion(t.nombre) ? t.monto : 0), 0);
-    setEl('lbl-pres-kpi-inv', fmt(inversion));
-    const badgeInv = document.getElementById('badge-pres-inv');
-    if (badgeInv) {
-        badgeInv.textContent = `${(ingreso > 0 ? (inversion / ingreso) * 100 : 0).toFixed(1)}% tasa ahorro/inv.`;
-        badgeInv.className = 'pnl-badge badge-success';
-    }
+// Totales del plan: suman todos los pagos activos y se muestran en una sola línea
+function renderTotales(res) {
+    const el = document.getElementById('lbl-pres-totales');
+    if (!el) return;
+    el.textContent = `Ingreso ${fmt(res.ingreso_total)} · Asignado ${fmt(res.total_asignado_monto)} · Sin asignar ${fmt(res.disponible_monto)}`;
+    el.classList.toggle('pres-totales-excedido', Boolean(res.excedido));
 }
 
 function nombrePago(orden, frecuencia) {
@@ -233,7 +194,7 @@ function renderGridTarjetas(pago, grid) {
                     ${iconSvg}
                 </div>
                 <div class="pres-card-titles">
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <div class="pres-card-nombre-fila">
                         <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
                         ${diaBadge}
                     </div>

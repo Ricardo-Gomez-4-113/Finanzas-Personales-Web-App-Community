@@ -812,11 +812,6 @@
 :root .btn-eliminar-apartado:hover { background: var(--danger-subtle); color: var(--danger-text); }
 
 /* ---------- Presupuesto ---------- */
-:root .pres-kpi-card { border-radius: var(--radius-m); box-shadow: none; }
-:root .pres-kpi-card:hover { transform: none; box-shadow: none; border-color: var(--gold-border); }
-:root .pres-kpi-title { font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; color: var(--text-muted); }
-
-:root .pres-kpi-tag,
 :root .pnl-badge {
     border-radius: 999px;
     border: 1px solid var(--border-color);
@@ -833,11 +828,6 @@
 :root .pnl-badge.badge-success { color: var(--success-text); border-color: color-mix(in srgb, var(--success-color) 30%, transparent); background: var(--success-subtle); }
 :root .pnl-badge.badge-gold { color: var(--gold-color); border-color: var(--gold-border); background: var(--gold-subtle); }
 
-:root .pres-kpi-val {
-    font-family: var(--font-num);
-    font-variant-numeric: tabular-nums lining-nums;
-    font-weight: 500;
-}
 
 :root .pres-chip,
 :root .btn-chip-tpl {

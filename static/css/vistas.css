@@ -2674,7 +2674,7 @@ input[type="number"].subperiodo-editor-input-pct {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 20px 24px;
+    padding: 14px 18px;
     box-shadow: var(--card-shadow);
 }
 
@@ -2716,71 +2716,6 @@ input[type="number"].subperiodo-editor-input-pct {
     font-size: 0.8rem;
     color: var(--text-muted);
 }
-
-.pres-cards-kpi {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 4px;
-}
-
-.pres-kpi-card {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 18px 20px;
-    box-shadow: var(--card-shadow);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.pres-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-}
-
-[data-theme="dark"] .pres-kpi-card:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-}
-
-.pres-kpi-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.pres-kpi-title {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: none;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-}
-
-.pres-kpi-tag {
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
-    background: var(--bg-color);
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-}
-
-.pres-kpi-val {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: var(--text-color);
-    font-variant-numeric: tabular-nums;
-    margin: 0;
-    line-height: 1.15;
-}
-
-.pres-val-gold { color: var(--gold-color); }
-.pres-val-success { color: var(--success-text); }
-.pres-val-inv { color: var(--success-color, var(--success-color)); }
 
 .badge-gold {
     background: var(--gold-subtle);
@@ -2977,8 +2912,8 @@ input[type="number"].subperiodo-editor-input-pct {
 /* Grid de Tarjetas de Presupuesto */
 .grid-presupuesto {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
 }
 
 .pres-card {
@@ -3215,10 +3150,6 @@ input[type="number"].subperiodo-editor-input-pct {
 @media (max-width: 860px) {
     .pres-config-row {
         grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    .pres-cards-kpi {
-        grid-template-columns: repeat(2, 1fr);
         gap: 12px;
     }
     .grid-presupuesto {
@@ -3461,6 +3392,29 @@ input[type="number"].subperiodo-editor-input-pct {
     font-size: 1.05rem;
     font-weight: 600;
     color: var(--text-main);
+}
+.pres-seccion-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pres-totales {
+    margin: 22px 0 4px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.pres-totales-excedido {
+    color: var(--danger-text);
+    font-weight: 600;
+}
+.pres-card-nombre-fila {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 .pres-seccion-ayuda {
     margin: 0 0 12px;

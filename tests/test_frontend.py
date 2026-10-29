@@ -349,6 +349,20 @@ def test_pagos_se_adaptan_a_la_frecuencia(navegador, base):
         ctx.close()
 
 
+def test_presupuesto_muestra_totales_en_una_linea(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-presupuesto")
+        # Las cuatro tarjetas KPI se quitaron: los totales van en una sola línea del encabezado de pagos
+        assert page.locator(".pres-kpi-card").count() == 0
+        page.wait_for_function("document.querySelector('#lbl-pres-totales').textContent.includes('Sin asignar')")
+        texto = page.inner_text("#lbl-pres-totales")
+        assert "Ingreso" in texto and "Asignado" in texto and "$" in texto, texto
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -469,6 +483,7 @@ if __name__ == "__main__":
                 (test_lista_de_movimientos_sigue_el_periodo_de_cobro, lambda: test_lista_de_movimientos_sigue_el_periodo_de_cobro(navegador, base)),
                 (test_doble_clic_al_guardar_tarjeta_no_duplica, lambda: test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base)),
                 (test_pagos_se_adaptan_a_la_frecuencia, lambda: test_pagos_se_adaptan_a_la_frecuencia(navegador, base)),
+                (test_presupuesto_muestra_totales_en_una_linea, lambda: test_presupuesto_muestra_totales_en_una_linea(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),

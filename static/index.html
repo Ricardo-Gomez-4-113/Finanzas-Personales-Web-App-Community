@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=c87a77a8c8">
-    <link rel="stylesheet" href="/static/css/layout.css?v=c87a77a8c8">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=c87a77a8c8">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=c87a77a8c8">
-    <link rel="stylesheet" href="/static/css/tema.css?v=c87a77a8c8">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1b3bfa577a">
+    <link rel="stylesheet" href="/static/css/layout.css?v=1b3bfa577a">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=1b3bfa577a">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=1b3bfa577a">
+    <link rel="stylesheet" href="/static/css/tema.css?v=1b3bfa577a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -719,44 +719,12 @@
                     </form>
                 </div>
 
-                <!-- 4 Tarjetas KPI de Resumen -->
-                <div class="cards pres-cards-kpi">
-                    <div class="card pres-kpi-card">
-                        <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Ingreso del plan</span>
-                            <span class="pres-kpi-tag" id="lbl-pres-kpi-ingreso-sub">MENSUAL</span>
-                        </div>
-                        <p class="pres-kpi-val" id="lbl-pres-kpi-ingreso">$0.00</p>
-                    </div>
-
-                    <div class="card pres-kpi-card">
-                        <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Total asignado</span>
-                            <span id="badge-pres-asignado" class="pnl-badge badge-gold">0.0% del total</span>
-                        </div>
-                        <p class="pres-kpi-val pres-val-gold" id="lbl-pres-kpi-asignado">$0.00</p>
-                    </div>
-
-                    <div class="card pres-kpi-card">
-                        <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Sin asignar</span>
-                            <span id="badge-pres-disponible" class="pnl-badge badge-success">100.0% sin asignar</span>
-                        </div>
-                        <p class="pres-kpi-val pres-val-success" id="lbl-pres-kpi-disponible">$0.00</p>
-                    </div>
-
-                    <div class="card pres-kpi-card">
-                        <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Inversión / ahorro</span>
-                            <span id="badge-pres-inv" class="pnl-badge badge-success">0.0%</span>
-                        </div>
-                        <p class="pres-kpi-val pres-val-inv" id="lbl-pres-kpi-inv">$0.00</p>
-                    </div>
-                </div>
-
                 <!-- Pagos del periodo: cada pago tiene su día de cobro y sus propias tarjetas -->
                 <div id="pres-pagos" class="pres-pagos">
-                    <h4 class="pres-seccion-titulo">Pagos del periodo</h4>
+                    <div class="pres-seccion-head">
+                        <h4 class="pres-seccion-titulo">Pagos del periodo</h4>
+                        <p class="pres-totales" id="lbl-pres-totales"></p>
+                    </div>
                     <p class="pres-seccion-ayuda">Cada pago reparte su ingreso en sus propias tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en el día de ese pago.</p>
                     <div id="pres-pagos-lista" class="pres-pagos-lista"></div>
                 </div>
@@ -1969,7 +1937,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=c87a77a8c8"></script>
+    <script type="module" src="/static/js/main.js?v=1b3bfa577a"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
