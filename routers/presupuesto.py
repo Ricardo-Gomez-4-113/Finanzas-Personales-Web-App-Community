@@ -283,7 +283,10 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         config_list = generar_subperiodos_default(frecuencia_nueva, sub_tipo)
 
     dia_pago = req.dia_pago
-    if req.dia_pago is not None:
+    if "dia_pago" not in req.model_fields_set:
+        # El día de cobro lo fija el pago 1 en la pantalla: guardar el ingreso no lo borra
+        dia_pago = cursor.execute("SELECT dia_pago FROM presupuesto_config WHERE id = 1").fetchone()["dia_pago"]
+    elif req.dia_pago is not None:
         try:
             dia_pago = int(req.dia_pago)
             if dia_pago < 1 or dia_pago > 31:
@@ -338,6 +341,9 @@ def actualizar_unidad_pago(orden: int, req: UnidadPagoUpdate, conn: sqlite3.Conn
     if orden > unidades_activas(cfg["frecuencia"]):
         raise HTTPException(status_code=422, detail=f"La frecuencia {cfg['frecuencia']} no tiene el pago {orden}.")
     cursor.execute("UPDATE presupuesto_unidades SET dia_pago = ? WHERE orden = ?", (req.dia_pago, orden))
+    if orden == 1:
+        # El día del pago 1 es también el día de cobro del ingreso fijo (lo leen la exportación y la nómina)
+        cursor.execute("UPDATE presupuesto_config SET dia_pago = ? WHERE id = 1", (req.dia_pago,))
     # Los días de los pagos activos con fecha deben ir en orden creciente
     cursor.execute("SELECT orden, dia_pago FROM presupuesto_unidades WHERE orden <= ? ORDER BY orden", (unidades_activas(cfg["frecuencia"]),))
     dias = [u["dia_pago"] for u in cursor.fetchall() if u["dia_pago"] is not None]

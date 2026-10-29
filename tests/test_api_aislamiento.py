@@ -354,6 +354,22 @@ def test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha):
     client.delete(f"/api/recurrentes/{rid}", headers=ha)
 
 
+def test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha):
+    estado = client.get("/api/presupuesto", headers=ha).json()
+    cfg_original, dia_original = estado["config"], estado["unidades"][0]["dia_pago"]
+    try:
+        r = client.put("/api/presupuesto/unidades/1", json={"dia_pago": 12}, headers=ha)
+        assert r.status_code == 200, r.text
+        # Guardar el ingreso sin enviar día no lo borra: el día sale del pago 1
+        r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
+        assert r.status_code == 200 and r.json()["config"]["dia_pago"] == 12, r.text
+    finally:
+        client.put(f"/api/presupuesto/unidades/1", json={"dia_pago": dia_original}, headers=ha)
+        client.put("/api/presupuesto/config", json={
+            "ingreso_base": cfg_original["ingreso_base"], "frecuencia": cfg_original["frecuencia"],
+            "subdivision_tipo": "ninguna"}, headers=ha)
+
+
 def test_pagos_del_presupuesto_por_api(client, ha):
     cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
     try:
@@ -445,6 +461,7 @@ if __name__ == "__main__":
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
             (test_pagos_del_presupuesto_por_api, lambda: test_pagos_del_presupuesto_por_api(client, ha)),
+            (test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra, lambda: test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha)),
             (test_msi_en_el_presupuesto_por_api, lambda: test_msi_en_el_presupuesto_por_api(client, ha)),
             (test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes, lambda: test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),

@@ -2680,7 +2680,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .pres-config-row {
     display: grid;
-    grid-template-columns: 1.4fr 1.15fr 0.95fr 1.35fr auto;
+    grid-template-columns: 1fr 1fr auto;
     gap: 14px;
     align-items: flex-end;
 }
@@ -3137,7 +3137,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 @media (max-width: 1080px) and (min-width: 861px) {
     .pres-config-row {
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr;
     }
     .pres-fg-subdiv {
         grid-column: span 2;

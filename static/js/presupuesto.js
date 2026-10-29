@@ -53,10 +53,8 @@ function renderizarVistaPresupuesto(data) {
     // 1. Inputs de configuración de ingreso base y frecuencia
     const inpIngreso = document.getElementById('pres-ingreso-base');
     const selFrecuencia = document.getElementById('pres-frecuencia');
-    const inpDia = document.getElementById('pres-ingreso-dia');
     if (inpIngreso && document.activeElement !== inpIngreso) inpIngreso.value = cfg.ingreso_base || '';
     if (selFrecuencia && document.activeElement !== selFrecuencia) selFrecuencia.value = cfg.frecuencia || 'mensual';
-    if (inpDia && document.activeElement !== inpDia) inpDia.value = (cfg.dia_pago !== undefined && cfg.dia_pago !== null) ? cfg.dia_pago : '';
 
     // Equivalencias de ingreso en el subtítulo
     const lblEq = document.getElementById('pres-ingreso-equivalentes');
@@ -259,18 +257,16 @@ export async function guardarConfigPresupuesto(e) {
     if (e && e.preventDefault) e.preventDefault();
     const inp = document.getElementById('pres-ingreso-base');
     const selFrec = document.getElementById('pres-frecuencia');
-    const inpDia = document.getElementById('pres-ingreso-dia');
     if (!inp || !selFrec) return;
 
     const ingreso_base = parseFloat(inp.value) || 0;
     const frecuencia = selFrec.value;
-    const dia_pago = (inpDia && inpDia.value) ? parseInt(inpDia.value, 10) : null;
 
     try {
         const res = await apiFetch('/api/presupuesto/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingreso_base, frecuencia, dia_pago })
+            body: JSON.stringify({ ingreso_base, frecuencia })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));

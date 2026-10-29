@@ -358,6 +358,8 @@ def test_presupuesto_muestra_totales_en_una_linea(navegador, base):
         page.wait_for_function("document.querySelector('#lbl-pres-totales').textContent.includes('Sin asignar')")
         texto = page.inner_text("#lbl-pres-totales")
         assert "Ingreso" in texto and "Asignado" in texto and "$" in texto, texto
+        # El día de cobro se fija en cada pago: la configuración del ingreso ya no tiene ese campo
+        assert page.locator("#pres-ingreso-dia").count() == 0
         assert not errores, errores
     finally:
         ctx.close()
