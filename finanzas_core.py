@@ -1226,13 +1226,13 @@ def exportar_presupuesto_a_fijos_core(
     fecha_base: date = None
 ) -> dict:
     """
-    Reemplazo total. Se borran todos los fijos (recurrentes sin compra a meses, incluidos los aportes
-    recurrentes a metas) y se crean desde el presupuesto:
+    Reemplazo total. Se borran todos los fijos, incluidos los aportes a metas y las compras a meses
+    (MSI) que no estén en el presupuesto, y se crean desde los pagos activos:
     - La nómina del ingreso fijo, con la frecuencia del presupuesto.
-    - Las tarjetas del tablero general, con su periodicidad, día o subperiodos.
-    - Las tarjetas de cada unidad de pago activa: un fijo mensual en la fecha de su pago.
-    Las compras a meses (MSI) no se tocan; mientras exista una ligada a la tarjeta o con su nombre,
-    esa tarjeta no genera fijo. Los movimientos ya generados se conservan, sin enlace a un fijo.
+    - Cada tarjeta de pago: un fijo mensual en la fecha de su pago. Una tarjeta MSI es una compra a
+      cuotas con el plazo indicado.
+    Los fijos del presupuesto que siguen vigentes se actualizan en su lugar para no duplicar el cargo
+    del mes. Los movimientos ya generados se conservan, sin enlace a un fijo.
     Lanza ValueError si las unidades activas no tienen fechas válidas.
     """
     hoy = fecha_base or ahora_local().date()
@@ -1320,23 +1320,6 @@ def exportar_presupuesto_a_fijos_core(
         nombre = t["nombre"].strip()
         tarjeta_id = t["id"]
 
-        # Una compra a meses activa con el mismo nombre (o ligada a la tarjeta) cubre la tarjeta:
-        # no se exporta fijo para no duplicar el cargo.
-        nombre_limpio = re.sub(r'\s*\((?:msi|meses sin intereses)\)', '', nombre, flags=re.IGNORECASE).strip()
-        msi_vigente = cursor.execute("""
-            SELECT 1 FROM recurrentes
-            WHERE tipo = 'gasto' AND total_cuotas IS NOT NULL AND activo = 1 AND (
-                presupuesto_tarjeta_id = ?
-                OR LOWER(TRIM(REPLACE(REPLACE(descripcion, ' (MSI)', ''), ' (msi)', ''))) = LOWER(?)
-                OR LOWER(TRIM(descripcion)) = LOWER(?)
-                OR LOWER(TRIM(descripcion)) LIKE LOWER(?)
-            )
-            LIMIT 1
-        """, (tarjeta_id, nombre_limpio, nombre, f"{nombre_limpio} (%")).fetchone()
-        if msi_vigente:
-            detalles.append({"descripcion": nombre, "monto": monto_tarjeta, "frecuencia": frecuencia, "accion": "ignorado_msi"})
-            continue
-
         cat_id = resolver_categoria_por_nombre(cursor, f"{nombre} {t['notas'] or ''}", tipo="gasto")
         ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
         apartado_id = ap["id"] if ap else None
@@ -1346,10 +1329,13 @@ def exportar_presupuesto_a_fijos_core(
             if t["unidad_orden"] > activas:
                 continue
             dia_f, prox_f = _calc_proxima_fecha(dias_unidades[t["unidad_orden"]], 'mensual', hoy)
+            # Compra a meses: su monto es la cuota y el fijo cobra hasta completar el plazo
+            msi_total = int(t["msi_cuotas"]) if t["tipo"] == 'msi' and t["msi_cuotas"] else None
             deseados.append({
                 "tarjeta_id": tarjeta_id, "tipo": "gasto", "descripcion": nombre,
                 "monto": round(monto_tarjeta, 2), "frecuencia": 'mensual', "dia": dia_f,
                 "proxima": prox_f, "categoria_id": cat_id, "apartado_id": apartado_id,
+                "total_cuotas": msi_total,
             })
             continue
 
@@ -1413,10 +1399,9 @@ def exportar_presupuesto_a_fijos_core(
             })
 
     # 2. Reemplazo. Los fijos del presupuesto que siguen vigentes se actualizan en su lugar (no se
-    #    recrean, así no se duplica el cargo del mes); el resto de fijos, incluidos los hechos a mano, se borra.
-    libres = cursor.execute(
-        "SELECT * FROM recurrentes WHERE total_cuotas IS NULL ORDER BY id ASC"
-    ).fetchall()
+    #    recrean, así no se duplica el cargo del mes); el resto de fijos, incluidos los hechos a mano
+    #    y las compras a meses, se borra.
+    libres = cursor.execute("SELECT * FROM recurrentes ORDER BY id ASC").fetchall()
     emparejados = []
     pendientes = []
     for item in deseados:
@@ -1440,12 +1425,13 @@ def exportar_presupuesto_a_fijos_core(
     for item, fila in emparejados:
         item["proxima"] = _sin_cargo_previo(cursor, item)
         valores = (item["descripcion"], item["tipo"], item["monto"], item["frecuencia"], item["dia"],
-                   item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"])
+                   item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"],
+                   item.get("total_cuotas"))
         if fila is not None:
             cursor.execute("""
                 UPDATE recurrentes
                 SET descripcion = ?, tipo = ?, monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?,
-                    categoria_id = ?, apartado_id = ?, presupuesto_tarjeta_id = ?, activo = 1
+                    categoria_id = ?, apartado_id = ?, presupuesto_tarjeta_id = ?, total_cuotas = ?, activo = 1
                 WHERE id = ?
             """, valores + (fila["id"],))
             actualizados += 1
@@ -1453,8 +1439,8 @@ def exportar_presupuesto_a_fijos_core(
         else:
             cursor.execute("""
                 INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
-                                         categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                                         categoria_id, apartado_id, presupuesto_tarjeta_id, total_cuotas, activo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """, valores)
             creados += 1
             accion = "creado"

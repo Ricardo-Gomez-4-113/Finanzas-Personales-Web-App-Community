@@ -321,6 +321,28 @@ def test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha):
                                                     "subdivision_tipo": cfg_original.get("subdivision_tipo") or "ninguna"}, headers=ha)
 
 
+def test_msi_en_el_presupuesto_por_api(client, ha):
+    cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
+    try:
+        r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "semanal", "subdivision_tipo": "ninguna"}, headers=ha)
+        assert r.status_code == 200, r.text
+        # Una compra a meses necesita su plazo
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Celular MSI", "monto": 800, "unidad_orden": 1, "tipo": "msi"}, headers=ha)
+        assert r.status_code == 422 and "meses" in r.text, r.text
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Celular MSI", "monto": 800, "unidad_orden": 1, "tipo": "msi", "msi_cuotas": 12}, headers=ha)
+        assert r.status_code == 201, r.text
+        tarjeta = r.json()
+        assert tarjeta["tipo"] == "msi" and tarjeta["msi_cuotas"] == 12, tarjeta
+        # Pasarla a normal limpia el plazo
+        r = client.patch(f"/api/presupuesto/tarjetas/{tarjeta['id']}", json={"tipo": "normal"}, headers=ha)
+        assert r.status_code == 200 and r.json()["tipo"] == "normal" and r.json()["msi_cuotas"] is None, r.text
+        client.delete(f"/api/presupuesto/tarjetas/{tarjeta['id']}", headers=ha)
+    finally:
+        client.put("/api/presupuesto/config", json={
+            "ingreso_base": cfg_original["ingreso_base"], "frecuencia": cfg_original["frecuencia"],
+            "subdivision_tipo": "ninguna"}, headers=ha)
+
+
 def test_pagos_del_presupuesto_por_api(client, ha):
     cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
     try:
@@ -412,6 +434,7 @@ if __name__ == "__main__":
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
             (test_pagos_del_presupuesto_por_api, lambda: test_pagos_del_presupuesto_por_api(client, ha)),
+            (test_msi_en_el_presupuesto_por_api, lambda: test_msi_en_el_presupuesto_por_api(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),

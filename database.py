@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 15
+CURRENT_TENANT_SCHEMA_VERSION = 16
 
 
 # =============================================================================
@@ -465,6 +465,23 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("UPDATE presupuesto_config SET subdivision_tipo = 'ninguna', subdivision_config = '[]' WHERE id = 1;")
         cursor.execute("PRAGMA user_version = 15;")
         current_version = 15
+
+    # -------------------------------------------------------------
+    # Versión 16: Compras a meses sin intereses dentro del presupuesto.
+    # tipo 'msi' marca una tarjeta cuyo monto es la cuota mensual; msi_cuotas es su plazo.
+    # Al exportar se convierte en una compra a cuotas (recurrente con total_cuotas).
+    # -------------------------------------------------------------
+    if current_version < 16 and CURRENT_TENANT_SCHEMA_VERSION >= 16:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'normal' CHECK (tipo IN ('normal', 'msi'));")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN msi_cuotas INTEGER CHECK (msi_cuotas IS NULL OR msi_cuotas BETWEEN 2 AND 60);")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("PRAGMA user_version = 16;")
+        current_version = 16
 
     conn.commit()
 

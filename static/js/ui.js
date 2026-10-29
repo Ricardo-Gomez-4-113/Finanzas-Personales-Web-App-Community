@@ -4,7 +4,6 @@
 
 import { cargarDatosAdmin } from './admin.js';
 import { estado } from './core.js';
-import { cargarRecurrentes } from './recurrentes.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { cargarInversiones } from './inversiones.js';
 import { repintarGraficas } from './dashboard.js';
@@ -175,7 +174,7 @@ export function cambiarPestana(tabId) {
         cargarDatosAdmin();
     }
     if (tabId === 'tab-movimientos') {
-        cargarRecurrentes();
+        document.dispatchEvent(new Event('activar-recurrentes'));
         renderTablaMovimientos();
     }
     if (tabId === 'tab-presupuesto') {
@@ -210,7 +209,7 @@ export function cambiarSubtabMovimientos(subtab) {
         btnFijos.classList.add('active');
         contentHistorial.classList.remove('active');
         contentFijos.classList.add('active');
-        cargarRecurrentes();
+        document.dispatchEvent(new Event('activar-recurrentes'));
     } else {
         btnFijos.classList.remove('active');
         btnHistorial.classList.add('active');

@@ -252,7 +252,7 @@ function renderGridTarjetas(pago, grid) {
             <div class="pres-card-metric-block">
                 <div class="pres-card-pct-badge pres-badge-${escapeHTML(t.color)}">${pctPago.toFixed(1)}% de este pago</div>
                 <div class="pres-card-amount">${fmt(t.monto)}</div>
-                <div class="pres-card-freq-tag">en este pago</div>
+                <div class="pres-card-freq-tag">${t.tipo === 'msi' ? `cuota mensual · ${t.msi_cuotas} meses` : 'en este pago'}</div>
             </div>
 
             <div class="pres-card-progress-bar">
@@ -479,7 +479,7 @@ export async function ejecutarExportarPresupuesto() {
             return;
         }
 
-        const advertencia = 'Al exportar se sobrescribe todo: se borran todos los fijos (también los que creaste a mano y los aportes a metas) y se reemplazan por lo que marcaste.\n\nLas compras a meses no se tocan.\n\n¿Continuar?';
+        const advertencia = 'Al exportar se sobrescribe todo: se borran todos los fijos (también los que creaste a mano y los aportes a metas) y se reemplazan por lo que marcaste.\n\nLas compras a meses también se borran, salvo las que tengas como tarjeta MSI del presupuesto.\n\n¿Continuar?';
         if (!confirm(advertencia)) {
             if (btn) btn.disabled = false;
             return;
@@ -521,6 +521,12 @@ export async function ejecutarExportarPresupuesto() {
 }
 
 
+// Los meses de la compra a MSI solo aparecen si la tarjeta es de ese tipo
+function sincronizarCamposMsi() {
+    const activo = document.getElementById('tarjeta-pres-msi')?.checked === true;
+    document.getElementById('tarjeta-pres-msi-campos')?.classList.toggle('hidden', !activo);
+}
+
 // Una tarjeta de pago toma el día del pago: el campo de día no se muestra
 function ajustarModalParaPago(esPago) {
     const campoDia = document.getElementById('tarjeta-pres-dia')?.closest('.form-group');
@@ -538,6 +544,9 @@ export function abrirModalCrearTarjeta(pago = null) {
     form.reset();
     document.getElementById('tarjeta-pres-icono').value = 'wallet';
     document.getElementById('tarjeta-pres-color').value = 'gold';
+    document.getElementById('tarjeta-pres-msi').checked = false;
+    document.getElementById('tarjeta-pres-msi-cuotas').value = '';
+    sincronizarCamposMsi();
     const inpDia = document.getElementById('tarjeta-pres-dia');
     if (inpDia) inpDia.value = '';
     if (titulo) {
@@ -567,6 +576,9 @@ export function abrirModalEditarTarjeta(t) {
     document.getElementById('tarjeta-pres-notas').value = t.notas || '';
     const inpDia = document.getElementById('tarjeta-pres-dia');
     if (inpDia) inpDia.value = (t.dia_pago !== undefined && t.dia_pago !== null) ? t.dia_pago : '';
+    document.getElementById('tarjeta-pres-msi').checked = t.tipo === 'msi';
+    document.getElementById('tarjeta-pres-msi-cuotas').value = t.msi_cuotas ?? '';
+    sincronizarCamposMsi();
 
     if (titulo) titulo.textContent = 'Editar tarjeta de presupuesto';
     ajustarModalParaPago(pagoTarjetaEditando !== null);
@@ -641,7 +653,9 @@ export async function guardarTarjetaPresupuesto(e) {
         toast('Define primero tu ingreso fijo base para asignar tarjetas por porcentaje.', 'error');
         return;
     }
-    const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago };
+    const esMsi = document.getElementById('tarjeta-pres-msi').checked;
+    const msiCuotas = parseInt(document.getElementById('tarjeta-pres-msi-cuotas').value, 10) || null;
+    const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago, tipo: esMsi ? 'msi' : 'normal', msi_cuotas: esMsi ? msiCuotas : null };
     if (!idEditar && pagoCrear !== null) body.unidad_orden = pagoCrear;
 
     guardandoTarjeta = true;
@@ -697,6 +711,8 @@ export async function eliminarTarjetaPresupuesto(id, nombre) {
 export function inicializarPresupuesto() {
     const formConfig = document.getElementById('form-presupuesto-config');
     if (formConfig) formConfig.addEventListener('submit', guardarConfigPresupuesto);
+
+    document.getElementById('tarjeta-pres-msi')?.addEventListener('change', sincronizarCamposMsi);
 
     const selFrec = document.getElementById('pres-frecuencia');
     if (selFrec) selFrec.addEventListener('change', alCambiarFrecuenciaPresupuesto);

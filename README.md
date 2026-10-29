@@ -91,7 +91,8 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * Los repartos se calculan en centavos: la suma de las tarjetas de un pago siempre coincide exactamente con su ingreso.
 * Pagos del periodo: según la frecuencia del ingreso (semanal 4, quincenal 2, mensual 1), aparecen bloques de pago con su día de cobro y sus propias tarjetas. Cada pago muestra su ingreso, lo asignado y lo libre, y no puede asignar más que su ingreso.
 * Cada pago tiene su propia distribución del ingreso: una barra con sus tarjetas y lo que queda libre.
-* Exportación del presupuesto a gastos fijos con fecha de inicio configurable. Es un reemplazo total: borra todos los fijos (salvo las compras a meses) y crea los del presupuesto. Cada tarjeta de un pago es un fijo mensual en el día de su pago.
+* Compras a meses sin intereses dentro de un pago: una tarjeta MSI aporta su cuota mensual y, al exportar, se convierte en una compra a cuotas con el plazo indicado.
+* Exportación del presupuesto a gastos fijos con fecha de inicio configurable. Es un reemplazo total: borra todos los fijos, también las compras a meses que no estén en el presupuesto, y crea los del presupuesto. Cada tarjeta de un pago es un fijo mensual en el día de su pago.
 
 ### 10. 🩺 Respaldo Automático y Monitoreo
 * **Respaldo nocturno:** `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/`, verifica cada copia y conserva 14 días.

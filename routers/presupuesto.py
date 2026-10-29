@@ -56,6 +56,8 @@ class TarjetaPresupuestoCreate(BaseModel):
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
     distribucion_subperiodos: Optional[List[dict]] = None
     unidad_orden: int = Field(..., ge=1, le=4, description="Pago al que pertenece la tarjeta (1 a 4)")
+    tipo: Literal['normal', 'msi'] = 'normal'
+    msi_cuotas: Optional[int] = Field(None, ge=2, le=60, description="Plazo de la compra a meses (solo tipo msi)")
 
 
 class UnidadPagoUpdate(BaseModel):
@@ -72,6 +74,8 @@ class TarjetaPresupuestoUpdate(BaseModel):
     orden: Optional[int] = None
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
     distribucion_subperiodos: Optional[List[dict]] = None
+    tipo: Optional[Literal['normal', 'msi']] = None
+    msi_cuotas: Optional[int] = Field(None, ge=2, le=60)
 
 
 class ImportarFijosRequest(BaseModel):
@@ -398,6 +402,15 @@ def exportar_presupuesto_a_fijos(
     return res
 
 
+def _validar_tipo_msi(tipo: str, msi_cuotas: Optional[int]) -> Optional[int]:
+    """Una compra a meses necesita su plazo; una tarjeta normal no lo guarda."""
+    if tipo == 'msi':
+        if msi_cuotas is None:
+            raise HTTPException(status_code=422, detail="Indica el número de meses de la compra a meses sin intereses.")
+        return msi_cuotas
+    return None
+
+
 def _resolver_montos(monto, porcentaje, ingreso):
     """Monto y porcentaje coherentes. Un monto vacío o en cero con porcentaje manda el porcentaje
     (la interfaz envía los dos campos). Sin ingreso base no se puede convertir un porcentaje."""
@@ -417,6 +430,7 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     ingreso = float(cfg["ingreso_base"])
 
     monto, porcentaje = _resolver_montos(req.monto, req.porcentaje, ingreso)
+    msi_cuotas = _validar_tipo_msi(req.tipo, req.msi_cuotas)
 
     if req.unidad_orden is not None:
         if req.unidad_orden > unidades_activas(cfg["frecuencia"]):
@@ -445,9 +459,9 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
         "SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas WHERE unidad_orden IS ?", (req.unidad_orden,)
     ).fetchone()[0]
     cursor.execute("""
-        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden))
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden, tipo, msi_cuotas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden, req.tipo, msi_cuotas))
 
     tarjeta_id = cursor.lastrowid
     conn.commit()
@@ -480,6 +494,11 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("notas = ?"); valores.append(req.notas)
     if req.orden is not None:
         campos.append("orden = ?"); valores.append(req.orden)
+    if req.tipo is not None or req.msi_cuotas is not None:
+        tipo_nuevo = req.tipo if req.tipo is not None else fila["tipo"]
+        cuotas_nuevas = req.msi_cuotas if req.msi_cuotas is not None else fila["msi_cuotas"]
+        campos.extend(["tipo = ?", "msi_cuotas = ?"])
+        valores.extend([tipo_nuevo, _validar_tipo_msi(tipo_nuevo, cuotas_nuevas)])
     dia_efectivo = req.dia_pago if "dia_pago" in req.model_fields_set else fila["dia_pago"]
 
     if "distribucion_subperiodos" in req.model_fields_set and not es_pago:

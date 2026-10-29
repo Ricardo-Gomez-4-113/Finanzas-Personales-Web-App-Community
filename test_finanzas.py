@@ -1007,7 +1007,53 @@ def test_presupuesto_tarjeta_dia_pago_y_subperiodos():
     assert parsed[1]["dia"] == 20
 
 
-def test_exportar_presupuesto_no_duplica_msi_y_respeta_dias():
+def test_exportar_borra_msi_que_no_estan_en_el_presupuesto():
+    conn = nueva_bd()
+    cur = conn.cursor()
+    # Compra a meses suelta (no está en el presupuesto): la exportación la borra
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
+        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+    """)
+    # Tarjeta del presupuesto con el mismo nombre (legacy, sin pago): se exporta como fijo normal
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
+        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 1074.92, 14)
+    """)
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    assert res["eliminados"] >= 1
+    assert not cur.execute("SELECT 1 FROM recurrentes WHERE descripcion = 'Pixel 10' AND total_cuotas IS NOT NULL").fetchone()
+    pixel = cur.execute("SELECT * FROM recurrentes WHERE descripcion LIKE 'Pixel 10%'").fetchall()
+    assert len(pixel) == 1 and pixel[0]["total_cuotas"] is None
+
+
+def test_exportar_msi_del_presupuesto_crea_compra_a_cuotas():
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    cur.execute("INSERT INTO presupuesto_unidades (orden, dia_pago) VALUES (1, 10) ON CONFLICT(orden) DO UPDATE SET dia_pago = 10")
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, unidad_orden, tipo, msi_cuotas)
+        VALUES ('Celular', 'credit-card', 'amber', 10.0, 1000.0, 1, 'msi', 12)
+    """)
+    conn.commit()
+
+    res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    assert res["creados"] >= 1
+    fijo = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Celular'").fetchone()
+    assert fijo["total_cuotas"] == 12
+    assert fijo["cuotas_generadas"] == 0
+    assert fijo["monto"] == 1000.0
+    assert fijo["dia"] == 10
+
+    # Segunda exportación: se actualiza en su lugar, sin duplicar la compra
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    assert cur.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Celular'").fetchone()[0] == 1
+
+
+def test_exportar_presupuesto_respeta_dias():
     conn = nueva_bd()
     cur = conn.cursor()
     # 1. Crear recurrente MSI Pixel 10
@@ -1032,15 +1078,10 @@ def test_exportar_presupuesto_no_duplica_msi_y_respeta_dias():
     conn.commit()
 
     res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
-    # Pixel 10 debe ser ignorado como MSI
-    msi_item = next((d for d in res["detalles"] if "Pixel" in d["descripcion"]), None)
-    assert msi_item is not None
-    assert msi_item["accion"] == "ignorado_msi"
-
-    # Verificar que solo hay 1 registro de Pixel 10 en recurrentes (el MSI original)
+    # La compra a meses 'Pixel 10' no está en el presupuesto: se borra y solo queda el fijo de la tarjeta
     pixel_recs = cur.execute("SELECT * FROM recurrentes WHERE descripcion LIKE '%Pixel%'").fetchall()
     assert len(pixel_recs) == 1
-    assert pixel_recs[0]["total_cuotas"] == 10
+    assert pixel_recs[0]["total_cuotas"] is None
 
     # Sueldo madre se debió crear con dia = 30
     madre_rec = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Sueldo madre'").fetchone()
@@ -1923,7 +1964,7 @@ def test_export_sobrescribe_todo_y_borra_lo_que_sobra():
     assert conn.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Dentista'").fetchone()[0] == 0
 
 
-def test_export_borra_tambien_los_fijos_a_mano_y_respeta_msi():
+def test_export_borra_tambien_los_fijos_a_mano_y_los_msi():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = _presupuesto_para_export()
     insertar_recurrente(conn, "Nómina quincenal", 'ingreso', 14250, 'quincenal', 15, date(2026, 10, 31))
@@ -1935,10 +1976,10 @@ def test_export_borra_tambien_los_fijos_a_mano_y_respeta_msi():
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
     conn.commit()
-    # Los fijos hechos a mano se borran, la compra a meses no se toca y la nómina sigue en el presupuesto
+    # Los fijos hechos a mano y la compra a meses que no está en el presupuesto se borran; la nómina sigue
     activos = _activos(conn)
     assert "Netflix" not in activos and "Nómina quincenal" not in activos, activos
-    assert activos["Pixel 10"] == 1074.92, activos
+    assert "Pixel 10" not in activos, activos
     assert activos["Nómina Fija (Presupuesto)"] == 9000.0, activos
 
 

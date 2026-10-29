@@ -180,6 +180,19 @@ def test_v15_pasa_las_tarjetas_del_tablero_general_al_pago_1():
         _migrar_hasta(conn, 15)  # idempotente
         assert _version(conn) == 15
 
+
+def test_v16_tarjetas_msi_y_tarjetas_normales_quedan_intactas():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 15)
+        conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES ('Luz', 'x', 'amber', 10, 900, '', 1, 1)")
+        conn.commit()
+        _migrar_hasta(conn, 16)
+        assert _version(conn) == 16
+        fila = conn.execute("SELECT tipo, msi_cuotas, monto FROM presupuesto_tarjetas WHERE nombre = 'Luz'").fetchone()
+        assert tuple(fila) == ("normal", None, 900.0), tuple(fila)
+        _migrar_hasta(conn, 16)  # idempotente
+        assert _version(conn) == 16
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo
