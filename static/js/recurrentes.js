@@ -3,7 +3,6 @@
  */
 
 import { apiFetch, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
-import { fechaCorta } from './dashboard.js';
 
 
 const FRECUENCIA_TXT = { semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual' };
@@ -525,25 +524,6 @@ export async function guardarEdicionRecurrente(e) {
 // Carga
 // -----------------------------------------------------------------------------
 
-const rangoPeriodo = p => `${fechaCorta(p.inicio)} al ${fechaCorta(p.fin)}`;
-
-function renderTablaPeriodos(periodos) {
-    const cuerpo = document.getElementById('tabla-periodos-body');
-    if (!cuerpo) return;
-    if (periodos.length === 0) {
-        cuerpo.innerHTML = '<tr><td colspan="5" class="empty-state">Sin periodos que mostrar.</td></tr>';
-        return;
-    }
-    const negativo = v => (v < 0 ? ' text-gasto' : '');
-    cuerpo.innerHTML = periodos.map(p => `<tr class="${p.en_curso ? 'periodo-en-curso' : ''}">
-            <td>${escapeHTML(rangoPeriodo(p))}${p.en_curso ? ' <span class="badge-tag">En curso</span>' : ''}</td>
-            <td class="num">${fmt(p.ingresos.total)}</td>
-            <td class="num">${fmt(p.gastos.total)}</td>
-            <td class="num">${fmt(p.metas)}</td>
-            <td class="num${negativo(p.saldo_final)}">${fmt(p.saldo_final)}</td>
-        </tr>`).join('');
-}
-
 export async function cargarRecurrentes() {
     try {
         const [resRec, resResumen, resApartados] = await Promise.all([
@@ -567,13 +547,11 @@ export async function cargarRecurrentes() {
         if (actual) {
             setTxt('lbl-rec-ingreso', actual.ingresos.total);
             setTxt('lbl-rec-gastos-normales', actual.gastos.normales);
-            setTxt('lbl-rec-gasto', actual.gastos.fijos_y_msi);
+            setTxt('lbl-rec-fijos', actual.gastos.fijos);
+            setTxt('lbl-rec-msi', actual.gastos.msi);
             setPlain('lbl-rec-ingreso-sub', `Recibido ${fmt(actual.ingresos.recibido)} · por recibir ${fmt(actual.ingresos.por_recibir)}`);
-            const cobro = resumen.periodo && resumen.periodo.cobro;
-            setPlain('lbl-rec-periodo', `Periodo del ${rangoPeriodo(actual)} · ${cobro ? `marcado por ${cobro.descripcion}` : 'mes calendario (sin ingreso fijo)'}`);
         }
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
-        renderTablaPeriodos(periodos);
 
 
         renderListaMsi(items.filter(r => r.es_msi && r.cuotas_generadas < r.total_cuotas));

@@ -250,24 +250,19 @@ def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
 
 
 def test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base):
-    """Resumen y Movimientos pintan el periodo en curso de la nómina quincenal, sin cifras repetidas."""
+    """Resumen y Movimientos pintan el periodo en curso, con fijos y compras a meses en tarjetas separadas."""
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         page.wait_for_selector("#periodo-libre:not(:empty)")
         assert page.locator("#lbl-dash-mes-ingresos").count() == 0, "Ingresos del periodo debe vivir solo en Movimientos"
         _ir(page, "tab-movimientos")
-        page.wait_for_function("document.querySelectorAll('#tabla-periodos-body tr').length >= 3", timeout=10000)
-        tarjetas = {i: page.inner_text(f"#{i}") for i in ("lbl-rec-ingreso", "lbl-rec-gastos-normales", "lbl-rec-gasto")}
-        assert tarjetas == {"lbl-rec-ingreso": "$14,000.00", "lbl-rec-gastos-normales": "$0.00",
-                            "lbl-rec-gasto": "$299.00"}, tarjetas
+        page.wait_for_selector("#lbl-rec-ingreso:not(:empty)")
+        tarjetas = {i: page.inner_text(f"#{i}") for i in ("lbl-rec-ingreso", "lbl-rec-gastos-normales", "lbl-rec-fijos", "lbl-rec-msi")}
+        assert tarjetas["lbl-rec-ingreso"] == "$14,000.00" and tarjetas["lbl-rec-gastos-normales"] == "$0.00", tarjetas
+        assert tarjetas["lbl-rec-fijos"] == "$299.00", tarjetas
         assert page.locator("#lbl-rec-libre").count() == 0, "el remanente se muestra solo como Libre en el Resumen"
-        assert page.locator("#tabla-periodos-body th, #tabla-periodos-body td").count() >= 0
-        encabezados = page.locator(".movs-periodos thead th").all_inner_texts()
-        assert "Remanente" not in encabezados and "Saldo al cierre" in encabezados, encabezados
-        filas = page.locator("#tabla-periodos-body tr")
-        primera, segunda = filas.nth(0).inner_text(), filas.nth(1).inner_text()
-        assert "15 oct al 30 oct" in primera and "$14,000.00" in primera and "$8,103.00" in primera, primera
-        assert "$11,500.00" in segunda and "$10,603.00" in segunda, segunda
+        assert page.locator("#tabla-periodos-body").count() == 0, "la tabla de periodos se quitó de Movimientos"
+        assert page.locator("#lbl-rec-periodo").count() == 0
         _sin_desbordamiento(page, "laptop/movimientos-periodos")
         assert not errores, errores
     finally:

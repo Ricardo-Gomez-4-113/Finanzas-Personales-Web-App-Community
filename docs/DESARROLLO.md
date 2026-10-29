@@ -60,7 +60,6 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Ingreso del periodo | Resumen, Movimientos | Ingresos con fecha dentro del periodo: recibidos más los fijos aún por recibir. |
 | Gastos del periodo | Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |
 | A metas | Movimientos | Depósitos menos retiros de metas del periodo, incluidos los aportes recurrentes programados. |
-| Saldo al cierre | Movimientos | Saldo inicial del periodo más su remanente; es el saldo inicial del siguiente periodo. |
 | Libre hasta el cobro | Resumen (periodo) | Disponible menos los cargos que faltan en el periodo más los ingresos que aún llegan en él: el saldo al cierre del periodo en curso. |
 | Deuda MSI | Fijos y MSI | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
 | Rubro del movimiento | Resumen, Movimientos | Se guarda en la propia transacción (`transacciones.rubro`: fijos, msi, normales, ingreso o metas). No depende del enlace a `recurrentes`, que al borrar un fijo pasa a NULL. |

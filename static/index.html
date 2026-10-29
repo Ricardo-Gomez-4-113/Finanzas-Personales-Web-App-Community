@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=7c9994b064">
-    <link rel="stylesheet" href="/static/css/layout.css?v=7c9994b064">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=7c9994b064">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=7c9994b064">
-    <link rel="stylesheet" href="/static/css/tema.css?v=7c9994b064">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=c87a77a8c8">
+    <link rel="stylesheet" href="/static/css/layout.css?v=c87a77a8c8">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=c87a77a8c8">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=c87a77a8c8">
+    <link rel="stylesheet" href="/static/css/tema.css?v=c87a77a8c8">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -409,7 +409,7 @@
         <!-- PESTAÑA: MOVIMIENTOS Y FIJOS (UNIFICADA)       -->
         <!-- ============================================== -->
         <section id="tab-movimientos" class="tab-content">
-            <div class="cards">
+            <div class="cards cards-4">
                 <!-- Compatibilidad DOM -->
 
                 <div class="card ingresos">
@@ -423,27 +423,12 @@
                     <small class="card-subtext">Variables del día a día en este periodo</small>
                 </div>
                 <div class="card gastos">
-                    <h3>Fijos y MSI</h3>
-                    <p id="lbl-rec-gasto">$0.00</p>
+                    <h3>Fijos</h3>
+                    <p id="lbl-rec-fijos">$0.00</p>
                 </div>
-            </div>
-            <p class="card-subtext movs-periodo-rango" id="lbl-rec-periodo"></p>
-
-            <div class="card movs-periodos">
-                <h3>Periodos según tu ingreso fijo</h3>
-                <div class="movs-periodos-tabla">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Periodo</th>
-                                <th class="num">Ingreso</th>
-                                <th class="num">Gastos</th>
-                                <th class="num">A metas</th>
-                                                                <th class="num">Saldo al cierre</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-periodos-body"></tbody>
-                    </table>
+                <div class="card gastos">
+                    <h3>Compras a meses</h3>
+                    <p id="lbl-rec-msi">$0.00</p>
                 </div>
             </div>
 
@@ -1984,7 +1969,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=7c9994b064"></script>
+    <script type="module" src="/static/js/main.js?v=c87a77a8c8"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
