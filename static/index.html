@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=77b8bccd90">
-    <link rel="stylesheet" href="/static/css/layout.css?v=77b8bccd90">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=77b8bccd90">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=77b8bccd90">
-    <link rel="stylesheet" href="/static/css/tema.css?v=77b8bccd90">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=dfcecede74">
+    <link rel="stylesheet" href="/static/css/layout.css?v=dfcecede74">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=dfcecede74">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=dfcecede74">
+    <link rel="stylesheet" href="/static/css/tema.css?v=dfcecede74">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -472,17 +472,19 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="monto">Monto ($)</label>
-                                <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
+                            <div class="form-row-2col">
+                                <div class="form-group">
+                                    <label for="monto">Monto ($)</label>
+                                    <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="categoria">Categoría</label>
+                                    <select id="categoria"></select>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="descripcion">Descripción</label>
                                 <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
-                            </div>
-                            <div class="form-group">
-                                <label for="categoria">Categoría</label>
-                                <select id="categoria"></select>
                             </div>
                             <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" data-on-click='[["cambiarSubtabMovimientos", "fijos"]]'>Ir a fijos y MSI</button></p>
                             <div class="form-actions">
@@ -568,6 +570,7 @@
                             <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
                         </div>
                         <form id="form-recurrente">
+                            <h4 class="form-seccion">Datos</h4>
                             <div class="form-group">
                                 <label for="rec-desc">Descripción</label>
                                 <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
@@ -613,6 +616,7 @@
                                 </div>
                                 <p class="hint-text" id="rec-preview"></p>
                             </div>
+                            <h4 class="form-seccion">Fecha y categoría</h4>
                             <div class="form-row-2col">
                                 <div class="form-group">
                                     <label for="rec-fecha">Fecha del primer pago</label>
@@ -623,15 +627,18 @@
                                     <select id="rec-categoria"></select>
                                 </div>
                             </div>
-                            <div class="form-group" id="rec-apartado-group">
+                            <h4 class="form-seccion">Destino</h4>
+                            <div id="rec-apartado-group" class="modal-apilado">
+                            <div class="form-group">
                                 <label for="rec-apartado-id">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icono-en-texto"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                                     Aportar automáticamente a una meta (opcional):
                                 </label>
                                 <select id="rec-apartado-id">
                                     <option value="">-- Ninguno (gasto común) --</option>
                                 </select>
-                                <span class="hint-text">Si seleccionas una meta, cada vez que venza el cargo se abonará automáticamente al saldo de tu apartado.</span>
+                            </div>
+                            <p class="modal-nota">Si seleccionas una meta, cada vez que venza el cargo se abonará automáticamente al saldo de tu apartado.</p>
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary" id="btn-guardar-recurrente">
@@ -800,6 +807,7 @@
                         <form id="form-inversion" class="card-form">
                             <h3 class="s-margin-top-0 s-margin-bottom-12px s-font-size-1rem s-color-var-text-color">Registrar posición</h3>
                             
+                            <h4 class="form-seccion">Activo</h4>
                             <div class="form-group">
                                 <label for="inv-ticker">Ticker (ej. VOO, QQQ, WALMEX.MX)</label>
                                 <div class="ticker-autocomplete-container">
@@ -820,9 +828,10 @@
                                     <option value="USD">USD (dólares - se convierte a MXN)</option>
                                     <option value="MXN">MXN (pesos mexicanos - sin multiplicar)</option>
                                 </select>
-                                <small class="s-color-var-text-muted s-font-size-0-78rem">Si compras en USD se multiplica por el tipo de cambio; si es en MXN se suma directo.</small>
                             </div>
+                            <p class="modal-nota">Si compras en USD se multiplica por el tipo de cambio; si es en MXN se suma directo.</p>
 
+                            <h4 class="form-seccion">Posición</h4>
                             <div class="form-row-2col">
                                 <div class="form-group">
                                     <label for="inv-cantidad">Cantidad</label>
@@ -835,7 +844,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="inv-precio-actual">Precio Actual <small class="s-color-var-text-muted">(Opcional, en su moneda)</small>:</label>
+                                <label for="inv-precio-actual">Precio actual (opcional, en su moneda)</label>
                                 <input type="number" step="0.01" min="0.01" id="inv-precio-actual" placeholder="Se obtiene automático">
                             </div>
 
@@ -1938,7 +1947,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=77b8bccd90"></script>
+    <script type="module" src="/static/js/main.js?v=dfcecede74"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

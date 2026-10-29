@@ -305,7 +305,8 @@ def test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base):
         page.fill("#tarjeta-pres-monto", "500")
         page.dispatch_event("#tarjeta-pres-monto", "input")
         page.dblclick("#form-tarjeta-presupuesto [type=submit]")
-        page.wait_for_timeout(2000)
+        _esperar(page, "[...document.querySelectorAll('#pres-pagos-lista .pres-card')].some(c => c.innerText.includes('Doble prueba'))", timeout=8)
+        page.wait_for_timeout(1000)  # un segundo envío duplicado tendría tiempo de llegar antes de contar
         nombres = page.evaluate("[...document.querySelectorAll('#pres-pagos-lista .pres-card')].map(c => c.innerText)")
         creadas = [n for n in nombres if "Doble prueba" in n]
         assert len(creadas) == 1, nombres

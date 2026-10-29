@@ -821,6 +821,28 @@
    la etiqueta queda arriba dentro de la caja y el valor debajo. Los checkboxes y radios no entran. */
 :root .form-group { margin-bottom: 12px; }
 
+/* Títulos de bloque dentro de un formulario largo: un filete los separa, sin mayúsculas */
+:root .form-seccion {
+    margin: 16px 0 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+:root form > .form-seccion:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+:root .icono-en-texto {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
 :root .form-group:has(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
     display: flex;
     flex-direction: column;
