@@ -119,6 +119,13 @@
     box-shadow: none;
 }
 
+:root .topbar-title-wrap {
+    min-width: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+    padding-right: 12px;
+}
+
 :root .topbar-section-title {
     min-width: 0;
     overflow: hidden;
