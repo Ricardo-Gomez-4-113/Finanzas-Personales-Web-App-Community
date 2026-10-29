@@ -363,6 +363,24 @@ def test_presupuesto_muestra_totales_en_una_linea(navegador, base):
         ctx.close()
 
 
+def test_selector_de_periodo_cambia_las_tarjetas(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#sel-periodo-movimientos option", state="attached")
+        opciones = page.eval_on_selector_all("#sel-periodo-movimientos option", "els => els.map(e => e.value)")
+        assert len(opciones) >= 2, opciones
+        page.select_option("#sel-periodo-movimientos", opciones[1])
+        periodo = page.evaluate("""(inicio) => fetch('/api/resumen?moneda_base=MXN', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
+            .then(r => r.json()).then(d => d.periodos.find(p => p.inicio === inicio))""", opciones[1])
+        assert periodo is not None, opciones
+        assert page.inner_text("#lbl-rec-ingreso") == f"${periodo['ingresos']['total']:,.2f}", page.inner_text("#lbl-rec-ingreso")
+        assert page.inner_text("#lbl-rec-fijos") == f"${periodo['gastos']['fijos']:,.2f}", page.inner_text("#lbl-rec-fijos")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -484,6 +502,7 @@ if __name__ == "__main__":
                 (test_doble_clic_al_guardar_tarjeta_no_duplica, lambda: test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base)),
                 (test_pagos_se_adaptan_a_la_frecuencia, lambda: test_pagos_se_adaptan_a_la_frecuencia(navegador, base)),
                 (test_presupuesto_muestra_totales_en_una_linea, lambda: test_presupuesto_muestra_totales_en_una_linea(navegador, base)),
+                (test_selector_de_periodo_cambia_las_tarjetas, lambda: test_selector_de_periodo_cambia_las_tarjetas(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),

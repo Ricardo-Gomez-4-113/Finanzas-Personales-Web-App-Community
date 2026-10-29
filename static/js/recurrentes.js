@@ -540,6 +540,40 @@ export async function guardarEdicionRecurrente(e) {
 // Carga
 // -----------------------------------------------------------------------------
 
+// Selector de periodo de las tarjetas de Movimientos. Los periodos vienen del resumen (empiezan igual que los de Fijos)
+let periodosKpi = [];
+let inicioKpiSeleccionado = null;
+
+function llenarSelectorPeriodo(periodos) {
+    periodosKpi = periodos;
+    const sel = document.getElementById('sel-periodo-movimientos');
+    if (!sel) return;
+    const previo = inicioKpiSeleccionado;
+    const enCurso = periodos.find(p => p.en_curso) || periodos[0];
+    inicioKpiSeleccionado = periodos.some(p => p.inicio === previo) ? previo : (enCurso ? enCurso.inicio : null);
+    sel.innerHTML = periodos.map(p => `<option value="${p.inicio}">${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}${p.en_curso ? ' (en curso)' : ''}</option>`).join('');
+    sel.value = inicioKpiSeleccionado || '';
+    if (!sel.dataset.listo) {
+        sel.addEventListener('change', () => {
+            inicioKpiSeleccionado = sel.value;
+            pintarKpisPeriodo();
+        });
+        sel.dataset.listo = '1';
+    }
+}
+
+function pintarKpisPeriodo() {
+    const p = periodosKpi.find(x => x.inicio === inicioKpiSeleccionado);
+    if (!p) return;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+    setTxt('lbl-rec-ingreso', p.ingresos.total);
+    setTxt('lbl-rec-gastos-normales', p.gastos.normales);
+    setTxt('lbl-rec-fijos', p.gastos.fijos);
+    setTxt('lbl-rec-msi', p.gastos.msi);
+    const sub = document.getElementById('lbl-rec-ingreso-sub');
+    if (sub) sub.textContent = `Recibido ${fmt(p.ingresos.recibido)} · por recibir ${fmt(p.ingresos.por_recibir)}`;
+}
+
 export async function cargarRecurrentes() {
     try {
         const [resRec, resResumen, resApartados, resPeriodos] = await Promise.all([
@@ -557,18 +591,11 @@ export async function cargarRecurrentes() {
 
         estado.resumen = resumen;
 
-        // Todas las cifras vienen del periodo en curso que calcula el backend (misma periodicidad que el ingreso fijo)
-        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
-        const setPlain = (id, texto) => { const el = document.getElementById(id); if (el) el.textContent = texto; };
+        // Las cifras de arriba son las del periodo elegido en el selector (por defecto, el periodo en curso)
         const periodos = Array.isArray(resumen.periodos) ? resumen.periodos : [];
-        const actual = periodos[0];
-        if (actual) {
-            setTxt('lbl-rec-ingreso', actual.ingresos.total);
-            setTxt('lbl-rec-gastos-normales', actual.gastos.normales);
-            setTxt('lbl-rec-fijos', actual.gastos.fijos);
-            setTxt('lbl-rec-msi', actual.gastos.msi);
-            setPlain('lbl-rec-ingreso-sub', `Recibido ${fmt(actual.ingresos.recibido)} · por recibir ${fmt(actual.ingresos.por_recibir)}`);
-        }
+        llenarSelectorPeriodo(periodos);
+        pintarKpisPeriodo();
+        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
 
 
