@@ -272,6 +272,13 @@ def test_excel_no_convierte_texto_en_formula(client, ha):
     assert tipos and all(t == "s" for t in tipos), tipos
 
 
+def test_arranque_define_la_ruta_de_clave_inicial(client):
+    """La rutina de arranque escribe admin_inicial.txt en DATA_DIR; main debe importar ese símbolo."""
+    import database
+    import main
+    assert main.DATA_DIR == database.DATA_DIR
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -298,6 +305,7 @@ if __name__ == "__main__":
             (test_sincronizar_tiene_enfriamiento, lambda: test_sincronizar_tiene_enfriamiento(client, ha)),
             (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
+            (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
             (test_token_deja_de_valer_tras_cambiar_contrasena, lambda: test_token_deja_de_valer_tras_cambiar_contrasena(client, ua)),
         ]
