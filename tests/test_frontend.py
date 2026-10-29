@@ -412,7 +412,7 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
                 { inicio: '2026-10-15', fin: '2026-10-30', en_curso: true,
                   totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 13201 } },
                 { inicio: '2026-10-31', fin: '2026-11-14', en_curso: false,
-                  totales: { ingresos: 0, fijos: 0, msi: 0, libre: -799, saldo_al_cierre: 12402 } },
+                  totales: { ingresos: 0, fijos: 14000, msi: 0, libre: -14000, saldo_al_cierre: -799 } },
             ];
             let elegido = -1;
             renderCintaPeriodos(raiz, periodos, { onSeleccionar: i => { elegido = i; } });
@@ -434,6 +434,22 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
         assert resultado["libre"] == "$13,201.00", resultado
         assert resultado["elegido"] == 1, resultado          # el clic avisa el índice elegido
         assert resultado["dias"] == "16" and resultado["presionado"] == "true", resultado
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#cinta-periodos .cinta-periodo")
+        celdas = page.locator("#cinta-periodos .cinta-periodo")
+        assert celdas.count() == 4, celdas.count()
+        actual = page.locator("#cinta-periodos .cinta-periodo-actual")
+        assert actual.count() == 1 and "En curso" in actual.inner_text(), actual.inner_text()
+        # El periodo en curso se lee igual en el hero y en la cinta: un solo saldo, no dos
+        assert page.inner_text("#periodo-libre") == actual.locator(".cinta-periodo-libre").inner_text(), (
+            page.inner_text("#periodo-libre"), actual.inner_text())
         assert not errores, errores
     finally:
         ctx.close()
@@ -546,6 +562,7 @@ if __name__ == "__main__":
                 (test_selector_de_periodo_cambia_las_tarjetas, lambda: test_selector_de_periodo_cambia_las_tarjetas(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
+                (test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual, lambda: test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),

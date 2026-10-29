@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=296ac850ef">
-    <link rel="stylesheet" href="/static/css/layout.css?v=296ac850ef">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=296ac850ef">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=296ac850ef">
-    <link rel="stylesheet" href="/static/css/tema.css?v=296ac850ef">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=3f433a93fb">
+    <link rel="stylesheet" href="/static/css/layout.css?v=3f433a93fb">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=3f433a93fb">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=3f433a93fb">
+    <link rel="stylesheet" href="/static/css/tema.css?v=3f433a93fb">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -324,7 +324,6 @@
                     </div>
                     <dl class="periodo-desglose">
                         <div><dt>Disponible hoy</dt><dd id="periodo-disponible">$0.00</dd></div>
-                        <div><dt>Cargos fijos por venir</dt><dd id="periodo-comprometido">$0.00</dd></div>
                         <div><dt>Faltan</dt><dd id="periodo-dias">0 días</dd></div>
                     </dl>
                 </div>
@@ -335,6 +334,11 @@
                 </div>
                 <ul id="periodo-eventos" class="periodo-eventos" aria-label="Cargos fijos antes del próximo cobro"></ul>
             </div>
+
+            <section class="cinta-bloque" aria-labelledby="cinta-titulo">
+                <h2 id="cinta-titulo" class="cinta-titulo">Lo que te queda por periodo</h2>
+                <div id="cinta-periodos"></div>
+            </section>
 
             <div class="hero-networth">
                 <div class="networth-header">
@@ -358,17 +362,15 @@
                     </div>
                 </div>
 
+                <div class="networth-rendimiento">
+                    <small>Rendimiento de inversiones</small>
+                    <strong id="lbl-dash-pnl">$0.00</strong>
+                </div>
+
                 <!-- Tira de Distribución de Patrimonio (Metas vs Inversiones) -->
                 <div class="networth-alloc-track" id="networth-alloc-track" title="Distribución de Patrimonio: Metas vs Inversiones">
                     <div class="alloc-bar alloc-bar-apartados s-width-50" id="alloc-bar-apartados"></div>
                     <div class="alloc-bar alloc-bar-inversiones s-width-50" id="alloc-bar-inversiones"></div>
-                </div>
-            </div>
-
-            <div class="cards">
-                <div class="card balance">
-                    <h3>Rendimiento de inversiones</h3>
-                    <p id="lbl-dash-pnl">$0.00</p>
                 </div>
             </div>
 
@@ -1934,7 +1936,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=296ac850ef"></script>
+    <script type="module" src="/static/js/main.js?v=3f433a93fb"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

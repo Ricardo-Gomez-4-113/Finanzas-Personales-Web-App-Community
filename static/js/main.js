@@ -7,12 +7,13 @@ import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
+import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=296ac850ef';
+import { cargarRecurrentes } from './recurrentes.js?v=3f433a93fb';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=296ac850ef';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=3f433a93fb';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -64,6 +65,10 @@ export async function cargarDatos() {
         }
 
         renderPeriodo(dataResumen.periodo);
+
+        // Cinta de periodos: el periodo en curso y los siguientes, con su saldo al cierre
+        const resCinta = await apiFetch('/api/recurrentes/periodos?n=4');
+        renderCintaPeriodos(document.getElementById('cinta-periodos'), (await resCinta.json()).periodos);
 
         // La lista de movimientos se acota al periodo en curso, el mismo corte que las tarjetas del resumen
         const periodosResumen = dataResumen.periodos || [];

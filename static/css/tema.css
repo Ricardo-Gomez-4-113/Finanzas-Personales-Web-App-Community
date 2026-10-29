@@ -399,10 +399,14 @@
 :root .cinta-periodo {
     flex: var(--dias, 1) 1 0;
     min-width: 0;
+    height: auto;
     display: flex;
     flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
     gap: 4px;
     font: inherit;
+    line-height: 1.35;
     text-align: left;
     color: var(--text-color);
     background: var(--surface-level2);
@@ -438,6 +442,18 @@
 }
 
 :root .cinta-periodo-estado { font-size: var(--fs-xs); color: var(--text-muted); }
+:root .cinta-periodo-etiqueta { font-size: var(--fs-xs); color: var(--text-muted); }
+
+:root .cinta-bloque { margin-bottom: 20px; }
+
+:root .cinta-titulo {
+    font-family: var(--font-ui);
+    font-size: var(--fs-base);
+    font-weight: 500;
+    text-align: left;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+}
 
 :root .cinta-periodo-libre {
     font-family: var(--font-num);
@@ -537,6 +553,26 @@
 :root .breakdown-dot { width: 8px; height: 8px; box-shadow: none; }
 :root .dot-apartados { background: var(--gold-color); }
 :root .dot-inversiones { background: var(--cyan-color); }
+
+/* Patrimonio y rendimiento en una sola tarjeta: el rendimiento vive en la columna derecha */
+:root .networth-header { grid-column: 1; grid-row: 1; }
+:root .networth-breakdown { grid-column: 1; grid-row: 2; }
+:root .networth-rendimiento {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    text-align: right;
+}
+:root .networth-rendimiento small { font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); }
+:root .networth-rendimiento strong {
+    font-size: var(--fs-xl);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-color);
+}
 
 :root .networth-alloc-track {
     grid-column: 1 / -1;
@@ -848,6 +884,9 @@
     :root .periodo-pista { grid-column: 1 / -1; grid-row: 1; }
     :root .periodo-extremo { grid-row: 2; }
     :root .hero-networth { grid-template-columns: 1fr; padding: 16px 18px; }
+    :root .networth-header,
+    :root .networth-breakdown,
+    :root .networth-rendimiento { grid-column: 1; grid-row: auto; text-align: left; align-items: flex-start; }
     :root .networth-breakdown { flex-direction: row; flex-wrap: wrap; gap: 12px 24px; }
     :root .cards { grid-template-columns: 1fr 1fr; }
     :root .cards .card { padding: 14px 16px; }
