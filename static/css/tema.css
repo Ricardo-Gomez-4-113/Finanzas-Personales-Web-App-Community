@@ -446,6 +446,9 @@
 
 :root .cinta-bloque { margin-bottom: 20px; }
 
+/* Periodo elegido en la cinta de Movimientos: también se marca en Fijos */
+:root .fijos-periodo-elegido { box-shadow: inset 0 0 0 1px var(--border-focus); }
+
 :root .cinta-titulo {
     font-family: var(--font-ui);
     font-size: var(--fs-base);

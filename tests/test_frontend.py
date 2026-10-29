@@ -369,15 +369,20 @@ def test_selector_de_periodo_cambia_las_tarjetas(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         _ir(page, "tab-movimientos")
-        page.wait_for_selector("#sel-periodo-movimientos option", state="attached")
-        opciones = page.eval_on_selector_all("#sel-periodo-movimientos option", "els => els.map(e => e.value)")
-        assert len(opciones) >= 2, opciones
-        page.select_option("#sel-periodo-movimientos", opciones[1])
-        periodo = page.evaluate("""(inicio) => fetch('/api/resumen?moneda_base=MXN', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
-            .then(r => r.json()).then(d => d.periodos.find(p => p.inicio === inicio))""", opciones[1])
-        assert periodo is not None, opciones
+        page.wait_for_selector("#cinta-movimientos .cinta-periodo")
+        celdas = page.locator("#cinta-movimientos .cinta-periodo")
+        assert celdas.count() == 4, celdas.count()
+        # Se elige el periodo siguiente al en curso: un periodo futuro, sin movimientos reales todavía
+        periodos = page.evaluate("""() => fetch('/api/resumen?moneda_base=MXN', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
+            .then(r => r.json()).then(d => d.periodos)""")
+        k = next(i for i, p in enumerate(periodos) if p["en_curso"])
+        periodo = periodos[k + 1]
+        celdas.nth(1).click()
         assert page.inner_text("#lbl-rec-ingreso") == f"${periodo['ingresos']['total']:,.2f}", page.inner_text("#lbl-rec-ingreso")
         assert page.inner_text("#lbl-rec-fijos") == f"${periodo['gastos']['fijos']:,.2f}", page.inner_text("#lbl-rec-fijos")
+        assert celdas.nth(1).get_attribute("aria-pressed") == "true", "la celda elegida queda presionada"
+        assert "Aún no hay movimientos" in page.inner_text("#tabla-movimientos"), page.inner_text("#tabla-movimientos")
+        assert page.locator("#fijos-periodos .fijos-periodo-elegido").count() == 1, "Fijos marca el mismo periodo"
         assert not errores, errores
     finally:
         ctx.close()

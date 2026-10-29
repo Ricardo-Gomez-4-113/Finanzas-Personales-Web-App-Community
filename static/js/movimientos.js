@@ -165,9 +165,11 @@ export function renderTablaMovimientos() {
     if (lista.length === 0) {
         const mensaje = (estado.cache.listaTransacciones || []).length === 0
             ? 'No hay movimientos. Registra tu primer movimiento o agrega tu nómina en Fijos y MSI.'
-            : usarVentana
-                ? 'No hay movimientos en este periodo. Elige «Todo el historial» para verlos.'
-                : 'Ningún movimiento coincide con los filtros.';
+            : usarVentana && ventana.futuro
+                ? 'Aún no hay movimientos en este periodo. Sus cargos programados están en Fijos y MSI.'
+                : usarVentana
+                    ? 'No hay movimientos en este periodo. Elige «Todo el historial» para verlos.'
+                    : 'Ningún movimiento coincide con los filtros.';
         tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${mensaje}</td></tr>`;
         actualizarSeleccionMovimientos();
         return;

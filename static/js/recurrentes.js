@@ -3,6 +3,8 @@
  */
 
 import { apiFetch, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
+import { renderCintaPeriodos } from './cinta_periodos.js';
+import { renderTablaMovimientos } from './movimientos.js';
 
 
 const FRECUENCIA_TXT = { semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual' };
@@ -234,7 +236,7 @@ function renderFijosPorPeriodo(data) {
             const fijos = p.items.filter(i => i.tipo !== 'ingreso' && !i.es_msi);
             const msi = p.items.filter(i => i.tipo !== 'ingreso' && i.es_msi);
             return `
-                <section class="fijos-periodo${p.en_curso ? ' fijos-periodo-actual' : ''}">
+                <section class="fijos-periodo${p.en_curso ? ' fijos-periodo-actual' : ''}${p.inicio === inicioKpiSeleccionado ? ' fijos-periodo-elegido' : ''}">
                     <header class="fijos-periodo-head">
                         <h3>${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}</h3>
                         ${p.en_curso ? '<span class="badge-tag badge-fijo">En curso</span>' : ''}
@@ -540,26 +542,34 @@ export async function guardarEdicionRecurrente(e) {
 // Carga
 // -----------------------------------------------------------------------------
 
-// Selector de periodo de las tarjetas de Movimientos. Los periodos vienen del resumen (empiezan igual que los de Fijos)
+// Periodo elegido en la cinta de Movimientos. Un solo estado mueve las cifras, la tabla y el resaltado de Fijos.
+// Las cifras salen del resumen (ingreso y gastos normales); la cinta y Fijos, de /api/recurrentes/periodos.
 let periodosKpi = [];
 let inicioKpiSeleccionado = null;
+let fijosPorPeriodo = { periodos: [], pausados: [] };
 
-function llenarSelectorPeriodo(periodos) {
-    periodosKpi = periodos;
-    const sel = document.getElementById('sel-periodo-movimientos');
-    if (!sel) return;
-    const previo = inicioKpiSeleccionado;
-    const enCurso = periodos.find(p => p.en_curso) || periodos[0];
-    inicioKpiSeleccionado = periodos.some(p => p.inicio === previo) ? previo : (enCurso ? enCurso.inicio : null);
-    sel.innerHTML = periodos.map(p => `<option value="${p.inicio}">${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}${p.en_curso ? ' (en curso)' : ''}</option>`).join('');
-    sel.value = inicioKpiSeleccionado || '';
-    if (!sel.dataset.listo) {
-        sel.addEventListener('change', () => {
-            inicioKpiSeleccionado = sel.value;
-            pintarKpisPeriodo();
-        });
-        sel.dataset.listo = '1';
-    }
+function pintarCintaMovimientos(periodos) {
+    const indiceEnCurso = periodos.findIndex(p => p.en_curso);
+    const previo = periodos.findIndex(p => p.inicio === inicioKpiSeleccionado);
+    const indice = previo >= 0 ? previo : Math.max(0, indiceEnCurso);
+    const teniaFoco = !!document.activeElement?.closest('#cinta-movimientos');
+    renderCintaPeriodos(document.getElementById('cinta-movimientos'), periodos, {
+        seleccionado: indice,
+        onSeleccionar: i => {
+            inicioKpiSeleccionado = periodos[i].inicio;
+            pintarCintaMovimientos(periodos);
+            renderFijosPorPeriodo(fijosPorPeriodo);
+        },
+    });
+    if (teniaFoco) document.querySelector(`#cinta-movimientos .cinta-periodo[data-indice="${indice}"]`)?.focus();
+
+    const elegido = periodos[indice];
+    if (!elegido) return;
+    inicioKpiSeleccionado = elegido.inicio;
+    // Un periodo posterior al en curso no tiene movimientos todavía: la tabla lo dice en vez de quedar vacía
+    estado.cache.ventana = { inicio: elegido.inicio, fin: elegido.fin, futuro: indice > indiceEnCurso };
+    pintarKpisPeriodo();
+    renderTablaMovimientos();
 }
 
 function pintarKpisPeriodo() {
@@ -580,7 +590,7 @@ export async function cargarRecurrentes() {
             apiFetch('/api/recurrentes'),
             apiFetch(`/api/resumen?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`),
             apiFetch('/api/apartados'),
-            apiFetch('/api/recurrentes/periodos?n=3')
+            apiFetch('/api/recurrentes/periodos?n=4')
         ]);
         const items = await resRec.json();
         const porPeriodo = resPeriodos.ok ? await resPeriodos.json() : { periodos: [], pausados: [] };
@@ -593,8 +603,9 @@ export async function cargarRecurrentes() {
 
         // Las cifras de arriba son las del periodo elegido en el selector (por defecto, el periodo en curso)
         const periodos = Array.isArray(resumen.periodos) ? resumen.periodos : [];
-        llenarSelectorPeriodo(periodos);
-        pintarKpisPeriodo();
+        periodosKpi = periodos;
+        fijosPorPeriodo = porPeriodo;
+        pintarCintaMovimientos(porPeriodo.periodos || []);
         const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
 

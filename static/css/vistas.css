@@ -3586,15 +3586,3 @@ input[type="number"].subperiodo-editor-input-pct {
     grid-column: 1 / -1;
 }
 
-/* Selector de periodo de las tarjetas de Movimientos */
-.periodo-selector {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0 0 12px;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-.periodo-selector select {
-    min-width: 220px;
-}
