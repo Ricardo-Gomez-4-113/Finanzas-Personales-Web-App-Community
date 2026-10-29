@@ -120,6 +120,10 @@
 }
 
 :root .topbar-section-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--font-num);
     font-weight: 500;
     font-size: var(--fs-lg);
@@ -845,6 +849,13 @@
     color: var(--primary-text);
     border: none;
     box-shadow: 0 12px 28px -10px var(--primary-glow), var(--shadow-float);
+    transition: transform 220ms ease, opacity 220ms ease;
+}
+
+:root .fab.fab-oculto {
+    transform: translateY(160%);
+    opacity: 0;
+    pointer-events: none;
 }
 
 :root .empty-state { color: var(--text-muted); }

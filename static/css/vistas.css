@@ -1654,6 +1654,8 @@
    ========================================================================== */
 .filtros-movimientos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .filtros-movimientos > * { flex: 1 1 150px; min-width: 0; }
+/* Su texto («Periodo de cobro actual») no cabe en 150px */
+#filtro-ventana { flex-basis: 210px; }
 
 /* Barra de acciones en lote de movimientos */
 .barra-lote {
@@ -3582,7 +3584,25 @@ input[type="number"].subperiodo-editor-input-pct {
 .fijo-pausado .fijo-fila-titulo strong {
     color: var(--text-muted);
 }
-.fijo-fila .rec-item-actions {
-    grid-column: 1 / -1;
+.fijo-fila-acciones {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+}
+@media (max-width: 720px) {
+    .fijo-fila-acciones {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        justify-content: flex-start;
+    }
+}
+.fijo-fila-acciones .btn-sm {
+    height: 26px;
+    padding: 0 9px;
+    font-size: 0.75rem;
 }
 

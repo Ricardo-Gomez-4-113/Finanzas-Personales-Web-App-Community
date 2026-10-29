@@ -460,6 +460,23 @@ def test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base):
         ctx.close()
 
 
+def test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base, viewport=VIEWPORTS["movil"])
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        # La rueda desplaza el contenedor que sea (ventana o área principal): el evento llega igual
+        page.mouse.move(200, 400)
+        page.mouse.wheel(0, 500)
+        page.wait_for_timeout(300)
+        assert "fab-oculto" in page.get_attribute("#btn-fab", "class"), "al bajar, el botón se oculta"
+        page.mouse.wheel(0, -1000)
+        page.wait_for_timeout(300)
+        assert "fab-oculto" not in page.get_attribute("#btn-fab", "class"), "al subir, el botón vuelve"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -568,6 +585,7 @@ if __name__ == "__main__":
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
                 (test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual, lambda: test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base)),
+                (test_fab_se_oculta_al_bajar_y_vuelve_al_subir, lambda: test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),

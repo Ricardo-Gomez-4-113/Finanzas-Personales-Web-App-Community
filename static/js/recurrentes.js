@@ -212,7 +212,7 @@ function filaFijo(i) {
                 <strong>${signo}${fmt(i.monto)}</strong>
                 <span>${i.estado === 'pausado' ? 'Próxima fecha ' : ''}${escapeHTML(i.fecha)}</span>
             </div>
-            ${acciones ? `<div class="rec-item-actions">${acciones}</div>` : ''}
+            ${acciones ? `<div class="fijo-fila-acciones">${acciones}</div>` : ''}
         </div>`;
 }
 

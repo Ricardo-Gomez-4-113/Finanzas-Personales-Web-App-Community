@@ -367,6 +367,18 @@ export function inicializarFab() {
         const monto = document.getElementById('monto');
         if (monto) setTimeout(() => monto.focus(), 60);
     });
+
+    // En móvil el botón se oculta mientras se baja la página, para no tapar las tarjetas al leer.
+    // Reaparece al subir o al dejar de desplazarse. El scroll puede ser de la ventana o de un contenedor.
+    let previo = 0;
+    let temporizador = null;
+    document.addEventListener('scroll', e => {
+        const y = e.target === document ? window.scrollY : e.target.scrollTop;
+        fab.classList.toggle('fab-oculto', y > previo && y > 80);
+        previo = y;
+        clearTimeout(temporizador);
+        temporizador = setTimeout(() => fab.classList.remove('fab-oculto'), 1200);
+    }, { capture: true, passive: true });
 }
 
 
