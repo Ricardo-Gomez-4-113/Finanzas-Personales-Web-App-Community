@@ -499,13 +499,27 @@ def test_resumen_fijos_msi_compromiso_mensual():
     conn.commit()
 
     r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
-    assert r['ingreso_fijo_mensual'] == 18751.08, r['ingreso_fijo_mensual']
-    assert r['gasto_fijo_mensual'] == 5000.0, r['gasto_fijo_mensual']
-    assert r['cuota_msi_mensual'] == 1074.92, r['cuota_msi_mensual']
-    assert r['compromiso_mensual_total'] == 6074.92, r['compromiso_mensual_total']
-    assert r['gastos_normales_mes'] == 0.0, r['gastos_normales_mes']
-    assert r['libre_al_mes'] == 12676.16, r['libre_al_mes']
+    # El periodo va del 15 al 30 de octubre: el cobro del 31 abre el siguiente
+    p = r['periodos'][0]
+    assert (p['inicio'], p['fin']) == ('2026-10-15', '2026-10-30'), p
+    assert p['ingresos']['total'] == 9375.54, p['ingresos']
+    assert p['gastos']['fijos'] == 5000.0 and p['gastos']['msi'] == 1074.92, p['gastos']
+    assert p['gastos']['normales'] == 0.0, p['gastos']
+    assert p['remanente'] == 3300.62, p
     assert r['deuda_msi'] == 12899.0, r['deuda_msi']
+
+
+def test_deuda_msi_incluye_compras_pausadas():
+    conn = nueva_bd()
+    conn.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
+                                 total_cuotas, cuotas_generadas, monto_total, categoria_id, activo)
+        VALUES ('Celular en pausa', 'gasto', 500, 'mensual', 5, '2026-10-05', 6, 2, 3000.0, 1, 0)
+    """)
+    conn.commit()
+    r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
+    assert r['deuda_msi'] == 2000.0, r['deuda_msi']  # 3,000 - 2 cuotas de 500, aunque esté pausada
+    assert r['periodos'][0]['gastos']['msi'] == 0.0, r['periodos'][0]['gastos']  # sin cobros programados
 
 
 def test_resumen_gastos_normales_mes():
@@ -518,12 +532,10 @@ def test_resumen_gastos_normales_mes():
     """)
     conn.commit()
 
-    r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
-    assert r['ingreso_fijo_mensual'] == 10000.0
-    assert r['gasto_fijo_mensual'] == 3000.0
-    assert r['compromiso_mensual_total'] == 3000.0
-    assert r['gastos_normales_mes'] == 1500.0
-    assert r['libre_al_mes'] == 5500.0
+    p = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))['periodos'][0]
+    assert p['ingresos']['total'] == 10000.0, p['ingresos']
+    assert p['gastos']['normales'] == 1500.0 and p['gastos']['fijos'] == 3000.0, p['gastos']
+    assert p['remanente'] == 5500.0, p
 
 
 def test_exportar_presupuesto_a_fijos_misma_periodicidad():
@@ -735,14 +747,14 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
     conn.commit()
 
     r1 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
-    assert r1['gastos_normales_mes'] == 1500.0
+    assert r1['periodos'][0]['gastos']['normales'] == 1500.0
     assert r1['mes_actual']['gastos'] == 1500.0
 
     cursor.execute("DELETE FROM transacciones WHERE id = ?", (tx_id,))
     conn.commit()
 
     r2 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
-    assert r2['gastos_normales_mes'] == 0.0
+    assert r2['periodos'][0]['gastos']['normales'] == 0.0
     assert r2['mes_actual']['gastos'] == 0.0
 
     # 2. En tarjetas KPI del presupuesto (get_presupuesto): resumen asignado y disponible excluyen tarjetas eliminadas

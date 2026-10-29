@@ -1716,8 +1716,9 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     Resumen patrimonial en la moneda base.
     - balance: transacciones materializadas (las cuotas MSI bajan el balance solo al vencer).
     - patrimonio_neto: suma apartados (metas) + inversiones (el efectivo operativo se gestiona por separado).
-      (rendimiento_fijo se reporta como métrica informativa independiente).
     - mes_actual: excluye movimientos de apartados (no son gasto ni ingreso real).
+    - deuda_msi: incluye las compras pausadas; la deuda sigue pendiente aunque no se cobre.
+    - periodos: flujo por periodo del ingreso fijo (ver calcular_periodos).
     """
     moneda_base_upper = moneda_base.upper()
     cursor = conn.cursor()
@@ -1740,34 +1741,13 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         val = float(inv["cantidad"]) * float(inv["precio_actual"])
         inversiones_total += convertir(val, (inv["moneda"] or "USD").upper(), moneda_base_upper, tasa_usd_mxn)
 
-    filas_rec = cursor.execute("SELECT * FROM recurrentes").fetchall()
-    deuda_msi = 0.0
-    ingreso_fijo = 0.0
-    gasto_fijo = 0.0
-    cuota_msi_mensual = 0.0
-    for r in filas_rec:
-        deuda_msi += deuda_pendiente(r)
-        if r["activo"]:
-            if r["total_cuotas"] is not None:
-                if int(r["cuotas_generadas"]) < int(r["total_cuotas"]):
-                    cuota_msi_mensual += mensualizar(float(r["monto"]), r["frecuencia"])
-            else:
-                if r["tipo"] == 'ingreso':
-                    ingreso_fijo += mensualizar(float(r["monto"]), r["frecuencia"])
-                else:
-                    gasto_fijo += mensualizar(float(r["monto"]), r["frecuencia"])
-
-    rendimiento_fijo = 0.0
-    for c in cursor.execute("SELECT * FROM cuentas_rendimiento").fetchall():
-        valor = valor_rendimiento(float(c["capital"]), float(c["tasa_anual"]),
-                                  date.fromisoformat(c["fecha_base"]), hoy)
-        rendimiento_fijo += valor
+    # Pausadas incluidas: una compra a meses pausada sigue debiéndose
+    deuda_msi = sum(deuda_pendiente(r) for r in cursor.execute("SELECT * FROM recurrentes").fetchall())
 
     mes = f"{hoy.year:04d}-{hoy.month:02d}"
     cursor.execute(
         """
         SELECT 
-            COALESCE(SUM(CASE WHEN tipo = 'gasto' AND apartado_id IS NULL AND recurrente_id IS NULL THEN monto ELSE 0 END), 0.0) AS gastos_normales,
             COALESCE(SUM(CASE WHEN tipo = 'gasto' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_gastos,
             COALESCE(SUM(CASE WHEN tipo = 'ingreso' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_ingresos
         FROM transacciones
@@ -1776,15 +1756,11 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         (mes,)
     )
     fila_mes = cursor.fetchone()
-    gastos_normales_mes = float(fila_mes["gastos_normales"]) if fila_mes else 0.0
     mes_gastos = float(fila_mes["mes_gastos"]) if fila_mes else 0.0
     mes_ingresos = float(fila_mes["mes_ingresos"]) if fila_mes else 0.0
 
     balance = ingresos - gastos
     patrimonio = conv(apartados) + inversiones_total
-    patrimonio_sin_rendimiento = patrimonio
-
-    compromiso_mensual_total = gasto_fijo + cuota_msi_mensual
 
     return {
         "moneda_base": moneda_base_upper,
@@ -1794,20 +1770,12 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         "balance": round(conv(balance), 2),
         "apartados": round(conv(apartados), 2),
         "inversiones": round(inversiones_total, 2),
-        "rendimiento_fijo": round(conv(rendimiento_fijo), 2),
         "deuda_msi": round(conv(deuda_msi), 2),
-        "cuota_msi_mensual": round(conv(cuota_msi_mensual), 2),
-        "ingreso_fijo_mensual": round(conv(ingreso_fijo), 2),
-        "gasto_fijo_mensual": round(conv(gasto_fijo), 2),
-        "compromiso_mensual_total": round(conv(compromiso_mensual_total), 2),
-        "gastos_normales_mes": round(conv(gastos_normales_mes), 2),
-        "libre_al_mes": round(conv(ingreso_fijo - compromiso_mensual_total - gastos_normales_mes), 2),
         "mes_actual": {
             "ingresos": round(conv(mes_ingresos), 2),
             "gastos": round(conv(mes_gastos), 2),
             "ahorro": round(conv(mes_ingresos - mes_gastos), 2),
         },
-        "patrimonio_sin_rendimiento": round(patrimonio_sin_rendimiento, 2),
         "patrimonio_neto": round(patrimonio, 2),
         "periodo": _periodo_en_moneda(calcular_periodo_actual(conn, hoy, balance), conv),
         "periodos": _periodos_en_moneda(calcular_periodos(conn, hoy)["periodos"], conv),

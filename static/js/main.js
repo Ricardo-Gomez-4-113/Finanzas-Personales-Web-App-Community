@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=9defc6b255';
+import { cargarRecurrentes } from './recurrentes.js?v=e3f105c185';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=9defc6b255';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=e3f105c185';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -43,10 +43,8 @@ export async function cargarDatos() {
 
         if (document.getElementById('lbl-dash-patrimonio')) {
             setTxt('lbl-dash-patrimonio', `${fmt(dataResumen.patrimonio_neto)} ${estado.monedaGlobal}`);
-            setTxt('lbl-dash-balance', `${fmt(dataResumen.balance)}`);
             setTxt('lbl-dash-apartados', `${fmt(dataResumen.apartados)}`);
             setTxt('lbl-dash-inversiones', `${fmt(dataResumen.inversiones)} ${estado.monedaGlobal}`);
-            setTxt('lbl-dash-deuda', `${fmt(dataResumen.deuda_msi)}`);
 
             // Tira de Distribución de Patrimonio (Metas vs Inversiones)
             const vAp = Math.max(0, Number(dataResumen.apartados) || 0);
@@ -72,7 +70,6 @@ export async function cargarDatos() {
         if (actual) {
             setTxt('lbl-dash-mes-ingresos', fmt(actual.ingresos.total));
             setTxt('lbl-dash-mes-gastos', fmt(actual.gastos.total));
-            setTxt('lbl-dash-mes-ahorro', fmt(actual.remanente));
         }
 
         if (document.getElementById('lbl-apartados-total-acum')) {

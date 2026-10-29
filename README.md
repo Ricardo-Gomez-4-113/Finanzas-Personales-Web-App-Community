@@ -60,6 +60,9 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 
 ### 5. 💳 Movimientos y 🎯 Metas de Ahorro
 * Registro rápido de ingresos y gastos con modales de edición in situ.
+* **Periodos según tu ingreso fijo:** el corte lo marca tu ingreso fijo de mayor monto (quincenal, semanal o mensual). Cada periodo va del día de cobro al día anterior al siguiente. Sin ingreso fijo, se usan meses calendario.
+* **Tarjetas del periodo:** ingreso (recibido y por recibir), gastos normales, fijos y MSI, remanente y saldo al cierre. Los aportes a metas se muestran aparte y no cuentan como gasto.
+* **Tabla de periodos:** los periodos en curso y los siguientes, con el saldo que se arrastra de uno a otro.
 * Sobres libres de ahorro y metas con barra de progreso porcentual.
 * Transferencias protegidas contra depósitos que excedan el balance disponible.
 
@@ -78,6 +81,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 ### 8. 🔁 Fijos, MSI y Cuentas con Rendimiento
 * **Fijos y MSI:** nómina (quincenal, mensual o semanal), gastos fijos (renta, suscripciones) y compras a meses. Cada registro genera sus movimientos reales solo cuando llega su fecha; nunca se insertan cobros futuros.
 * **Compras a meses:** el balance baja al vencer cada cuota; la deuda pendiente se muestra aparte y no resta del patrimonio neto.
+* **Compras pausadas:** no tienen cobros programados, pero su deuda sigue contando en Deuda MSI hasta liquidarlas.
 * **Cuentas con rendimiento:** saldos con tasa anual fija (interés diario compuesto). No modifican el balance disponible; aportar, retirar o cambiar la tasa capitaliza el saldo actual.
 * **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del mes por categoría.
 * **Saltar pagos:** un fijo puede saltarse una vez y una cuota MSI puede contabilizarse o aplazarse.
@@ -254,7 +258,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 ### Endpoints Financieros Multi-Tenant (Aislados por Usuario)
 | Método | Endpoint | Seguridad | Descripción |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/resumen` | `verify_token` | Resumen patrimonial del tenant en la divisa base |
+| `GET` | `/api/resumen` | `verify_token` | Resumen patrimonial del tenant en la divisa base, con los periodos del ingreso fijo (`periodos`) |
 | `GET` | `/api/resumen-mensual` | `verify_token` | Agrupación de ingresos y gastos mensuales |
 | `GET` | `/api/transacciones` | `verify_token` | Listado de movimientos con categoría y origen (fijo, MSI o apartado) |
 | `POST` | `/api/transacciones` | `verify_token` | Registrar movimiento (la categoría debe existir) |
