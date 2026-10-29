@@ -3447,6 +3447,7 @@ input[type="number"].subperiodo-editor-input-pct {
     display: flex;
     align-items: center;
     gap: 8px;
+    white-space: nowrap;
     font-size: 0.8rem;
     color: var(--text-muted);
 }

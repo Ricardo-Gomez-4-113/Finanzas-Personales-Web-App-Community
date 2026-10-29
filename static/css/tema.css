@@ -848,3 +848,5 @@
 :root .pres-suggested-label { font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; color: var(--text-muted); }
 
 :root .pres-alloc-track { border-radius: 999px; background: var(--surface-level2); }
+:root .pres-pago .pres-pago-vacio { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; color: var(--text-muted); }
+:root .pres-pago-titulo h4 { text-align: left; }
