@@ -1818,6 +1818,11 @@ def fijos_por_periodo(conn: sqlite3.Connection, hoy: date, n: int = 3) -> Dict[s
             "por_pagar": round(sum(i["monto"] for i in grupo["items"] if i["estado"] == 'programado' and i["tipo"] != 'ingreso'), 2),
         }
 
+    # Libre y saldo al cierre salen de calcular_periodos: mismos límites, una sola fórmula
+    for grupo, resumen in zip(grupos, calcular_periodos(conn, hoy, max(1, n))["periodos"]):
+        grupo["totales"]["libre"] = resumen["remanente"]
+        grupo["totales"]["saldo_al_cierre"] = resumen["saldo_final"]
+
     pausados = []
     for r in conn.execute("SELECT * FROM recurrentes WHERE activo = 0").fetchall():
         if r["total_cuotas"] is not None and int(r["cuotas_generadas"]) >= int(r["total_cuotas"]):

@@ -1897,10 +1897,14 @@ def test_fijos_por_periodo_programados_pausados_y_cuota_msi():
         ("2026-10-22", "Tablet", "programado"), ("2026-10-25", "Netflix", "programado")], p1["items"]
     tablet = p1["items"][0]
     assert (tablet["es_msi"], tablet["cuota"], tablet["total_cuotas"]) == (True, 3, 3), tablet
-    assert p1["totales"] == {"ingresos": 0.0, "fijos": 299.0, "msi": 500.0, "por_pagar": 799.0}, p1["totales"]
+    assert p1["totales"] == {"ingresos": 0.0, "fijos": 299.0, "msi": 500.0, "por_pagar": 799.0,
+                             "libre": -799.0, "saldo_al_cierre": -799.0}, p1["totales"]
     assert (p2["inicio"], p2["fin"], p2["fecha_cobro"]) == ("2026-10-31", "2026-11-14", "2026-11-15"), p2
     assert [(i["descripcion"], i["estado"]) for i in p2["items"]] == [("Nómina", "programado")], p2["items"]
     assert p2["totales"]["ingresos"] == 14000.0, p2["totales"]
+    # Libre del periodo = ingreso - fijos - MSI; el saldo al cierre arrastra el déficit del periodo anterior
+    assert p2["totales"]["libre"] == 14000.0, p2["totales"]
+    assert p2["totales"]["saldo_al_cierre"] == 13201.0, p2["totales"]
     # Los pausados no tienen periodo: van aparte y no suman a ningún periodo
     assert [(i["descripcion"], i["estado"]) for i in r["pausados"]] == [("Gym", "pausado")], r["pausados"]
     assert all(i["descripcion"] != "Gym" for p in r["periodos"] for i in p["items"])
