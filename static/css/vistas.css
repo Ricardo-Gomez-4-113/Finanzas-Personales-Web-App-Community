@@ -3489,3 +3489,99 @@ input[type="number"].subperiodo-editor-input-pct {
     font-size: 0.8rem;
     color: var(--text-muted);
 }
+
+/* Fijos y compras a meses por periodo de cobro */
+.fijos-periodo {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--panel-bg);
+}
+.fijos-periodo-actual {
+    border-color: var(--gold-border);
+}
+.fijos-periodo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.fijos-periodo-head h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+    font-variant-numeric: tabular-nums;
+}
+.fijos-periodo-totales {
+    margin: 6px 0 10px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.fijos-bloque {
+    margin-top: 10px;
+}
+.fijos-bloque h4 {
+    margin: 0 0 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.fijos-bloque-ayuda {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.fijo-fila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-color);
+}
+.fijo-fila:first-of-type {
+    border-top: 0;
+}
+.fijo-fila-main {
+    min-width: 0;
+}
+.fijo-fila-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.fijo-fila-titulo strong {
+    overflow-wrap: anywhere;
+}
+.fijo-fila-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.fijo-origen {
+    color: var(--gold-color);
+}
+.fijo-fila-monto {
+    display: grid;
+    justify-items: end;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.fijo-fila-monto strong {
+    font-size: 0.92rem;
+    color: var(--text-main);
+}
+.fijo-pausado .fijo-fila-titulo strong {
+    color: var(--text-muted);
+}
+.fijo-fila .rec-item-actions {
+    grid-column: 1 / -1;
+}

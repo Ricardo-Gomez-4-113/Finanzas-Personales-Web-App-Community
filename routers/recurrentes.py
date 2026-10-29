@@ -4,13 +4,14 @@ import sqlite3
 from datetime import date
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from finanzas_core import (
     validar_fecha_operativa,
     ahora_local,
     deuda_pendiente,
+    fijos_por_periodo,
     materializar_recurrentes,
     mensualizar,
     primera_fecha_quincenal,
@@ -89,6 +90,14 @@ def _serializar(fila) -> dict:
     d["tarjeta_nombre"] = d.get("tarjeta_nombre")
     d["tarjeta_monto_total"] = float(d.get("tarjeta_monto_total", 0.0)) if d.get("tarjeta_monto_total") is not None else None
     return d
+
+
+@router.get("/api/recurrentes/periodos", summary="Fijos y compras a meses agrupados por periodo de cobro")
+def listar_fijos_por_periodo(n: int = Query(3, ge=1, le=6), conn: sqlite3.Connection = Depends(get_tenant_db)):
+    hoy = ahora_local().date()
+    materializar_recurrentes(conn, hoy)
+    conn.commit()
+    return fijos_por_periodo(conn, hoy, n)
 
 
 @router.get("/api/recurrentes", summary="Listar fijos y compras a meses")

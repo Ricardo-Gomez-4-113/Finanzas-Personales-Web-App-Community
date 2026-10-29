@@ -1725,6 +1725,112 @@ def calcular_periodos(conn: sqlite3.Connection, hoy: date, n: int = 6) -> Dict[s
     return {"ingreso_principal": cobro_info, "periodos": periodos}
 
 
+def _fijo_en_periodo(r, fecha: date, monto: float, estado: str, cuota=None) -> Dict[str, Any]:
+    """Una fila de Fijos y MSI dentro de un periodo: un cargo registrado o programado de un recurrente."""
+    return {
+        "id": r["id"],
+        "descripcion": r["descripcion"],
+        "tipo": r["tipo"],
+        "fecha": fecha.isoformat(),
+        "monto": round(monto, 2),
+        "estado": estado,
+        "es_msi": r["total_cuotas"] is not None,
+        "cuota": cuota,
+        "total_cuotas": r["total_cuotas"],
+        "meta": r["apartado_id"] is not None,
+    }
+
+
+def fijos_por_periodo(conn: sqlite3.Connection, hoy: date, n: int = 3) -> Dict[str, Any]:
+    """
+    Fijos y compras a meses agrupados por periodo de cobro, desde el periodo en curso.
+    Cada cargo cae en el periodo que contiene su fecha: 'aplicado' si ya se registró en Movimientos y
+    'programado' si aún no se cargó. Los pausados van aparte, porque no generan cargos.
+    Los saltos no dejan registro, así que no se reconstruyen en periodos pasados.
+    """
+    vigentes = _recurrentes_vigentes(conn)
+    principal = _ingreso_principal(vigentes)
+    limites = _limites_periodos(principal, hoy, max(1, n))
+    desde, hasta = limites[0][0], limites[-1][1]
+    grupos = [{
+        "inicio": ini.isoformat(),
+        "fin": fin.isoformat(),
+        "fecha_cobro": cobro.isoformat() if cobro else None,
+        "en_curso": ini <= hoy <= fin,
+        "items": [],
+    } for ini, fin, cobro in limites]
+
+    def grupo_de(fecha: date):
+        for (ini, fin, _), grupo in zip(limites, grupos):
+            if ini <= fecha <= fin:
+                return grupo
+        return None
+
+    nombres = {f["id"]: (f["apartado_nombre"], f["tarjeta_nombre"]) for f in conn.execute(
+        """
+        SELECT r.id, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre
+        FROM recurrentes r
+        LEFT JOIN apartados a ON a.id = r.apartado_id
+        LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
+        """
+    ).fetchall()}
+
+    for f in conn.execute(
+        """
+        SELECT t.fecha, t.monto, t.tipo, t.descripcion, t.recurrente_id, t.apartado_id, r.total_cuotas
+        FROM transacciones t JOIN recurrentes r ON r.id = t.recurrente_id
+        WHERE substr(t.fecha, 1, 10) BETWEEN ? AND ?
+        ORDER BY t.fecha, t.id
+        """,
+        (desde.isoformat(), hasta.isoformat()),
+    ).fetchall():
+        fecha = date.fromisoformat(f["fecha"][:10])
+        grupo = grupo_de(fecha)
+        if grupo is None:
+            continue
+        grupo["items"].append(_fijo_en_periodo(
+            {"id": f["recurrente_id"], "descripcion": f["descripcion"], "tipo": f["tipo"],
+             "total_cuotas": f["total_cuotas"], "apartado_id": f["apartado_id"]},
+            fecha, float(f["monto"]), "aplicado"))
+
+    cuotas_vistas = {}
+    for r, fecha, importe in _ocurrencias_programadas(vigentes, hasta):
+        grupo = grupo_de(fecha) if fecha >= desde else None
+        if grupo is None:
+            continue
+        k = cuotas_vistas.get(r["id"], 0) + 1
+        cuotas_vistas[r["id"]] = k
+        cuota = int(r["cuotas_generadas"]) + k if r["total_cuotas"] is not None else None
+        fila = _fijo_en_periodo(r, fecha, importe, "programado", cuota)
+        fila["primera_de_su_fijo"] = k == 1
+        grupo["items"].append(fila)
+
+    for grupo in grupos:
+        grupo["items"].sort(key=lambda i: (i["fecha"], i["descripcion"]))
+        for i in grupo["items"]:
+            i["apartado_nombre"], i["tarjeta_nombre"] = nombres.get(i["id"], (None, None))
+        ingresos = [i for i in grupo["items"] if i["tipo"] == 'ingreso']
+        gastos = [i for i in grupo["items"] if i["tipo"] != 'ingreso']
+        grupo["totales"] = {
+            "ingresos": round(sum(i["monto"] for i in ingresos), 2),
+            "fijos": round(sum(i["monto"] for i in gastos if not i["es_msi"]), 2),
+            "msi": round(sum(i["monto"] for i in gastos if i["es_msi"]), 2),
+            "por_pagar": round(sum(i["monto"] for i in grupo["items"] if i["estado"] == 'programado' and i["tipo"] != 'ingreso'), 2),
+        }
+
+    pausados = []
+    for r in conn.execute("SELECT * FROM recurrentes WHERE activo = 0").fetchall():
+        if r["total_cuotas"] is not None and int(r["cuotas_generadas"]) >= int(r["total_cuotas"]):
+            continue
+        cuota = int(r["cuotas_generadas"]) + 1 if r["total_cuotas"] is not None else None
+        fila = _fijo_en_periodo(r, date.fromisoformat(r["proxima_fecha"]), float(r["monto"]), "pausado", cuota)
+        fila["frecuencia"] = r["frecuencia"]
+        fila["apartado_nombre"], fila["tarjeta_nombre"] = nombres.get(r["id"], (None, None))
+        pausados.append(fila)
+    pausados.sort(key=lambda i: i["descripcion"])
+    return {"periodos": grupos, "pausados": pausados}
+
+
 def calcular_periodo_actual(conn: sqlite3.Connection, hoy: date, balance: float) -> Dict[str, Any]:
     """
     Vista del periodo en curso de calcular_periodos para el tablero: del último cobro al siguiente.

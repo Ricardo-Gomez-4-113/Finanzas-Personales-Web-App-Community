@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=977ceedf63">
-    <link rel="stylesheet" href="/static/css/layout.css?v=977ceedf63">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=977ceedf63">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=977ceedf63">
-    <link rel="stylesheet" href="/static/css/tema.css?v=977ceedf63">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=bcc2acc907">
+    <link rel="stylesheet" href="/static/css/layout.css?v=bcc2acc907">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=bcc2acc907">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=bcc2acc907">
+    <link rel="stylesheet" href="/static/css/tema.css?v=bcc2acc907">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -638,15 +638,15 @@
                     <div class="panel">
                         <h2 class="panel-heading">
                             <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                            <span>Compras a meses</span>
+                            <span>Fijos y compras a meses por periodo</span>
                         </h2>
                         <p class="card-subtext">Deuda MSI pendiente: <strong id="lbl-fijos-deuda">$0.00</strong></p>
-                        <div id="lista-msi"></div>
-                        <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                            <span>Ingresos y gastos fijos</span>
-                        </h2>
-                        <div id="lista-fijos"></div>
+                        <div id="fijos-periodos"></div>
+                        <div id="fijos-pausados-bloque" class="fijos-bloque hidden">
+                            <h4>Pausados</h4>
+                            <p class="fijos-bloque-ayuda">No generan cargos hasta que los reanudes.</p>
+                            <div id="fijos-pausados"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1937,7 +1937,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=977ceedf63"></script>
+    <script type="module" src="/static/js/main.js?v=bcc2acc907"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

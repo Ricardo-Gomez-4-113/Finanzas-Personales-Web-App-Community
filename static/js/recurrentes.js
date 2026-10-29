@@ -164,77 +164,93 @@ async function guardarRecurrente(e) {
 // Listas y tarjetas
 // -----------------------------------------------------------------------------
 
-function renderListaMsi(items) {
-    const cont = document.getElementById('lista-msi');
-    if (!cont) return;
-    if (items.length === 0) {
-        cont.innerHTML = '<p class="empty-state">No tienes compras a meses. Registra una laptop, celular o cualquier compra en cuotas.</p>';
-        return;
-    }
-    cont.innerHTML = '';
-    items.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'rec-item';
-        const terminado = r.cuotas_generadas >= r.total_cuotas;
-        // Pausada: la deuda sigue pendiente (cuenta en Deuda MSI) pero no hay cobros programados
-        const pausado = !terminado && !r.activo;
-        const etiqueta = terminado ? 'Terminado' : pausado ? 'Pausado' : `Cuota ${escapeHTML(String(r.cuotas_generadas))} de ${escapeHTML(String(r.total_cuotas))}`;
-        const estadoPago = terminado ? 'Compra liquidada' : pausado ? 'Cobros pausados' : `Próximo pago: <strong>${escapeHTML(r.proxima_fecha)}</strong>`;
-        card.innerHTML = `
-            <div class="rec-item-head">
-                <strong>${escapeHTML(r.descripcion)}</strong>
-                <span class="badge-tag badge-msi">${etiqueta}</span>
-            </div>
-            <div class="progress-bar-bg"><div class="progress-bar-fill"></div></div>
-            <div class="rec-item-meta">
-                <span>Pendiente: <strong>${fmt(r.deuda_pendiente)}</strong></span>
-                <span>${estadoPago}</span>
-            </div>
-            <div class="rec-item-actions">
-                <button type="button" class="btn-secondary btn-sm" data-accion="editar" data-id="${r.id}">Editar</button>
-                ${!terminado && !pausado ? `<button type="button" class="btn-secondary btn-sm" data-accion="saltar" data-id="${r.id}" title="Saltar próximo cobro (${escapeHTML(r.proxima_fecha)})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 3px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Saltar pago</button>` : ''}
-                <button type="button" class="btn-secondary btn-sm" data-accion="eliminar" data-id="${r.id}">Eliminar</button>
-            </div>`;
-        card.querySelector('.progress-bar-fill').style.width = `${Math.min(100, r.progreso_pct || 0)}%`;
-        cont.appendChild(card);
-    });
+// Fijos y compras a meses por periodo de cobro: el backend decide periodos, estados y cuotas
+const ESTADO_FIJO_TXT = { aplicado: 'Aplicado', programado: 'Programado', pausado: 'Pausado' };
+
+function fechaPeriodo(iso) {
+    return new Date(`${iso}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 }
 
-function renderListaFijos(items) {
-    const cont = document.getElementById('lista-fijos');
-    if (!cont) return;
-    if (items.length === 0) {
-        cont.innerHTML = '<p class="empty-state">Aún no tienes ingresos ni gastos fijos. Agrega tu nómina o tu renta para ver tu libre del periodo.</p>';
-        return;
-    }
-    cont.innerHTML = '';
-    items.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'rec-item';
-        const esIngreso = r.tipo === 'ingreso';
-        const badgeMeta = r.apartado_nombre ? `<span class="badge-tag badge-apartado" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); display: inline-flex; align-items: center; gap: 4px;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg> Aporta a: ${escapeHTML(r.apartado_nombre)}</span>` : '';
-        const badgePres = r.presupuesto_tarjeta_id ? `<span class="badge-tag" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); display: inline-flex; align-items: center; gap: 4px;" title="Vinculado al presupuesto: ${escapeHTML(r.tarjeta_nombre || 'Dividido')}"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Presupuesto: ${escapeHTML(r.tarjeta_nombre || 'Dividido')}</span>` : '';
-        card.innerHTML = `
-            <div class="rec-item-head">
-                <strong>${escapeHTML(r.descripcion)}</strong>
-                <div class="s-display-flex s-align-items-center s-gap-8px">
-                    ${badgePres}
-                    ${badgeMeta}
-                    <span class="badge-tag ${r.activo ? 'badge-fijo' : ''}">${r.activo ? (esIngreso ? 'Ingreso' : 'Gasto') : 'Pausado'}</span>
+function etiquetaFijo(i) {
+    if (i.es_msi) return i.cuota ? `Cuota ${i.cuota} de ${i.total_cuotas}` : 'Cuota aplicada';
+    return i.tipo === 'ingreso' ? 'Ingreso fijo' : 'Gasto fijo';
+}
+
+function accionesFijo(i) {
+    const boton = (accion, texto, extra = '') => `<button type="button" class="btn-secondary btn-sm" data-accion="${accion}" data-id="${i.id}" ${extra}>${texto}</button>`;
+    if (i.estado === 'aplicado') return '';
+    // Saltar, pausar y eliminar actúan sobre el fijo entero: solo se ofrecen en su primera fila
+    const primera = i.estado === 'pausado' || i.primera_de_su_fijo;
+    if (!primera) return boton('editar', 'Editar');
+    const saltar = i.estado === 'programado' ? boton('saltar', 'Saltar', `title="Saltar próximo cobro (${escapeHTML(i.fecha)})"`) : '';
+    const pausa = i.estado === 'pausado' ? boton('reanudar', 'Reanudar') : boton('pausar', 'Pausar');
+    return boton('editar', 'Editar') + saltar + pausa + boton('eliminar', 'Eliminar');
+}
+
+function filaFijo(i) {
+    const origen = [
+        i.meta ? `Aporta a ${i.apartado_nombre || 'una meta'}` : '',
+        i.tarjeta_nombre ? `Presupuesto: ${i.tarjeta_nombre}` : '',
+    ].filter(Boolean).map(t => `<span class="fijo-origen">${escapeHTML(t)}</span>`).join('');
+    const signo = i.tipo === 'ingreso' ? '+' : '';
+    const acciones = accionesFijo(i);
+    return `
+        <div class="fijo-fila fijo-${i.estado}">
+            <div class="fijo-fila-main">
+                <div class="fijo-fila-titulo">
+                    <strong>${escapeHTML(i.descripcion)}</strong>
+                    <span class="badge-tag ${i.estado === 'programado' ? 'badge-fijo' : ''}">${ESTADO_FIJO_TXT[i.estado]}</span>
+                </div>
+                <div class="fijo-fila-meta">
+                    <span>${escapeHTML(etiquetaFijo(i))}</span>
+                    ${origen}
                 </div>
             </div>
-            <div class="rec-item-meta">
-                <span>${fmt(r.monto)} · ${escapeHTML(FRECUENCIA_TXT[r.frecuencia] || r.frecuencia)}</span>
-                <span>Próxima fecha: <strong>${escapeHTML(r.proxima_fecha)}</strong></span>
+            <div class="fijo-fila-monto">
+                <strong>${signo}${fmt(i.monto)}</strong>
+                <span>${i.estado === 'pausado' ? 'Próxima fecha ' : ''}${escapeHTML(i.fecha)}</span>
             </div>
-            <div class="rec-item-actions">
-                <button type="button" class="btn-secondary btn-sm" data-accion="editar" data-id="${r.id}">Editar</button>
-                ${r.activo ? `<button type="button" class="btn-secondary btn-sm" data-accion="saltar" data-id="${r.id}" title="Saltar próximo ciclo (${escapeHTML(r.proxima_fecha)})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 3px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Saltar pago</button>` : ''}
-                <button type="button" class="btn-secondary btn-sm" data-accion="${r.activo ? 'pausar' : 'reanudar'}" data-id="${r.id}">${r.activo ? 'Pausar' : 'Reanudar'}</button>
-                <button type="button" class="btn-secondary btn-sm" data-accion="eliminar" data-id="${r.id}">Eliminar</button>
-            </div>`;
-        cont.appendChild(card);
-    });
+            ${acciones ? `<div class="rec-item-actions">${acciones}</div>` : ''}
+        </div>`;
+}
+
+function bloqueFijos(titulo, items) {
+    if (items.length === 0) return '';
+    return `<div class="fijos-bloque"><h4>${titulo}</h4>${items.map(filaFijo).join('')}</div>`;
+}
+
+function renderFijosPorPeriodo(data) {
+    const cont = document.getElementById('fijos-periodos');
+    const bloqueP = document.getElementById('fijos-pausados-bloque');
+    const contP = document.getElementById('fijos-pausados');
+    if (!cont) return;
+    const periodos = data.periodos || [];
+    if (periodos.every(p => p.items.length === 0) && !(data.pausados || []).length) {
+        cont.innerHTML = '<p class="empty-state">Aún no tienes ingresos ni gastos fijos. Agrega tu nómina o tu renta para verlos por periodo.</p>';
+    } else {
+        cont.innerHTML = periodos.map(p => {
+            const t = p.totales;
+            const ingresos = p.items.filter(i => i.tipo === 'ingreso');
+            const fijos = p.items.filter(i => i.tipo !== 'ingreso' && !i.es_msi);
+            const msi = p.items.filter(i => i.tipo !== 'ingreso' && i.es_msi);
+            return `
+                <section class="fijos-periodo${p.en_curso ? ' fijos-periodo-actual' : ''}">
+                    <header class="fijos-periodo-head">
+                        <h3>${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}</h3>
+                        ${p.en_curso ? '<span class="badge-tag badge-fijo">En curso</span>' : ''}
+                    </header>
+                    <p class="fijos-periodo-totales">Ingresos ${fmt(t.ingresos)} · Gastos fijos ${fmt(t.fijos)} · Compras a meses ${fmt(t.msi)} · Por pagar ${fmt(t.por_pagar)}</p>
+                    ${bloqueFijos('Ingresos y gastos fijos', [...ingresos, ...fijos])}
+                    ${bloqueFijos('Compras a meses', msi)}
+                    ${p.items.length === 0 ? '<p class="fijos-bloque-ayuda">Sin cargos en este periodo.</p>' : ''}
+                </section>`;
+        }).join('');
+    }
+    const pausados = data.pausados || [];
+    if (bloqueP && contP) {
+        bloqueP.classList.toggle('hidden', pausados.length === 0);
+        contP.innerHTML = pausados.map(filaFijo).join('');
+    }
 }
 
 let recurrenteSeleccionadoParaSaltar = null;
@@ -526,12 +542,14 @@ export async function guardarEdicionRecurrente(e) {
 
 export async function cargarRecurrentes() {
     try {
-        const [resRec, resResumen, resApartados] = await Promise.all([
+        const [resRec, resResumen, resApartados, resPeriodos] = await Promise.all([
             apiFetch('/api/recurrentes'),
             apiFetch(`/api/resumen?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`),
-            apiFetch('/api/apartados')
+            apiFetch('/api/apartados'),
+            apiFetch('/api/recurrentes/periodos?n=3')
         ]);
         const items = await resRec.json();
+        const porPeriodo = resPeriodos.ok ? await resPeriodos.json() : { periodos: [], pausados: [] };
         const resumen = await resumenJson(resResumen);
         const apartados = resApartados.ok ? await resApartados.json() : [];
         estado.cache.apartados = apartados;
@@ -554,8 +572,7 @@ export async function cargarRecurrentes() {
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
 
 
-        renderListaMsi(items.filter(r => r.es_msi && r.cuotas_generadas < r.total_cuotas));
-        renderListaFijos(items.filter(r => !r.es_msi));
+        renderFijosPorPeriodo(porPeriodo);
         llenarCategoriasRec();
         llenarApartadosRec();
     } catch (error) {
@@ -586,7 +603,7 @@ export function inicializarRecurrentes() {
     if (form) form.addEventListener('submit', guardarRecurrente);
     const formEdit = document.getElementById('form-editar-recurrente');
     if (formEdit) formEdit.addEventListener('submit', guardarEdicionRecurrente);
-    const listas = ['lista-msi', 'lista-fijos'].map(id => document.getElementById(id)).filter(Boolean);
+    const listas = ['fijos-periodos', 'fijos-pausados'].map(id => document.getElementById(id)).filter(Boolean);
     listas.forEach(l => l.addEventListener('click', accionRecurrente));
     const fecha = document.getElementById('rec-fecha');
     restaurarFechaHoy();

@@ -71,6 +71,7 @@ import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
 from finanzas_core import (
     convertir,
+    fijos_por_periodo,
     calcular_resumen,
     siguiente_fecha,
     materializar_recurrentes,
@@ -1877,6 +1878,47 @@ def test_periodo_actual_sin_ingreso_fijo_usa_mes_calendario():
     conn = nueva_bd()
     p = calcular_periodo_actual(conn, date(2028, 2, 10), 1000.0)
     assert (p["inicio"], p["fin"], p["cobro"], p["libre"]) == ("2028-02-01", "2028-02-29", None, 1000.0), p
+
+
+def test_fijos_por_periodo_programados_pausados_y_cuota_msi():
+    conn = nueva_bd()
+    hoy = date(2026, 10, 20)
+    insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'quincenal', None, date(2026, 10, 31))
+    insertar_recurrente(conn, "Netflix", 'gasto', 299, 'mensual', 25, date(2026, 10, 25))
+    insertar_recurrente(conn, "Tablet", 'gasto', 500, 'mensual', 22, date(2026, 10, 22), total=3, monto_total=1500)
+    conn.execute("UPDATE recurrentes SET cuotas_generadas = 2 WHERE descripcion = 'Tablet'")  # queda la cuota 3
+    insertar_recurrente(conn, "Gym", 'gasto', 400, 'mensual', 5, date(2026, 11, 5))
+    conn.execute("UPDATE recurrentes SET activo = 0 WHERE descripcion = 'Gym'")
+    r = fijos_por_periodo(conn, hoy, 2)
+    p1, p2 = r["periodos"]
+    # El periodo cierra el día antes del siguiente cobro: la nómina del 31 abre el segundo periodo
+    assert (p1["inicio"], p1["fin"], p1["en_curso"]) == ("2026-10-15", "2026-10-30", True), p1
+    assert [(i["fecha"], i["descripcion"], i["estado"]) for i in p1["items"]] == [
+        ("2026-10-22", "Tablet", "programado"), ("2026-10-25", "Netflix", "programado")], p1["items"]
+    tablet = p1["items"][0]
+    assert (tablet["es_msi"], tablet["cuota"], tablet["total_cuotas"]) == (True, 3, 3), tablet
+    assert p1["totales"] == {"ingresos": 0.0, "fijos": 299.0, "msi": 500.0, "por_pagar": 799.0}, p1["totales"]
+    assert (p2["inicio"], p2["fin"], p2["fecha_cobro"]) == ("2026-10-31", "2026-11-14", "2026-11-15"), p2
+    assert [(i["descripcion"], i["estado"]) for i in p2["items"]] == [("Nómina", "programado")], p2["items"]
+    assert p2["totales"]["ingresos"] == 14000.0, p2["totales"]
+    # Los pausados no tienen periodo: van aparte y no suman a ningún periodo
+    assert [(i["descripcion"], i["estado"]) for i in r["pausados"]] == [("Gym", "pausado")], r["pausados"]
+    assert all(i["descripcion"] != "Gym" for p in r["periodos"] for i in p["items"])
+
+
+def test_fijos_por_periodo_marca_aplicados_y_no_cuenta_dos_veces():
+    from finanzas_core import materializar_recurrentes
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'quincenal', None, date(2026, 10, 31))
+    insertar_recurrente(conn, "Netflix", 'gasto', 299, 'mensual', 25, date(2026, 10, 25))
+    hoy = date(2026, 10, 26)
+    materializar_recurrentes(conn, hoy)
+    conn.commit()
+    p1 = fijos_por_periodo(conn, hoy, 1)["periodos"][0]
+    estados = [(i["descripcion"], i["estado"]) for i in p1["items"]]
+    assert estados.count(("Netflix", "aplicado")) == 1, estados
+    assert ("Netflix", "programado") not in estados, estados  # ya cargado: no se programa de nuevo
+    assert p1["totales"]["fijos"] == 299.0, p1["totales"]
 
 
 def _con_pagos(frecuencia, dias, tarjetas):

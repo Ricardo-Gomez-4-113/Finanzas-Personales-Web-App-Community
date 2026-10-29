@@ -368,13 +368,13 @@ def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     try:
         _ir(page, "tab-movimientos")
         page.click("#btn-subtab-fijos")
-        page.wait_for_selector("#lista-msi .rec-item")
-        msi = page.inner_text("#lista-msi")
-        assert "Laptop a 12 MSI" in msi, msi
+        page.wait_for_selector("#fijos-periodos .fijos-periodo")
+        texto = page.inner_text("#fijos-periodos")
+        assert "Laptop a 12 MSI" in texto, texto     # la compra a meses cae en su periodo
+        assert "En curso" in texto, texto            # el periodo actual va marcado
         assert page.inner_text("#lbl-fijos-deuda") != "$0.00", "la deuda MSI debe mostrarse en Fijos y MSI"
-        fijos = page.inner_text("#lista-fijos")
-        assert "2026-11-15" in fijos, fijos          # próximo cargo de Netflix tras el 15 de octubre
-        assert "2026-10-31" in fijos, fijos          # próxima nómina
+        assert "2026-10-31" in texto, texto          # próxima nómina
+        assert page.locator("#fijos-periodos .fijo-fila").count() >= 3, texto
         assert not errores, errores
     finally:
         ctx.close()
