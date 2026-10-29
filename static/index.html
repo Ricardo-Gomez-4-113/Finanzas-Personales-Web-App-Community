@@ -13,29 +13,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Finanzas Cloud | Software de Finanzas Personales, Inversiones y Gestión Patrimonial (MXN/USD)</title>
-    <meta name="description" content="Software privado de finanzas personales y gestión patrimonial en México. Controla ingresos, gastos, metas de ahorro por sobres y portafolios bursátiles MXN/USD en tiempo real con bases SQLite físicamente aisladas.">
-    <meta name="keywords" content="finanzas personales, gestión patrimonial, software financiero México, control de gastos, presupuesto por sobres, portafolio de inversiones, seguimiento de acciones y ETFs, finanzas cloud, SQLite multi-tenant, patrimonio neto MXN USD, RGM Labs">
-    <meta name="author" content="RGM Labs">
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <title>Finanzas Personales</title>
+    <meta name="description" content="Finanzas personales autoalojadas: ingresos, gastos, presupuesto por pagos, metas e inversiones.">
     <meta name="theme-color" content="#0F1318">
-    <link rel="canonical" href="https://finanzas.rgmlabs.org/">
 
-    <!-- Open Graph / Facebook / WhatsApp / LinkedIn -->
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Finanzas Cloud">
-    <meta property="og:locale" content="es_MX">
-    <meta property="og:url" content="https://finanzas.rgmlabs.org/">
-    <meta property="og:title" content="Finanzas Cloud | Gestión Patrimonial y Finanzas Personales Soberanas">
-    <meta property="og:description" content="Consolida tu patrimonio neto en tiempo real, domina tus presupuestos por sobres y supervisa portafolios bursátiles (MXN/USD) con bases de datos SQLite físicamente aisladas.">
-    <meta property="og:image" content="https://finanzas.rgmlabs.org/static/favicon.svg">
-
-    <!-- Twitter / X Cards -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Finanzas Cloud | Software de Gestión Patrimonial e Inversiones (MXN/USD)">
-    <meta name="twitter:description" content="El estándar institucional para tu patrimonio personal. Control de caja, sobres de ahorro y cotizaciones bursátiles en vivo con aislamiento físico SQLite.">
-
-    <!-- Favicon SVG Finanzas Cloud Sovereign Wealth -->
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%230F1318' stroke='%23C9B37E' stroke-width='1.5'/><path d='M10 22L16 10L22 22H18.5L16 16.8L13.5 22H10Z' fill='%23ECE7DC'/><circle cx='16' cy='14' r='2.2' fill='%23C9B37E'/></svg>">
     <link rel="alternate icon" href="/static/favicon.svg" type="image/svg+xml">
     <!-- Google Fonts: Hanken Grotesk (interfaz) + Fraunces (cifras) -->
@@ -49,132 +31,6 @@
     <link rel="stylesheet" href="/static/css/tema.css?v=71f78111fa">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
-    <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "Organization",
-          "@id": "https://finanzas.rgmlabs.org/#organization",
-          "name": "Finanzas Cloud · RGM Labs",
-          "url": "https://finanzas.rgmlabs.org/",
-          "logo": "https://finanzas.rgmlabs.org/static/favicon.svg",
-          "description": "Proyecto independiente desarrollado por RGM Labs especializado en software de gestión patrimonial soberana y finanzas personales con aislamiento físico de datos."
-        },
-        {
-          "@type": "SoftwareApplication",
-          "@id": "https://finanzas.rgmlabs.org/#software",
-          "name": "Finanzas Cloud",
-          "applicationCategory": "FinanceApplication",
-          "applicationSubCategory": "Personal Finance & Wealth Management",
-          "operatingSystem": "Web, Linux, Docker",
-          "url": "https://finanzas.rgmlabs.org/",
-          "inLanguage": "es-MX",
-          "author": {
-            "@id": "https://finanzas.rgmlabs.org/#organization"
-          },
-          "description": "Plataforma privada de inteligencia patrimonial para consolidar riqueza neta, flujo de caja, presupuestos por sobres y portafolios bursátiles bimoneda (MXN/USD) con bases de datos SQLite físicamente aisladas por usuario.",
-          "featureList": [
-            "Tablero de Patrimonio Neto 360° en MXN y USD",
-            "Presupuestos inteligentes por quincenas y semanas con sincronización automática",
-            "Control y amortización de compras a Meses Sin Intereses (MSI)",
-            "Seguimiento de portafolio bursátil en tiempo real vía Yahoo Finance",
-            "Análisis de rendimientos en Cetes y Renta Fija con retención de ISR",
-            "Metas y sobres de ahorro con capital blindado",
-            "Arquitectura Multi-Tenant con aislamiento físico SQLite WAL por usuario",
-            "Exportación de auditorías en Excel (.xlsx) y respaldos calientes (.db)"
-          ],
-          "offers": [
-            {
-              "@type": "Offer",
-              "name": "Edición Community (Self-Hosted Open Source)",
-              "price": "0",
-              "priceCurrency": "MXN",
-              "availability": "https://schema.org/InStock",
-              "url": "https://github.com/Ricardo-Gomez-4-113/Finanzas-Personales-Web-App-Community"
-            },
-            {
-              "@type": "Offer",
-              "name": "Plan Finanzas Cloud Gestionado",
-              "price": "50",
-              "priceCurrency": "MXN",
-              "priceSpecification": {
-                "@type": "UnitPriceSpecification",
-                "price": "50.00",
-                "priceCurrency": "MXN",
-                "unitText": "MONTH"
-              },
-              "availability": "https://schema.org/InStock",
-              "url": "https://finanzas.rgmlabs.org/"
-            }
-          ]
-        },
-        {
-          "@type": "FAQPage",
-          "@id": "https://finanzas.rgmlabs.org/#faqpage",
-          "mainEntity": [
-            {
-              "@type": "Question",
-              "name": "¿Por qué cobran $50 MXN/mes si el código es gratis en GitHub?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "El software es 100% libre bajo licencia GNU GPLv3: puedes descargar el código completo e instalarlo en tu propio servidor sin costo. Los $50 MXN al mes del plan Finanzas Cloud cubren exclusivamente la infraestructura en la nube 24/7, certificados SSL, servicio de correo transaccional OTP ya configurado, respaldos automáticos y soporte técnico prioritario."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿Qué es Finanzas Cloud y en qué se distingue de una app bancaria convencional?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Finanzas Cloud es un centro de comando financiero privado que consolida cuentas de liquidez, apartados de ahorro y portafolios de inversión bursátil en un solo lugar. A diferencia de las apps comerciales, no vende créditos, no incluye rastreadores publicitarios y opera con bases de datos físicamente aisladas bajo control del usuario."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿Mis datos financieros están completamente aislados de otros usuarios?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Sí, al 100%. Finanzas Cloud implementa una arquitectura multi-tenant física donde cada cuenta posee su propio archivo SQLite independiente en modo WAL. Tus transacciones, metas e inversiones nunca se mezclan en tablas compartidas."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿De dónde provienen las cotizaciones bursátiles y el tipo de cambio?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "La plataforma consulta en tiempo real los mercados financieros internacionales mediante Yahoo Finance para actualizar precios de acciones y ETFs, además de sincronizar automáticamente el tipo de cambio interbancario USD/MXN."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿Puedo descargar y respaldar mi información en cualquier momento?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Sí. Puedes descargar una copia íntegra en caliente de tu archivo SQLite (.db) con un clic, así como exportar reportes ejecutivos en formato Excel (.xlsx) sin bloqueo de proveedor."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿Cómo gestiona Finanzas Cloud los Meses Sin Intereses (MSI) y gastos fijos?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Finanzas Cloud incorpora un motor especializado para México que registra cada plan a Meses Sin Intereses, calcula cuotas pagadas vs pendientes, monitorea fechas de corte y amortiza automáticamente el capital reduciendo el pasivo en tiempo real de tu patrimonio neto."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "¿La plataforma realiza cálculos fiscales de retención de ISR para inversiones?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Sí. La calculadora de Renta Fija aplica la tasa oficial federal de retención de ISR vigente sobre el capital para CETES Directo, Bonos y SOFIPOs (Nu, Finsus, Klar), mostrando la ganancia neta real después de impuestos."
-              }
-            }
-          ]
-        }
-      ]
-    }
-    </script>
 </head>
 <body>
 
@@ -201,7 +57,7 @@
                         </defs>
                     </svg>
                 </div>
-                <h2>Finanzas Cloud</h2>
+                <h2>Finanzas Personales</h2>
                 <p>Monitoreo patrimonial y finanzas personales</p>
             </div>
             <form id="form-login" data-on-submit='[["iniciarSesion", "$event"]]'>
@@ -240,7 +96,7 @@
         <!-- Panel Lateral Desplegable / Colapsable (Sidebar) -->
         <aside id="app-sidebar" class="app-sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-brand s-cursor-pointer" data-on-click='[["mostrarVistaLanding"]]' title="Ir a la página de presentación">
+                <div class="sidebar-brand">
                     <div class="brand-logo-wrap">
                         <svg class="finora-logo-svg" width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <rect width="32" height="32" rx="9" fill="url(#finora-grad-side)" stroke="#C9B37E" stroke-opacity="0.55" stroke-width="1"/>
@@ -259,7 +115,7 @@
                         </svg>
                     </div>
                     <div class="brand-text-wrap">
-                        <span class="brand-title">Finanzas Cloud</span>
+                        <span class="brand-title">Finanzas Personales</span>
                     </div>
                 </div>
                 <button type="button" id="btn-sidebar-collapse" class="btn-sidebar-collapse" data-on-click='[["toggleSidebar"]]' title="Colapsar / Expandir panel lateral">
@@ -435,12 +291,6 @@
                             <div class="dropdown-section-divider"></div>
 
                             <div class="dropdown-action-list">
-                                <button type="button" class="dropdown-action-btn" data-on-click='[["mostrarVistaLanding"], ["cerrarUserDropdown"]]' title="Ver la página de presentación de Finanzas Cloud">
-                                    <span class="action-icon">
-                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                                    </span>
-                                    <span>Ver presentación</span>
-                                </button>
                                 <button type="button" id="btn-dropdown-eliminar-cuenta" class="dropdown-action-btn dropdown-btn-danger hidden" data-on-click='[["solicitarEliminarMiCuenta"], ["cerrarUserDropdown"]]' title="Eliminar definitivamente tu cuenta y datos">
                                     <span class="action-icon">
                                         <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -2012,57 +1862,6 @@
     </div>
 
     <!-- ============================================== -->
-    <!-- MODAL: SOLICITAR ACCESO / FINANZAS CLOUD       -->
-    <!-- ============================================== -->
-    <div id="modal-solicitar-acceso" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-solicitar-acceso-titulo" data-on-click='[["cerrarModalSolicitarAcceso"]]' data-solo-fondo>
-        <div class="modal-card modal-access-card" style="max-width: 540px; width: 94%;">
-            <div class="modal-header">
-                <div class="s-display-flex s-align-items-center s-gap-10px">
-                    <div class="kpi-icon-pill gold" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(197, 160, 89, 0.15); color: var(--gold-color);">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-                    </div>
-                    <div>
-                        <h3 id="modal-solicitar-acceso-titulo" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-color);">Comenzar con Finanzas Cloud</h3>
-                        <div style="font-size: 0.78rem; color: var(--text-muted);">$50 MXN / mes · Servidor dedicado &amp; Bóveda SQLite WAL</div>
-                    </div>
-                </div>
-                <button type="button" class="btn-modal-close" data-on-click='[["cerrarModalSolicitarAcceso"]]' aria-label="Cerrar modal">&times;</button>
-            </div>
-            <div class="modal-body" style="padding: 20px 24px; line-height: 1.6;">
-                <div style="background: var(--gold-subtle); border: 1px solid var(--gold-border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
-                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--gold-color); margin-bottom: 8px;">Tu suscripción institucional incluye:</div>
-                    <ul style="margin: 0; padding-left: 18px; font-size: 0.84rem; color: var(--text-color); display: flex; flex-direction: column; gap: 6px;">
-                        <li>Base de datos SQLite independiente y dedicada físicamente por usuario.</li>
-                        <li>Servicio de correos y códigos de acceso OTP gestionado sin configuraciones externas.</li>
-                        <li>Respaldos continuos en la nube, actualizaciones y cifrado de grado bancario.</li>
-                        <li>Acompañamiento guiado y soporte técnico directo.</li>
-                    </ul>
-                </div>
-                <div style="background: var(--surface-subtle); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px 16px; margin-bottom: 18px; text-align: center;">
-                    <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.12); color: var(--gold-color); margin-bottom: 10px;">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    </div>
-                    <h4 style="margin: 0 0 6px 0; font-size: 1rem; font-weight: 700; color: var(--text-color);">Registro y altas próximamente</h4>
-                    <p style="margin: 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
-                        El sistema automatizado de altas para nuevas cuentas de Finanzas Cloud ($50 MXN/mes) estará disponible muy pronto. Actualmente la plataforma opera en fase privada por invitación para garantizar el aislamiento físico y rendimiento óptimo de las bóvedas.
-                    </p>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button type="button" class="btn-primary btn-block" data-on-click='[["cerrarModalSolicitarAcceso"], ["mostrarToast", "¡Próximamente disponible! El registro automatizado abrirá pronto.", "info"]]' style="text-align: center; padding: 12px; font-weight: 700; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        <span>Entendido / próximamente</span>
-                    </button>
-                </div>
-                <div style="text-align: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-muted);">
-                    ¿Ya cuentas con tu usuario y contraseña asignados?
-                    <a href="#" data-prevent data-on-click='[["cerrarModalSolicitarAcceso"], ["mostrarVistaLogin"]]' style="color: var(--gold-color); font-weight: 600; text-decoration: underline; margin-left: 4px;">Ingresa a tu cuenta aquí</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================== -->
     <!-- MODAL 7: MARCO LEGAL, TÉRMINOS Y PRIVACIDAD    -->
     <!-- ============================================== -->
     <div id="modal-legal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-legal-titulo" data-on-click='[["cerrarModalLegal"]]' data-solo-fondo>
@@ -2070,7 +1869,7 @@
             <div class="modal-header">
                 <h3 id="modal-legal-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Marco legal & soberanía de datos — Finanzas Cloud</span>
+                    <span>Marco legal y privacidad</span>
                 </h3>
                 <button type="button" class="btn-modal-close" data-on-click='[["cerrarModalLegal"]]'>&times;</button>
             </div>
@@ -2099,25 +1898,25 @@
                     </div>
 
                     <div class="s-margin-14px-0-16px-0 s-padding-12px-14px s-background-var-primary-subtle s-border-1px-solid-var-border-color s-border-radius-8px s-font-size-0-84rem s-color-var-text-color s-line-height-1-5">
-                        <strong>Aviso legal:</strong> Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
+                        <strong>Aviso legal:</strong> Finanzas Personales es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </div>
 
                     <h4>1. Naturaleza y objeto del servicio</h4>
                     <p>
-                        <strong>Finanzas Cloud</strong> es una solución de software orientada a la inteligencia financiera personal, consolidación cuantitativa de patrimonio, presupuestación por el método de sobres y seguimiento de inversiones multimoneda (MXN/USD). El acceso y uso de la plataforma implican la aceptación plena e incondicional de los presentes Términos y Condiciones.
+                        <strong>Finanzas Personales</strong> es una solución de software orientada a la inteligencia financiera personal, consolidación cuantitativa de patrimonio, presupuestación por el método de sobres y seguimiento de inversiones multimoneda (MXN/USD). El acceso y uso de la plataforma implican la aceptación plena e incondicional de los presentes Términos y Condiciones.
                     </p>
                     <p>
-                        Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
+                        Finanzas Personales es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </p>
 
                     <h4>2. Soberanía tecnológica y aislamiento físico</h4>
                     <p>
-                        A diferencia de plataformas comerciales convencionales, Finanzas Cloud implementa una arquitectura <em>Multi-Tenant Hermética</em>. Cada usuario cuenta con su propio repositorio de base de datos SQLite físicamente independiente en el servidor. Tus movimientos contables, saldos, categorías y portafolios de inversión residen de forma aislada, garantizando que ninguna otra cuenta u organización tenga visibilidad sobre tus activos.
+                        A diferencia de plataformas comerciales convencionales, Finanzas Personales implementa una arquitectura <em>Multi-Tenant Hermética</em>. Cada usuario cuenta con su propio repositorio de base de datos SQLite físicamente independiente en el servidor. Tus movimientos contables, saldos, categorías y portafolios de inversión residen de forma aislada, garantizando que ninguna otra cuenta u organización tenga visibilidad sobre tus activos.
                     </p>
 
                     <h4>3. Propiedad y portabilidad incondicional</h4>
                     <p>
-                        El usuario es el único y exclusivo propietario de los datos financieros registrados. Finanzas Cloud garantiza el derecho de portabilidad permanente: puedes exportar en cualquier momento tu historial en hojas de cálculo Excel (<code>.xlsx</code>) o descargar una copia de seguridad íntegra de tu base de datos física (<code>.db</code>) en un solo clic, sin ningún tipo de retención forzosa (<em>Zero Vendor Lock-in</em>).
+                        El usuario es el único y exclusivo propietario de los datos financieros registrados. Finanzas Personales garantiza el derecho de portabilidad permanente: puedes exportar en cualquier momento tu historial en hojas de cálculo Excel (<code>.xlsx</code>) o descargar una copia de seguridad íntegra de tu base de datos física (<code>.db</code>) en un solo clic, sin ningún tipo de retención forzosa (<em>Zero Vendor Lock-in</em>).
                     </p>
 
                     <h4>4. Responsabilidad y custodia de credenciales</h4>
@@ -2127,12 +1926,12 @@
 
                     <h4>5. Disponibilidad y responsabilidad del software</h4>
                     <p>
-                        Finanzas Cloud provee sus herramientas bajo el principio de buena fe técnica. Si bien implementamos estándares de cifrado criptográfico rigurosos y respaldos directos, el software se entrega "tal cual" (<em>as is</em>). El usuario es incentivado a descargar periódicamente respaldos de su base de datos local para su custodia personal.
+                        Finanzas Personales provee sus herramientas bajo el principio de buena fe técnica. Si bien implementamos estándares de cifrado criptográfico rigurosos y respaldos directos, el software se entrega "tal cual" (<em>as is</em>). El usuario es incentivado a descargar periódicamente respaldos de su base de datos local para su custodia personal.
                     </p>
 
                     <h4>6. Deslinde de marca e independencia</h4>
                     <p>
-                        Finanzas Cloud es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
+                        Finanzas Personales es un proyecto desarrollado de forma independiente por RGM Labs. No está afiliado, respaldado ni asociado con ninguna otra entidad o marca registrada con el mismo nombre.
                     </p>
                 </div>
 
@@ -2145,7 +1944,7 @@
 
                     <h4>1. Responsable del tratamiento de datos</h4>
                     <p>
-                        Finanzas Cloud actúa como responsable técnico de la infraestructura de almacenamiento y procesamiento de la plataforma de gestión patrimonial privada.
+                        Finanzas Personales actúa como responsable técnico de la infraestructura de almacenamiento y procesamiento de la plataforma de gestión patrimonial privada.
                     </p>
 
                     <h4>2. Datos personales recabados</h4>
@@ -2160,7 +1959,7 @@
                         Tus datos se utilizan <strong>exclusivamente</strong> para permitirte autenticarte en el sistema, calcular balances cuantitativos en pantalla y enviarte códigos temporales de restablecimiento.
                     </p>
                     <p>
-                        <strong>Política de cero venta de datos:</strong> Finanzas Cloud <strong>no vende, no comercializa, no transfiere ni cede</strong> ningún dato personal ni financiero a agencias de publicidad, corredores de datos (<em>data brokers</em>), instituciones de crédito ni terceros bajo ninguna circunstancia.
+                        <strong>Política de cero venta de datos:</strong> Finanzas Personales <strong>no vende, no comercializa, no transfiere ni cede</strong> ningún dato personal ni financiero a agencias de publicidad, corredores de datos (<em>data brokers</em>), instituciones de crédito ni terceros bajo ninguna circunstancia.
                     </p>
 
                     <h4>4. Cifrado y medidas de seguridad</h4>
@@ -2183,7 +1982,7 @@
 
                     <h4>1. No constituye asesoría financiera</h4>
                     <p>
-                        Finanzas Cloud es una herramienta de software para fines estrictamente informativos, de organización y seguimiento administrativo personal. <strong>No constituye una casa de bolsa, entidad de ahorro, banco, asesor de inversión ni intermediario financiero regulado.</strong>
+                        Finanzas Personales es una herramienta de software para fines estrictamente informativos, de organización y seguimiento administrativo personal. <strong>No constituye una casa de bolsa, entidad de ahorro, banco, asesor de inversión ni intermediario financiero regulado.</strong>
                     </p>
                     <p>
                         Ningún contenido, cálculo de rendimiento, gráfica de distribución o indicador mostrado en la aplicación debe interpretarse como una recomendación de inversión, compra, venta o asesoramiento fiscal o contable.
@@ -2191,7 +1990,7 @@
 
                     <h4>2. Fuentes de mercado y tipos de cambio</h4>
                     <p>
-                        Las tasas de cotización (USD/MXN, EUR) y valores de activos bursátiles provienen de APIs públicas de referencia y son provistas a título indicativo para simulación cuantitativa. Finanzas Cloud no garantiza su exactitud en tiempo real ni se hace responsable por variaciones cambiarias en transacciones externas.
+                        Las tasas de cotización (USD/MXN, EUR) y valores de activos bursátiles provienen de APIs públicas de referencia y son provistas a título indicativo para simulación cuantitativa. Finanzas Personales no garantiza su exactitud en tiempo real ni se hace responsable por variaciones cambiarias en transacciones externas.
                     </p>
 
                     <h4>3. Autonomía y decisiones patrimoniales</h4>

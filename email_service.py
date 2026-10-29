@@ -4,7 +4,7 @@ email_service.py - Servicio de Notificaciones y Envío de Correos Transaccionale
 Este módulo gestiona:
 1. Conexión segura TLS/SSL con servidores SMTP (por defecto Gmail: smtp.gmail.com:587).
 2. Construcción de correos en formato multiparte (HTML enriquecido + texto plano).
-3. Plantilla con la identidad visual institucional de Finanzas Cloud (Obsidian & Satin Gold).
+3. Plantilla con la identidad visual de Finanzas Personales (Obsidian & Satin Gold).
 """
 
 import os
@@ -34,9 +34,9 @@ def enviar_correo_codigo_recuperacion(destinatario: str, nombre_usuario: str, co
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ.get("SMTP_USER", "").strip()
     smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
-    smtp_from = os.environ.get("SMTP_FROM", f"Finanzas Cloud <{smtp_user}>")
+    smtp_from = os.environ.get("SMTP_FROM", f"Finanzas Personales <{smtp_user}>")
 
-    asunto = f"{codigo} es tu código de recuperación en Finanzas Cloud"
+    asunto = f"{codigo} es tu código de recuperación en Finanzas Personales"
     nombre_seguro = html.escape(nombre_usuario or "Usuario")
 
     # Si está configurada la API Key de Resend, enviamos directamente por Resend API
@@ -45,7 +45,7 @@ def enviar_correo_codigo_recuperacion(destinatario: str, nombre_usuario: str, co
     # Cuerpo en texto plano (fallback para clientes de correo sin soporte HTML)
     texto_plano = f"""Hola {nombre_usuario},
 
-Recibimos una solicitud para restablecer la contraseña de tu cuenta en Finanzas Cloud.
+Recibimos una solicitud para restablecer la contraseña de tu cuenta en Finanzas Personales.
 
 Tu código de recuperación es: {codigo}
 
@@ -54,7 +54,7 @@ Este código es de un solo uso y expirará en 15 minutos.
 Si no solicitaste este cambio, puedes ignorar este mensaje de forma segura. Tu cuenta permanece protegida.
 
 --
-Finanzas Cloud | Gestión Patrimonial
+Finanzas Personales
 """
 
     # Cuerpo HTML enriquecido con diseño institucional Obsidian & Satin Gold
@@ -81,11 +81,11 @@ Finanzas Cloud | Gestión Patrimonial
                                         </div>
                                     </td>
                                     <td style="vertical-align: middle;">
-                                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #f8fafc;">FINANZAS <span style="color: #dfba73;">CLOUD</span></span>
+                                        <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #f8fafc;">FINANZAS <span style="color: #dfba73;">PERSONALES</span></span>
                                     </td>
                                 </tr>
                             </table>
-                            <p style="margin: 6px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #c5a059; font-weight: 600;">Gestión Patrimonial</p>
+                            <p style="margin: 6px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #c5a059; font-weight: 600;">Finanzas personales</p>
                         </td>
                     </tr>
                     
@@ -108,7 +108,7 @@ Finanzas Cloud | Gestión Patrimonial
                             </div>
 
                             <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.5; color: #94a3b8; text-align: center;">
-                                Introduce este código de 6 dígitos en la pantalla de inicio de sesión de Finanzas Cloud para configurar tu nueva contraseña.
+                                Introduce este código de 6 dígitos en la pantalla de inicio de sesión de Finanzas Personales para configurar tu nueva contraseña.
                             </p>
                             
                             <!-- Alerta de Seguridad -->
@@ -124,7 +124,7 @@ Finanzas Cloud | Gestión Patrimonial
                     <tr>
                         <td style="padding: 20px 32px 28px 32px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06); background-color: rgba(0, 0, 0, 0.2);">
                             <p style="margin: 0; font-size: 11px; color: #475569;">
-                                Este es un mensaje de seguridad automatizado emitido por tu servidor Finanzas Cloud.
+                                Este es un mensaje de seguridad automatizado emitido por tu servidor Finanzas Personales.
                             </p>
                         </td>
                     </tr>
@@ -150,7 +150,7 @@ Finanzas Cloud | Gestión Patrimonial
             import json
             import urllib.request
             
-            resend_from = os.environ.get("RESEND_FROM", "Finanzas Cloud <notificaciones@finanzas.rgmlabs.org>").strip()
+            resend_from = os.environ.get("RESEND_FROM", "Finanzas Personales <no-responder@example.com>").strip()
             payload = {
                 "from": resend_from,
                 "to": [destinatario],
@@ -164,7 +164,7 @@ Finanzas Cloud | Gestión Patrimonial
                 headers={
                     "Authorization": f"Bearer {resend_api_key}",
                     "Content-Type": "application/json",
-                    "User-Agent": "FinanzasCloud/1.0"
+                    "User-Agent": "FinanzasPersonales/1.0"
                 },
                 method="POST"
             )
