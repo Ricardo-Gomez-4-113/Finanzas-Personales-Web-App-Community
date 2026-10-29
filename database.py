@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 12
+CURRENT_TENANT_SCHEMA_VERSION = 13
 
 
 # =============================================================================
@@ -406,6 +406,27 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_tarjeta ON recurrentes(presupuesto_tarjeta_id);")
         cursor.execute("PRAGMA user_version = 12;")
         current_version = 12
+
+    # -------------------------------------------------------------
+    # Versión 13: Rubro del movimiento guardado en la propia transacción.
+    # Antes el rubro (fijo, MSI, normal, meta) se deducía del enlace a recurrentes, que al borrar el
+    # fijo pasa a NULL y movía el cargo a "normales" en el historial de periodos.
+    # -------------------------------------------------------------
+    if current_version < 13 and CURRENT_TENANT_SCHEMA_VERSION >= 13:
+        try:
+            cursor.execute("ALTER TABLE transacciones ADD COLUMN rubro TEXT;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("UPDATE transacciones SET rubro = 'metas' WHERE rubro IS NULL AND apartado_id IS NOT NULL;")
+        cursor.execute("UPDATE transacciones SET rubro = 'ingreso' WHERE rubro IS NULL AND tipo = 'ingreso';")
+        cursor.execute("""
+            UPDATE transacciones SET rubro = 'msi'
+            WHERE rubro IS NULL AND recurrente_id IN (SELECT id FROM recurrentes WHERE total_cuotas IS NOT NULL);
+        """)
+        cursor.execute("UPDATE transacciones SET rubro = 'fijos' WHERE rubro IS NULL AND recurrente_id IS NOT NULL;")
+        cursor.execute("UPDATE transacciones SET rubro = 'normales' WHERE rubro IS NULL;")
+        cursor.execute("PRAGMA user_version = 13;")
+        current_version = 13
 
     conn.commit()
 

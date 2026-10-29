@@ -139,6 +139,29 @@ def test_bd_nueva_no_genera_respaldo():
             database.olvidar_tenant("user_5.db")
 
 
+def test_v13_rellena_el_rubro_de_los_movimientos_existentes():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 12)
+        conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo) VALUES ('Netflix', 'gasto', 300, 'mensual', 5, '2026-11-05', NULL, 0, 1)")
+        conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo) VALUES ('Celular', 'gasto', 500, 'mensual', 6, '2026-11-06', 6, 1, 3000, 1)")
+        conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 0)")
+        conn.executemany("INSERT INTO transacciones (fecha, monto, tipo, descripcion, recurrente_id, apartado_id) VALUES (?, ?, ?, ?, ?, ?)", [
+            ("2026-10-05", 300, "gasto", "Netflix", 1, None),
+            ("2026-10-06", 500, "gasto", "Celular (2/6)", 2, None),
+            ("2026-10-07", 1000, "gasto", "Súper", None, None),
+            ("2026-10-08", 14000, "ingreso", "Nómina", None, None),
+            ("2026-10-09", 800, "gasto", "Ahorro Viaje", None, 1),
+        ])
+        conn.commit()
+        _migrar_hasta(conn, 13)
+        assert _version(conn) == 13
+        rubros = dict(conn.execute("SELECT descripcion, rubro FROM transacciones").fetchall())
+        assert rubros == {"Netflix": "fijos", "Celular (2/6)": "msi", "Súper": "normales",
+                          "Nómina": "ingreso", "Ahorro Viaje": "metas"}, rubros
+        _migrar_hasta(conn, 13)  # idempotente
+        assert _version(conn) == 13
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

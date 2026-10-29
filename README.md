@@ -89,6 +89,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 ### 9. 🧮 Presupuesto por Subperiodos
 * Tarjetas de presupuesto por categoría con reparto por quincenas o semanas (simétrico o personalizado).
 * Los repartos se calculan en centavos: la suma de los subperiodos siempre coincide exactamente con el total.
+* En un presupuesto quincenal, cada monto es por quincena: al exportarlo a fijos, cada cargo se repite en su día y en el de la otra quincena, así el mes cuadra con el equivalente mensual de la tarjeta.
 * Exportación del presupuesto a gastos fijos con fecha de inicio configurable.
 
 ### 10. 🩺 Respaldo Automático y Monitoreo

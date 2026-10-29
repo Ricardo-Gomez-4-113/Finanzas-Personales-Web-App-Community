@@ -196,10 +196,11 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
             try:
                 cursor.execute(
                     """
-                    INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id, rubro)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (prox.isoformat(), monto_cuota, fila["tipo"], fila["categoria_id"], descripcion, fila["id"], apartado_id)
+                    (prox.isoformat(), monto_cuota, fila["tipo"], fila["categoria_id"], descripcion, fila["id"], apartado_id,
+                     clase_movimiento(fila["tipo"], apartado_id, fila["id"], total is not None))
                 )
                 if apartado_id and fila["tipo"] == 'gasto':
                     cursor.execute(
@@ -1352,6 +1353,19 @@ def exportar_presupuesto_a_fijos_core(
             dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
             items.append({"descripcion": nombre, "monto": s_monto, "frecuencia": s_frec, "dia": dia_f, "proxima": prox_f})
 
+        # Presupuesto quincenal: el monto es por quincena y un día fijo se repite en la otra quincena.
+        # El motor de fijos mensuales lo representa con un fijo en el día y otro en su par (d±15).
+        if frecuencia == 'quincenal':
+            expandidos = []
+            for itm in items:
+                expandidos.append(itm)
+                if itm["frecuencia"] == 'mensual' and itm["dia"] is not None:
+                    pareja = itm["dia"] + 15 if itm["dia"] <= 15 else itm["dia"] - 15
+                    dia_2, prox_2 = _calc_proxima_fecha(pareja, 'mensual', hoy)
+                    expandidos.append({**itm, "descripcion": f"{itm['descripcion']} · 2.ª quincena",
+                                       "dia": dia_2, "proxima": prox_2})
+            items = expandidos
+
         for itm in items:
             deseados.append({
                 "tarjeta_id": tarjeta_id, "tipo": "gasto", "descripcion": itm["descripcion"],
@@ -1505,8 +1519,9 @@ def valor_rendimiento(capital: float, tasa_anual: float, fecha_base: date, hoy: 
     return round(capital * (1 + tasa_anual / 100 / 365) ** dias, 2)
 
 
-def _inicio_periodo(fin: date, frecuencia: str) -> date:
-    """Fecha de cobro anterior a `fin` para un ingreso de la frecuencia dada."""
+def _inicio_periodo(fin: date, frecuencia: str, dia: Optional[int] = None) -> date:
+    """Fecha de cobro anterior a `fin` para un ingreso de la frecuencia dada.
+    En mensual el día de cobro es el ancla (como en siguiente_fecha), no el día de `fin`."""
     if frecuencia == 'semanal':
         return fin - timedelta(days=7)
     if frecuencia == 'quincenal':
@@ -1515,7 +1530,8 @@ def _inicio_periodo(fin: date, frecuencia: str) -> date:
             return date(anio, mes, ultimo_dia_mes(anio, mes))
         return date(fin.year, fin.month, 15)
     anio, mes = (fin.year - 1, 12) if fin.month == 1 else (fin.year, fin.month - 1)
-    return date(anio, mes, min(fin.day, ultimo_dia_mes(anio, mes)))
+    ancla = dia if dia else fin.day
+    return date(anio, mes, min(ancla, ultimo_dia_mes(anio, mes)))
 
 
 def _recurrentes_vigentes(conn: sqlite3.Connection) -> list:
@@ -1545,7 +1561,7 @@ def _limites_periodos(principal, hoy: date, n: int) -> list:
     cobro = date.fromisoformat(principal["proxima_fecha"])
     while cobro <= hoy:
         cobro = siguiente_fecha(cobro, frecuencia, dia)
-    inicio = min(_inicio_periodo(cobro, frecuencia), hoy)
+    inicio = min(_inicio_periodo(cobro, frecuencia, dia), hoy)
     for _ in range(n):
         limites.append((inicio, cobro - timedelta(days=1), cobro))
         inicio, cobro = cobro, siguiente_fecha(cobro, frecuencia, dia)
@@ -1571,7 +1587,7 @@ def _ocurrencias_programadas(vigentes: list, hasta: date):
             fecha = siguiente_fecha(fecha, r["frecuencia"], r["dia"])
 
 
-def _clase_movimiento(tipo: str, apartado_id, recurrente_id, es_msi: bool) -> str:
+def clase_movimiento(tipo: str, apartado_id, recurrente_id, es_msi: bool) -> str:
     """Rubro de un movimiento dentro de un periodo: ingreso, normales, fijos, msi o metas."""
     if apartado_id is not None:
         return "metas"
@@ -1612,7 +1628,7 @@ def calcular_periodos(conn: sqlite3.Connection, hoy: date, n: int = 6) -> Dict[s
 
     filas = conn.execute(
         """
-        SELECT t.fecha, t.monto, t.tipo, t.apartado_id, t.recurrente_id, r.total_cuotas
+        SELECT t.fecha, t.monto, t.tipo, t.apartado_id, t.recurrente_id, t.rubro, r.total_cuotas
         FROM transacciones t LEFT JOIN recurrentes r ON r.id = t.recurrente_id
         WHERE substr(t.fecha, 1, 10) BETWEEN ? AND ?
         """,
@@ -1622,14 +1638,14 @@ def calcular_periodos(conn: sqlite3.Connection, hoy: date, n: int = 6) -> Dict[s
         i = indice(date.fromisoformat(f["fecha"][:10]))
         if i is None:
             continue
-        clase = _clase_movimiento(f["tipo"], f["apartado_id"], f["recurrente_id"], f["total_cuotas"] is not None)
+        clase = f["rubro"] or clase_movimiento(f["tipo"], f["apartado_id"], f["recurrente_id"], f["total_cuotas"] is not None)
         registrado[i][clase] += importe_con_signo(clase, f["tipo"], float(f["monto"]))
 
     for r, fecha, importe in _ocurrencias_programadas(vigentes, hasta):
         i = indice(fecha) if fecha >= desde else None
         if i is None:
             continue
-        clase = _clase_movimiento(r["tipo"], r["apartado_id"], r["id"], r["total_cuotas"] is not None)
+        clase = clase_movimiento(r["tipo"], r["apartado_id"], r["id"], r["total_cuotas"] is not None)
         programado[i][clase] += importe_con_signo(clase, r["tipo"], importe)
         if r["tipo"] == 'gasto':
             eventos[i].append({

@@ -64,8 +64,10 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Saldo al cierre | Movimientos | Saldo inicial del periodo más su remanente; es el saldo inicial del siguiente periodo. |
 | Libre hasta el cobro | Resumen (periodo) | Disponible menos los cargos que faltan en el periodo más los ingresos que aún llegan en él: el saldo al cierre del periodo en curso. |
 | Deuda MSI | Resumen, Movimientos y fijos | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
+| Rubro del movimiento | Resumen, Movimientos | Se guarda en la propia transacción (`transacciones.rubro`: fijos, msi, normales, ingreso o metas). No depende del enlace a `recurrentes`, que al borrar un fijo pasa a NULL. |
+| Exportación del presupuesto | Fijos y Movimientos | En un presupuesto quincenal, cada monto (tarjeta o subperiodo) es por quincena: se exporta como un fijo en su día y otro en su par (d±15). Así el mes cuadra con el equivalente mensual que muestra la tarjeta. |
 
-Reglas que las pruebas vigilan: el historial mensual y el Resumen usan la misma regla de movimientos de apartados; el `monto_actual` de cada apartado coincide con sus movimientos; el saldo al cierre de un periodo es el saldo inicial del siguiente, y lo libre hasta el cobro es el saldo al cierre del periodo en curso.
+Reglas que las pruebas vigilan: los periodos son contiguos y no se solapan, cada movimiento cae en un solo periodo, el inicio de un periodo mensual usa el día de cobro como ancla, la exportación quincenal cuadra con el presupuesto, el historial mensual y el Resumen usan la misma regla de movimientos de apartados; el `monto_actual` de cada apartado coincide con sus movimientos; el saldo al cierre de un periodo es el saldo inicial del siguiente, y lo libre hasta el cobro es el saldo al cierre del periodo en curso.
 
 ## Diseño de la interfaz
 

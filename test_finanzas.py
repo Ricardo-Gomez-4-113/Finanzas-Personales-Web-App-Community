@@ -1091,9 +1091,9 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes
     conn = nueva_bd()
     cur = conn.cursor()
-    # Ingreso quincenal de 10000
+    # Ingreso quincenal de 10000; la tarjeta es 4000 POR QUINCENA (la interfaz muestra 8000 al mes)
     conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
-    # Tarjeta dividida Transporte: 2000 en Dia 1 y 2000 en Dia 16
+    # Tarjeta dividida Transporte: 2000 en Dia 1 y 2000 en Dia 16 de cada quincena
     sub_transporte = [
         {"id": "q1", "nombre": "Quincena 1", "monto": 2000.0, "porcentaje": 50.0, "dia": 1},
         {"id": "q2", "nombre": "Quincena 2", "monto": 2000.0, "porcentaje": 50.0, "dia": 16}
@@ -1108,20 +1108,12 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     res = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 20))
     assert res["total_procesados"] >= 2
 
-    # Deben crearse dos recurrentes independientes con presupuesto_tarjeta_id
-    recs = cur.execute("SELECT descripcion, tipo, monto, frecuencia, dia, presupuesto_tarjeta_id FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC", (t_id,)).fetchall()
-    assert len(recs) == 2
-    assert recs[0]["descripcion"] == "Transporte (Quincena 1)"
-    assert recs[0]["monto"] == 2000.0
-    assert recs[0]["dia"] == 1
-    assert recs[0]["frecuencia"] == "mensual"
-    assert recs[0]["presupuesto_tarjeta_id"] == t_id
-
-    assert recs[1]["descripcion"] == "Transporte (Quincena 2)"
-    assert recs[1]["monto"] == 2000.0
-    assert recs[1]["dia"] == 16
-    assert recs[1]["frecuencia"] == "mensual"
-    assert recs[1]["presupuesto_tarjeta_id"] == t_id
+    # Cada subperiodo se repite en las dos quincenas del mes: 4 fijos mensuales, 8000 al mes
+    recs = cur.execute("SELECT descripcion, tipo, monto, frecuencia, dia, presupuesto_tarjeta_id FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC, descripcion ASC", (t_id,)).fetchall()
+    assert len(recs) == 4, [tuple(r) for r in recs]
+    assert sorted(r["dia"] for r in recs) == [1, 1, 16, 16]
+    assert all(r["frecuencia"] == "mensual" and r["monto"] == 2000.0 and r["presupuesto_tarjeta_id"] == t_id for r in recs)
+    assert round(sum(r["monto"] for r in recs), 2) == 8000.0
 
     # Re-exportar con actualización: no debe duplicar
     cur.execute("UPDATE presupuesto_tarjetas SET monto = 4200.0 WHERE id = ?", (t_id,))
@@ -1133,10 +1125,10 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     conn.commit()
 
     res2 = exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 20))
-    recs2 = cur.execute("SELECT descripcion, monto FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC", (t_id,)).fetchall()
-    assert len(recs2) == 2
-    assert recs2[0]["monto"] == 2100.0
-    assert recs2[1]["monto"] == 2100.0
+    recs2 = cur.execute("SELECT descripcion, monto FROM recurrentes WHERE presupuesto_tarjeta_id = ? ORDER BY dia ASC, descripcion ASC", (t_id,)).fetchall()
+    assert len(recs2) == 4, [tuple(r) for r in recs2]
+    assert all(r["monto"] == 2100.0 for r in recs2)
+    assert len(recs) == 4
 
 
 def test_exportar_tarjeta_subperiodo_dia_futuro_no_materializa_antes_de_tiempo():
@@ -2175,6 +2167,89 @@ def test_periodo_lo_marca_el_ingreso_fijo_mayor():
     # El sueldo mensual marca el periodo (1-31 oct); el freelance del 31 oct entra como ingreso por recibir
     assert (p0["inicio"], p0["fin"], p0["fecha_cobro"]) == ("2026-10-01", "2026-10-31", "2026-11-01"), p0
     assert p0["ingresos"]["por_recibir"] == 5000.0, p0["ingresos"]
+
+
+def test_rubro_sobrevive_al_borrar_el_fijo():
+    from finanzas_core import calcular_periodos, materializar_recurrentes
+    conn = nueva_bd()
+    f = insertar_recurrente(conn, "Netflix", 'gasto', 300, 'mensual', 5, date(2026, 10, 5))
+    materializar_recurrentes(conn, date(2026, 10, 20))
+    conn.execute("DELETE FROM recurrentes WHERE id = ?", (f["id"],))
+    conn.commit()
+    g = calcular_periodos(conn, date(2026, 10, 20), 1)["periodos"][0]["gastos"]
+    assert (g["fijos"], g["normales"], g["pagado"]) == (300.0, 0.0, 300.0), g  # sigue siendo un fijo, no un gasto normal
+
+
+def test_periodo_mensual_dia_31_empieza_en_el_cobro_real():
+    from finanzas_core import calcular_periodos
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Principal", 'ingreso', 5000, 'mensual', 31, date(2027, 4, 30))
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-30', 1000, 'gasto')")  # antes del cobro del 31 de marzo
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-31', 200, 'gasto')")
+    conn.commit()
+    p = calcular_periodos(conn, date(2027, 4, 10), 1)["periodos"][0]
+    assert p["inicio"] == "2027-03-31", p
+    assert p["gastos"]["normales"] == 200.0, p["gastos"]
+
+
+def test_exportar_quincenal_cuadra_con_el_presupuesto():
+    from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes
+    casos = [
+        ("mensual", None, None, 1000.0),
+        ("mensual", 10, None, 1000.0),
+        ("quincenal", None, None, 2000.0),
+        ("quincenal", 10, None, 2000.0),
+        ("quincenal", None, [{"nombre": "1a", "monto": 500.0, "porcentaje": 50.0, "dia": 1},
+                             {"nombre": "2a", "monto": 500.0, "porcentaje": 50.0, "dia": 16}], 2000.0),
+    ]
+    for frecuencia, dia_pago, subs, esperado in casos:
+        conn = nueva_bd()
+        cur = conn.cursor()
+        cur.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = ?, subdivision_tipo = 'ninguna' WHERE id = 1", (frecuencia,))
+        cur.execute("""INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos)
+                       VALUES ('Renta', 'x', 'blue', 10, 1000, 'Vivienda', 1, ?, ?)""", (dia_pago, json.dumps(subs) if subs else None))
+        conn.commit()
+        exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 1))
+        conn.commit()
+        for dia in range(1, 31):
+            materializar_recurrentes(conn, date(2026, 11, dia))
+        real = cur.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE descripcion LIKE 'Renta%' AND fecha BETWEEN '2026-11-01' AND '2026-11-30'").fetchone()[0]
+        assert abs(real - esperado) < 0.01, (frecuencia, dia_pago, subs, real, esperado)
+
+
+def test_periodos_invariantes_con_escenarios_aleatorios():
+    """Sin huecos ni solapes entre periodos, cada movimiento en un único periodo y saldos encadenados."""
+    import random
+    from datetime import timedelta
+    from finanzas_core import calcular_periodos, materializar_recurrentes
+    for seed in range(60):
+        rng = random.Random(seed)
+        conn = nueva_bd()
+        cur = conn.cursor()
+        hoy = date(2026, 1, 1) + timedelta(days=rng.randint(0, 900))
+        frec_p = rng.choice(["quincenal", "mensual", "semanal"])
+        dia_p = rng.randint(1, 31) if frec_p == "mensual" else None
+        insertar_recurrente(conn, "Principal", 'ingreso', round(rng.uniform(1000, 9000), 2), frec_p, dia_p,
+                            hoy + timedelta(days=rng.randint(-40, 40)))
+        for i in range(rng.randint(0, 3)):
+            f = rng.choice(["mensual", "quincenal", "semanal"])
+            insertar_recurrente(conn, f"Gasto{i}", 'gasto', round(rng.uniform(100, 3000), 2), f,
+                                rng.randint(1, 31) if f == "mensual" else None, hoy + timedelta(days=rng.randint(-40, 40)))
+        materializar_recurrentes(conn, hoy)
+        for i in range(rng.randint(0, 5)):
+            cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)",
+                        ((hoy - timedelta(days=rng.randint(0, 90))).isoformat(), round(rng.uniform(10, 4000), 2), rng.choice(["ingreso", "gasto"])))
+        conn.commit()
+        ps = calcular_periodos(conn, hoy, 6)["periodos"]
+        for a, b in zip(ps, ps[1:]):
+            assert date.fromisoformat(a["fin"]) + timedelta(days=1) == date.fromisoformat(b["inicio"]), (seed, a["fin"], b["inicio"])
+            assert abs(a["saldo_final"] - b["saldo_inicial"]) < 0.02, (seed, a, b)
+        assert date.fromisoformat(ps[0]["inicio"]) <= hoy <= date.fromisoformat(ps[0]["fin"]), (seed, hoy, ps[0])
+        desde, hasta = ps[0]["inicio"], ps[-1]["fin"]
+        ing_db = cur.execute("SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='ingreso' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
+        gas_db = cur.execute("SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='gasto' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
+        assert abs(sum(p["ingresos"]["recibido"] for p in ps) - ing_db) < 0.02, seed
+        assert abs(sum(p["gastos"]["pagado"] for p in ps) - gas_db) < 0.02, seed
 
 
 if __name__ == '__main__':

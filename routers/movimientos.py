@@ -13,6 +13,7 @@ import sqlite3
 
 from finanzas_core import (
     ahora_local,
+    clase_movimiento,
     calcular_resumen,
     resumen_mensual_core,
     deficit_al_eliminar_lote,
@@ -90,10 +91,10 @@ def crear_transaccion(t: Transaccion, conn: sqlite3.Connection = Depends(get_ten
 
     cursor.execute(
         """
-        INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion) 
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, rubro)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (t.fecha, t.monto, t.tipo, t.categoria_id, t.descripcion)
+        (t.fecha, t.monto, t.tipo, t.categoria_id, t.descripcion, clase_movimiento(t.tipo, None, None, False))
     )
     conn.commit()
     return {"mensaje": "Transacción guardada con éxito"}
@@ -259,13 +260,15 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+    # El rubro cambia solo si cambia el tipo; un fijo o una MSI conservan su rubro aunque se borre el enlace
+    nuevo_rubro = trans["rubro"] if nuevo_tipo == trans["tipo"] else clase_movimiento(nuevo_tipo, trans["apartado_id"], trans["recurrente_id"], False)
     cursor.execute(
         """
         UPDATE transacciones 
-        SET fecha = ?, monto = ?, tipo = ?, categoria_id = ?, descripcion = ?
+        SET fecha = ?, monto = ?, tipo = ?, categoria_id = ?, descripcion = ?, rubro = ?
         WHERE id = ?
         """,
-        (nueva_fecha, nuevo_monto, nuevo_tipo, nueva_cat, nueva_desc, id_transaccion)
+        (nueva_fecha, nuevo_monto, nuevo_tipo, nueva_cat, nueva_desc, nuevo_rubro, id_transaccion)
     )
     conn.commit()
     return {"mensaje": "Transacción actualizada con éxito"}

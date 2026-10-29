@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import sqlite3
 
-from finanzas_core import ahora_local
+from finanzas_core import ahora_local, clase_movimiento
 from security import (
     get_tenant_db
 )
@@ -115,8 +115,8 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             nuevo_saldo = round(monto_actual + mov.monto, 2)
             desc = f"Ahorro destinado a: {apartado['nombre']}"
             cursor.execute(
-                'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES (?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, mov.monto, 'gasto', 1, desc, apartado_id)
+                'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (fecha_hoy, mov.monto, 'gasto', 1, desc, apartado_id, clase_movimiento('gasto', apartado_id, None, False))
             )
             
         elif mov.accion == 'retirar':
@@ -127,8 +127,8 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             nuevo_saldo = round(monto_actual - mov.monto, 2)
             desc = f"Retiro de ahorro: {apartado['nombre']}"
             cursor.execute(
-                'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES (?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, mov.monto, 'ingreso', 1, desc, apartado_id)
+                'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (fecha_hoy, mov.monto, 'ingreso', 1, desc, apartado_id, clase_movimiento('ingreso', apartado_id, None, False))
             )
         
         cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (nuevo_saldo, apartado_id))
