@@ -26,6 +26,11 @@ python3 test_finanzas.py   # solo la lógica financiera, rápido y sin Docker
 
 Todo cambio en `finanzas_core.py` lleva su caso en `test_finanzas.py`.
 
+Pruebas de funcionamiento:
+- `tests/escenario.py` crea un usuario de referencia con seis meses de historia (nómina, renta, Netflix, una compra a 12 MSI, dos metas), solo por la API. Sus cifras esperadas están calculadas a mano en el mismo archivo.
+- Las pruebas del escenario corren con el reloj fijo: `FINANZAS_MODO_PRUEBA=1` y `FINANZAS_HOY=2026-10-20T10:00:00`. Sin `FINANZAS_MODO_PRUEBA`, la variable `FINANZAS_HOY` no tiene efecto, así que producción siempre usa la hora real.
+- `./scripts/smoke_produccion.sh [puerto]` revisa los contenedores reales (salud, páginas, recursos con `?v=`, cabeceras de seguridad, 401 sin token, Community sin landing). Es solo de lectura: no crea usuarios ni toca datos. Úsalo después de cada despliegue.
+
 Cómo funcionan las suites:
 - Cada archivo corre **todas** sus pruebas aunque una falle, y al final muestra cuáles fallaron. El código de salida es 1 si hubo fallos.
 - Para agregar una prueba basta con escribir una función `test_...`: el ejecutor la descubre sola (`tests/ejecutor.py`).

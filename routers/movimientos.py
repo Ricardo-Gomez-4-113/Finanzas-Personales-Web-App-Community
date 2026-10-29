@@ -123,9 +123,12 @@ def eliminar_transaccion(
 
     # Si está vinculado a un apartado de ahorro / meta
     # Si es gasto (depósito/ahorro): se descuenta de la meta.
-    # Si es ingreso (retiro de ahorro): NO se reincorpora a la meta (el dinero sacado no vuelve a la meta).
+    # Movimiento de meta: se deshace su efecto en el saldo (un retiro devuelve el dinero a la meta)
     if trans["apartado_id"] is not None:
-        revertir_movimiento_apartado(cursor, trans["apartado_id"], trans["tipo"], trans["monto"])
+        try:
+            revertir_movimiento_apartado(cursor, trans["apartado_id"], trans["tipo"], trans["monto"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
     if trans["recurrente_id"] is not None:
@@ -173,7 +176,10 @@ def eliminar_transacciones_lote(
 
     # Validación de déficit si no es forzado y no es vaciado total
     if not req.forzar and not req.todos:
-        deficit = deficit_al_eliminar_lote(cursor, transacciones)
+        try:
+            deficit = deficit_al_eliminar_lote(cursor, transacciones)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         if deficit is not None:
             deficit_encontrado, fecha_deficit = deficit
             raise HTTPException(
@@ -187,7 +193,10 @@ def eliminar_transacciones_lote(
     # Procesar ajustes en una transacción SQL atómica
     for t in transacciones:
         if t["apartado_id"] is not None:
-            revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
+            try:
+                revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
 
         if t["recurrente_id"] is not None:
             rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (t["recurrente_id"],)).fetchone()

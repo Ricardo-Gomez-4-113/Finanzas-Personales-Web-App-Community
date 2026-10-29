@@ -1936,15 +1936,19 @@ def test_saldo_de_apartados_coincide_con_sus_movimientos():
         if rnd.random() < 0.6 or guardado < monto:
             conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'gasto', 1, 'dep', ?)", (monto, aid))
             conn.execute("UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?", (monto, aid))
-        elif rnd.random() < 0.5:
+        elif rnd.random() < 0.5 and guardado >= monto:
             conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'ingreso', 1, 'ret', ?)", (monto, aid))
             conn.execute("UPDATE apartados SET monto_actual = monto_actual - ? WHERE id = ?", (monto, aid))
         else:
             # Borrar un movimiento de la meta (depósito o retiro) al azar: el saldo debe seguir cuadrando
             mov = conn.execute("SELECT id, tipo, monto FROM transacciones WHERE apartado_id = ? ORDER BY RANDOM() LIMIT 1", (aid,)).fetchone()
             if mov:
-                conn.execute("DELETE FROM transacciones WHERE id = ?", (mov["id"],))
-                revertir_movimiento_apartado(conn.cursor(), aid, mov["tipo"], mov["monto"])
+                try:
+                    revertir_movimiento_apartado(conn.cursor(), aid, mov["tipo"], mov["monto"])
+                except ValueError:
+                    pass  # la app lo rechaza: el depósito ya tiene retiros encima
+                else:
+                    conn.execute("DELETE FROM transacciones WHERE id = ?", (mov["id"],))
         conn.commit()
     for aid in (1, 2):
         guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
@@ -1993,6 +1997,41 @@ def test_conciliacion_resumen_historial_y_periodo():
     assert per["disponible"] == r["balance"], per
     # Lo guardado en metas más lo disponible es el efectivo total: 22,500 + 4,500 = 27,000
     assert r["balance"] + r["apartados"] == 27000.0
+
+
+def test_no_se_borra_deposito_si_ya_se_retiro_parte():
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 100)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 100, 'gasto', 1)")
+    dep = conn.execute("SELECT id FROM transacciones").fetchone()["id"]
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 50, 'ingreso', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 50 WHERE id = 1")
+    conn.commit()
+    try:
+        revertir_movimiento_apartado(conn.cursor(), 1, 'gasto', 100)
+    except ValueError as e:
+        assert "retiro" in str(e).lower(), str(e)
+    else:
+        raise AssertionError("debía rechazar: el depósito ya tiene un retiro encima")
+    # El rechazo no cambia nada
+    assert conn.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 50
+
+
+def test_borrar_retiro_luego_deposito_queda_cuadrado():
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 100)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 100, 'gasto', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 50, 'ingreso', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 50 WHERE id = 1")
+    ret = conn.execute("SELECT id FROM transacciones WHERE tipo = 'ingreso'").fetchone()["id"]
+    conn.commit()
+    # Primero se borra el retiro (el dinero vuelve a la meta) y después el depósito
+    revertir_movimiento_apartado(conn.cursor(), 1, 'ingreso', 50)
+    conn.execute("DELETE FROM transacciones WHERE id = ?", (ret,))
+    revertir_movimiento_apartado(conn.cursor(), 1, 'gasto', 100)
+    conn.execute("DELETE FROM transacciones WHERE apartado_id = 1 AND tipo = 'gasto'")
+    conn.commit()
+    assert conn.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 0.0
 
 
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ Reúne los cálculos que antes estaban duplicados en main.py y export_service.py
 """
 
 import calendar
+import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import json
@@ -17,12 +18,20 @@ from typing import Any, Dict, Iterable, Optional, Union
 
 
 def ahora_local() -> datetime:
-    """Retorna la fecha y hora actual en la zona horaria de México (CST / UTC-6)."""
+    """Retorna la fecha y hora actual en la zona horaria de México (CST / UTC-6).
+
+    Solo en modo de pruebas (FINANZAS_MODO_PRUEBA=1) puede fijarse "hoy" con FINANZAS_HOY
+    (por ejemplo "2026-10-20T10:00:00"), para que materialización y periodos sean reproducibles.
+    En producción esa variable no tiene efecto."""
     try:
         from zoneinfo import ZoneInfo
-        return datetime.now(ZoneInfo("America/Mexico_City"))
+        zona = ZoneInfo("America/Mexico_City")
     except Exception:
-        return datetime.now()
+        zona = None
+    if os.environ.get("FINANZAS_MODO_PRUEBA") == "1" and os.environ.get("FINANZAS_HOY"):
+        fijo = datetime.fromisoformat(os.environ["FINANZAS_HOY"])
+        return fijo.replace(tzinfo=zona) if zona else fijo
+    return datetime.now(zona) if zona else datetime.now()
 
 
 def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: float) -> float:
@@ -1420,8 +1429,16 @@ def resumen_mensual_core(conn: sqlite3.Connection) -> list:
 
 def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo: str, monto: float) -> None:
     """Deshace en el saldo de una meta un movimiento que se borra. Un depósito (gasto) se resta de la
-    meta; un retiro (ingreso) vuelve a sumarse. Así el saldo guardado sigue igual a sus movimientos."""
+    meta; un retiro (ingreso) vuelve a sumarse. Así el saldo guardado sigue igual a sus movimientos.
+    Un depósito no se puede borrar si parte de su dinero ya se retiró: la meta no lo tendría."""
     delta = -float(monto) if tipo == 'gasto' else float(monto)
+    if delta < 0:
+        actual = cursor.execute("SELECT monto_actual FROM apartados WHERE id = ?", (apartado_id,)).fetchone()
+        if actual is not None and float(actual[0]) + delta < -0.001:
+            raise ValueError(
+                "No es posible eliminar este depósito porque parte de ese dinero ya se retiró de la meta. "
+                "Primero elimina los retiros posteriores."
+            )
     cursor.execute(
         "UPDATE apartados SET monto_actual = MAX(0.0, ROUND(monto_actual + ?, 2)) WHERE id = ?",
         (delta, apartado_id),

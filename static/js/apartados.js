@@ -176,6 +176,9 @@ export async function realizarMovimiento(id, accion) {
 
         if (res.ok) {
             if (input) input.value = '';
+            // Se libera antes de repintar: si no, un clic rápido en otro botón se ignora en silencio
+            procesandoMovimientoApartado = false;
+            btns.forEach(b => b.disabled = false);
             await cargarApartados();
             recargar();
         } else {

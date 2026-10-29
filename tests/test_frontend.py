@@ -5,6 +5,7 @@ Login, registrar un ingreso, ver cada pestaña sin errores de JS ni desbordamien
 Requiere playwright (se ejecuta en Docker, ver tests/run_frontend.sh). Nunca toca 'data/' del proyecto.
 """
 
+import json
 import os
 import shutil
 import socket
@@ -31,6 +32,7 @@ sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminTest#12345"
 
+import escenario  # noqa: E402
 import master_db  # noqa: E402
 import security  # noqa: E402
 
@@ -139,15 +141,205 @@ def test_registrar_ingreso_y_modal_accesible(navegador, base):
         page.locator(".btn-editar").first.click()
         page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
         # El foco entra al modal de forma asíncrona: esperamos a que quede dentro, no un tiempo fijo.
-        page.wait_for_function("document.getElementById('modal-editar-transaccion').contains(document.activeElement)")
+        _esperar(page, "document.getElementById('modal-editar-transaccion').contains(document.activeElement)")
         for _ in range(30):
             page.keyboard.press("Tab")
             assert page.evaluate("document.getElementById('modal-editar-transaccion').contains(document.activeElement)"), \
                 "Tab no debe sacar el foco del modal"
         page.keyboard.press("Escape")
         page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
-        page.wait_for_function("document.activeElement && document.activeElement.classList.contains('btn-editar')")
+        _esperar(page, "document.activeElement && document.activeElement.classList.contains('btn-editar')")
         assert not errores, "errores de JS:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
+class _ClienteHttp:
+    """Adaptador mínimo para sembrar el escenario por HTTP real contra el servidor de la prueba."""
+
+    def __init__(self, base, token):
+        self.base, self.token = base, token
+
+    def _req(self, metodo, ruta, body=None, headers=None):
+        import json as _json
+        import urllib.error
+        datos = _json.dumps(body).encode() if body is not None else None
+        cab = {"Content-Type": "application/json", "Authorization": f"Bearer {self.token}"}
+        req = urllib.request.Request(self.base + ruta, method=metodo, data=datos, headers=cab)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return _Respuesta(r.status, r.read())
+        except urllib.error.HTTPError as e:
+            return _Respuesta(e.code, e.read())
+
+    def post(self, ruta, json=None, headers=None):
+        return self._req("POST", ruta, json)
+
+    def get(self, ruta, headers=None):
+        return self._req("GET", ruta)
+
+
+class _Respuesta:
+    def __init__(self, status_code, cuerpo):
+        self.status_code = status_code
+        self.content = cuerpo
+        self.text = cuerpo.decode(errors="ignore")
+
+    def json(self):
+        import json as _json
+        return _json.loads(self.content or b"null")
+
+
+def _sembrar_escenario(base):
+    """Crea el usuario de referencia y su historia, por la API, con el reloj fijo del servidor."""
+    master_db.create_user_entry(escenario.USUARIO, security.hash_password(escenario.CLAVE), email="escenario@test.local")
+    body = json.dumps({"username": escenario.USUARIO, "password": escenario.CLAVE}).encode()
+    req = urllib.request.Request(base + "/auth/login", data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        token = json.loads(r.read())["access_token"]
+    escenario.sembrar(_ClienteHttp(base, token), {"Authorization": f"Bearer {token}"})
+
+
+def _entrar(page, base, usuario=USUARIO, clave=CLAVE):
+    page.goto(base + "/login")
+    page.fill("#login-username", usuario)
+    page.fill("#login-password", clave)
+    page.click("#form-login [type=submit]")
+    page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+
+
+def _esperar(page, expresion, timeout=10.0):
+    """Espera a que `expresion` (JavaScript) sea verdadera. Sondeo con evaluate: wait_for_function
+    con cadenas usa eval, que la política CSP de la app bloquea."""
+    limite = time.time() + timeout
+    while time.time() < limite:
+        if page.evaluate(expresion):
+            return
+        page.wait_for_timeout(100)
+    estado = page.evaluate("[...document.querySelectorAll('.card-apartado')].map(c => c.innerText.replace(/\\n/g,' | ')).join(' || ')")
+    raise AssertionError(f"no se cumplió en {timeout}s: {expresion}\nTarjetas ahora: {estado}")
+
+
+def _ir(page, tab):
+    page.evaluate(f"document.querySelector('[data-tab=\"{tab}\"]').click()")
+    page.wait_for_selector(f"#{tab}.active")
+
+
+def _flujo_escenario(navegador, base, viewport=None):
+    """Contexto con sesión del escenario y registro de errores de JavaScript."""
+    ctx, page, errores = _contexto(navegador, viewport or VIEWPORTS["laptop"])
+    _entrar(page, base, escenario.USUARIO, escenario.CLAVE)
+    return ctx, page, errores
+
+
+def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        assert page.inner_text("#periodo-libre") == "$8,103.00", page.inner_text("#periodo-libre")
+        assert page.inner_text("#periodo-disponible") == "$8,103.00"
+        assert "31 de octubre" in page.inner_text("#periodo-titulo"), page.inner_text("#periodo-titulo")
+        assert "7,000.00" in page.inner_text("#lbl-dash-patrimonio"), page.inner_text("#lbl-dash-patrimonio")
+        historial = page.locator("#lista-resumen-mensual .monthly-card")
+        assert historial.count() == 3, historial.count()
+        primera = historial.nth(0).inner_text()
+        assert "oct 2026" in primera.lower() and "+$14,000.00" in primera and "-$14,799.00" in primera, primera
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#lista-proximos .rec-item")
+        proximos = page.inner_text("#lista-proximos")
+        assert "MSI 3/12" in proximos, proximos
+        assert "2026-11-15" in proximos, proximos          # próximo cargo de Netflix tras el 15 de octubre
+        assert "2026-10-31" in proximos, proximos          # próxima nómina
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        tema_antes = page.get_attribute("html", "data-theme")
+        page.click("#btn-user-menu-trigger")
+        page.click("#btn-modo")
+        assert page.get_attribute("html", "data-theme") != tema_antes
+        page.click("#btn-toggle-privacidad")
+        assert page.evaluate("document.body.classList.contains('privacy-mode')")
+        page.click("#btn-toggle-privacidad")
+        page.keyboard.press("Escape")
+        assert page.inner_text("#periodo-libre") == "$8,103.00", "cambiar de tema no debe alterar cifras"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_movimiento_crear_editar_y_borrar(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.fill("#fecha", "2026-10-21")
+        page.select_option("#tipo", "gasto")
+        page.fill("#monto", "123.45")
+        page.fill("#descripcion", "e2e-cafe")
+        page.click("#transaccion-form [type=submit]")
+        fila = page.locator("#tabla-movimientos tr", has_text="e2e-cafe")
+        fila.wait_for()
+        assert "$123.45" in fila.inner_text()
+
+        fila.locator(".btn-editar").click()
+        page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
+        page.fill("#modal-edit-trans-monto", "200")
+        page.click("#form-editar-transaccion [type=submit]")
+        page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
+        _esperar(page, "[...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('e2e-cafe') && tr.textContent.includes('$200.00'))")
+
+        page.once("dialog", lambda d: d.accept())
+        page.locator("#tabla-movimientos tr", has_text="e2e-cafe").locator(".btn-eliminar").click()
+        _esperar(page, "![...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('e2e-cafe'))")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def _movimiento_en_meta(page, nombre, cantidad, boton):
+    """Escribe el monto y pulsa el botón de la meta en una sola instrucción del navegador.
+    La lista se repinta tras cada operación y borraría un monto escrito en dos pasos."""
+    for _ in range(20):
+        hecho = page.evaluate("""([nombre, cantidad, boton]) => {
+            const card = [...document.querySelectorAll('.card-apartado')].find(c => c.textContent.includes(nombre));
+            if (!card) return false;
+            const input = card.querySelector('input[type=number]');
+            const btn = [...card.querySelectorAll('button')].find(b => b.textContent.trim() === boton);
+            if (!input || !btn || btn.disabled) return false;
+            input.value = cantidad;
+            btn.click();
+            return true;
+        }""", [nombre, cantidad, boton])
+        if hecho:
+            return
+        page.wait_for_timeout(200)
+    raise AssertionError(f"no se pudo usar el botón {boton} de {nombre}")
+
+
+def test_meta_depositar_y_retirar(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-apartados")
+        page.locator(".card-apartado", has_text="Fondo de emergencia").wait_for()
+        _movimiento_en_meta(page, "Fondo de emergencia", "500", "Depositar")
+        _esperar(page, "[...document.querySelectorAll('.card-apartado')].some(c => c.textContent.includes('Fondo de emergencia') && c.textContent.includes('$2,500.00'))")
+        _movimiento_en_meta(page, "Fondo de emergencia", "500", "Retirar")
+        page.wait_for_timeout(1500)
+        page.wait_for_timeout(1500)
+        _esperar(page, "[...document.querySelectorAll('.card-apartado')].some(c => c.textContent.includes('Fondo de emergencia') && c.textContent.includes('$2,000.00'))")
+        assert not errores, errores
     finally:
         ctx.close()
 
@@ -155,10 +347,12 @@ def test_registrar_ingreso_y_modal_accesible(navegador, base):
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
+    escenario.activar_modo_prueba()  # el servidor hereda el reloj fijo del escenario
     proc, base = _arrancar_servidor()
     try:
         # Tras el arranque: el servidor ya creó la base maestra en TMP/data.
         master_db.create_user_entry(USUARIO, security.hash_password(CLAVE), email=f"{USUARIO}@test.local")
+        _sembrar_escenario(base)
         with sync_playwright() as p:
             navegador = p.chromium.launch()
             registradas = [
@@ -166,6 +360,11 @@ if __name__ == "__main__":
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
+                (test_resumen_muestra_las_cifras_del_escenario, lambda: test_resumen_muestra_las_cifras_del_escenario(navegador, base)),
+                (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
+                (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
+                (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
+                (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
