@@ -282,15 +282,20 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
     if req.activo is not None:
         campos.append("activo = ?"); valores.append(1 if req.activo else 0)
 
-    # Si se reactiva un recurrente pausado y no se especificó proxima_fecha,
-    # avanzar proxima_fecha para evitar cobros retroactivos acumulados mientras estuvo inactivo
-    if reactivando and req.proxima_fecha is None:
-        hoy = ahora_local().date()
-        fecha_actual = date.fromisoformat(fila["proxima_fecha"])
-        if fecha_actual < hoy:
-            nueva_vigente = proxima_fecha_vigente(fecha_actual, fila["frecuencia"], fila["dia"], hoy)
-            campos.append("proxima_fecha = ?"); valores.append(nueva_vigente.isoformat())
-            campos.append("dia = ?"); valores.append(nueva_vigente.day)
+    # Sin nueva proxima_fecha, la fecha guardada se ajusta en una sola escritura:
+    # - al pasar a quincenal se re-ancla al día 15 o fin de mes, igual que al crear;
+    # - al reactivar un pausado se avanza a la vigente, para no cobrar retroactivamente lo acumulado.
+    if req.proxima_fecha is None:
+        fecha_guardada = date.fromisoformat(fila["proxima_fecha"])
+        fecha_nueva = primera_fecha_quincenal(fecha_guardada) if req.frecuencia == 'quincenal' else None
+        if reactivando:
+            hoy = ahora_local().date()
+            base = fecha_nueva or fecha_guardada
+            if base < hoy:
+                fecha_nueva = proxima_fecha_vigente(base, req.frecuencia or fila["frecuencia"], fila["dia"], hoy)
+        if fecha_nueva is not None and fecha_nueva != fecha_guardada:
+            campos.append("proxima_fecha = ?"); valores.append(fecha_nueva.isoformat())
+            campos.append("dia = ?"); valores.append(fecha_nueva.day)
     if req.categoria_id is not None:
         campos.append("categoria_id = ?"); valores.append(req.categoria_id)
     if "presupuesto_tarjeta_id" in req.model_fields_set:

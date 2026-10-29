@@ -354,6 +354,17 @@ def test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha):
     client.delete(f"/api/recurrentes/{rid}", headers=ha)
 
 
+def test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo(client, ha):
+    r = client.post("/api/recurrentes", json={"descripcion": "Ingreso mensual prueba", "tipo": "ingreso", "frecuencia": "mensual",
+                                              "monto": 300, "fecha_inicio": "2026-10-30"}, headers=ha)
+    assert r.status_code == 201, r.text
+    rid = r.json()["id"]
+    # Sin nueva fecha, el cambio a quincenal lleva el próximo cargo al día 15 o fin de mes: el 30 pasa al 31
+    r = client.patch(f"/api/recurrentes/{rid}", json={"frecuencia": "quincenal"}, headers=ha)
+    assert r.status_code == 200 and r.json()["proxima_fecha"] == "2026-10-31", r.text
+    client.delete(f"/api/recurrentes/{rid}", headers=ha)
+
+
 def test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha):
     estado = client.get("/api/presupuesto", headers=ha).json()
     cfg_original, dia_original = estado["config"], estado["unidades"][0]["dia_pago"]
@@ -464,6 +475,7 @@ if __name__ == "__main__":
             (test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra, lambda: test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha)),
             (test_msi_en_el_presupuesto_por_api, lambda: test_msi_en_el_presupuesto_por_api(client, ha)),
             (test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes, lambda: test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha)),
+            (test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo, lambda: test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
