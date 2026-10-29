@@ -152,7 +152,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     apartados_base = round(total_apartados_mxn * factor_mxn_a_base, 2)
     
     # Patrimonio Neto = Balance Disponible + Ahorro en Sobres/Metas + Valor de Inversiones
-    patrimonio_neto = round(balance_base + apartados_base + total_inv_valor, 2)
+    patrimonio_neto = round(apartados_base + total_inv_valor, 2)  # metas + inversiones; el disponible no es patrimonio
 
     # =========================================================================
     # PASO 5: DISEÑO Y ESTILOS INSTITUCIONALES EN OPENPYXL
@@ -226,7 +226,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
         cell.border = border_thin
 
     kpis = [
-        ("Patrimonio Neto Total", patrimonio_neto, "Total acumulado de Efectivo + Sobres + Inversiones"),
+        ("Patrimonio Neto Total", patrimonio_neto, "Metas y sobres de ahorro + Inversiones"),
         ("Balance en Efectivo Disponible", balance_base, "Flujo de caja libre y disponible (Ingresos - Gastos)"),
         ("Total en Sobres de Ahorro / Metas", apartados_base, "Capital reservado en fondos de emergencia y metas"),
         ("Valor de Mercado del Portafolio", total_inv_valor, "Valuación actual de mercado de acciones y ETFs"),

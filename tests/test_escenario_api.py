@@ -161,11 +161,8 @@ def test_excel_coincide_con_el_resumen():
     resumen = _resumen()
     assert abs(_fila_excel(libro, "Balance en Efectivo Disponible") - resumen["balance"]) < 0.01
     assert abs(_fila_excel(libro, "Total en Sobres de Ahorro / Metas") - resumen["apartados"]) < 0.01
-    # PENDIENTE DE DECISIÓN: el Excel llama "Patrimonio Neto" a disponible + metas + inversiones (15,103),
-    # mientras el Resumen lo llama igual pero solo cuenta metas + inversiones (7,000). El README además dice
-    # que el patrimonio resta la deuda MSI, y ningún cálculo lo hace. Aquí se fija el comportamiento actual.
     patrimonio_excel = _fila_excel(libro, "Patrimonio Neto Total")
-    assert abs(patrimonio_excel - (resumen["balance"] + resumen["patrimonio_neto"])) < 0.01, (patrimonio_excel, resumen)
+    assert abs(patrimonio_excel - resumen["patrimonio_neto"]) < 0.01, (patrimonio_excel, resumen["patrimonio_neto"])
 
 
 def test_respaldo_se_restaura_identico():

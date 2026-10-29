@@ -51,10 +51,10 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
   * Protección contra auto-bloqueo y auto-eliminación de la cuenta del administrador en sesión.
 
 ### 4. 📊 Dashboard Central & Patrimonio Neto (Net Worth)
-* **Métrica Consolidada:** Cálculo en tiempo real de tu Patrimonio Neto Total integrando los 3 pilares financieros:
-  * 💵 **Balance Disponible** (Efectivo en caja).
+* **Métrica Consolidada:** Tu Patrimonio Neto es lo que tienes ahorrado e invertido, en tiempo real:
   * 🐖 **Apartados y Metas** (Ahorro guardado en sobres).
   * 📈 **Portafolio de Inversión** (Valor de mercado actual de acciones y ETFs).
+  * El **Balance Disponible** (efectivo en caja) se muestra aparte y no forma parte del patrimonio.
 * **Métricas de Flujo:** Ingresos totales, gastos acumulados y rendimiento global de inversiones.
 * **Gráfica Mensual:** Comparativa visual de ingresos vs gastos mes a mes con Chart.js.
 
@@ -77,7 +77,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 
 ### 8. 🔁 Fijos, MSI y Cuentas con Rendimiento
 * **Fijos y MSI:** nómina (quincenal, mensual o semanal), gastos fijos (renta, suscripciones) y compras a meses. Cada registro genera sus movimientos reales solo cuando llega su fecha; nunca se insertan cobros futuros.
-* **Compras a meses:** el balance baja al vencer cada cuota; el patrimonio neto resta la deuda pendiente.
+* **Compras a meses:** el balance baja al vencer cada cuota; la deuda pendiente se muestra aparte y no resta del patrimonio neto.
 * **Cuentas con rendimiento:** saldos con tasa anual fija (interés diario compuesto). No modifican el balance disponible; aportar, retirar o cambiar la tasa capitaliza el saldo actual.
 * **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del mes por categoría.
 * **Saltar pagos:** un fijo puede saltarse una vez y una cuota MSI puede contabilizarse o aplazarse.
