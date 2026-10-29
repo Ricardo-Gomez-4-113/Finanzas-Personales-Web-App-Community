@@ -320,29 +320,29 @@ export function abrirModalExportarPresupuesto() {
     const contItems = document.getElementById('lista-items-exportar-presupuesto');
     if (contItems) {
         if (tarjetas.length === 0) {
-            contItems.innerHTML = `<div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No tienes tarjetas de presupuesto para exportar. Crea tarjetas primero.</div>`;
+            contItems.innerHTML = `<div class="modal-vacio">No tienes tarjetas de presupuesto para exportar. Crea tarjetas primero.</div>`;
         } else {
             contItems.innerHTML = tarjetas.map(t => {
                 const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
                 return `
-                    <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
-                            <input type="checkbox" class="chk-item-exportar" data-id="${t.id}" checked style="cursor: pointer; width: 16px; height: 16px;">
-                            <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <div class="modal-fila-lista">
+                        <label class="modal-fila-etiqueta">
+                            <input type="checkbox" class="chk-item-exportar" data-id="${t.id}" checked>
+                            <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)} modal-fila-icono">
                                 ${iconSvg}
                             </div>
-                            <div style="min-width: 0;">
-                                <div style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">
+                            <div class="modal-fila-nombre">
+                                <div class="modal-fila-titulo">
                                     ${escapeHTML(t.nombre)}
                                 </div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                <div class="modal-fila-detalle">
                                     ${t.unidad_orden ? escapeHTML(nombrePago(t.unidad_orden, cfg.frecuencia)) + ' · ' : ''}${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>
                                 </div>
                             </div>
                         </label>
-                        <div style="text-align: right; flex-shrink: 0;">
-                            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main); font-variant-numeric: tabular-nums;">${fmt(t.monto)}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums;">${t.porcentaje.toFixed(1)}%</div>
+                        <div class="modal-fila-cifra">
+                            <div class="modal-fila-monto">${fmt(t.monto)}</div>
+                            <div class="modal-fila-pct">${t.porcentaje.toFixed(1)}%</div>
                         </div>
                     </div>
                 `;

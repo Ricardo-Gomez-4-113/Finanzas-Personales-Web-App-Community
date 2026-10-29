@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=9d8f35ff81">
-    <link rel="stylesheet" href="/static/css/layout.css?v=9d8f35ff81">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=9d8f35ff81">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=9d8f35ff81">
-    <link rel="stylesheet" href="/static/css/tema.css?v=9d8f35ff81">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=77b8bccd90">
+    <link rel="stylesheet" href="/static/css/layout.css?v=77b8bccd90">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=77b8bccd90">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=77b8bccd90">
+    <link rel="stylesheet" href="/static/css/tema.css?v=77b8bccd90">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -1223,7 +1223,7 @@
     <!-- MODAL 2: EDITAR MOVIMIENTO / TRANSACCIÓN       -->
     <!-- ============================================== -->
     <div id="modal-editar-transaccion" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-editar-transaccion-titulo" data-on-click='[["cerrarModalEditarTransaccion"]]' data-solo-fondo>
-        <div class="modal-card">
+        <div class="modal-card modal-card--md">
             <div class="modal-header">
                 <h3 id="modal-editar-transaccion-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -1279,7 +1279,7 @@
     <!-- MODAL 2B: EDITAR FIJO O COMPRA A MESES (MSI)   -->
     <!-- ============================================== -->
     <div id="modal-editar-recurrente" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-editar-recurrente-titulo" data-on-click='[["cerrarModalEditarRecurrente"]]' data-solo-fondo>
-        <div class="modal-card">
+        <div class="modal-card modal-card--md">
             <div class="modal-header">
                 <h3 id="modal-editar-recurrente-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1344,7 +1344,7 @@
     <!-- MODAL 3: CREAR NUEVO USUARIO TENANT (ADMIN)   -->
     <!-- ============================================== -->
     <div id="modal-crear-usuario" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-crear-usuario-titulo" data-on-click='[["cerrarModalCrearUsuario"]]' data-solo-fondo>
-        <div class="modal-card">
+        <div class="modal-card modal-card--md">
             <div class="modal-header">
                 <h3 id="modal-crear-usuario-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
@@ -1360,8 +1360,8 @@
                 <div class="form-group">
                     <label for="nuevo-user-email">Correo electrónico (opcional)</label>
                     <input type="email" id="nuevo-user-email" placeholder="ejemplo@gmail.com" autocomplete="email">
-                    <small class="s-color-var-text-muted s-font-size-0-8rem">Permite recuperar contraseña en caso de olvido.</small>
                 </div>
+                <p class="modal-nota">Permite recuperar contraseña en caso de olvido.</p>
                 <div class="form-group">
                     <label for="nuevo-user-password">Contraseña</label>
                     <input type="password" id="nuevo-user-password" required minlength="4" placeholder="Mínimo 4 caracteres">
@@ -1372,8 +1372,8 @@
                         <option value="user" selected>Usuario estándar (solo su base de datos)</option>
                         <option value="admin">Administrador (acceso total y gestión)</option>
                     </select>
-                    <small class="s-color-var-text-muted s-font-size-0-8rem">Se aprovisionará automáticamente un archivo SQLite independiente para este usuario.</small>
                 </div>
+                <p class="modal-nota">Se aprovisionará automáticamente un archivo SQLite independiente para este usuario.</p>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-on-click='[["cerrarModalCrearUsuario"]]'>Cancelar</button>
                     <button type="submit" class="btn-primary">
@@ -1389,7 +1389,7 @@
     <!-- MODAL 4: EDITAR USUARIO (ADMIN Y PERFIL)      -->
     <!-- ============================================== -->
     <div id="modal-editar-usuario" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-editar-usuario-titulo" data-on-click='[["cerrarModalEditarUsuario"]]' data-solo-fondo>
-        <div class="modal-card">
+        <div class="modal-card modal-card--md">
             <div class="modal-header">
                 <h3 id="modal-editar-usuario-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -1408,14 +1408,14 @@
                 <div class="form-group">
                     <label for="edit-user-email">Correo electrónico</label>
                     <input type="email" id="edit-user-email" placeholder="ejemplo@gmail.com" autocomplete="email">
-                    <small class="s-color-var-text-muted s-font-size-0-8rem">Utilizado para recibir códigos de recuperación de contraseña.</small>
                 </div>
+                <p class="modal-nota">Utilizado para recibir códigos de recuperación de contraseña.</p>
                 
                 <div class="form-group">
                     <label for="edit-user-password">Nueva contraseña</label>
                     <input type="password" id="edit-user-password" minlength="4" placeholder="Dejar en blanco para no cambiar">
-                    <small class="s-color-var-text-muted s-font-size-0-8rem">Solo escribe una contraseña si deseas actualizarla (mínimo 4 caracteres).</small>
                 </div>
+                <p class="modal-nota">Solo escribe una contraseña si deseas actualizarla (mínimo 4 caracteres).</p>
                 
                 <div class="form-group" id="group-edit-user-role">
                     <label for="edit-user-role">Rol de acceso</label>
@@ -1498,7 +1498,7 @@
     <!-- MODAL: CREAR / EDITAR TARJETA DE PRESUPUESTO    -->
     <!-- ============================================== -->
     <div id="modal-tarjeta-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-tarjeta-pres-title" data-on-click='[["cerrarModalTarjetaPresupuesto"]]' data-solo-fondo>
-        <div class="modal-card">
+        <div class="modal-card modal-card--md">
             <div class="modal-header">
                 <h3 id="modal-tarjeta-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
@@ -1528,21 +1528,23 @@
                         </div>
                     </div>
                 </div>
-                <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-margin-bottom-12px s-display-block">Escribe el monto en dinero ($) o el porcentaje (%); el otro campo se calcula automáticamente.</small>
+                <p class="modal-nota">Escribe el monto en dinero ($) o el porcentaje (%); el otro campo se calcula automáticamente.</p>
 
-                <div class="form-group">
-                    <label class="s-display-flex s-align-items-center s-gap-8px">
+                <div class="modal-bloque">
+                    <label class="modal-check">
                         <input type="checkbox" id="tarjeta-pres-msi">
                         <span>Compra a meses sin intereses</span>
                     </label>
                 </div>
-                <div id="tarjeta-pres-msi-campos" class="form-group hidden">
-                    <label for="tarjeta-pres-msi-cuotas">Número de meses</label>
-                    <input type="number" id="tarjeta-pres-msi-cuotas" min="2" max="60" step="1" placeholder="Ej. 12" class="input-calc">
-                    <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-display-block">El monto es la cuota mensual. Al exportar se cobra hasta completar el plazo.</small>
+                <div id="tarjeta-pres-msi-campos" class="hidden">
+                    <div class="form-group">
+                        <label for="tarjeta-pres-msi-cuotas">Número de meses</label>
+                        <input type="number" id="tarjeta-pres-msi-cuotas" min="2" max="60" step="1" placeholder="Ej. 12" class="input-calc">
+                    </div>
+                    <p class="modal-nota">El monto es la cuota mensual. Al exportar se cobra hasta completar el plazo.</p>
                 </div>
 
-                <div class="form-row-2col">
+                <div class="form-row-2col fila-apilable">
                     <div class="form-group">
                         <label for="tarjeta-pres-icono">Icono</label>
                         <select id="tarjeta-pres-icono">
@@ -1578,12 +1580,12 @@
 
                 <div class="form-group">
                     <label for="tarjeta-pres-dia">Día de cargo general (1 al 31, opcional)</label>
-                    <div class="calc-input-adornment" style="max-width: 140px;">
+                    <div class="calc-input-adornment campo-corto">
                         <span class="calc-adornment-prefix">Día</span>
                         <input type="number" id="tarjeta-pres-dia" min="1" max="31" placeholder="14" class="input-calc calc-has-prefix-dia">
                     </div>
-                    <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-display-block" style="margin-top: 4px;">Día del mes programado para este cargo. Si tienes sub-períodos, puedes asignar un día a cada quincena o semana abajo.</small>
                 </div>
+                <p class="modal-nota">Día del mes programado para este cargo. Si tienes sub-períodos, puedes asignar un día a cada quincena o semana abajo.</p>
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-on-click='[["cerrarModalTarjetaPresupuesto"]]'>Cancelar</button>
@@ -1600,7 +1602,7 @@
     <!-- MODAL: EXPORTAR PRESUPUESTO A MOVIMIENTOS Y FIJOS        -->
     <!-- ======================================================== -->
     <div id="modal-exportar-presupuesto" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-exportar-pres-title" data-on-click='[["cerrarModalExportarPresupuesto"]]' data-solo-fondo>
-        <div class="modal-card modal-subdiv-card">
+        <div class="modal-card modal-card--lg">
             <div class="modal-header">
                 <h3 id="modal-exportar-pres-title" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1614,48 +1616,48 @@
                 </p>
 
                 <!-- Bloque Ingreso Fijo Base (Nómina) -->
-                <div id="exportar-pres-ingreso-box" class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
-                        <input type="checkbox" id="chk-exportar-ingreso" checked style="width: 16px; height: 16px; cursor: pointer;">
+                <div id="exportar-pres-ingreso-box" class="modal-bloque modal-bloque-fila">
+                    <label class="modal-check">
+                        <input type="checkbox" id="chk-exportar-ingreso" checked>
                         <div>
-                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">Exportar Ingreso Base (Nómina)</div>
-                            <div id="exportar-pres-ingreso-txt" style="font-size: 0.8rem; color: var(--text-muted);">$0.00</div>
+                            <div class="modal-opcion-titulo">Exportar Ingreso Base (Nómina)</div>
+                            <div id="exportar-pres-ingreso-txt" class="modal-nota">$0.00</div>
                         </div>
                     </label>
                     <span class="pnl-badge badge-success">Ingreso</span>
                 </div>
 
                 <!-- Selector Inicio de Cargos (Evitar cobros retroactivos) -->
-                <div class="pres-import-item-row" style="padding: 10px 12px; background: var(--surface-subtle); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
-                    <label for="exportar-inicio-cargos" style="display: block; font-weight: 600; font-size: 0.88rem; color: var(--text-main); margin-bottom: 6px;">
+                <div class="modal-bloque">
+                    <label for="exportar-inicio-cargos" class="modal-titulo-bloque">
                         ¿A partir de cuándo comenzar los cargos?
                     </label>
-                    <select id="exportar-inicio-cargos" class="form-control" style="width: 100%; margin-bottom: 6px;" data-on-change='[["cambiarInicioCargosExportar", "$value"]]'>
+                    <select id="exportar-inicio-cargos" class="form-control" data-on-change='[["cambiarInicioCargosExportar", "$value"]]'>
                         <option value="natural" id="opt-exportar-natural">Próxima fecha natural (según calendario)</option>
                         <option value="siguiente_quincena" id="opt-exportar-sig-quincena">A partir de la siguiente quincena</option>
                         <option value="proximo_mes" id="opt-exportar-prox-mes">A partir del 1er día del próximo mes</option>
                         <option value="personalizada">Fecha de inicio personalizada...</option>
                     </select>
-                    <div id="box-exportar-fecha-custom" class="hidden" style="margin-top: 8px;">
-                        <label for="exportar-fecha-personalizada" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Fecha base para programar</label>
-                        <input type="date" id="exportar-fecha-personalizada" class="form-control" style="width: 100%;">
+                    <div id="box-exportar-fecha-custom" class="hidden form-group">
+                        <label for="exportar-fecha-personalizada">Fecha base para programar</label>
+                        <input type="date" id="exportar-fecha-personalizada" class="form-control">
                     </div>
-                    <div id="exportar-inicio-ayuda" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; margin-top: 4px;">
+                    <div id="exportar-inicio-ayuda" class="modal-nota">
                         Evita cargos de quincenas o fechas ya transcurridas si empezaste a usar la app a mitad de mes.
                     </div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Tarjetas de gasto a exportar</span>
+                <div class="modal-bloque-fila">
+                    <span class="modal-titulo-bloque">Tarjetas de gasto a exportar</span>
                     <button type="button" id="btn-toggle-todos-exportar" class="btn-sm btn-ghost" data-on-click='[["toggleSeleccionarTodosExportar"]]'>Deseleccionar todos</button>
                 </div>
 
                 <!-- Lista de Tarjetas con Checkbox -->
-                <div id="lista-items-exportar-presupuesto" style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-subtle); scrollbar-width: thin;"></div>
+                <div id="lista-items-exportar-presupuesto" class="modal-lista"></div>
 
-                <div style="margin-top: 14px; padding: 10px; background: var(--surface-card); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-main); margin-bottom: 0;">
-                        <input type="checkbox" id="chk-exportar-actualizar" checked style="width: 15px; height: 15px; cursor: pointer;">
+                <div class="modal-bloque">
+                    <label class="modal-check">
+                        <input type="checkbox" id="chk-exportar-actualizar" checked>
                         <span>Actualizar registros existentes si ya tienen el mismo nombre (evita duplicados)</span>
                     </label>
                 </div>
@@ -1674,7 +1676,7 @@
     <!-- MODAL: SALTAR PAGO DE COMPRA A MESES (MSI)     -->
     <!-- ============================================== -->
     <div id="modal-saltar-msi" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-saltar-msi-titulo" data-on-click='[["cerrarModalSaltarMsi"]]' data-solo-fondo>
-        <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-card">
             <div class="modal-header">
                 <h3 id="modal-saltar-msi-titulo" class="s-display-flex s-align-items-center s-gap-8px">
                     <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
@@ -1683,30 +1685,30 @@
                 <button type="button" class="btn-modal-close" aria-label="Cerrar modal" data-on-click='[["cerrarModalSaltarMsi"]]'>&times;</button>
             </div>
             <div class="modal-body">
-                <p id="modal-saltar-msi-desc" class="modal-instruction" style="margin-bottom: 16px;">
+                <p id="modal-saltar-msi-desc" class="modal-instruction">
                     Selecciona cómo deseas registrar este salto en tu compra a meses.
                 </p>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button type="button" id="btn-saltar-msi-pagada" class="btn-secondary" style="text-align: left; padding: 12px; height: auto; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-radius: 8px;">
-                        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                <div class="modal-apilado">
+                    <button type="button" id="btn-saltar-msi-pagada" class="btn-secondary modal-opcion">
+                        <div class="modal-opcion-titulo">
                             <span>Marcar como pagada por fuera</span>
                             <span class="pnl-badge badge-success">Recomendado</span>
                         </div>
-                        <div id="modal-saltar-msi-pagada-txt" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                        <div id="modal-saltar-msi-pagada-txt" class="modal-nota">
                             Computa esta cuota como pagada fuera de la app (avanza al siguiente número de cuota) y posterga la fecha al siguiente mes sin crear movimiento de gasto.
                         </div>
                     </button>
-                    <button type="button" id="btn-saltar-msi-aplazar" class="btn-secondary" style="text-align: left; padding: 12px; height: auto; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-radius: 8px;">
-                        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">
+                    <button type="button" id="btn-saltar-msi-aplazar" class="btn-secondary modal-opcion">
+                        <div class="modal-opcion-titulo">
                             Solo postergar fecha (aplazada)
                         </div>
-                        <div id="modal-saltar-msi-aplazar-txt" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                        <div id="modal-saltar-msi-aplazar-txt" class="modal-nota">
                             Mantiene el número de cuotas pendientes y únicamente pospone la fecha de cobro al próximo mes.
                         </div>
                     </button>
                 </div>
             </div>
-            <div class="modal-actions" style="margin-top: 16px;">
+            <div class="modal-actions">
                 <button type="button" class="btn-secondary" data-on-click='[["cerrarModalSaltarMsi"]]'>Cancelar</button>
             </div>
         </div>
@@ -1936,7 +1938,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=9d8f35ff81"></script>
+    <script type="module" src="/static/js/main.js?v=77b8bccd90"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

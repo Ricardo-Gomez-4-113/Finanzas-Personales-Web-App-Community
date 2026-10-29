@@ -821,7 +821,7 @@
    la etiqueta queda arriba dentro de la caja y el valor debajo. Los checkboxes y radios no entran. */
 :root .form-group { margin-bottom: 12px; }
 
-:root .form-group:has(> input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), > select, > textarea) {
+:root .form-group:has(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -834,11 +834,11 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-:root .form-group:has(> input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), > select, > textarea):hover {
+:root .form-group:has(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea):hover {
     border-color: color-mix(in srgb, var(--border-color) 50%, var(--text-muted));
 }
 
-:root .form-group:has(> input:focus, > select:focus, > textarea:focus) {
+:root .form-group:has(input:focus, select:focus, textarea:focus) {
     border-color: var(--border-focus);
     box-shadow: 0 0 0 3px var(--gold-glow);
 }
@@ -853,9 +853,9 @@
     color: var(--text-muted);
 }
 
-:root .form-group > input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
-:root .form-group > select,
-:root .form-group > textarea {
+:root .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+:root .form-group select,
+:root .form-group textarea {
     width: 100%;
     height: 26px;
     padding: 0;
@@ -868,15 +868,26 @@
     color: var(--text-color);
 }
 
-:root .form-group > textarea {
+:root .form-group textarea {
     height: auto;
     min-height: 56px;
     resize: vertical;
 }
 
+/* El adorno ($, %, Día) va dentro de la caja: su prefijo y sufijo se alinean con la etiqueta */
+:root .form-group .calc-input-adornment > .calc-adornment-prefix { left: 0; }
+:root .form-group .calc-input-adornment > .calc-adornment-suffix { right: 0; }
+
 /* Tamaños de modal: el tamaño va en la clase, nunca en un estilo en línea */
 :root .modal-card--md { max-width: 560px; }
 :root .modal-card--lg { max-width: 720px; }
+
+/* Dentro de un modal, las parejas de campos se quedan en dos columnas también en móvil (cada campo mide ~158 px) */
+@media (max-width: 520px) {
+    :root .modal-card .form-row-2col { grid-template-columns: 1fr 1fr; gap: 10px; }
+    /* Los selects con texto largo (icono, color) sí se apilan: ahí dos columnas cortan el texto */
+    :root .modal-card .form-row-2col.fila-apilable { grid-template-columns: 1fr; }
+}
 
 /* Las acciones quedan visibles al pie aunque el contenido del modal crezca */
 :root .modal-card { --modal-pad-x: 22px; --modal-pad-y: 22px; }
@@ -896,9 +907,177 @@
 
 /* En móvil el texto de los campos va a 16 px: iOS no hace zoom al enfocar */
 @media (max-width: 720px) {
-    :root .form-group > input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
-    :root .form-group > select,
-    :root .form-group > textarea { font-size: 1rem; }
+    :root .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    :root .form-group select,
+    :root .form-group textarea { font-size: 1rem; }
+}
+
+/* ---------- Modales: bloques, opciones y notas (sin estilos en línea) ---------- */
+:root .modal-bloque {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-m);
+}
+
+:root .modal-bloque-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+:root .modal-titulo-bloque {
+    margin: 0 0 6px;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+:root .modal-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-main);
+    cursor: pointer;
+}
+
+:root .modal-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex: none;
+    cursor: pointer;
+}
+
+:root .modal-nota {
+    margin: 4px 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+:root .modal-opcion {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: auto;
+    padding: 12px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-m);
+    cursor: pointer;
+}
+
+:root .modal-opcion-titulo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+:root .modal-opcion .modal-nota { margin: 0; }
+
+:root .modal-fila-lista {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+:root .modal-fila-lista:last-child { border-bottom: 0; }
+
+:root .campo-corto { max-width: 140px; }
+
+:root .modal-apilado {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Una lista del modal crece con su contenido: el modal es quien hace scroll, no un bloque de alto fijo */
+:root .modal-lista {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-m);
+    background: var(--surface-subtle);
+}
+
+:root .modal-fila-etiqueta {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+:root .modal-fila-etiqueta input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex: none;
+    cursor: pointer;
+}
+
+:root .modal-fila-icono {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+}
+
+:root .modal-fila-nombre {
+    min-width: 0;
+}
+
+:root .modal-fila-titulo {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+:root .modal-fila-detalle {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+:root .modal-fila-cifra {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+:root .modal-fila-monto {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-main);
+    font-variant-numeric: tabular-nums;
+}
+
+:root .modal-fila-pct {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+:root .modal-vacio {
+    padding: 14px;
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
 }
 
 /* ---------- Modales ---------- */
