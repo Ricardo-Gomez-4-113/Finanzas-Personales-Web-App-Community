@@ -193,6 +193,32 @@ def test_v16_tarjetas_msi_y_tarjetas_normales_quedan_intactas():
         _migrar_hasta(conn, 16)  # idempotente
         assert _version(conn) == 16
 
+def test_v17_normaliza_quincenales_y_no_toca_mensuales():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 16)
+        filas = [
+            ("Nómina octubre", "quincenal", "2026-10-30"),   # día 30 no es 15 ni fin de mes: pasa a 31
+            ("Nómina 7", "quincenal", "2026-10-07"),         # antes del 15: pasa al 15
+            ("Nómina 15", "quincenal", "2026-10-15"),        # ya es válida: no cambia
+            ("Renta", "mensual", "2026-10-30"),              # mensual: no cambia
+        ]
+        for desc, frec, prox in filas:
+            conn.execute(
+                "INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, cuotas_generadas, activo) "
+                "VALUES (?, 'ingreso', 1000, ?, 30, ?, 0, 1)", (desc, frec, prox))
+        conn.commit()
+        _migrar_hasta(conn, 17)
+        assert _version(conn) == 17
+        obtenido = {r["descripcion"]: (r["proxima_fecha"], r["dia"]) for r in conn.execute("SELECT * FROM recurrentes")}
+        assert obtenido == {
+            "Nómina octubre": ("2026-10-31", 31),
+            "Nómina 7": ("2026-10-15", 15),
+            "Nómina 15": ("2026-10-15", 30),
+            "Renta": ("2026-10-30", 30),
+        }, obtenido
+        _migrar_hasta(conn, 17)  # idempotente
+        assert _version(conn) == 17
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

@@ -343,6 +343,17 @@ def test_msi_en_el_presupuesto_por_api(client, ha):
             "subdivision_tipo": "ninguna"}, headers=ha)
 
 
+def test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha):
+    r = client.post("/api/recurrentes", json={"descripcion": "Nómina prueba", "tipo": "ingreso", "frecuencia": "quincenal",
+                                              "monto": 9000, "fecha_inicio": "2026-10-15"}, headers=ha)
+    assert r.status_code == 201, r.text
+    rid = r.json()["id"]
+    # Una fecha que no es 15 ni fin de mes se lleva al primer cobro de su quincena
+    r = client.patch(f"/api/recurrentes/{rid}", json={"proxima_fecha": "2026-10-30"}, headers=ha)
+    assert r.status_code == 200 and r.json()["proxima_fecha"] == "2026-10-31", r.text
+    client.delete(f"/api/recurrentes/{rid}", headers=ha)
+
+
 def test_pagos_del_presupuesto_por_api(client, ha):
     cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
     try:
@@ -435,6 +446,7 @@ if __name__ == "__main__":
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
             (test_pagos_del_presupuesto_por_api, lambda: test_pagos_del_presupuesto_por_api(client, ha)),
             (test_msi_en_el_presupuesto_por_api, lambda: test_msi_en_el_presupuesto_por_api(client, ha)),
+            (test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes, lambda: test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),

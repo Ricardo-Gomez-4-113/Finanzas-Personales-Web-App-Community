@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 16
+CURRENT_TENANT_SCHEMA_VERSION = 17
 
 
 # =============================================================================
@@ -482,6 +482,26 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             pass
         cursor.execute("PRAGMA user_version = 16;")
         current_version = 16
+
+    if current_version < 17 and CURRENT_TENANT_SCHEMA_VERSION >= 17:
+        # Fijos quincenales con una fecha que no es día 15 ni fin de mes (p. ej. día 30 en octubre) generaban
+        # dos cargos en la misma quincena. Se llevan al primer día de cobro de su quincena.
+        import calendar
+        from datetime import date as _date
+        for fila in cursor.execute("SELECT id, proxima_fecha FROM recurrentes WHERE frecuencia = 'quincenal'").fetchall():
+            if not fila["proxima_fecha"]:
+                continue
+            actual = _date.fromisoformat(fila["proxima_fecha"])
+            ultimo = calendar.monthrange(actual.year, actual.month)[1]
+            if actual.day in (15, ultimo):
+                continue
+            nueva = _date(actual.year, actual.month, 15) if actual.day < 15 else _date(actual.year, actual.month, ultimo)
+            cursor.execute(
+                "UPDATE recurrentes SET proxima_fecha = ?, dia = ? WHERE id = ?",
+                (nueva.isoformat(), nueva.day, fila["id"]),
+            )
+        cursor.execute("PRAGMA user_version = 17;")
+        current_version = 17
 
     conn.commit()
 

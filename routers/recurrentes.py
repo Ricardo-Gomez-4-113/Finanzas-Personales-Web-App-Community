@@ -250,6 +250,8 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
             nueva_fecha = date.fromisoformat(req.proxima_fecha)
         except ValueError:
             raise HTTPException(status_code=400, detail="La fecha de próximo cargo no es válida.")
+        if (req.frecuencia or fila["frecuencia"]) == 'quincenal':
+            nueva_fecha = primera_fecha_quincenal(nueva_fecha)  # día 15 o fin de mes, igual que al crear
 
         ultimo_cargo = cursor.execute(
             "SELECT MAX(fecha) as ult FROM transacciones WHERE recurrente_id = ?",
