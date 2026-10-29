@@ -321,6 +321,47 @@ def test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha):
                                                     "subdivision_tipo": cfg_original.get("subdivision_tipo") or "ninguna"}, headers=ha)
 
 
+def test_pagos_del_presupuesto_por_api(client, ha):
+    cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
+    try:
+        r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "semanal", "subdivision_tipo": "ninguna"}, headers=ha)
+        assert r.status_code == 200, r.text
+        unidades = r.json()["unidades"]
+        assert [u["activa"] for u in unidades] == [True, True, True, True], unidades
+        # Las fechas de pago van en orden creciente
+        for orden, dia in [(1, 5), (2, 12), (3, 19), (4, 26)]:
+            assert client.put(f"/api/presupuesto/unidades/{orden}", json={"dia_pago": dia}, headers=ha).status_code == 200
+        r = client.put("/api/presupuesto/unidades/2", json={"dia_pago": 3}, headers=ha)
+        assert r.status_code == 422 and "orden creciente" in r.text, r.text
+        client.put("/api/presupuesto/unidades/2", json={"dia_pago": 12}, headers=ha)
+        # Una tarjeta de pago toma el día del pago y no admite más que el ingreso de ese pago
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Renta semana", "monto": 4000, "unidad_orden": 1, "dia_pago": 28}, headers=ha)
+        assert r.status_code == 201 and r.json()["unidad_orden"] == 1 and r.json()["dia_pago"] is None, r.text
+        tid = r.json()["id"]
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Exceso", "monto": 7000, "unidad_orden": 1}, headers=ha)
+        assert r.status_code == 422 and "pago 1" in r.text, r.text
+        # Con frecuencia mensual solo hay un pago: no se puede dejar una tarjeta en el pago 3
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Pago tres", "monto": 500, "unidad_orden": 3}, headers=ha)
+        assert r.status_code == 201, r.text
+        tid3 = r.json()["id"]
+        r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
+        assert r.status_code == 422 and "frecuencia mensual" in r.text, r.text
+        client.delete(f"/api/presupuesto/tarjetas/{tid3}", headers=ha)
+        # Exportar: la tarjeta de pago sale como fijo en la fecha de su pago, el tablero general no se mezcla
+        r = client.post("/api/presupuesto/exportar-a-fijos", json={}, headers=ha)
+        assert r.status_code == 200, r.text
+        estado = client.get("/api/presupuesto", headers=ha).json()
+        pago1 = next(u for u in estado["unidades"] if u["orden"] == 1)
+        assert [t["nombre"] for t in pago1["tarjetas"]] == ["Renta semana"], pago1
+        assert all(t["nombre"] != "Renta semana" for t in estado["tarjetas"])
+        client.delete(f"/api/presupuesto/tarjetas/{tid}", headers=ha)
+    finally:
+        for orden in range(1, 5):
+            client.put(f"/api/presupuesto/unidades/{orden}", json={"dia_pago": None}, headers=ha)
+        client.put("/api/presupuesto/config", json={"ingreso_base": cfg_original["ingreso_base"], "frecuencia": cfg_original["frecuencia"],
+                                                    "subdivision_tipo": cfg_original.get("subdivision_tipo") or "ninguna"}, headers=ha)
+
+
 def test_hsts_solo_sobre_https(client):
     assert "strict-transport-security" not in client.get("/login").headers
     assert "strict-transport-security" in client.get("/login", headers={"X-Forwarded-Proto": "https"}).headers
@@ -370,6 +411,7 @@ if __name__ == "__main__":
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
+            (test_pagos_del_presupuesto_por_api, lambda: test_pagos_del_presupuesto_por_api(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),

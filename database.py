@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 13
+CURRENT_TENANT_SCHEMA_VERSION = 14
 
 
 # =============================================================================
@@ -427,6 +427,27 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("UPDATE transacciones SET rubro = 'normales' WHERE rubro IS NULL;")
         cursor.execute("PRAGMA user_version = 13;")
         current_version = 13
+
+    # -------------------------------------------------------------
+    # Versión 14: Unidades de pago del presupuesto. Hay cuatro filas fijas (semana 1 a 4, o quincena 1 y 2,
+    # o el mes); la frecuencia del ingreso decide cuántas están activas. Cada tarjeta puede pertenecer a
+    # una unidad (unidad_orden); las tarjetas sin unidad forman el tablero general, como antes.
+    # -------------------------------------------------------------
+    if current_version < 14 and CURRENT_TENANT_SCHEMA_VERSION >= 14:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS presupuesto_unidades (
+                orden INTEGER PRIMARY KEY CHECK (orden BETWEEN 1 AND 4),
+                dia_pago INTEGER CHECK (dia_pago BETWEEN 1 AND 31)
+            );
+        """)
+        cursor.execute("INSERT OR IGNORE INTO presupuesto_unidades (orden, dia_pago) VALUES (1, NULL), (2, NULL), (3, NULL), (4, NULL);")
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN unidad_orden INTEGER REFERENCES presupuesto_unidades(orden) ON DELETE SET NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_presupuesto_unidad ON presupuesto_tarjetas(unidad_orden);")
+        cursor.execute("PRAGMA user_version = 14;")
+        current_version = 14
 
     conn.commit()
 

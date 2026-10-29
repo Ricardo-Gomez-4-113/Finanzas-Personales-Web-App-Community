@@ -9,6 +9,8 @@ import { apiFetch, escapeHTML, fmt, formatErrorDetail, toast } from './core.js';
 let cachePresupuesto = null;
 let subperiodoActivoId = 'total';
 let editorSubperiodosTemp = [];
+// Pago al que pertenece la tarjeta del modal (null para el tablero general)
+let pagoTarjetaEditando = null;
 
 const ICONOS_SVG = {
     'home': `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -128,7 +130,8 @@ function renderizarVistaPresupuesto(data) {
     // 4. Barra visual segmentada de asignación (100% allocation track)
     renderBarraDistribucion(tarjetas, res, cfg);
 
-    // 5. Grid de Tarjetas de Presupuesto
+    // 5. Pagos del periodo y tablero general
+    renderPagos(data);
     renderGridTarjetas(tarjetas, cfg);
 }
 
@@ -329,9 +332,81 @@ function renderBarraDistribucion(tarjetas, res, cfg) {
     }
 }
 
-function renderGridTarjetas(tarjetas, cfg) {
-    const grid = document.getElementById('grid-tarjetas-presupuesto');
+function nombrePago(orden, frecuencia) {
+    if (frecuencia === 'semanal') return `Semana ${orden}`;
+    if (frecuencia === 'quincenal') return `Quincena ${orden}`;
+    return 'Pago del mes';
+}
+
+// Un bloque por pago activo: día de cobro, ingreso del pago, lo asignado y sus tarjetas
+function renderPagos(data) {
+    const lista = document.getElementById('pres-pagos-lista');
+    if (!lista) return;
+    const cfg = data.config;
+    const activos = (data.unidades || []).filter(u => u.activa);
+    lista.innerHTML = '';
+
+    activos.forEach(u => {
+        const nombre = nombrePago(u.orden, cfg.frecuencia);
+        const opcionesDia = ['<option value="">Sin fecha</option>']
+            .concat(Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}" ${u.dia_pago === i + 1 ? 'selected' : ''}>Día ${i + 1}</option>`))
+            .join('');
+        const bloque = document.createElement('section');
+        bloque.className = 'card pres-pago';
+        bloque.innerHTML = `
+            <div class="pres-pago-head">
+                <div class="pres-pago-titulo">
+                    <h4>${escapeHTML(nombre)}</h4>
+                    <span>Ingreso de este pago: ${fmt(u.ingreso)}</span>
+                </div>
+                <label class="pres-pago-dia-label">Día de cobro
+                    <select class="select-calc pres-pago-dia" aria-label="Día de cobro de ${escapeHTML(nombre)}">${opcionesDia}</select>
+                </label>
+            </div>
+            <div class="pres-pago-stats">
+                <span>Asignado: <strong>${fmt(u.total_asignado)}</strong></span>
+                <span>Libre: <strong>${fmt(u.libre)}</strong></span>
+                ${u.excedido ? '<span class="pres-pago-excedido">Las tarjetas superan el ingreso de este pago</span>' : ''}
+            </div>
+            <div class="grid-presupuesto pres-pago-grid"></div>
+            <button type="button" class="btn-secondary pres-pago-add">Añadir tarjeta a ${escapeHTML(nombre)}</button>
+        `;
+        bloque.querySelector('.pres-pago-dia').addEventListener('change', (e) => guardarDiaPago(u.orden, e.target.value));
+        bloque.querySelector('.pres-pago-add').addEventListener('click', () => abrirModalCrearTarjeta(u.orden));
+        renderGridTarjetas(u.tarjetas, cfg, bloque.querySelector('.pres-pago-grid'), u);
+        lista.appendChild(bloque);
+    });
+}
+
+async function guardarDiaPago(orden, valor) {
+    const dia_pago = valor ? parseInt(valor, 10) : null;
+    try {
+        const res = await apiFetch(`/api/presupuesto/unidades/${orden}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dia_pago })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, 'No se pudo guardar la fecha de pago.'), 'error');
+            cargarPresupuesto();
+            return;
+        }
+        cachePresupuesto = await res.json();
+        renderizarVistaPresupuesto(cachePresupuesto);
+    } catch (e) {
+        toast('Error de conexión al guardar la fecha de pago.', 'error');
+    }
+}
+
+// Con `pago` (el pago activo) el grid muestra solo sus tarjetas y el día que cuenta es el del pago
+function renderGridTarjetas(tarjetas, cfg, grid = document.getElementById('grid-tarjetas-presupuesto'), pago = null) {
     if (!grid) return;
+
+    if (pago && tarjetas.length === 0) {
+        grid.innerHTML = `<p class="pres-pago-vacio">Sin tarjetas en este pago.</p>`;
+        return;
+    }
 
     if (tarjetas.length === 0) {
         grid.innerHTML = `
@@ -351,7 +426,7 @@ function renderGridTarjetas(tarjetas, cfg) {
     }
 
     const subperiodos = cfg.subdivision_config || [];
-    const esSubperiodo = (subperiodoActivoId !== 'total');
+    const esSubperiodo = !pago && (subperiodoActivoId !== 'total');
     const spActivo = esSubperiodo ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
 
     grid.innerHTML = '';
@@ -364,6 +439,7 @@ function renderGridTarjetas(tarjetas, cfg) {
         let montoMostrar = t.monto;
         let tagFreq = FRECUENCIA_LABEL[cfg.frecuencia] || '';
         let badgePctTxt = `${t.porcentaje.toFixed(1)}%`;
+        if (pago) tagFreq = 'en este pago';
 
         if (spActivo) {
             const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
@@ -425,7 +501,7 @@ function renderGridTarjetas(tarjetas, cfg) {
                     </span>
                 `;
             } else {
-                const diaUnico = subsConDia.length === 1 ? subsConDia[0].dia : t.dia_pago;
+                const diaUnico = pago ? pago.dia_pago : (subsConDia.length === 1 ? subsConDia[0].dia : t.dia_pago);
                 if (diaUnico) {
                     diaBadgeHtml = `
                         <span class="pres-card-dia-badge" title="Día de cargo mensual programado: ${diaUnico}">
@@ -557,7 +633,11 @@ export function abrirModalExportarPresupuesto() {
         return;
     }
     const cfg = cachePresupuesto.config || {};
-    const tarjetas = cachePresupuesto.tarjetas || [];
+    // Exportan el tablero general y las tarjetas de los pagos activos
+    const tarjetas = [
+        ...(cachePresupuesto.tarjetas || []),
+        ...(cachePresupuesto.unidades || []).filter(u => u.activa).flatMap(u => u.tarjetas),
+    ];
 
     const badgeFrec = document.getElementById('exportar-frecuencia-badge');
     if (badgeFrec) {
@@ -602,7 +682,7 @@ export function abrirModalExportarPresupuesto() {
                                     ${escapeHTML(t.nombre)}
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted);">
-                                    ${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>${subDivididoTxt}
+                                    ${t.unidad_orden ? escapeHTML(nombrePago(t.unidad_orden, cfg.frecuencia)) + ' · ' : ''}${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>${subDivididoTxt}
                                 </div>
                             </div>
                         </label>
@@ -701,7 +781,7 @@ export async function ejecutarExportarPresupuesto() {
             return;
         }
 
-        const advertencia = 'Al exportar se sobrescribe todo: los fijos del presupuesto actuales se borran y se reemplazan por lo que marcaste.\n\nTus fijos propios y las compras a meses no se tocan.\n\n¿Continuar?';
+        const advertencia = 'Al exportar se sobrescribe todo: se borran todos los fijos (también los que creaste a mano y los aportes a metas) y se reemplazan por lo que marcaste.\n\nLas compras a meses no se tocan.\n\n¿Continuar?';
         if (!confirm(advertencia)) {
             if (btn) btn.disabled = false;
             return;
@@ -849,8 +929,16 @@ function renderSubperiodosInputsTarjeta(tarjeta) {
     });
 }
 
-export function abrirModalCrearTarjeta() {
+// Una tarjeta de pago toma el día y no se subdivide: se ocultan esos campos
+function ajustarModalParaPago(esPago) {
+    const campoDia = document.getElementById('tarjeta-pres-dia')?.closest('.form-group');
+    if (campoDia) campoDia.classList.toggle('hidden', esPago);
+    if (esPago) document.getElementById('tarjeta-pres-subdivision-wrapper')?.classList.add('hidden');
+}
+
+export function abrirModalCrearTarjeta(pago = null) {
     idTarjetaEditando = null;
+    pagoTarjetaEditando = Number.isInteger(pago) ? pago : null;
     const modal = document.getElementById('modal-tarjeta-presupuesto');
     const form = document.getElementById('form-tarjeta-presupuesto');
     const titulo = document.getElementById('modal-tarjeta-pres-title');
@@ -861,8 +949,13 @@ export function abrirModalCrearTarjeta() {
     document.getElementById('tarjeta-pres-color').value = 'gold';
     const inpDia = document.getElementById('tarjeta-pres-dia');
     if (inpDia) inpDia.value = '';
-    if (titulo) titulo.textContent = 'Nueva Tarjeta de Presupuesto';
+    if (titulo) {
+        titulo.textContent = pagoTarjetaEditando
+            ? `Nueva tarjeta · ${nombrePago(pagoTarjetaEditando, cachePresupuesto?.config?.frecuencia)}`
+            : 'Nueva Tarjeta de Presupuesto';
+    }
     renderSubperiodosInputsTarjeta(null);
+    ajustarModalParaPago(pagoTarjetaEditando !== null);
     modal.classList.remove('hidden');
 
     const inpNombre = document.getElementById('tarjeta-pres-nombre');
@@ -871,6 +964,7 @@ export function abrirModalCrearTarjeta() {
 
 export function abrirModalEditarTarjeta(t) {
     idTarjetaEditando = t.id;
+    pagoTarjetaEditando = t.unidad_orden ?? null;
     const modal = document.getElementById('modal-tarjeta-presupuesto');
     const titulo = document.getElementById('modal-tarjeta-pres-title');
     if (!modal) return;
@@ -886,6 +980,7 @@ export function abrirModalEditarTarjeta(t) {
 
     if (titulo) titulo.textContent = 'Editar Tarjeta de Presupuesto';
     renderSubperiodosInputsTarjeta(t);
+    ajustarModalParaPago(pagoTarjetaEditando !== null);
     modal.classList.remove('hidden');
 }
 
@@ -893,6 +988,7 @@ export function cerrarModalTarjetaPresupuesto() {
     const modal = document.getElementById('modal-tarjeta-presupuesto');
     if (modal) modal.classList.add('hidden');
     idTarjetaEditando = null;
+    pagoTarjetaEditando = null;
 }
 
 function sincronizarSubperiodosDesdeMonto(montoTotal) {
@@ -969,6 +1065,7 @@ export async function guardarTarjetaPresupuesto(e) {
     if (guardandoTarjeta) return;
     // Se captura antes de cualquier await: al cerrar el modal la variable global pasa a null
     const idEditar = idTarjetaEditando;
+    const pagoCrear = pagoTarjetaEditando;
     const nombre = document.getElementById('tarjeta-pres-nombre').value.trim();
     let monto = parseFloat(document.getElementById('tarjeta-pres-monto').value) || 0;
     let porcentaje = parseFloat(document.getElementById('tarjeta-pres-pct').value) || 0;
@@ -1037,6 +1134,7 @@ export async function guardarTarjetaPresupuesto(e) {
     }
 
     const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago };
+    if (!idEditar && pagoCrear !== null) body.unidad_orden = pagoCrear;
     if (distribucion_subperiodos !== undefined) {
         body.distribucion_subperiodos = distribucion_subperiodos;
     }

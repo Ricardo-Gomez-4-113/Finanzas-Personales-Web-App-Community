@@ -1183,19 +1183,29 @@ def calcular_fecha_inicio_exportacion(
 
 NOMINA_PRESUPUESTO = "Nómina Fija (Presupuesto)"
 
+# Pagos por frecuencia del ingreso fijo: semanal 4 (semanas), quincenal 2 (quincenas), mensual 1.
+UNIDADES_POR_FRECUENCIA = {'semanal': 4, 'quincenal': 2, 'mensual': 1}
 
-def _fijos_del_presupuesto(cursor: sqlite3.Cursor) -> list:
-    """Fijos que el presupuesto administra: tarjetas (no MSI) y la nómina que él crea.
-    Los fijos que el usuario creó a mano nunca entran aquí."""
-    return cursor.execute(
-        """
-        SELECT * FROM recurrentes
-        WHERE (tipo = 'gasto' AND presupuesto_tarjeta_id IS NOT NULL AND total_cuotas IS NULL)
-           OR (tipo = 'ingreso' AND descripcion = ?)
-        ORDER BY id ASC
-        """,
-        (NOMINA_PRESUPUESTO,),
-    ).fetchall()
+
+def unidades_activas(frecuencia: str) -> int:
+    return UNIDADES_POR_FRECUENCIA.get(frecuencia, 1)
+
+
+def validar_dias_unidades(dias: dict) -> None:
+    """dias: día de cobro por pago que se va a exportar ({orden: día}). Lanza ValueError si a alguno le falta
+    la fecha o no van en orden creciente (cada pago después del anterior)."""
+    ordenados = sorted(dias.items())
+    if any(d is None for _, d in ordenados):
+        raise ValueError("Define la fecha de cada pago que tiene tarjetas antes de exportar.")
+    valores = [d for _, d in ordenados]
+    if any(a >= b for a, b in zip(valores, valores[1:])):
+        raise ValueError("Las fechas de pago deben ir en orden creciente: cada pago después del anterior.")
+
+
+def _es_del_presupuesto(fila) -> bool:
+    """Fijo que administra el presupuesto: ligado a una tarjeta o la nómina que él crea.
+    Un fijo hecho a mano nunca se empareja con el presupuesto, aunque comparta nombre."""
+    return fila["presupuesto_tarjeta_id"] is not None or fila["descripcion"] == NOMINA_PRESUPUESTO
 
 
 def _sin_cargo_previo(cursor: sqlite3.Cursor, item: dict) -> date:
@@ -1216,14 +1226,14 @@ def exportar_presupuesto_a_fijos_core(
     fecha_base: date = None
 ) -> dict:
     """
-    Sobrescribe todo: los fijos del presupuesto se dejan exactamente como el presupuesto actual
-    (tarjetas marcadas, nómina, montos, frecuencia, día, categoría). Lo que ya no corresponde
-    (tarjeta desmarcada, monto en cero, nómina desmarcada, subperiodo eliminado) se borra.
-    Sus movimientos ya generados se conservan, sin enlace a un fijo. Para no duplicar un cargo
-    que ya existe, un fijo nuevo salta cualquier fecha que ya tenga un movimiento con el mismo nombre.
-    - Las compras a meses (MSI) ligadas a una tarjeta no se tocan; mientras existan, esa tarjeta
-      no genera fijo, como antes.
-    - Los fijos creados a mano, incluida una nómina propia, no se modifican.
+    Reemplazo total. Se borran todos los fijos (recurrentes sin compra a meses, incluidos los aportes
+    recurrentes a metas) y se crean desde el presupuesto:
+    - La nómina del ingreso fijo, con la frecuencia del presupuesto.
+    - Las tarjetas del tablero general, con su periodicidad, día o subperiodos.
+    - Las tarjetas de cada unidad de pago activa: un fijo mensual en la fecha de su pago.
+    Las compras a meses (MSI) no se tocan; mientras exista una ligada a la tarjeta o con su nombre,
+    esa tarjeta no genera fijo. Los movimientos ya generados se conservan, sin enlace a un fijo.
+    Lanza ValueError si las unidades activas no tienen fechas válidas.
     """
     hoy = fecha_base or ahora_local().date()
     if cursor.connection and not cursor.connection.row_factory:
@@ -1238,7 +1248,23 @@ def exportar_presupuesto_a_fijos_core(
     except Exception:
         pass
 
-    detalles = []
+    unidades = cursor.execute("SELECT orden, dia_pago FROM presupuesto_unidades ORDER BY orden").fetchall()
+    dias_unidades = {u["orden"]: u["dia_pago"] for u in unidades}
+    activas = unidades_activas(frecuencia)
+    con_tarjetas = {r["unidad_orden"] for r in cursor.execute(
+        "SELECT DISTINCT unidad_orden FROM presupuesto_tarjetas WHERE unidad_orden IS NOT NULL AND monto > 0 AND unidad_orden <= ?",
+        (activas,),
+    ).fetchall()}
+    validar_dias_unidades({o: dias_unidades.get(o) for o in sorted(con_tarjetas)})
+    excedidas = cursor.execute("""
+        SELECT unidad_orden, SUM(monto) AS total FROM presupuesto_tarjetas
+        WHERE unidad_orden IS NOT NULL AND unidad_orden <= ?
+        GROUP BY unidad_orden HAVING SUM(monto) > ? + 0.005
+        ORDER BY unidad_orden
+    """, (activas, ingreso_base)).fetchall()
+    if excedidas:
+        orden = excedidas[0]["unidad_orden"]
+        raise ValueError(f"Las tarjetas del pago {orden} suman más que su ingreso. Ajústalas antes de exportar.")
 
     def _calc_proxima_fecha(dia_n: Optional[int], freq: str, hoy_d: date) -> tuple[int, date]:
         if dia_n is not None:
@@ -1267,8 +1293,9 @@ def exportar_presupuesto_a_fijos_core(
             dia_f = prox.day
         return dia_f, prox
 
-    # 1. Estado deseado: lo que el presupuesto debe tener como fijos hoy
+    # 1. Estado deseado: lo que el presupuesto debe tener como fijos
     deseados = []
+    detalles = []
     if incluir_ingreso and ingreso_base > 0:
         cat_ingreso = resolver_categoria_por_nombre(cursor, "Nómina", tipo="ingreso")
         dia_fijo, proxima = _calc_proxima_fecha(dia_pago_ingreso, frecuencia, hoy)
@@ -1314,6 +1341,18 @@ def exportar_presupuesto_a_fijos_core(
         ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
         apartado_id = ap["id"] if ap else None
 
+        # Tarjeta de una unidad de pago: un fijo mensual en la fecha de su pago, sin subdivisiones
+        if t["unidad_orden"] is not None:
+            if t["unidad_orden"] > activas:
+                continue
+            dia_f, prox_f = _calc_proxima_fecha(dias_unidades[t["unidad_orden"]], 'mensual', hoy)
+            deseados.append({
+                "tarjeta_id": tarjeta_id, "tipo": "gasto", "descripcion": nombre,
+                "monto": round(monto_tarjeta, 2), "frecuencia": 'mensual', "dia": dia_f,
+                "proxima": prox_f, "categoria_id": cat_id, "apartado_id": apartado_id,
+            })
+            continue
+
         sub_list = None
         if "distribucion_subperiodos" in t.keys() and t["distribucion_subperiodos"]:
             try:
@@ -1353,8 +1392,8 @@ def exportar_presupuesto_a_fijos_core(
             dia_f, prox_f = _calc_proxima_fecha(s_dia, s_frec, hoy)
             items.append({"descripcion": nombre, "monto": s_monto, "frecuencia": s_frec, "dia": dia_f, "proxima": prox_f})
 
-        # Presupuesto quincenal: el monto es por quincena y un día fijo se repite en la otra quincena.
-        # El motor de fijos mensuales lo representa con un fijo en el día y otro en su par (d±15).
+        # Presupuesto quincenal del tablero general: el monto es por quincena y un día fijo se repite
+        # en la otra quincena. El motor de fijos mensuales lo representa con un fijo en el día y otro en su par (d±15).
         if frecuencia == 'quincenal':
             expandidos = []
             for itm in items:
@@ -1373,14 +1412,16 @@ def exportar_presupuesto_a_fijos_core(
                 "proxima": itm["proxima"], "categoria_id": cat_id, "apartado_id": apartado_id,
             })
 
-    # 2. Emparejar lo deseado con los fijos ya administrados: primero por descripción exacta,
-    #    luego reutilizando el fijo de la misma tarjeta (renombrada o con otro subperiodo).
-    libres = _fijos_del_presupuesto(cursor)
+    # 2. Reemplazo. Los fijos del presupuesto que siguen vigentes se actualizan en su lugar (no se
+    #    recrean, así no se duplica el cargo del mes); el resto de fijos, incluidos los hechos a mano, se borra.
+    libres = cursor.execute(
+        "SELECT * FROM recurrentes WHERE total_cuotas IS NULL ORDER BY id ASC"
+    ).fetchall()
     emparejados = []
     pendientes = []
     for item in deseados:
-        fila = next((r for r in libres
-                     if r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]
+        fila = next((r for r in libres if _es_del_presupuesto(r)
+                     and r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]
                      and r["descripcion"] == item["descripcion"]), None)
         if fila is not None:
             libres.remove(fila)
@@ -1388,8 +1429,9 @@ def exportar_presupuesto_a_fijos_core(
         else:
             pendientes.append(item)
     for item in pendientes:
-        fila = next((r for r in libres
-                     if r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]), None)
+        # Tarjeta renombrada o con otro subperiodo: se reutiliza su fijo
+        fila = next((r for r in libres if _es_del_presupuesto(r)
+                     and r["presupuesto_tarjeta_id"] == item["tarjeta_id"] and r["tipo"] == item["tipo"]), None)
         if fila is not None:
             libres.remove(fila)
         emparejados.append((item, fila))
@@ -1418,7 +1460,6 @@ def exportar_presupuesto_a_fijos_core(
             accion = "creado"
         detalles.append({"descripcion": item["descripcion"], "monto": item["monto"], "frecuencia": item["frecuencia"], "accion": accion})
 
-    # 3. Lo que sobra ya no corresponde al presupuesto: se borra
     for sobrante in libres:
         cursor.execute("DELETE FROM recurrentes WHERE id = ?", (sobrante["id"],))
         eliminados += 1
@@ -1433,7 +1474,6 @@ def exportar_presupuesto_a_fijos_core(
         "total_procesados": creados + actualizados,
         "detalles": detalles
     }
-
 
 
 def resumen_mensual_core(conn: sqlite3.Connection) -> list:

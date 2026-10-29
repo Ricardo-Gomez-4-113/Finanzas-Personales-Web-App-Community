@@ -294,6 +294,38 @@ def test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base):
         ctx.close()
 
 
+def test_pagos_se_adaptan_a_la_frecuencia(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-presupuesto")
+        original = page.evaluate("""() => fetch('/api/presupuesto', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
+            .then(r => r.json()).then(d => d.config)""")
+        def fijar_config(frecuencia):
+            page.evaluate("""(frecuencia) => fetch('/api/presupuesto/config', {method: 'PUT',
+                headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},
+                body: JSON.stringify({ingreso_base: 9000, frecuencia: frecuencia, subdivision_tipo: 'ninguna'})})""", frecuencia)
+            page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        try:
+            # Semanal: cuatro pagos independientes; mensual: uno solo
+            fijar_config("semanal")
+            _esperar(page, "document.querySelectorAll('#pres-pagos-lista .pres-pago').length === 4")
+            fijar_config("mensual")
+            _esperar(page, "document.querySelectorAll('#pres-pagos-lista .pres-pago').length === 1")
+            # El modal de un pago no pide día ni subdivisión: el día es el del pago
+            page.evaluate("document.querySelector('#pres-pagos-lista .pres-pago-add').click()")
+            page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
+            assert "Pago del mes" in page.inner_text("#modal-tarjeta-pres-title"), page.inner_text("#modal-tarjeta-pres-title")
+            assert not page.is_visible("#tarjeta-pres-dia"), "el día no debe pedirse en una tarjeta de pago"
+            page.keyboard.press("Escape")
+        finally:
+            page.evaluate("""(cfg) => fetch('/api/presupuesto/config', {method: 'PUT',
+                headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},
+                body: JSON.stringify({ingreso_base: cfg.ingreso_base, frecuencia: cfg.frecuencia, dia_pago: cfg.dia_pago, subdivision_tipo: 'ninguna'})})""", original)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -408,6 +440,7 @@ if __name__ == "__main__":
                 (test_resumen_muestra_las_cifras_del_escenario, lambda: test_resumen_muestra_las_cifras_del_escenario(navegador, base)),
                 (test_movimientos_y_resumen_muestran_el_mismo_periodo, lambda: test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base)),
                 (test_doble_clic_al_guardar_tarjeta_no_duplica, lambda: test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base)),
+                (test_pagos_se_adaptan_a_la_frecuencia, lambda: test_pagos_se_adaptan_a_la_frecuencia(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),

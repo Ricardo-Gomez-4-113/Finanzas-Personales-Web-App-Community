@@ -19,6 +19,8 @@ from finanzas_core import (
     exportar_presupuesto_a_fijos_core,
     materializar_recurrentes,
     ahora_local,
+    unidades_activas,
+    validar_dias_unidades,
 )
 from security import get_tenant_db
 
@@ -53,6 +55,11 @@ class TarjetaPresupuestoCreate(BaseModel):
     notas: Optional[str] = Field("", max_length=255)
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
     distribucion_subperiodos: Optional[List[dict]] = None
+    unidad_orden: Optional[int] = Field(None, ge=1, le=4, description="Pago al que pertenece la tarjeta; vacío para el tablero general")
+
+
+class UnidadPagoUpdate(BaseModel):
+    dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes en que se cobra este pago")
 
 
 class TarjetaPresupuestoUpdate(BaseModel):
@@ -159,6 +166,49 @@ def serializar_tarjeta(t: sqlite3.Row, ingreso_base: float, frecuencia: str, sub
     return d
 
 
+def _estado_unidades(cursor: sqlite3.Cursor, cfg: dict) -> list:
+    """Los cuatro pagos del presupuesto. Solo los activos según la frecuencia tienen ingreso y libre;
+    los inactivos no se muestran, pero sus tarjetas se conservan (y se impide cambiar a una frecuencia que las dejaría fuera)."""
+    activas = unidades_activas(cfg["frecuencia"])
+    ingreso = float(cfg["ingreso_base"])
+    filas_unidades = cursor.execute("SELECT orden, dia_pago FROM presupuesto_unidades ORDER BY orden").fetchall()
+    filas_tarjetas = cursor.execute(
+        "SELECT * FROM presupuesto_tarjetas WHERE unidad_orden IS NOT NULL ORDER BY orden ASC, id ASC"
+    ).fetchall()
+    unidades = []
+    for u in filas_unidades:
+        orden = u["orden"]
+        activa = orden <= activas
+        tarjetas = [serializar_tarjeta(t, ingreso, cfg["frecuencia"]) for t in filas_tarjetas if t["unidad_orden"] == orden]
+        total = round(sum(t["monto"] for t in tarjetas), 2)
+        unidades.append({
+            "orden": orden,
+            "activa": activa,
+            "dia_pago": u["dia_pago"],
+            "ingreso": round(ingreso, 2) if activa else 0.0,
+            "total_asignado": total,
+            "libre": max(0.0, round(ingreso - total, 2)) if activa else 0.0,
+            "excedido": activa and total > ingreso + 0.005,
+            "tarjetas": tarjetas,
+        })
+    return unidades
+
+
+def _validar_capacidad_unidad(cursor: sqlite3.Cursor, cfg: dict, orden: int, monto_nuevo: float, excluir_id: Optional[int] = None):
+    """Las tarjetas de un pago no pueden sumar más que el ingreso de ese pago."""
+    ingreso = float(cfg["ingreso_base"])
+    total = cursor.execute(
+        "SELECT COALESCE(SUM(monto), 0) FROM presupuesto_tarjetas WHERE unidad_orden = ? AND id IS NOT ?",
+        (orden, excluir_id),
+    ).fetchone()[0]
+    if float(total) + monto_nuevo > ingreso + 0.005:
+        restante = max(0.0, round(ingreso - float(total), 2))
+        raise HTTPException(
+            status_code=422,
+            detail=f"El pago {orden} solo tiene {restante:,.2f} disponibles de su ingreso; esta tarjeta suma {monto_nuevo:,.2f}.",
+        )
+
+
 # -----------------------------------------------------------------------------
 # Endpoints de la API
 # -----------------------------------------------------------------------------
@@ -174,7 +224,9 @@ def get_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
     fijos = detectar_fijos_recurrentes(cursor, frecuencia)
 
     subperiodos = cfg["subdivision_config"] if cfg["subdivision_tipo"] != 'ninguna' else []
-    filas_tarjetas = cursor.execute("SELECT * FROM presupuesto_tarjetas ORDER BY orden ASC, id ASC").fetchall()
+    filas_tarjetas = cursor.execute(
+        "SELECT * FROM presupuesto_tarjetas WHERE unidad_orden IS NULL ORDER BY orden ASC, id ASC"
+    ).fetchall()
     tarjetas = [serializar_tarjeta(t, ingreso_base, frecuencia, subperiodos) for t in filas_tarjetas]
 
     total_monto = sum(t["monto"] for t in tarjetas)
@@ -186,6 +238,7 @@ def get_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
         "config": cfg,
         "fijos_detectados": fijos,
         "tarjetas": tarjetas,
+        "unidades": _estado_unidades(cursor, cfg),
         "resumen": {
             "total_asignado_monto": round(total_monto, 2),
             "total_asignado_pct": round(total_pct, 2),
@@ -207,6 +260,16 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         sub_tipo = 'ninguna'
     elif frecuencia_nueva == 'quincenal' and sub_tipo == 'quincenas':
         sub_tipo = 'semanas'
+
+    # Una frecuencia más corta no puede dejar tarjetas huérfanas en pagos que ya no existen
+    tarjetas_fuera = cursor.execute(
+        "SELECT COUNT(*) FROM presupuesto_tarjetas WHERE unidad_orden > ?", (unidades_activas(frecuencia_nueva),)
+    ).fetchone()[0]
+    if tarjetas_fuera:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Hay tarjetas en pagos que la frecuencia {frecuencia_nueva} no usa. Muévelas o bórralas antes de cambiarla.",
+        )
 
     if sub_tipo == 'ninguna':
         config_list = []
@@ -265,6 +328,25 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
 
 
 
+@router.put("/api/presupuesto/unidades/{orden}", summary="Fijar el día de cobro de un pago del presupuesto")
+def actualizar_unidad_pago(orden: int, req: UnidadPagoUpdate, conn: sqlite3.Connection = Depends(get_tenant_db)):
+    if orden < 1 or orden > 4:
+        raise HTTPException(status_code=404, detail="Pago de presupuesto no encontrado.")
+    cursor = conn.cursor()
+    cfg = obtener_config_presupuesto(cursor)
+    if orden > unidades_activas(cfg["frecuencia"]):
+        raise HTTPException(status_code=422, detail=f"La frecuencia {cfg['frecuencia']} no tiene el pago {orden}.")
+    cursor.execute("UPDATE presupuesto_unidades SET dia_pago = ? WHERE orden = ?", (req.dia_pago, orden))
+    # Los días de los pagos activos con fecha deben ir en orden creciente
+    cursor.execute("SELECT orden, dia_pago FROM presupuesto_unidades WHERE orden <= ? ORDER BY orden", (unidades_activas(cfg["frecuencia"]),))
+    dias = [u["dia_pago"] for u in cursor.fetchall() if u["dia_pago"] is not None]
+    if any(a >= b for a, b in zip(dias, dias[1:])):
+        conn.rollback()
+        raise HTTPException(status_code=422, detail="Las fechas de pago deben ir en orden creciente: cada pago después del anterior.")
+    conn.commit()
+    return get_presupuesto(conn)
+
+
 @router.post("/api/presupuesto/importar-fijos", summary="Importar nómina y gastos de Fijos y MSI")
 def importar_fijos_a_presupuesto(
     req: Optional[ImportarFijosRequest] = None,
@@ -301,12 +383,16 @@ def exportar_presupuesto_a_fijos(
         hoy=hoy_local
     )
 
-    res = exportar_presupuesto_a_fijos_core(
-        cursor=cursor,
-        tarjetas_ids=req.tarjetas_ids,
-        incluir_ingreso=req.incluir_ingreso,
-        fecha_base=fecha_inicio_efectiva
-    )
+    try:
+        res = exportar_presupuesto_a_fijos_core(
+            cursor=cursor,
+            tarjetas_ids=req.tarjetas_ids,
+            incluir_ingreso=req.incluir_ingreso,
+            fecha_base=fecha_inicio_efectiva
+        )
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(status_code=422, detail=str(e))
     materializadas = materializar_recurrentes(conn, hoy_local)
     conn.commit()
     res["transacciones_materializadas"] = materializadas
@@ -321,8 +407,8 @@ def aplicar_plantilla(req: PlantillaRequest, conn: sqlite3.Connection = Depends(
     cfg = obtener_config_presupuesto(cursor)
     ingreso = float(cfg["ingreso_base"])
 
-    # Limpiar tarjetas previas
-    cursor.execute("DELETE FROM presupuesto_tarjetas")
+    # Limpiar las tarjetas del tablero general (las de cada pago se conservan)
+    cursor.execute("DELETE FROM presupuesto_tarjetas WHERE unidad_orden IS NULL")
 
     if req.plantilla == '50-30-20':
         plantillas = [
@@ -369,6 +455,14 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
 
     monto, porcentaje = _resolver_montos(req.monto, req.porcentaje, ingreso)
 
+    if req.unidad_orden is not None:
+        if req.unidad_orden > unidades_activas(cfg["frecuencia"]):
+            raise HTTPException(status_code=422, detail=f"La frecuencia {cfg['frecuencia']} no tiene el pago {req.unidad_orden}.")
+        _validar_capacidad_unidad(cursor, cfg, req.unidad_orden, round(monto, 2))
+        # El día lo marca el pago; una tarjeta de pago no se subdivide
+        req.dia_pago = None
+        req.distribucion_subperiodos = None
+
     # Normalizar distribucion_subperiodos y sincronizar dia_pago si es de un solo sub-período activo
     dist_list = None
     if req.distribucion_subperiodos:
@@ -384,11 +478,13 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
 
     # Determinar orden consecutivo
     dist_json = json.dumps(dist_list) if dist_list else None
-    max_orden = cursor.execute("SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas").fetchone()[0]
+    max_orden = cursor.execute(
+        "SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas WHERE unidad_orden IS ?", (req.unidad_orden,)
+    ).fetchone()[0]
     cursor.execute("""
-        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json))
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden))
 
     tarjeta_id = cursor.lastrowid
     conn.commit()
@@ -408,6 +504,8 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
     cfg = obtener_config_presupuesto(cursor)
     ingreso = float(cfg["ingreso_base"])
 
+    # Una tarjeta de pago toma su día del pago: ignora día y subdivisiones que llegue a enviar
+    es_pago = fila["unidad_orden"] is not None
     campos, valores = [], []
     if req.nombre is not None:
         campos.append("nombre = ?"); valores.append(req.nombre.strip())
@@ -421,7 +519,7 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("orden = ?"); valores.append(req.orden)
     dia_efectivo = req.dia_pago if "dia_pago" in req.model_fields_set else fila["dia_pago"]
 
-    if "distribucion_subperiodos" in req.model_fields_set:
+    if "distribucion_subperiodos" in req.model_fields_set and not es_pago:
         dist_list = [dict(x) for x in req.distribucion_subperiodos] if req.distribucion_subperiodos else None
         if dist_list:
             positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
@@ -434,7 +532,7 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
                 dia_efectivo = int(positivos[0]["dia"])
         dist_json = json.dumps(dist_list) if dist_list else None
         campos.append("distribucion_subperiodos = ?"); valores.append(dist_json)
-    elif "dia_pago" in req.model_fields_set and fila["distribucion_subperiodos"]:
+    elif "dia_pago" in req.model_fields_set and fila["distribucion_subperiodos"] and not es_pago:
         try:
             dist_list = json.loads(fila["distribucion_subperiodos"])
             if isinstance(dist_list, list):
@@ -448,12 +546,14 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         except Exception:
             pass
 
-    if "dia_pago" in req.model_fields_set or dia_efectivo != fila["dia_pago"]:
+    if not es_pago and ("dia_pago" in req.model_fields_set or dia_efectivo != fila["dia_pago"]):
         campos.append("dia_pago = ?"); valores.append(dia_efectivo)
 
     # Si se actualiza monto o porcentaje, priorizar monto explícito y sincronizar el otro campo
     if req.monto is not None or req.porcentaje is not None:
         monto, pct = _resolver_montos(req.monto, req.porcentaje, ingreso)
+        if es_pago:
+            _validar_capacidad_unidad(cursor, cfg, fila["unidad_orden"], monto, excluir_id=tarjeta_id)
         campos.extend(["monto = ?", "porcentaje = ?"])
         valores.extend([monto, pct])
 

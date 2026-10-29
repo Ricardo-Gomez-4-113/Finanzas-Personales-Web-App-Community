@@ -1824,6 +1824,77 @@ def test_periodo_actual_sin_ingreso_fijo_usa_mes_calendario():
     assert (p["inicio"], p["fin"], p["cobro"], p["libre"]) == ("2028-02-01", "2028-02-29", None, 1000.0), p
 
 
+def _con_pagos(frecuencia, dias, tarjetas):
+    """Presupuesto con pagos: dias por orden ({orden: día}) y tarjetas [(orden, nombre, monto)]."""
+    conn = nueva_bd()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 5000, frecuencia = ? WHERE id = 1", (frecuencia,))
+    for orden, dia in dias.items():
+        conn.execute("UPDATE presupuesto_unidades SET dia_pago = ? WHERE orden = ?", (dia, orden))
+    for orden, nombre, monto in tarjetas:
+        conn.execute(
+            "INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) "
+            "VALUES (?, 'x', 'amber', 0, ?, '', 1, ?)", (nombre, monto, orden))
+    conn.commit()
+    return conn
+
+
+def test_pagos_semanales_cada_tarjeta_cae_en_su_fecha():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _con_pagos('semanal', {1: 5, 2: 12, 3: 19, 4: 26},
+                      [(1, 'Renta', 1500.0), (3, 'Despensa', 800.0)])
+    res = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    conn.commit()
+    fijos = {r["descripcion"]: r for r in conn.execute("SELECT * FROM recurrentes WHERE activo = 1")}
+    # Las tarjetas de pago son fijos mensuales en el día de su pago
+    assert fijos["Renta"]["dia"] == 5 and fijos["Renta"]["frecuencia"] == 'mensual', dict(fijos["Renta"])
+    assert fijos["Despensa"]["dia"] == 19 and fijos["Despensa"]["monto"] == 800.0
+    assert fijos["Nómina Fija (Presupuesto)"]["frecuencia"] == 'semanal'
+    assert res["creados"] == 3, res
+
+
+def test_pago_con_tarjetas_exige_fecha():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _con_pagos('quincenal', {1: None, 2: 30}, [(1, 'Renta', 1500.0)])
+    try:
+        exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    except ValueError as e:
+        assert "fecha" in str(e).lower(), e
+    else:
+        raise AssertionError("debía fallar: el pago 1 tiene tarjetas y no tiene fecha")
+
+
+def test_fechas_de_pago_en_orden_creciente():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _con_pagos('quincenal', {1: 20, 2: 10}, [(1, 'Renta', 1500.0), (2, 'Luz', 300.0)])
+    try:
+        exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    except ValueError as e:
+        assert "orden" in str(e).lower(), e
+    else:
+        raise AssertionError("debía fallar: el pago 2 (día 10) va antes que el pago 1 (día 20)")
+
+
+def test_pago_no_supera_su_ingreso_al_exportar():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _con_pagos('quincenal', {1: 15, 2: 30}, [(1, 'Renta', 4000.0), (1, 'Coche', 1500.0)])
+    try:
+        exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    except ValueError as e:
+        assert "pago 1" in str(e), e
+    else:
+        raise AssertionError("debía fallar: el pago 1 suma 5500 con un ingreso de 5000")
+
+
+def test_pago_inactivo_no_se_exporta_pero_conserva_la_tarjeta():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = _con_pagos('mensual', {1: 15}, [(1, 'Renta', 1500.0), (3, 'Escondida', 900.0)])
+    res = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
+    conn.commit()
+    assert _activos(conn).get("Escondida") is None, _activos(conn)
+    assert conn.execute("SELECT COUNT(*) FROM presupuesto_tarjetas WHERE nombre = 'Escondida'").fetchone()[0] == 1
+    assert res["creados"] == 2, res
+
+
 def _presupuesto_para_export():
     conn = nueva_bd()
     conn.execute("UPDATE presupuesto_config SET ingreso_base = 9000, frecuencia = 'quincenal' WHERE id = 1")
@@ -1852,18 +1923,23 @@ def test_export_sobrescribe_todo_y_borra_lo_que_sobra():
     assert conn.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Dentista'").fetchone()[0] == 0
 
 
-def test_export_no_toca_fijos_creados_a_mano():
+def test_export_borra_tambien_los_fijos_a_mano_y_respeta_msi():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = _presupuesto_para_export()
     insertar_recurrente(conn, "Nómina quincenal", 'ingreso', 14250, 'quincenal', 15, date(2026, 10, 31))
     insertar_recurrente(conn, "Netflix", 'gasto', 299, 'mensual', 15, date(2026, 10, 25))
-    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
-    conn.execute("UPDATE presupuesto_tarjetas SET monto = 0 WHERE nombre IN ('Transporte', 'Dentista')")
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 0")
+    conn.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
+        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+    """)
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
     conn.commit()
-    assert _activos(conn) == {"Nómina quincenal": 14250.0, "Netflix": 299.0}, _activos(conn)
+    # Los fijos hechos a mano se borran, la compra a meses no se toca y la nómina sigue en el presupuesto
+    activos = _activos(conn)
+    assert "Netflix" not in activos and "Nómina quincenal" not in activos, activos
+    assert activos["Pixel 10"] == 1074.92, activos
+    assert activos["Nómina Fija (Presupuesto)"] == 9000.0, activos
 
 
 def test_export_renombrar_tarjeta_reutiliza_fijo_sin_duplicar_cargo():

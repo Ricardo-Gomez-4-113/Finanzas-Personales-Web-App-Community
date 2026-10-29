@@ -3453,3 +3453,72 @@ input[type="number"].subperiodo-editor-input-pct {
 .movs-periodos-tabla tr.periodo-en-curso td {
     font-weight: 600;
 }
+
+/* Pagos del periodo: cada pago reparte su ingreso en sus propias tarjetas */
+.pres-seccion-titulo {
+    margin: 22px 0 4px;
+    font-family: var(--font-num);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.pres-seccion-ayuda {
+    margin: 0 0 12px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+.pres-pagos-lista {
+    display: grid;
+    gap: 14px;
+}
+.pres-pago {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+}
+.pres-pago-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pres-pago-titulo h4 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.pres-pago-dia-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.pres-pago-dia {
+    min-width: 92px;
+}
+.pres-pago-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.pres-pago-stats strong {
+    color: var(--text-main);
+}
+.pres-pago-excedido {
+    color: var(--danger-text);
+    font-weight: 600;
+}
+.pres-pago-vacio {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.pres-pago-add {
+    justify-self: start;
+}

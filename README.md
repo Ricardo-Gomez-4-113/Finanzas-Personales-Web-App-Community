@@ -90,7 +90,9 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * Tarjetas de presupuesto por categoría con reparto por quincenas o semanas (simétrico o personalizado).
 * Los repartos se calculan en centavos: la suma de los subperiodos siempre coincide exactamente con el total.
 * En un presupuesto quincenal, cada monto es por quincena: al exportarlo a fijos, cada cargo se repite en su día y en el de la otra quincena, así el mes cuadra con el equivalente mensual de la tarjeta.
-* Exportación del presupuesto a gastos fijos con fecha de inicio configurable.
+* Pagos del periodo: según la frecuencia del ingreso (semanal 4, quincenal 2, mensual 1), aparecen bloques de pago con su día de cobro y sus propias tarjetas. Cada pago muestra su ingreso, lo asignado y lo libre, y no puede asignar más que su ingreso.
+* El tablero general sigue disponible para tarjetas que no pertenecen a un pago.
+* Exportación del presupuesto a gastos fijos con fecha de inicio configurable. Es un reemplazo total: borra todos los fijos (salvo las compras a meses) y crea los del presupuesto. Cada tarjeta de un pago es un fijo mensual en el día de su pago.
 
 ### 10. 🩺 Respaldo Automático y Monitoreo
 * **Respaldo nocturno:** `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/`, verifica cada copia y conserva 14 días.
@@ -277,6 +279,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `GET` | `/api/presupuesto` | `verify_token` | Presupuesto con tarjetas y repartos por subperiodo |
 | `PUT` | `/api/presupuesto/config` | `verify_token` | Configurar ingreso base, frecuencia y subdivisión |
 | `POST` / `PATCH` / `DELETE` | `/api/presupuesto/tarjetas[/{id}]` | `verify_token` | Crear, editar o eliminar tarjetas de presupuesto |
+| `PUT` | `/api/presupuesto/unidades/{orden}` | `verify_token` | Fijar el día de cobro de un pago (1 a 4) |
 | `POST` | `/api/presupuesto/exportar-a-fijos` | `verify_token` | Convertir el presupuesto en gastos fijos |
 | `GET` | `/api/rendimiento` | `verify_token` | Cuentas con rendimiento: valor actual, interés y ganancia mensual |
 | `POST` | `/api/rendimiento` | `verify_token` | Crear cuenta con rendimiento |
