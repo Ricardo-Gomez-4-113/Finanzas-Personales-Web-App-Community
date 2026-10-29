@@ -400,6 +400,45 @@ def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
         ctx.close()
 
 
+def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        resultado = page.evaluate("""async () => {
+            const { renderCintaPeriodos } = await import('/static/js/cinta_periodos.js');
+            const raiz = document.createElement('div');
+            document.body.appendChild(raiz);
+            const periodos = [
+                { inicio: '2026-10-15', fin: '2026-10-30', en_curso: true,
+                  totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 13201 } },
+                { inicio: '2026-10-31', fin: '2026-11-14', en_curso: false,
+                  totales: { ingresos: 0, fijos: 0, msi: 0, libre: -799, saldo_al_cierre: 12402 } },
+            ];
+            let elegido = -1;
+            renderCintaPeriodos(raiz, periodos, { onSeleccionar: i => { elegido = i; } });
+            const botones = [...raiz.querySelectorAll('.cinta-periodo')];
+            botones[1].click();
+            return {
+                n: botones.length,
+                actual: botones[0].classList.contains('cinta-periodo-actual'),
+                libre: botones[0].querySelector('.cinta-periodo-libre').textContent,
+                riesgo: botones[1].classList.contains('cinta-periodo-riesgo'),
+                sinIngreso: !!botones[1].querySelector('.cinta-periodo-sin-ingreso'),
+                elegido,
+                dias: botones[0].style.getPropertyValue('--dias'),
+                presionado: botones[0].getAttribute('aria-pressed'),
+            };
+        }""")
+        assert resultado["n"] == 2, resultado
+        assert resultado["actual"] and resultado["riesgo"] and resultado["sinIngreso"], resultado
+        assert resultado["libre"] == "$13,201.00", resultado
+        assert resultado["elegido"] == 1, resultado          # el clic avisa el índice elegido
+        assert resultado["dias"] == "16" and resultado["presionado"] == "true", resultado
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -506,6 +545,7 @@ if __name__ == "__main__":
                 (test_presupuesto_muestra_totales_en_una_linea, lambda: test_presupuesto_muestra_totales_en_una_linea(navegador, base)),
                 (test_selector_de_periodo_cambia_las_tarjetas, lambda: test_selector_de_periodo_cambia_las_tarjetas(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
+                (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),
