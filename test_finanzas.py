@@ -2090,6 +2090,21 @@ def test_msi_pausada_cuenta_como_deuda_pero_no_resta_en_el_periodo():
     assert r['periodo']['comprometido'] == 0.0 and r['periodo']['libre'] == r['balance'] + 5000.0, r['periodo']  # + ingreso por recibir
 
 
+def test_fijos_pausados_no_cuentan_en_el_periodo():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Sueldo", 'ingreso', 5000, 'mensual', 1, date(2026, 10, 1))
+    insertar_recurrente(conn, "Bono pausado", 'ingreso', 2000, 'mensual', 15, date(2026, 10, 15))
+    insertar_recurrente(conn, "Netflix pausado", 'gasto', 300, 'mensual', 25, date(2026, 10, 25))
+    conn.execute("UPDATE recurrentes SET activo = 0 WHERE descripcion IN ('Bono pausado', 'Netflix pausado')")
+    conn.commit()
+    r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
+    p = r['periodos'][0]
+    assert p['ingresos']['total'] == 5000.0 and p['gastos']['fijos'] == 0.0, p  # ni el bono ni el gasto pausados
+    assert p['remanente'] == 5000.0 and r['periodo']['comprometido'] == 0.0, p
+    assert r['deuda_msi'] == 0.0, r['deuda_msi']
+    assert all(e['descripcion'] != 'Netflix pausado' for e in p['eventos']), p['eventos']
+
+
 def test_periodos_siguen_la_quincena_y_comparan_ingreso_con_gastos():
     from finanzas_core import calcular_periodos
     conn, hoy = _escenario_periodos()
