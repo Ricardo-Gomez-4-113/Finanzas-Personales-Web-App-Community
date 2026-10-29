@@ -249,6 +249,29 @@ def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
         ctx.close()
 
 
+def test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base):
+    """Ambas pestañas pintan el periodo en curso de la nómina quincenal (cifras de escenario.ESPERADO)."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        page.wait_for_function("document.getElementById('lbl-dash-mes-gastos').textContent === '$299.00'", timeout=10000)
+        assert page.inner_text("#lbl-dash-mes-ingresos") == "$14,000.00", page.inner_text("#lbl-dash-mes-ingresos")
+        _ir(page, "tab-movimientos")
+        page.wait_for_function("document.querySelectorAll('#tabla-periodos-body tr').length >= 3", timeout=10000)
+        tarjetas = {i: page.inner_text(f"#{i}") for i in ("lbl-rec-ingreso", "lbl-rec-gastos-normales", "lbl-rec-gasto", "lbl-rec-libre")}
+        assert tarjetas == {"lbl-rec-ingreso": "$14,000.00", "lbl-rec-gastos-normales": "$0.00",
+                            "lbl-rec-gasto": "$299.00", "lbl-rec-libre": "$6,701.00"}, tarjetas
+        assert "$8,103.00" in page.inner_text("#lbl-rec-libre-sub"), page.inner_text("#lbl-rec-libre-sub")
+        filas = page.locator("#tabla-periodos-body tr")
+        primera, segunda = filas.nth(0).inner_text(), filas.nth(1).inner_text()
+        assert "15 oct al 30 oct" in primera and "$6,701.00" in primera and "$8,103.00" in primera, primera
+        assert "$2,500.00" in segunda and "$10,603.00" in segunda, segunda
+        _sin_desbordamiento(page, "laptop/movimientos-periodos")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -361,6 +384,7 @@ if __name__ == "__main__":
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
                 (test_resumen_muestra_las_cifras_del_escenario, lambda: test_resumen_muestra_las_cifras_del_escenario(navegador, base)),
+                (test_movimientos_y_resumen_muestran_el_mismo_periodo, lambda: test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),

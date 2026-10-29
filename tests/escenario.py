@@ -80,4 +80,18 @@ ESPERADO = {
     "meta_fondo": 2000.0,
     "libre_hasta_cobro": 8103.0,
     "fecha_fin_periodo": "2026-10-31",
+    # Periodos de la nómina quincenal (del cobro al día anterior al siguiente cobro):
+    #   Saldo antes del 15 oct: 28,000 - 19,000 - 598 - 4,000 - 3,000 = 1,402
+    #   15-30 oct: nómina 15 oct 14,000; Netflix 15 oct 299; metas 6,000 - 1,000 + 2,000 = 7,000
+    #              remanente 14,000 - 299 - 7,000 = 6,701; saldo al cierre 1,402 + 6,701 = 8,103
+    #   31 oct-14 nov: nómina 31 oct 14,000; renta 1 nov 9,500; cuota MSI 10 nov 2,000 -> 2,500; saldo 10,603
+    #   15-29 nov: nómina 15 nov 14,000; Netflix 15 nov 299 -> 13,701; saldo 24,304
+    "periodos": [
+        {"inicio": "2026-10-15", "fin": "2026-10-30", "ingreso": 14000.0, "fijos": 299.0, "msi": 0.0, "normales": 0.0,
+         "metas": 7000.0, "remanente": 6701.0, "saldo_inicial": 1402.0, "saldo_final": 8103.0},
+        {"inicio": "2026-10-31", "fin": "2026-11-14", "ingreso": 14000.0, "fijos": 9500.0, "msi": 2000.0, "normales": 0.0,
+         "metas": 0.0, "remanente": 2500.0, "saldo_inicial": 8103.0, "saldo_final": 10603.0},
+        {"inicio": "2026-11-15", "fin": "2026-11-29", "ingreso": 14000.0, "fijos": 299.0, "msi": 0.0, "normales": 0.0,
+         "metas": 0.0, "remanente": 13701.0, "saldo_inicial": 10603.0, "saldo_final": 24304.0},
+    ],
 }

@@ -55,14 +55,17 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Disponible (balance) | Resumen, periodo de cobro | Suma de ingresos menos gastos de **todas** las transacciones (incluye depósitos y retiros de metas, que mueven dinero hacia y desde el ahorro). |
 | Dinero en metas | Resumen, Metas | Suma de `monto_actual` de los apartados; coincide con depósitos menos retiros de sus movimientos. |
 | Patrimonio | Resumen | Metas + valor de inversiones. |
-| Ingresos / gastos del mes | Resumen, historial mensual | Solo transacciones **sin** apartado. Los depósitos a metas no son gasto. |
-| Gastos normales del mes | Movimientos y fijos | Gastos del mes sin fijos ni cuotas MSI. |
-| Compromiso mensual | Movimientos y fijos | Fijos activos mensualizados más cuotas MSI mensuales. |
-| Libre al mes | Movimientos y fijos | Ingreso fijo mensual menos compromiso menos gastos normales del mes. |
-| Libre hasta el cobro | Resumen (periodo) | Disponible menos cargos fijos y cuotas MSI entre mañana y el siguiente cobro. |
-| Deuda MSI | Movimientos y fijos | Monto total pendiente de cada compra a meses. |
+| Ingresos / gastos del mes | Historial mensual | Solo transacciones **sin** apartado. Los depósitos a metas no son gasto. |
+| Periodo | Resumen, Movimientos | Lo marca el ingreso fijo de mayor monto mensual: del día de cobro al día anterior al siguiente cobro. Sin ingreso fijo, meses calendario. `calcular_periodos` devuelve el periodo en curso y los siguientes. |
+| Ingreso del periodo | Resumen, Movimientos | Ingresos con fecha dentro del periodo: recibidos más los fijos aún por recibir. |
+| Gastos del periodo | Resumen, Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |
+| A metas | Movimientos | Depósitos menos retiros de metas del periodo, incluidos los aportes recurrentes programados. |
+| Remanente del periodo | Movimientos | Ingreso del periodo menos gastos menos aportes a metas. |
+| Saldo al cierre | Movimientos | Saldo inicial del periodo más su remanente; es el saldo inicial del siguiente periodo. |
+| Libre hasta el cobro | Resumen (periodo) | Disponible menos los cargos que faltan en el periodo más los ingresos que aún llegan en él: el saldo al cierre del periodo en curso. |
+| Deuda MSI | Resumen, Movimientos y fijos | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
 
-Reglas que las pruebas vigilan: el historial mensual y el Resumen usan la misma regla de movimientos de apartados, y el `monto_actual` de cada apartado debe coincidir con sus movimientos.
+Reglas que las pruebas vigilan: el historial mensual y el Resumen usan la misma regla de movimientos de apartados; el `monto_actual` de cada apartado coincide con sus movimientos; el saldo al cierre de un periodo es el saldo inicial del siguiente, y lo libre hasta el cobro es el saldo al cierre del periodo en curso.
 
 ## Diseño de la interfaz
 

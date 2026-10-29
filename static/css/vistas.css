@@ -3425,3 +3425,31 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 
+/* Periodos según el ingreso fijo (Movimientos): sin alto fijo para no anidar scroll vertical */
+.movs-periodo-rango {
+    margin: 0 0 16px;
+}
+
+.movs-periodos {
+    margin-bottom: 20px;
+}
+
+.movs-periodos-tabla {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.movs-periodos-tabla table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.movs-periodos-tabla th.num,
+.movs-periodos-tabla td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.movs-periodos-tabla tr.periodo-en-curso td {
+    font-weight: 600;
+}

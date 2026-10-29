@@ -84,6 +84,21 @@ def test_periodo_libre_hasta_el_cobro():
     assert per["comprometido"] == 0.0, per
 
 
+def test_periodos_siguen_la_nomina_y_encadenan_el_saldo():
+    r = _resumen()
+    ps = r["periodos"]
+    for obtenido, esperado in zip(ps, escenario.ESPERADO["periodos"]):
+        assert (obtenido["inicio"], obtenido["fin"]) == (esperado["inicio"], esperado["fin"]), obtenido
+        assert obtenido["ingresos"]["total"] == esperado["ingreso"], obtenido
+        g = obtenido["gastos"]
+        assert (g["fijos"], g["msi"], g["normales"]) == (esperado["fijos"], esperado["msi"], esperado["normales"]), obtenido
+        assert obtenido["metas"] == esperado["metas"], obtenido
+        assert obtenido["remanente"] == esperado["remanente"], obtenido
+        assert (obtenido["saldo_inicial"], obtenido["saldo_final"]) == (esperado["saldo_inicial"], esperado["saldo_final"]), obtenido
+    # El tablero y los periodos cuentan lo mismo: lo libre hasta el cobro es el saldo al cierre del periodo en curso
+    assert r["periodo"]["libre"] == ps[0]["saldo_final"] == r["balance"], (r["periodo"], ps[0])
+
+
 def test_metas_guardan_lo_correcto():
     assert _apartado(ESTADO["ids"]["viaje"])["monto_actual"] == escenario.ESPERADO["meta_viaje"]
     assert _apartado(ESTADO["ids"]["fondo"])["monto_actual"] == escenario.ESPERADO["meta_fondo"]
@@ -190,6 +205,7 @@ if __name__ == "__main__":
             (test_mes_actual_excluye_metas, test_mes_actual_excluye_metas),
             (test_historial_mensual_coincide_con_el_mes_actual, test_historial_mensual_coincide_con_el_mes_actual),
             (test_periodo_libre_hasta_el_cobro, test_periodo_libre_hasta_el_cobro),
+            (test_periodos_siguen_la_nomina_y_encadenan_el_saldo, test_periodos_siguen_la_nomina_y_encadenan_el_saldo),
             (test_metas_guardan_lo_correcto, test_metas_guardan_lo_correcto),
             (test_fijos_se_cargan_en_las_fechas_correctas, test_fijos_se_cargan_en_las_fechas_correctas),
             (test_ningun_fijo_cobra_fechas_futuras, test_ningun_fijo_cobra_fechas_futuras),

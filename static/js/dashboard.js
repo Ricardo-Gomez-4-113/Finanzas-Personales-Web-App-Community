@@ -134,7 +134,7 @@ export function actualizarGraficaCategorias(data) {
 // 5.4 PERIODO DE COBRO EN CURSO (línea de tiempo del Resumen)
 // =============================================================================
 
-const fechaCorta = iso => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+export const fechaCorta = iso => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
     .format(new Date(`${iso}T00:00:00Z`)).replace('.', '');
 const fechaLarga = iso => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' })
     .format(new Date(`${iso}T00:00:00Z`));

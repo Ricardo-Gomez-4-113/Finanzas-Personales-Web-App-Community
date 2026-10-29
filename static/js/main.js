@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=4e1a08f14d';
+import { cargarRecurrentes } from './recurrentes.js?v=9defc6b255';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=4e1a08f14d';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=9defc6b255';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -67,13 +67,13 @@ export async function cargarDatos() {
 
         renderPeriodo(dataResumen.periodo);
 
-        // Tarjetas del mes
-        const mes = dataResumen.mes_actual || { ingresos: 0, gastos: 0, ahorro: 0 };
-        setTxt('lbl-dash-mes-ingresos', fmt(mes.ingresos));
-        setTxt('lbl-dash-mes-gastos', fmt(mes.gastos));
-        setTxt('lbl-dash-mes-ahorro', fmt(mes.ahorro));
-        const tasaAhorro = mes.ingresos > 0 ? Math.round((mes.ahorro / mes.ingresos) * 1000) / 10 : 0;
-        setTxt('lbl-dash-tasa-ahorro', `(${tasaAhorro}% de ahorro)`);
+        // Tarjetas del periodo en curso: mismas cifras que Movimientos (periodicidad del ingreso fijo)
+        const actual = (dataResumen.periodos || [])[0];
+        if (actual) {
+            setTxt('lbl-dash-mes-ingresos', fmt(actual.ingresos.total));
+            setTxt('lbl-dash-mes-gastos', fmt(actual.gastos.total));
+            setTxt('lbl-dash-mes-ahorro', fmt(actual.remanente));
+        }
 
         if (document.getElementById('lbl-apartados-total-acum')) {
             document.getElementById('lbl-apartados-total-acum').textContent = `${fmt(dataResumen.apartados)}`;

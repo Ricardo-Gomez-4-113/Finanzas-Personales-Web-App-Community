@@ -1518,60 +1518,196 @@ def _inicio_periodo(fin: date, frecuencia: str) -> date:
     return date(anio, mes, min(fin.day, ultimo_dia_mes(anio, mes)))
 
 
-def calcular_periodo_actual(conn: sqlite3.Connection, hoy: date, balance: float) -> Dict[str, Any]:
-    """
-    Periodo de cobro en curso: del último cobro al siguiente ingreso fijo activo.
-    Sin ingreso fijo, el periodo es el mes calendario. Lista los fijos y cuotas MSI que caen
-    entre mañana y el próximo cobro (inclusive) y calcula cuánto queda libre del balance actual.
-    """
+def _recurrentes_vigentes(conn: sqlite3.Connection) -> list:
+    """Recurrentes activos que aún generan cargos (los MSI con todas sus cuotas quedan fuera)."""
     filas = conn.execute("SELECT * FROM recurrentes WHERE activo = 1").fetchall()
-    vigentes = [r for r in filas if not (r["total_cuotas"] is not None and int(r["cuotas_generadas"]) >= int(r["total_cuotas"]))]
-    ingresos = sorted(
-        (r for r in vigentes if r["tipo"] == 'ingreso' and r["proxima_fecha"]),
-        key=lambda r: r["proxima_fecha"],
-    )
-    if ingresos:
-        cobro = ingresos[0]
-        fin = max(date.fromisoformat(cobro["proxima_fecha"]), hoy)
-        inicio = min(_inicio_periodo(fin, cobro["frecuencia"]), hoy)
-        cobro_info = {"descripcion": cobro["descripcion"], "monto": round(float(cobro["monto"]), 2), "frecuencia": cobro["frecuencia"]}
-    else:
-        inicio = date(hoy.year, hoy.month, 1)
-        fin = date(hoy.year, hoy.month, ultimo_dia_mes(hoy.year, hoy.month))
-        cobro_info = None
+    return [r for r in filas if not (r["total_cuotas"] is not None and int(r["cuotas_generadas"]) >= int(r["total_cuotas"]))]
 
-    eventos = []
+
+def _ingreso_principal(vigentes: list):
+    """Ingreso fijo que marca la periodicidad: el de mayor equivalente mensual; si empatan, el de cobro más próximo."""
+    ingresos = [r for r in vigentes if r["tipo"] == 'ingreso' and r["proxima_fecha"] and r["apartado_id"] is None]
+    if not ingresos:
+        return None
+    return min(ingresos, key=lambda r: (-mensualizar(float(r["monto"]), r["frecuencia"]), r["proxima_fecha"]))
+
+
+def _limites_periodos(principal, hoy: date, n: int) -> list:
+    """(inicio, fin inclusivo, fecha del siguiente cobro) de n periodos consecutivos, empezando por el que contiene hoy."""
+    limites = []
+    if principal is None:
+        anio, mes = hoy.year, hoy.month
+        for _ in range(n):
+            limites.append((date(anio, mes, 1), date(anio, mes, ultimo_dia_mes(anio, mes)), None))
+            anio, mes = (anio + 1, 1) if mes == 12 else (anio, mes + 1)
+        return limites
+    frecuencia, dia = principal["frecuencia"], principal["dia"]
+    cobro = date.fromisoformat(principal["proxima_fecha"])
+    while cobro <= hoy:
+        cobro = siguiente_fecha(cobro, frecuencia, dia)
+    inicio = min(_inicio_periodo(cobro, frecuencia), hoy)
+    for _ in range(n):
+        limites.append((inicio, cobro - timedelta(days=1), cobro))
+        inicio, cobro = cobro, siguiente_fecha(cobro, frecuencia, dia)
+    return limites
+
+
+def _ocurrencias_programadas(vigentes: list, hasta: date):
+    """Ocurrencias aún no materializadas de cada recurrente hasta `hasta`, con el importe real de cada cuota MSI."""
     for r in vigentes:
-        if r["tipo"] != 'gasto' or not r["proxima_fecha"]:
+        if not r["proxima_fecha"]:
             continue
         fecha = date.fromisoformat(r["proxima_fecha"])
-        restantes = None
-        if r["total_cuotas"] is not None:
-            restantes = int(r["total_cuotas"]) - int(r["cuotas_generadas"])
-        while fecha <= fin and (restantes is None or restantes > 0):
-            if fecha > hoy:
-                eventos.append({
-                    "fecha": fecha.isoformat(),
-                    "descripcion": r["descripcion"],
-                    "monto": round(float(r["monto"]), 2),
-                    "es_msi": r["total_cuotas"] is not None,
-                })
+        total = int(r["total_cuotas"]) if r["total_cuotas"] is not None else None
+        n = int(r["cuotas_generadas"])
+        monto = float(r["monto"])
+        while fecha <= hasta and (total is None or n < total):
+            n += 1
+            if total is not None and n == total and r["monto_total"] is not None:
+                importe = round(float(r["monto_total"]) - monto * (total - 1), 2)  # misma regla que materializar_recurrentes
+            else:
+                importe = monto
+            yield r, fecha, importe
             fecha = siguiente_fecha(fecha, r["frecuencia"], r["dia"])
-            if restantes is not None:
-                restantes -= 1
-    eventos.sort(key=lambda e: (e["fecha"], e["descripcion"]))
+
+
+def _clase_movimiento(tipo: str, apartado_id, recurrente_id, es_msi: bool) -> str:
+    """Rubro de un movimiento dentro de un periodo: ingreso, normales, fijos, msi o metas."""
+    if apartado_id is not None:
+        return "metas"
+    if tipo == 'ingreso':
+        return "ingreso"
+    if recurrente_id is None:
+        return "normales"
+    return "msi" if es_msi else "fijos"
+
+
+def calcular_periodos(conn: sqlite3.Connection, hoy: date, n: int = 6) -> Dict[str, Any]:
+    """
+    Periodos sucesivos con la periodicidad del ingreso fijo principal (sin ingreso fijo: meses calendario).
+    Cada periodo va del cobro al día anterior al siguiente cobro y compara el ingreso del periodo con los
+    gastos fechados dentro: lo ya registrado más lo programado (fijos, cuotas MSI, aportaciones a metas)
+    que aún no se cargó, con sus fechas reales. Las aportaciones a metas se reportan aparte de los gastos.
+    remanente = ingreso - gastos - metas; el saldo al cierre de un periodo es el saldo inicial del siguiente.
+    Montos en MXN: la conversión de moneda la aplica quien presenta.
+    """
+    vigentes = _recurrentes_vigentes(conn)
+    principal = _ingreso_principal(vigentes)
+    limites = _limites_periodos(principal, hoy, max(1, n))
+    desde, hasta = limites[0][0], limites[-1][1]
+    rubros = ("ingreso", "normales", "fijos", "msi", "metas")
+    registrado = [dict.fromkeys(rubros, 0.0) for _ in limites]
+    programado = [dict.fromkeys(rubros, 0.0) for _ in limites]
+    eventos = [[] for _ in limites]
+
+    def indice(fecha: date):
+        for i, (ini, fin, _) in enumerate(limites):
+            if ini <= fecha <= fin:
+                return i
+        return None
+
+    def importe_con_signo(clase: str, tipo: str, monto: float) -> float:
+        # En metas un depósito (gasto) suma y un retiro (ingreso) devuelve dinero al periodo
+        return -monto if clase == "metas" and tipo == 'ingreso' else monto
+
+    filas = conn.execute(
+        """
+        SELECT t.fecha, t.monto, t.tipo, t.apartado_id, t.recurrente_id, r.total_cuotas
+        FROM transacciones t LEFT JOIN recurrentes r ON r.id = t.recurrente_id
+        WHERE substr(t.fecha, 1, 10) BETWEEN ? AND ?
+        """,
+        (desde.isoformat(), hasta.isoformat()),
+    ).fetchall()
+    for f in filas:
+        i = indice(date.fromisoformat(f["fecha"][:10]))
+        if i is None:
+            continue
+        clase = _clase_movimiento(f["tipo"], f["apartado_id"], f["recurrente_id"], f["total_cuotas"] is not None)
+        registrado[i][clase] += importe_con_signo(clase, f["tipo"], float(f["monto"]))
+
+    for r, fecha, importe in _ocurrencias_programadas(vigentes, hasta):
+        i = indice(fecha) if fecha >= desde else None
+        if i is None:
+            continue
+        clase = _clase_movimiento(r["tipo"], r["apartado_id"], r["id"], r["total_cuotas"] is not None)
+        programado[i][clase] += importe_con_signo(clase, r["tipo"], importe)
+        if r["tipo"] == 'gasto':
+            eventos[i].append({
+                "fecha": fecha.isoformat(),
+                "descripcion": r["descripcion"],
+                "monto": round(importe, 2),
+                "es_msi": r["total_cuotas"] is not None,
+                "es_meta": r["apartado_id"] is not None,
+            })
+
+    saldo = float(conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0) FROM transacciones WHERE substr(fecha, 1, 10) < ?",
+        (desde.isoformat(),),
+    ).fetchone()[0])
+    periodos = []
+    for i, (inicio, fin, fecha_cobro) in enumerate(limites):
+        reg, prog = registrado[i], programado[i]
+        total = {k: reg[k] + prog[k] for k in rubros}
+        gastos = total["normales"] + total["fijos"] + total["msi"]
+        remanente = total["ingreso"] - gastos - total["metas"]
+        saldo_inicial = saldo
+        saldo += remanente
+        periodos.append({
+            "inicio": inicio.isoformat(),
+            "fin": fin.isoformat(),
+            "fecha_cobro": fecha_cobro.isoformat() if fecha_cobro else None,
+            "en_curso": inicio <= hoy <= fin,
+            "ingresos": {
+                "recibido": round(reg["ingreso"], 2),
+                "por_recibir": round(prog["ingreso"], 2),
+                "total": round(total["ingreso"], 2),
+            },
+            "gastos": {
+                "normales": round(total["normales"], 2),
+                "fijos": round(total["fijos"], 2),
+                "msi": round(total["msi"], 2),
+                "fijos_y_msi": round(total["fijos"] + total["msi"], 2),
+                "pagado": round(reg["normales"] + reg["fijos"] + reg["msi"], 2),
+                "por_pagar": round(prog["normales"] + prog["fijos"] + prog["msi"], 2),
+                "total": round(gastos, 2),
+            },
+            "metas": round(total["metas"], 2),
+            "remanente": round(remanente, 2),
+            "saldo_inicial": round(saldo_inicial, 2),
+            "saldo_final": round(saldo, 2),
+            "eventos": sorted(eventos[i], key=lambda e: (e["fecha"], e["descripcion"])),
+        })
+    cobro_info = None
+    if principal is not None:
+        cobro_info = {"descripcion": principal["descripcion"], "monto": round(float(principal["monto"]), 2), "frecuencia": principal["frecuencia"]}
+    return {"ingreso_principal": cobro_info, "periodos": periodos}
+
+
+def calcular_periodo_actual(conn: sqlite3.Connection, hoy: date, balance: float) -> Dict[str, Any]:
+    """
+    Vista del periodo en curso de calcular_periodos para el tablero: del último cobro al siguiente.
+    Lista los cargos programados que faltan antes del próximo cobro y calcula cuánto queda libre del
+    balance actual, sumando los ingresos que aún llegan dentro del periodo.
+    """
+    datos = calcular_periodos(conn, hoy, 1)
+    p = datos["periodos"][0]
+    inicio = date.fromisoformat(p["inicio"])
+    fin = date.fromisoformat(p["fecha_cobro"] or p["fin"])  # el tablero cuenta hasta el día del cobro
+    eventos = [{k: e[k] for k in ("fecha", "descripcion", "monto", "es_msi")} for e in p["eventos"] if e["fecha"] > hoy.isoformat()]
     comprometido = round(sum(e["monto"] for e in eventos), 2)
+    por_recibir = p["ingresos"]["por_recibir"]
     return {
         "inicio": inicio.isoformat(),
         "fin": fin.isoformat(),
         "hoy": hoy.isoformat(),
         "dias_totales": max(1, (fin - inicio).days),
         "dias_restantes": max(0, (fin - hoy).days),
-        "cobro": cobro_info,
+        "cobro": datos["ingreso_principal"],
         "eventos": eventos,
         "disponible": round(balance, 2),
         "comprometido": comprometido,
-        "libre": round(balance - comprometido, 2),
+        "por_recibir": por_recibir,
+        "libre": round(balance + por_recibir - comprometido, 2),
     }
 
 
@@ -1674,11 +1810,24 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         "patrimonio_sin_rendimiento": round(patrimonio_sin_rendimiento, 2),
         "patrimonio_neto": round(patrimonio, 2),
         "periodo": _periodo_en_moneda(calcular_periodo_actual(conn, hoy, balance), conv),
+        "periodos": _periodos_en_moneda(calcular_periodos(conn, hoy)["periodos"], conv),
     }
 
 
+def _periodos_en_moneda(periodos: list, conv) -> list:
+    for p in periodos:
+        for grupo in ("ingresos", "gastos"):
+            for clave, valor in p[grupo].items():
+                p[grupo][clave] = round(conv(valor), 2)
+        for clave in ("metas", "remanente", "saldo_inicial", "saldo_final"):
+            p[clave] = round(conv(p[clave]), 2)
+        for e in p["eventos"]:
+            e["monto"] = round(conv(e["monto"]), 2)
+    return periodos
+
+
 def _periodo_en_moneda(periodo: Dict[str, Any], conv) -> Dict[str, Any]:
-    for clave in ("disponible", "comprometido", "libre"):
+    for clave in ("disponible", "comprometido", "por_recibir", "libre"):
         periodo[clave] = round(conv(periodo[clave]), 2)
     for e in periodo["eventos"]:
         e["monto"] = round(conv(e["monto"]), 2)

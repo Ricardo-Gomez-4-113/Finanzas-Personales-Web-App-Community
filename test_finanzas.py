@@ -2034,6 +2034,109 @@ def test_borrar_retiro_luego_deposito_queda_cuadrado():
     assert conn.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 0.0
 
 
+def _escenario_periodos():
+    """
+    Hoy 20 oct 2026, nómina quincenal de 14,000 (ya cobrada el 15 oct, próxima el 31).
+    Antes del periodo: nómina 30 sep +14,000, súper 5 oct -3,000, cuota 1/3 de la tablet 10 oct -333.33
+        -> saldo inicial 10,666.67
+    """
+    conn = nueva_bd()
+    nomina = insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'quincenal', None, date(2026, 10, 31))
+    insertar_recurrente(conn, "Renta", 'gasto', 9500, 'mensual', 1, date(2026, 11, 1))
+    insertar_recurrente(conn, "Clases", 'gasto', 200, 'semanal', None, date(2026, 10, 21))
+    tablet = insertar_recurrente(conn, "Tablet", 'gasto', 333.33, 'mensual', 10, date(2026, 11, 10), total=3, monto_total=1000)
+    conn.execute("UPDATE recurrentes SET cuotas_generadas = 1 WHERE id = ?", (tablet["id"],))
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 800)")
+    aporte = insertar_recurrente(conn, "Aporte viaje", 'gasto', 500, 'mensual', 16, date(2026, 11, 16))
+    conn.execute("UPDATE recurrentes SET apartado_id = 1 WHERE id = ?", (aporte["id"],))
+    for fecha, monto, tipo, rec, ap in [
+        ("2026-09-30", 14000, 'ingreso', nomina["id"], None),
+        ("2026-10-05", 3000, 'gasto', None, None),
+        ("2026-10-10", 333.33, 'gasto', tablet["id"], None),
+        ("2026-10-15", 14000, 'ingreso', nomina["id"], None),
+        ("2026-10-16", 2000, 'ingreso', None, None),  # bono puntual
+        ("2026-10-18", 1000, 'gasto', None, None),
+        ("2026-10-20", 1000, 'gasto', None, 1),  # depósito a la meta
+        ("2026-10-20", 200, 'ingreso', None, 1),  # retiro de la meta
+    ]:
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id, apartado_id) VALUES (?, ?, ?, ?, ?)",
+                     (fecha, monto, tipo, rec, ap))
+    conn.commit()
+    return conn, date(2026, 10, 20)
+
+
+def test_periodos_siguen_la_quincena_y_comparan_ingreso_con_gastos():
+    from finanzas_core import calcular_periodos
+    conn, hoy = _escenario_periodos()
+    datos = calcular_periodos(conn, hoy, 5)
+    ps = datos["periodos"]
+    assert datos["ingreso_principal"]["descripcion"] == "Nómina"
+    assert [(p["inicio"], p["fin"], p["fecha_cobro"]) for p in ps] == [
+        ("2026-10-15", "2026-10-30", "2026-10-31"),
+        ("2026-10-31", "2026-11-14", "2026-11-15"),
+        ("2026-11-15", "2026-11-29", "2026-11-30"),
+        ("2026-11-30", "2026-12-14", "2026-12-15"),
+        ("2026-12-15", "2026-12-30", "2026-12-31"),
+    ], ps
+    assert [p["en_curso"] for p in ps] == [True, False, False, False, False]
+    # P0 15-30 oct: entra nómina 14,000 + bono 2,000; súper 1,000 pagado; clases 21 y 28 por pagar 400;
+    #     meta: depósito 1,000 - retiro 200 = 800. Remanente 16,000 - 1,400 - 800 = 13,800
+    p0 = ps[0]
+    assert p0["ingresos"] == {"recibido": 16000.0, "por_recibir": 0.0, "total": 16000.0}, p0["ingresos"]
+    assert p0["gastos"] == {"normales": 1000.0, "fijos": 400.0, "msi": 0.0, "fijos_y_msi": 400.0, "pagado": 1000.0, "por_pagar": 400.0, "total": 1400.0}, p0["gastos"]
+    assert (p0["metas"], p0["remanente"], p0["saldo_inicial"], p0["saldo_final"]) == (800.0, 13800.0, 10666.67, 24466.67), p0
+    # P1 31 oct-14 nov: nómina 31 oct 14,000; renta 1 nov 9,500 + clases 4 y 11 nov 400; cuota 2/3 333.33
+    p1 = ps[1]
+    assert p1["ingresos"]["por_recibir"] == 14000.0 and p1["gastos"]["fijos"] == 9900.0 and p1["gastos"]["msi"] == 333.33, p1
+    assert (p1["remanente"], p1["saldo_final"]) == (3766.67, 28233.34), p1
+    # P2 15-29 nov: nómina 14,000; clases 18 y 25 nov 400; aporte a la meta 16 nov 500 (no es gasto)
+    p2 = ps[2]
+    assert (p2["gastos"]["total"], p2["metas"], p2["remanente"], p2["saldo_final"]) == (400.0, 500.0, 13100.0, 41333.34), p2
+    # P3 30 nov-14 dic: nómina 14,000; renta 1 dic 9,500 + clases 2 y 9 dic 400; última cuota 3/3 ajustada 333.34
+    p3 = ps[3]
+    assert (p3["gastos"]["msi"], p3["remanente"], p3["saldo_final"]) == (333.34, 3766.66, 45100.0), p3
+    # P4 15-30 dic: la tablet ya terminó; clases 16, 23 y 30 dic = 600 (fechas reales, no un promedio)
+    p4 = ps[4]
+    assert (p4["gastos"]["msi"], p4["gastos"]["fijos"], p4["metas"], p4["remanente"]) == (0.0, 600.0, 500.0, 12900.0), p4
+    for anterior, siguiente in zip(ps, ps[1:]):
+        assert anterior["saldo_final"] == siguiente["saldo_inicial"], (anterior, siguiente)
+
+
+def test_periodo_actual_libre_es_el_saldo_al_cierre_del_periodo():
+    from finanzas_core import calcular_periodos
+    conn, hoy = _escenario_periodos()
+    balance = float(conn.execute("SELECT SUM(CASE WHEN tipo='ingreso' THEN monto ELSE -monto END) FROM transacciones").fetchone()[0])
+    p = calcular_periodo_actual(conn, hoy, balance)
+    assert (p["inicio"], p["fin"]) == ("2026-10-15", "2026-10-31"), p
+    assert [e["fecha"] for e in p["eventos"]] == ["2026-10-21", "2026-10-28"], p["eventos"]
+    assert p["libre"] == calcular_periodos(conn, hoy, 1)["periodos"][0]["saldo_final"] == 24466.67, p
+
+
+def test_periodos_sin_ingreso_fijo_son_meses_calendario():
+    from finanzas_core import calcular_periodos
+    conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-01', 1000, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-03', 100, 'gasto')")
+    datos = calcular_periodos(conn, date(2028, 2, 10), 2)
+    ps = datos["periodos"]
+    assert datos["ingreso_principal"] is None
+    assert [(p["inicio"], p["fin"], p["fecha_cobro"], p["remanente"], p["saldo_final"]) for p in ps] == [
+        ("2028-02-01", "2028-02-29", None, 900.0, 900.0),
+        ("2028-03-01", "2028-03-31", None, 0.0, 900.0),
+    ], ps
+
+
+def test_periodo_lo_marca_el_ingreso_fijo_mayor():
+    from finanzas_core import calcular_periodos
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Freelance", 'ingreso', 5000, 'quincenal', None, date(2026, 10, 31))  # 10,000 al mes
+    insertar_recurrente(conn, "Sueldo", 'ingreso', 20000, 'mensual', 1, date(2026, 11, 1))
+    p0 = calcular_periodos(conn, date(2026, 10, 20), 1)["periodos"][0]
+    # El sueldo mensual marca el periodo (1-31 oct); el freelance del 31 oct entra como ingreso por recibir
+    assert (p0["inicio"], p0["fin"], p0["fecha_cobro"]) == ("2026-10-01", "2026-10-31", "2026-11-01"), p0
+    assert p0["ingresos"]["por_recibir"] == 5000.0, p0["ingresos"]
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo
