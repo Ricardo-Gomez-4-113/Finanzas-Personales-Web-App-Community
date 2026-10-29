@@ -47,7 +47,7 @@ class ConfigPresupuestoUpdate(BaseModel):
 class TarjetaPresupuestoCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
     icono: str = Field("wallet", max_length=50)
-    color: str = Field("gold", max_length=30)
+    color: str = Field("gold", max_length=30, pattern=r"^[a-z][a-z-]{0,29}$")
     porcentaje: Optional[float] = Field(None, ge=0, le=100)
     monto: Optional[float] = Field(None, ge=0, le=1e12)
     notas: Optional[str] = Field("", max_length=255)
@@ -58,7 +58,7 @@ class TarjetaPresupuestoCreate(BaseModel):
 class TarjetaPresupuestoUpdate(BaseModel):
     nombre: Optional[str] = Field(None, min_length=1, max_length=100)
     icono: Optional[str] = Field(None, max_length=50)
-    color: Optional[str] = Field(None, max_length=30)
+    color: Optional[str] = Field(None, max_length=30, pattern=r"^[a-z][a-z-]{0,29}$")
     porcentaje: Optional[float] = Field(None, ge=0, le=100)
     monto: Optional[float] = Field(None, ge=0, le=1e12)
     notas: Optional[str] = Field(None, max_length=255)

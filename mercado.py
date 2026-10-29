@@ -1,3 +1,4 @@
+import threading
 """
 mercado.py - Cotizaciones de Yahoo Finance y tipos de cambio (con caché).
 
@@ -82,10 +83,21 @@ _CACHE_TASAS = {
     "expira_en": 0.0
 }
 
+_LOCK_TASAS = threading.Lock()
+
 def obtener_tasas_cambio():
     ahora = time.time()
     if _CACHE_TASAS["datos"] is not None and ahora < _CACHE_TASAS["expira_en"]:
         return _CACHE_TASAS["datos"]
+    # Un solo refresco a la vez: las peticiones concurrentes esperan y reusan el resultado
+    with _LOCK_TASAS:
+        ahora = time.time()
+        if _CACHE_TASAS["datos"] is not None and ahora < _CACHE_TASAS["expira_en"]:
+            return _CACHE_TASAS["datos"]
+        return _refrescar_tasas_cambio()
+
+def _refrescar_tasas_cambio():
+    ahora = time.time()
 
     tasas = {
         "USD": 1.0,

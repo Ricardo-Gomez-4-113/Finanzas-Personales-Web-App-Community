@@ -62,7 +62,7 @@ export async function cargarInversiones() {
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(pos.ticker)}</strong></td>
                         <td><span class="badge-peso" style="${badgeMonedaColor}">${escapeHTML(pos.moneda)}</span></td>
-                        <td>${pos.cantidad}</td>
+                        <td>${escapeHTML(String(pos.cantidad))}</td>
                         <td>${fmt(pos.precio_promedio)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
                         <td>${fmt(pos.precio_actual)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
                         <td><strong>${fmt(pos.valor_actual)}</strong> ${subOrig}</td>

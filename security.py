@@ -12,6 +12,7 @@ Este módulo implementa:
 
 import os
 import time
+import hashlib
 import ipaddress
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Generator, List
@@ -116,6 +117,30 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     except (jwt.PyJWTError, Exception):
         return None
 
+def huella_clave(password_hash: str) -> str:
+    """Huella corta del hash de contraseña. El token la lleva y deja de valer al cambiar la contraseña."""
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()[:16]
+
+def claims_sesion(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Claims del JWT de sesión. Incluye la huella de la contraseña para invalidar sesiones previas."""
+    return {
+        "sub": str(user["id"]),
+        "username": user["username"],
+        "role": user["role"],
+        "db_name": user["db_name"],
+        "email": user.get("email"),
+        "pwd": huella_clave(user["password_hash"]),
+    }
+
+HASH_SENUELO: Optional[str] = None
+
+def hash_senuelo() -> str:
+    """Hash de referencia para igualar el tiempo de login cuando el usuario no existe."""
+    global HASH_SENUELO
+    if HASH_SENUELO is None:
+        HASH_SENUELO = hash_password("senuelo-sin-uso-real")
+    return HASH_SENUELO
+
 def verify_token(token: Optional[str] = Depends(oauth2_scheme)) -> Dict[str, Any]:
     """
     Dependencia de seguridad que autentica al usuario:
@@ -148,6 +173,9 @@ def verify_token(token: Optional[str] = Depends(oauth2_scheme)) -> Dict[str, Any
     # Verificar en master_db para revocar acceso inmediato si fue desactivado
     user = master_db.get_user_by_id(user_id_int)
     if not user:
+        raise cred_exception
+    # Un cambio de contraseña invalida los tokens emitidos antes
+    if payload.get("pwd") != huella_clave(user["password_hash"]):
         raise cred_exception
         
     if not user.get("is_active"):
@@ -210,16 +238,36 @@ def get_tenant_db(current_user: Dict[str, Any] = Depends(verify_token)) -> Gener
 # Control en memoria de intentos fallidos de autenticación (freno anti fuerza bruta)
 _intentos_fallidos_login: Dict[str, List[float]] = {}
 
+_MAX_CLAVES_LOGIN = 10000
+_VENTANA_LOGIN_SEG = 300
+
+def _purgar_intentos(ahora: float) -> None:
+    """Quita claves vencidas y, si siguen siendo demasiadas, descarta las más antiguas."""
+    for k in list(_intentos_fallidos_login):
+        vivos = [t for t in _intentos_fallidos_login[k] if ahora - t < _VENTANA_LOGIN_SEG]
+        if vivos:
+            _intentos_fallidos_login[k] = vivos
+        else:
+            del _intentos_fallidos_login[k]
+    if len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
+        for k in sorted(_intentos_fallidos_login, key=lambda c: _intentos_fallidos_login[c][-1])[: _MAX_CLAVES_LOGIN // 2]:
+            del _intentos_fallidos_login[k]
+
 def registrar_fallo_login(clave: str):
     ahora = time.time()
-    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < 300]
+    if len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
+        _purgar_intentos(ahora)
+    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
     intentos.append(ahora)
     _intentos_fallidos_login[clave] = intentos
 
 def verificar_tasa_login(clave: str):
     ahora = time.time()
-    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < 300]
-    _intentos_fallidos_login[clave] = intentos
+    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
+    if intentos:
+        _intentos_fallidos_login[clave] = intentos
+    else:
+        _intentos_fallidos_login.pop(clave, None)
     if len(intentos) >= 5:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -239,6 +287,12 @@ def es_ip_privada_o_loopback(ip_str: str) -> bool:
         return False
 
 
+# Proxies cuya cabecera CF-Connecting-IP se acepta: solo el loopback del host y el gateway
+# del bridge de Docker (por donde llega el tráfico de cloudflared hacia el contenedor).
+_PROXIES_CONFIABLES = {
+    ip.strip() for ip in os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1,172.17.0.1").split(",") if ip.strip()
+}
+
 def obtener_ip_cliente(request: Request) -> str:
     """
     Resuelve la dirección IP real del cliente detrás de Cloudflare y proxies reversos confiables.
@@ -250,7 +304,7 @@ def obtener_ip_cliente(request: Request) -> str:
     3. Si no hay proxy confiable o no existe la cabecera, recurre a request.client.host o 'unknown'.
     """
     direct_ip = request.client.host if request.client else "unknown"
-    if es_ip_privada_o_loopback(direct_ip):
+    if direct_ip in _PROXIES_CONFIABLES:
         cf_ip = request.headers.get("CF-Connecting-IP")
         if cf_ip:
             cf_ip_clean = cf_ip.strip()

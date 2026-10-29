@@ -2,13 +2,14 @@
 
 from fastapi import APIRouter
 from fastapi import HTTPException, status, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+import time
 from typing import Literal, Optional, Dict, Any
 import sqlite3
 
 from datetime import date
 
-from finanzas_core import ahora_local, convertir, valor_rendimiento, valorar_posiciones
+from finanzas_core import ahora_local, convertir, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
 from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios
 from security import (
     verify_token,
@@ -101,10 +102,24 @@ def eliminar_inversion(inversion_id: int, conn: sqlite3.Connection = Depends(get
     conn.commit()
     return {"mensaje": "Inversión eliminada."}
 
+MAX_POSICIONES_SYNC = 100
+COOLDOWN_SYNC_SEG = 30
+_ultima_sync: Dict[str, float] = {}
+
 @router.post("/api/inversiones/sincronizar", summary="Sincronizar cotizaciones en vivo")
-def sincronizar_precios(conn: sqlite3.Connection = Depends(get_tenant_db)):
+def sincronizar_precios(
+    conn: sqlite3.Connection = Depends(get_tenant_db),
+    current_user: Dict[str, Any] = Depends(verify_token),
+):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT id, ticker FROM inversiones").fetchall()
+    if len(filas) > MAX_POSICIONES_SYNC:
+        raise HTTPException(status_code=422, detail=f"Demasiadas posiciones para sincronizar a la vez (máximo {MAX_POSICIONES_SYNC}).")
+    ahora_sync = time.time()
+    clave_sync = current_user["db_name"]
+    if ahora_sync - _ultima_sync.get(clave_sync, 0.0) < COOLDOWN_SYNC_SEG:
+        raise HTTPException(status_code=429, detail="Espera unos segundos antes de volver a sincronizar.")
+    _ultima_sync[clave_sync] = ahora_sync
     actualizados = []
     no_actualizados = []
 
@@ -185,6 +200,11 @@ class RendimientoCreate(BaseModel):
     capital: float = Field(..., gt=0, le=1e12)
     tasa_anual: float = Field(..., ge=0, le=100)
     fecha_inicio: str = Field(..., pattern=FECHA_PATTERN)
+
+    @field_validator("fecha_inicio")
+    @classmethod
+    def _fecha_acotada(cls, v: str) -> str:
+        return validar_fecha_operativa(v)
 
 
 class RendimientoMovimiento(BaseModel):

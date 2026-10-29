@@ -285,6 +285,8 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
 
             c_id = ws1.cell(row=idx, column=1, value=ap["id"])
             c_nom = ws1.cell(row=idx, column=2, value=ap["nombre"])
+            if isinstance(ap["nombre"], str) and ap["nombre"][:1] in ("=", "+", "-", "@"):
+                c_nom.data_type = "s"  # nombre escrito por el usuario: nunca una fórmula
             c_tipo = ws1.cell(row=idx, column=3, value=ap["tipo"].capitalize())
             c_saldo = ws1.cell(row=idx, column=4, value=saldo_ap)
             c_meta = ws1.cell(row=idx, column=5, value=meta_ap if meta_ap else "-")
@@ -544,6 +546,8 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
 
     def _celda(ws, row, col, valor, fmt=None):
         c = ws.cell(row=row, column=col, value=valor)
+        if isinstance(valor, str) and valor[:1] in ("=", "+", "-", "@"):
+            c.data_type = "s"  # texto del usuario: nunca una fórmula
         c.border = border_thin
         c.font = font_regular
         if fmt:

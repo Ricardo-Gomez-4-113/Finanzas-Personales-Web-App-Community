@@ -7,6 +7,9 @@ from typing import Literal, Optional, Dict, Any
 
 import master_db
 from security import (
+    claims_sesion,
+    hash_senuelo,
+    huella_clave,
     registrar_fallo_login, 
     verificar_tasa_login, 
     limpiar_fallos_login,
@@ -74,7 +77,9 @@ def login(credentials: LoginRequest, request: Request):
     username = credentials.username.strip()
     user = master_db.get_user_by_username(username)
     
-    if not user or not verify_password(credentials.password, user["password_hash"]):
+    # Se verifica siempre (contra un hash señuelo si no hay usuario) para igualar el tiempo de respuesta
+    clave_valida = verify_password(credentials.password, user["password_hash"] if user else hash_senuelo())
+    if not user or not clave_valida:
         registrar_fallo_login(clave_tasa)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -94,14 +99,7 @@ def login(credentials: LoginRequest, request: Request):
     master_db.update_login_activity(user["id"], timestamp_hoy)
     
     # Generar token JWT
-    payload = {
-        "sub": str(user["id"]),
-        "username": user["username"],
-        "role": user["role"],
-        "db_name": user["db_name"],
-        "email": user.get("email")
-    }
-    token = create_access_token(payload)
+    token = create_access_token(claims_sesion(user))
     
     return {
         "access_token": token,
@@ -139,13 +137,7 @@ def editar_mi_perfil(req: UserUpdateRequest, current_user: Dict[str, Any] = Depe
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    nuevo_token = create_access_token({
-        "sub": str(user_actualizado["id"]),
-        "username": user_actualizado["username"],
-        "role": user_actualizado["role"],
-        "db_name": user_actualizado["db_name"],
-        "email": user_actualizado.get("email")
-    })
+    nuevo_token = create_access_token(claims_sesion(master_db.get_user_by_id(user_id)))
 
     return {
         "mensaje": "Perfil actualizado exitosamente.",
@@ -218,15 +210,11 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
     client_ip = obtener_ip_cliente(request)
     clave_tasa = f"forgot:{client_ip}:{req.identifier.strip().lower()}"
     verificar_tasa_login(clave_tasa)
+    # Cada solicitud cuenta igual, exista o no la cuenta: no hay oráculo ni bloqueo por tercero
+    registrar_fallo_login(clave_tasa)
 
     user = master_db.get_user_by_identifier(req.identifier)
     if user and user.get("email") and user.get("is_active"):
-        intentos = master_db.count_recent_reset_requests(user["id"], hours=24)
-        if intentos >= 2:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Has alcanzado el límite máximo de 2 intentos de recuperación de contraseña para este usuario en las últimas 24 horas. Por seguridad, solicita asistencia al administrador del sistema."
-            )
         codigo = master_db.create_password_reset_code(user["id"])
         background_tasks.add_task(
             enviar_correo_codigo_recuperacion,
@@ -234,8 +222,6 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
             user["username"],
             codigo
         )
-    else:
-        registrar_fallo_login(clave_tasa)
 
     return {
         "mensaje": "Si el usuario o correo electrónico existe y tiene una dirección registrada, hemos enviado un código de recuperación de 6 dígitos (válido por 15 minutos)."
@@ -251,15 +237,16 @@ def reset_password(req: ResetPasswordRequest, request: Request):
     clave_tasa = f"reset:{client_ip}:{req.identifier.strip().lower()}"
     verificar_tasa_login(clave_tasa)
 
-    nuevo_hash = hash_password(req.new_password)
-    user, error_msg = master_db.verify_and_use_reset_code(req.identifier, req.code, nuevo_hash)
+    user, error_msg = master_db.verify_reset_code(req.identifier, req.code)
     if not user:
         registrar_fallo_login(clave_tasa)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_msg or "El código de recuperación es incorrecto, ya ha sido utilizado o ha expirado (vigencia de 15 minutos)."
+            detail=error_msg or master_db.MENSAJE_CODIGO_INVALIDO
         )
 
+    # El hash costoso solo se calcula cuando el código ya es válido
+    master_db.update_user_password(user["id"], hash_password(req.new_password))
     limpiar_fallos_login(clave_tasa)
     return {
         "mensaje": f"¡Contraseña actualizada exitosamente para '{user['username']}'! Ya puedes iniciar sesión con tu nueva contraseña."

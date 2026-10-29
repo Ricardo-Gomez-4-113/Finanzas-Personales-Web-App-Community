@@ -297,7 +297,7 @@ function renderBarraDistribucion(tarjetas, res, cfg) {
         sumaSlices += pct;
 
         const slice = document.createElement('div');
-        slice.className = `pres-alloc-slice pres-color-${t.color}`;
+        slice.className = `pres-alloc-slice pres-color-${escapeHTML(t.color)}`;
         slice.style.width = `${pct}%`;
         slice.title = `${t.nombre}: ${pct.toFixed(1)}% (${fmt(montoCard)})`;
         track.appendChild(slice);
@@ -305,7 +305,7 @@ function renderBarraDistribucion(tarjetas, res, cfg) {
         if (legend) {
             const item = document.createElement('div');
             item.className = 'pres-legend-item';
-            item.innerHTML = `<span class="pres-legend-dot pres-color-${t.color}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${fmt(montoCard)})</span>`;
+            item.innerHTML = `<span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${fmt(montoCard)})</span>`;
             legend.appendChild(item);
         }
     });
@@ -357,7 +357,7 @@ function renderGridTarjetas(tarjetas, cfg) {
     grid.innerHTML = '';
     tarjetas.forEach(t => {
         const card = document.createElement('div');
-        card.className = `card pres-card pres-card-accent-${t.color}`;
+        card.className = `card pres-card pres-card-accent-${escapeHTML(t.color)}`;
         const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
         const eq = t.equivalentes || {};
 
@@ -444,7 +444,7 @@ function renderGridTarjetas(tarjetas, cfg) {
 
         card.innerHTML = `
             <div class="pres-card-header">
-                <div class="pres-card-icon-wrap pres-icon-${t.color}">
+                <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)}">
                     ${iconSvg}
                 </div>
                 <div class="pres-card-titles">
@@ -465,13 +465,13 @@ function renderGridTarjetas(tarjetas, cfg) {
             </div>
 
             <div class="pres-card-metric-block">
-                <div class="pres-card-pct-badge pres-badge-${t.color}">${badgePctTxt}</div>
+                <div class="pres-card-pct-badge pres-badge-${escapeHTML(t.color)}">${badgePctTxt}</div>
                 <div class="pres-card-amount">${fmt(montoMostrar)}</div>
                 <div class="pres-card-freq-tag">${tagFreq}</div>
             </div>
 
             <div class="pres-card-progress-bar">
-                <div class="pres-card-progress-fill pres-color-${t.color}" style="width: ${Math.min(100, t.porcentaje)}%"></div>
+                <div class="pres-card-progress-fill pres-color-${escapeHTML(t.color)}" style="width: ${Math.min(100, t.porcentaje)}%"></div>
             </div>
 
             ${miniDesgloseHtml}
@@ -594,7 +594,7 @@ export function abrirModalExportarPresupuesto() {
                     <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
                             <input type="checkbox" class="chk-item-exportar" data-id="${t.id}" checked style="cursor: pointer; width: 16px; height: 16px;">
-                            <div class="pres-card-icon-wrap pres-icon-${t.color}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)}" style="width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 ${iconSvg}
                             </div>
                             <div style="min-width: 0;">

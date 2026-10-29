@@ -104,6 +104,16 @@ def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: flo
 # FIJOS, MSI Y CUENTAS CON RENDIMIENTO
 # =============================================================================
 
+FECHA_MIN_OPERATIVA = date(2000, 1, 1)
+FECHA_MAX_OPERATIVA = date(2100, 12, 31)
+
+def validar_fecha_operativa(texto: str) -> str:
+    """Acepta solo fechas ISO entre 2000 y 2100. Evita iteraciones enormes y desbordes en rendimientos."""
+    fecha = date.fromisoformat(texto)
+    if not (FECHA_MIN_OPERATIVA <= fecha <= FECHA_MAX_OPERATIVA):
+        raise ValueError("La fecha debe estar entre 2000-01-01 y 2100-12-31.")
+    return texto
+
 def ultimo_dia_mes(anio: int, mes: int) -> int:
     return calendar.monthrange(anio, mes)[1]
 

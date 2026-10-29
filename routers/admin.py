@@ -9,6 +9,7 @@ import master_db
 from routers.auth import UserUpdateRequest
 from finanzas_core import ahora_local
 from security import (
+    claims_sesion,
     hash_password,
     create_access_token,
     verify_admin
@@ -145,13 +146,7 @@ def admin_editar_usuario(user_id: int, req: UserUpdateRequest, admin: Dict[str, 
 
     # Si se modificó la cuenta activa del admin, renovar su JWT
     if user_id == admin["id"]:
-        nuevo_token = create_access_token({
-            "sub": str(user_actualizado["id"]),
-            "username": user_actualizado["username"],
-            "role": user_actualizado["role"],
-            "db_name": user_actualizado["db_name"],
-            "email": user_actualizado.get("email")
-        })
+        nuevo_token = create_access_token(claims_sesion(master_db.get_user_by_id(user_actualizado["id"])))
         resp["new_token"] = nuevo_token
 
     return resp

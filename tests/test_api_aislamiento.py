@@ -54,7 +54,8 @@ def _login(client, usuario, clave=PASS):
 
 
 def _token_forjado(user, **extra):
-    payload = {"sub": str(user["id"]), "username": user["username"], "role": user["role"], "db_name": user["db_name"]}
+    # Parte de los claims reales (incluida la huella de contraseña) y sobrescribe lo que se quiera falsificar
+    payload = security.claims_sesion(master_db.get_user_by_id(user["id"]))
     payload.update(extra)
     return {"Authorization": f"Bearer {security.create_access_token(payload)}"}
 
@@ -229,6 +230,48 @@ def test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha):
     assert saldo == 1000.0, saldo
 
 
+def test_token_deja_de_valer_tras_cambiar_contrasena(client, ua):
+    h = _login(client, "usuario_a")
+    assert client.get("/api/resumen", headers=h).status_code == 200
+    r = client.patch("/auth/profile", json={"password": "NuevaClave#2026"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert client.get("/api/resumen", headers=h).status_code == 401
+    # El token que devuelve el propio cambio sí sirve
+    nuevo = {"Authorization": f"Bearer {r.json()['new_token']}"}
+    assert client.get("/api/resumen", headers=nuevo).status_code == 200
+
+
+def test_reset_no_revela_existencia_de_cuenta(client):
+    _crear_usuario("usuario_reset")
+    inexistente = client.post("/auth/reset-password", json={"identifier": "nadie_asi", "code": "123456", "new_password": "Otra#Clave2026"})
+    erroneo = client.post("/auth/reset-password", json={"identifier": "usuario_reset", "code": "123456", "new_password": "Otra#Clave2026"})
+    assert inexistente.status_code == erroneo.status_code == 400
+    assert inexistente.json()["detail"] == erroneo.json()["detail"], (inexistente.text, erroneo.text)
+
+
+def test_sincronizar_tiene_enfriamiento(client, ha):
+    primera = client.post("/api/inversiones/sincronizar", headers=ha)
+    segunda = client.post("/api/inversiones/sincronizar", headers=ha)
+    assert primera.status_code == 200, primera.text
+    assert segunda.status_code == 429, segunda.text
+
+
+def test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha):
+    r = client.post("/api/rendimiento", json={"nombre": "Viejo", "capital": 1000, "tasa_anual": 10, "fecha_inicio": "0001-01-01"}, headers=ha)
+    assert r.status_code == 422, r.text
+
+
+def test_excel_no_convierte_texto_en_formula(client, ha):
+    import io
+    import openpyxl
+    client.post("/api/apartados", json={"nombre": "=1+1", "tipo": "libre"}, headers=ha)
+    r = client.get("/api/exportar-excel?moneda_base=MXN", headers=ha)
+    assert r.status_code == 200, r.text
+    libro = openpyxl.load_workbook(io.BytesIO(r.content))
+    tipos = [c.data_type for fila in libro["Resumen General"].iter_rows() for c in fila if c.value == "=1+1"]
+    assert tipos and all(t == "s" for t in tipos), tipos
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -251,7 +294,12 @@ if __name__ == "__main__":
             (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
             (test_health_publico_y_sin_datos_de_usuarios, lambda: test_health_publico_y_sin_datos_de_usuarios(client)),
             (test_borrar_retiro_de_meta_devuelve_el_dinero, lambda: test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)),
+            (test_reset_no_revela_existencia_de_cuenta, lambda: test_reset_no_revela_existencia_de_cuenta(client)),
+            (test_sincronizar_tiene_enfriamiento, lambda: test_sincronizar_tiene_enfriamiento(client, ha)),
+            (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),
+            (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
+            (test_token_deja_de_valer_tras_cambiar_contrasena, lambda: test_token_deja_de_valer_tras_cambiar_contrasena(client, ua)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_api_aislamiento")

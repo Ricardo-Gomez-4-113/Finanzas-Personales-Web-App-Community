@@ -12,6 +12,7 @@ Este módulo centraliza:
 
 import os
 import shutil
+import hmac
 import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -250,65 +251,52 @@ def create_password_reset_code(user_id: int) -> str:
     finally:
         conn.close()
 
-def verify_and_use_reset_code(identifier: str, code: str, new_password_hash: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+MENSAJE_CODIGO_INVALIDO = "El código es incorrecto, ya fue usado o expiró. Solicita uno nuevo."
+
+def verify_reset_code(identifier: str, code: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
-    Verifica que el código OTP de 6 dígitos pertenezca al usuario, esté vigente y no haya sido usado.
-    Aplica una política estricta de máximo 2 intentos fallidos antes de invalidar el código permanentemente.
-    Si es válido, actualiza el password_hash del usuario y marca el código como usado.
+    Valida el código de recuperación sin tocar la contraseña. Devuelve (usuario, None) si es válido
+    o (None, mensaje_neutro) en cualquier otro caso: mismo mensaje para usuario inexistente y para
+    código erróneo, para no revelar cuentas. El conteo de intentos ocurre en una transacción
+    inmediata, así que ráfagas concurrentes no superan el límite.
     """
     user = get_user_by_identifier(identifier)
-    if not user:
-        return None, "El usuario o correo electrónico ingresado no existe en el sistema."
-
-    user_id = user["id"]
-    code_clean = code.strip()
     ahora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     conn = get_master_conn()
     try:
         cursor = conn.cursor()
-    
-        reset_row = cursor.execute(
-            """
-            SELECT * FROM password_resets 
-            WHERE user_id = ? AND used = 0 AND expires_at >= ?
-            ORDER BY id DESC LIMIT 1
-            """,
-            (user_id, ahora_str)
-        ).fetchone()
-
-        if not reset_row:
-            return None, "El código de recuperación es incorrecto, ya ha sido utilizado o ha expirado (vigencia de 15 minutos)."
-
-        reset_id = reset_row["id"]
-        codigo_correcto = reset_row["code"]
-        intentos_previos = reset_row["attempts"] if "attempts" in reset_row.keys() else 0
-
-        if code_clean != codigo_correcto:
-            nuevos_intentos = intentos_previos + 1
-            if nuevos_intentos >= 2:
-                cursor.execute("UPDATE password_resets SET attempts = ?, used = 1 WHERE id = ?", (nuevos_intentos, reset_id))
-                conn.commit()
-                return None, "Has superado el límite de 2 intentos permitidos para este código de recuperación. El código ha sido cancelado por seguridad. Solicita uno nuevo o contacta al administrador."
-            else:
-                cursor.execute("UPDATE password_resets SET attempts = ? WHERE id = ?", (nuevos_intentos, reset_id))
-                conn.commit()
-                return None, f"Código de recuperación incorrecto. Te queda {2 - nuevos_intentos} intento antes de que el código sea cancelado."
-
-        # Si coincide, quemar el código y actualizar credencial
-        cursor.execute("UPDATE password_resets SET used = 1 WHERE id = ?", (reset_id,))
-        cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_password_hash, user_id))
+        cursor.execute("BEGIN IMMEDIATE")
+        row = None
+        if user:
+            row = cursor.execute(
+                "SELECT * FROM password_resets WHERE user_id = ? AND used = 0 AND expires_at >= ? ORDER BY id DESC LIMIT 1",
+                (user["id"], ahora_str),
+            ).fetchone()
+        if not user or not row:
+            conn.rollback()
+            return None, MENSAJE_CODIGO_INVALIDO
+        if hmac.compare_digest(code.strip().encode("utf-8"), row["code"].encode("utf-8")):
+            cursor.execute("UPDATE password_resets SET used = 1 WHERE id = ?", (row["id"],))
+            conn.commit()
+            return dict(user), None
+        cursor.execute("UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?", (row["id"],))
+        cursor.execute("UPDATE password_resets SET used = 1 WHERE id = ? AND attempts >= 2", (row["id"],))
         conn.commit()
-    
-        updated_user = cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(updated_user) if updated_user else None, None
+        return None, MENSAJE_CODIGO_INVALIDO
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
-
-# =============================================================================
-# 6. OPERACIONES CRUD DE USUARIOS Y TENANTS
-# =============================================================================
+def update_user_password(user_id: int, password_hash: str) -> None:
+    """Actualiza solo el hash de contraseña de un usuario."""
+    conn = get_master_conn()
+    try:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 def create_user_entry(
     username: str, 

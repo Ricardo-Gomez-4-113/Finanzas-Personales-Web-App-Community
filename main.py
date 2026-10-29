@@ -18,7 +18,8 @@ import sqlite3
 from contextlib import asynccontextmanager
 
 from database import (
-    ensure_tenant_directories
+    ensure_tenant_directories,
+    DATA_DIR
 )
 import master_db
 from security import (
@@ -44,7 +45,12 @@ async def lifespan(app: FastAPI):
     if migrado:
         print(f"[STARTUP] Base de datos maestra inicializada. Administrador creado: {migrado['username']} (db: {migrado['db_name']})")
         if clave_generada:
-            print(f"[STARTUP] DEFAULT_ADMIN_PASSWORD no definida: clave temporal del admin = {admin_default_pass} (cámbiala al iniciar sesión)")
+            # La clave nunca va a stdout (quedaría en los logs): se escribe en un archivo solo legible por el dueño
+            ruta_clave = os.path.join(DATA_DIR, "admin_inicial.txt")
+            fd = os.open(ruta_clave, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f_clave:
+                f_clave.write(admin_default_pass + "\n")
+            print(f"[STARTUP] Clave temporal del admin guardada en {ruta_clave} (permisos 600). Cámbiala al iniciar sesión y borra ese archivo.")
     else:
         print("[STARTUP] Base de datos maestra lista y verificada.")
 
@@ -104,6 +110,16 @@ async def sqlite_operational_error_handler(request: Request, exc: sqlite3.Operat
 async def add_security_and_cache_headers(request: Request, call_next):
     """Agrega cabeceras de seguridad HTTP (HSTS, CSP, nosniff, etc.) y políticas anti-caché."""
     response = await call_next(request)
+    return _aplicar_cabeceras(response, request.url.path)
+
+@app.exception_handler(Exception)
+async def manejar_error_inesperado(request: Request, exc: Exception):
+    """Un error no capturado responde 500 genérico con las mismas cabeceras (el middleware no lo cubre)."""
+    response = JSONResponse(status_code=500, content={"detail": "Error interno del servidor."})
+    return _aplicar_cabeceras(response, request.url.path)
+
+def _aplicar_cabeceras(response, path: str):
+    """Cabeceras de seguridad y políticas anti-caché. Se usa en el middleware y en los errores 500."""
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
@@ -121,7 +137,6 @@ async def add_security_and_cache_headers(request: Request, call_next):
         "base-uri 'self'; "
         "form-action 'self';"
     )
-    path = request.url.path
     if path.startswith("/api/") or path == "/api" or path.startswith("/auth/") or path == "/auth":
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
         response.headers["Pragma"] = "no-cache"

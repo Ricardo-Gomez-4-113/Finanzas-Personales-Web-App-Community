@@ -173,7 +173,7 @@ function renderListaMsi(items) {
         card.innerHTML = `
             <div class="rec-item-head">
                 <strong>${escapeHTML(r.descripcion)}</strong>
-                <span class="badge-tag badge-msi">${terminado ? 'Terminado' : `Cuota ${r.cuotas_generadas} de ${r.total_cuotas}`}</span>
+                <span class="badge-tag badge-msi">${terminado ? 'Terminado' : `Cuota ${escapeHTML(String(r.cuotas_generadas))} de ${escapeHTML(String(r.total_cuotas))}`}</span>
             </div>
             <div class="progress-bar-bg"><div class="progress-bar-fill"></div></div>
             <div class="rec-item-meta">
@@ -214,7 +214,7 @@ function renderListaFijos(items) {
                 </div>
             </div>
             <div class="rec-item-meta">
-                <span>${fmt(r.monto)} · ${FRECUENCIA_TXT[r.frecuencia] || r.frecuencia}</span>
+                <span>${fmt(r.monto)} · ${escapeHTML(FRECUENCIA_TXT[r.frecuencia] || r.frecuencia)}</span>
                 <span>Próxima fecha: <strong>${escapeHTML(r.proxima_fecha)}</strong></span>
             </div>
             <div class="rec-item-actions">

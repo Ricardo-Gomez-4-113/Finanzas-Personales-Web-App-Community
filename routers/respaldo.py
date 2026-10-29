@@ -54,7 +54,7 @@ def descargar_backup(background_tasks: BackgroundTasks, current_user: Dict[str, 
     )
 
 @router.post("/api/restore", summary="Restaurar base de datos individual del tenant")
-async def restaurar_backup(
+def restaurar_backup(
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(verify_token)
 ):
@@ -76,7 +76,7 @@ async def restaurar_backup(
         )
 
     MAX_SIZE = 50 * 1024 * 1024
-    content = await file.read()
+    content = file.file.read(MAX_SIZE + 1)  # lectura acotada: nunca más de 50 MB + 1 byte en memoria
     if len(content) > MAX_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

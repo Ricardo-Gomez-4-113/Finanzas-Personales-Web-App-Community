@@ -5,9 +5,10 @@ from datetime import date
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from finanzas_core import (
+    validar_fecha_operativa,
     ahora_local,
     deuda_pendiente,
     materializar_recurrentes,
@@ -39,6 +40,11 @@ class RecurrenteCreate(BaseModel):
     apartado_id: Optional[int] = None
     presupuesto_tarjeta_id: Optional[int] = None
 
+    @field_validator("fecha_inicio")
+    @classmethod
+    def _fecha_acotada(cls, v: str) -> str:
+        return validar_fecha_operativa(v)
+
 
 class RecurrenteUpdate(BaseModel):
     descripcion: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -46,6 +52,11 @@ class RecurrenteUpdate(BaseModel):
     frecuencia: Optional[str] = None
     proxima_fecha: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     apartado_id: Optional[int] = None
+
+    @field_validator("proxima_fecha")
+    @classmethod
+    def _fecha_acotada(cls, v):
+        return validar_fecha_operativa(v) if v is not None else v
     activo: Optional[bool] = None
     categoria_id: Optional[int] = None
     presupuesto_tarjeta_id: Optional[int] = None
