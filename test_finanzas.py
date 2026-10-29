@@ -2077,6 +2077,19 @@ def _escenario_periodos():
     return conn, date(2026, 10, 20)
 
 
+def test_msi_pausada_cuenta_como_deuda_pero_no_resta_en_el_periodo():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Sueldo", 'ingreso', 5000, 'mensual', 1, date(2026, 10, 1))
+    insertar_recurrente(conn, "Celular", 'gasto', 500, 'mensual', 25, date(2026, 10, 25), total=6, monto_total=3000)
+    conn.execute("UPDATE recurrentes SET activo = 0 WHERE descripcion = 'Celular'")
+    conn.commit()
+    r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
+    assert r['deuda_msi'] == 3000.0, r['deuda_msi']  # sigue siendo deuda
+    p = r['periodos'][0]
+    assert p['gastos']['msi'] == 0.0 and p['remanente'] == 5000.0, p  # no resta en el periodo
+    assert r['periodo']['comprometido'] == 0.0 and r['periodo']['libre'] == r['balance'] + 5000.0, r['periodo']  # + ingreso por recibir
+
+
 def test_periodos_siguen_la_quincena_y_comparan_ingreso_con_gastos():
     from finanzas_core import calcular_periodos
     conn, hoy = _escenario_periodos()
