@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=71f78111fa">
-    <link rel="stylesheet" href="/static/css/layout.css?v=71f78111fa">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=71f78111fa">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=71f78111fa">
-    <link rel="stylesheet" href="/static/css/tema.css?v=71f78111fa">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=7c9994b064">
+    <link rel="stylesheet" href="/static/css/layout.css?v=7c9994b064">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=7c9994b064">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=7c9994b064">
+    <link rel="stylesheet" href="/static/css/tema.css?v=7c9994b064">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -366,14 +366,6 @@
             </div>
 
             <div class="cards">
-                <div class="card ingresos">
-                    <h3>Ingresos del periodo</h3>
-                    <p id="lbl-dash-mes-ingresos">$0.00</p>
-                </div>
-                <div class="card gastos">
-                    <h3>Gastos del periodo</h3>
-                    <p id="lbl-dash-mes-gastos">$0.00</p>
-                </div>
                 <div class="card balance">
                     <h3>Rendimiento de inversiones</h3>
                     <p id="lbl-dash-pnl">$0.00</p>
@@ -402,20 +394,12 @@
             <div class="dashboard-grid">
                 <div class="panel">
                     <h2 class="panel-heading">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>Próximos fijos</span>
-                    </h2>
-                    <div id="lista-proximos"></div>
-                </div>
-
-                <div class="panel">
-                    <h2 class="panel-heading">
                         <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                        <span>Gastos del mes por categoría</span>
+                        <span>Gastos del periodo por categoría</span>
                     </h2>
                     <div class="chart-container-dona">
                         <canvas id="graficaCategorias"></canvas>
-                        <div id="categorias-sin-datos" class="hidden empty-state">Sin gastos registrados este mes.</div>
+                        <div id="categorias-sin-datos" class="hidden empty-state">Sin gastos registrados en este periodo.</div>
                     </div>
                 </div>
             </div>
@@ -425,11 +409,8 @@
         <!-- PESTAÑA: MOVIMIENTOS Y FIJOS (UNIFICADA)       -->
         <!-- ============================================== -->
         <section id="tab-movimientos" class="tab-content">
-            <div class="cards cards-4">
+            <div class="cards">
                 <!-- Compatibilidad DOM -->
-                <span id="lbl-balance" class="hidden"></span>
-                <span id="lbl-ingresos" class="hidden"></span>
-                <span id="lbl-gastos" class="hidden"></span>
 
                 <div class="card ingresos">
                     <h3>Ingreso del periodo</h3>
@@ -444,12 +425,6 @@
                 <div class="card gastos">
                     <h3>Fijos y MSI</h3>
                     <p id="lbl-rec-gasto">$0.00</p>
-                    <small class="card-subtext">Deuda MSI: <strong id="lbl-rec-deuda">$0.00</strong></small>
-                </div>
-                <div class="card balance">
-                    <h3>Remanente del periodo</h3>
-                    <p id="lbl-rec-libre">$0.00</p>
-                    <small class="card-subtext" id="lbl-rec-libre-sub">Ingreso menos gastos y aportes a metas</small>
                 </div>
             </div>
             <p class="card-subtext movs-periodo-rango" id="lbl-rec-periodo"></p>
@@ -464,8 +439,7 @@
                                 <th class="num">Ingreso</th>
                                 <th class="num">Gastos</th>
                                 <th class="num">A metas</th>
-                                <th class="num">Remanente</th>
-                                <th class="num">Saldo al cierre</th>
+                                                                <th class="num">Saldo al cierre</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-periodos-body"></tbody>
@@ -681,6 +655,7 @@
                             <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                             <span>Compras a meses</span>
                         </h2>
+                        <p class="card-subtext">Deuda MSI pendiente: <strong id="lbl-fijos-deuda">$0.00</strong></p>
                         <div id="lista-msi"></div>
                         <h2 class="panel-heading">
                             <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
@@ -693,8 +668,7 @@
         </section>
 
         <!-- Sección de compatibilidad oculta -->
-        <section id="tab-recurrentes" class="tab-content hidden"></section>
-
+        
         <!-- ============================================== -->
         <!-- PESTAÑA: ORGANIZADOR DE PRESUPUESTO POR TARJETAS -->
         <!-- ============================================== -->
@@ -764,7 +738,7 @@
                 <div class="cards pres-cards-kpi">
                     <div class="card pres-kpi-card">
                         <div class="pres-kpi-header">
-                            <span class="pres-kpi-title">Ingreso del periodo</span>
+                            <span class="pres-kpi-title">Ingreso del plan</span>
                             <span class="pres-kpi-tag" id="lbl-pres-kpi-ingreso-sub">MENSUAL</span>
                         </div>
                         <p class="pres-kpi-val" id="lbl-pres-kpi-ingreso">$0.00</p>
@@ -2010,7 +1984,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=71f78111fa"></script>
+    <script type="module" src="/static/js/main.js?v=7c9994b064"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

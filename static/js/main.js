@@ -6,13 +6,13 @@ import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
-import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
+import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=71f78111fa';
+import { cargarRecurrentes } from './recurrentes.js?v=7c9994b064';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=71f78111fa';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=7c9994b064';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -71,21 +71,8 @@ export async function cargarDatos() {
         estado.cache.ventana = periodoActual ? { inicio: periodoActual.inicio, fin: periodoActual.fin } : null;
         renderTablaMovimientos();
 
-        // Tarjetas del periodo en curso: mismas cifras que Movimientos (periodicidad del ingreso fijo)
-        const actual = (dataResumen.periodos || [])[0];
-        if (actual) {
-            setTxt('lbl-dash-mes-ingresos', fmt(actual.ingresos.total));
-            setTxt('lbl-dash-mes-gastos', fmt(actual.gastos.total));
-        }
-
         if (document.getElementById('lbl-apartados-total-acum')) {
             document.getElementById('lbl-apartados-total-acum').textContent = `${fmt(dataResumen.apartados)}`;
-        }
-
-        if (document.getElementById('lbl-balance')) {
-            document.getElementById('lbl-balance').textContent = `${fmt(dataResumen.balance)}`;
-            document.getElementById('lbl-ingresos').textContent = `${fmt(dataResumen.ingresos)}`;
-            document.getElementById('lbl-gastos').textContent = `${fmt(dataResumen.gastos)}`;
         }
 
         // 2. Resumen Mensual Histórico
@@ -123,7 +110,7 @@ export async function cargarDatos() {
         await Promise.all([
             cargarMovimientos(),
             cargarCategorias(),
-            cargarRecurrentes().then(() => renderProximos()),
+            cargarRecurrentes(),
             cargarGraficaCategorias(),
             cargarApartados(),
             cargarInversiones(),

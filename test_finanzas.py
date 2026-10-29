@@ -1007,6 +1007,20 @@ def test_presupuesto_tarjeta_dia_pago_y_subperiodos():
     assert parsed[1]["dia"] == 20
 
 
+def test_gastos_por_categoria_solo_cuenta_el_periodo_de_cobro():
+    from finanzas_core import ventana_periodo_actual, gastos_por_categoria_periodo
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'mensual', 15, date(2026, 10, 15))
+    for fecha, monto in [("2026-10-14", 100), ("2026-10-16", 300), ("2026-11-14", 50), ("2026-11-15", 999)]:
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, monto))
+    conn.commit()
+    ventana = ventana_periodo_actual(conn, date(2026, 10, 20))
+    assert ventana["inicio"] <= "2026-10-20" <= ventana["fin"], ventana
+    res = gastos_por_categoria_periodo(conn, ventana["inicio"], ventana["fin"], "MXN", 18.4)
+    assert res["total"] == 350.0, (ventana, res)
+    assert res["desde"] == ventana["inicio"] and res["hasta"] == ventana["fin"], res
+
+
 def test_exportar_borra_msi_que_no_estan_en_el_presupuesto():
     conn = nueva_bd()
     cur = conn.cursor()

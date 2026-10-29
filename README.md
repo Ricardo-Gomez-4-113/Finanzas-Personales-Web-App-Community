@@ -61,7 +61,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 ### 5. 💳 Movimientos y 🎯 Metas de Ahorro
 * Registro rápido de ingresos y gastos con modales de edición in situ.
 * **Periodos según tu ingreso fijo:** el corte lo marca tu ingreso fijo de mayor monto (quincenal, semanal o mensual). Cada periodo va del día de cobro al día anterior al siguiente. Sin ingreso fijo, se usan meses calendario.
-* **Tarjetas del periodo:** ingreso (recibido y por recibir), gastos normales, fijos y MSI, remanente y saldo al cierre. Los aportes a metas se muestran aparte y no cuentan como gasto.
+* **Tarjetas del periodo:** ingreso (recibido y por recibir), gastos normales, fijos y MSI. El Resumen muestra el libre del periodo en curso y la tabla de periodos el saldo al cierre de cada uno. Los aportes a metas se muestran aparte y no cuentan como gasto.
 * **Tabla de periodos:** los periodos en curso y los siguientes, con el saldo que se arrastra de uno a otro.
 * **Lista de movimientos por periodo:** por defecto muestra solo el periodo de cobro en curso, el mismo de las tarjetas. «Todo el historial» quita el corte, y el filtro de mes lo reemplaza.
 * Sobres libres de ahorro y metas con barra de progreso porcentual.
@@ -84,7 +84,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * **Compras a meses:** el balance baja al vencer cada cuota; la deuda pendiente se muestra aparte y no resta del patrimonio neto.
 * **Compras pausadas:** no tienen cobros programados, pero su deuda sigue contando en Deuda MSI hasta liquidarlas.
 * **Cuentas con rendimiento:** saldos con tasa anual fija (interés diario compuesto). No modifican el balance disponible; aportar, retirar o cambiar la tasa capitaliza el saldo actual.
-* **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del mes por categoría.
+* **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del periodo de cobro por categoría.
 * **Saltar pagos:** un fijo puede saltarse una vez y una cuota MSI puede contabilizarse o aplazarse.
 
 ### 9. 🧮 Presupuesto por Pagos
@@ -271,7 +271,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `POST` | `/api/transacciones/eliminar-lote` | `verify_token` | Eliminar varios movimientos a la vez |
 | `GET` | `/api/categorias` | `verify_token` | Listar categorías de gasto e ingreso |
 | `POST` | `/api/categorias` | `verify_token` | Crear categoría (nombre único por tipo) |
-| `GET` | `/api/gastos-por-categoria` | `verify_token` | Gasto del mes por categoría (`?mes=YYYY-MM&moneda_base=`), sin movimientos de apartados |
+| `GET` | `/api/gastos-por-categoria` | `verify_token` | Gasto del periodo de cobro en curso por categoría (`?moneda_base=`), sin movimientos de apartados |
 | `GET` | `/api/recurrentes` | `verify_token` | Fijos y compras a meses con deuda pendiente y progreso |
 | `POST` | `/api/recurrentes` | `verify_token` | Crear fijo o compra a meses (`meses` + `monto_total`) |
 | `PATCH` | `/api/recurrentes/{id}` | `verify_token` | Editar descripción, monto (solo fijos), categoría o pausar/reanudar |

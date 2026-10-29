@@ -1753,6 +1753,38 @@ def calcular_periodo_actual(conn: sqlite3.Connection, hoy: date, balance: float)
     }
 
 
+def ventana_periodo_actual(conn: sqlite3.Connection, hoy: date) -> Dict[str, str]:
+    """Inicio y fin (inclusive) del periodo de cobro en curso, con el mismo corte que el Resumen."""
+    p = calcular_periodos(conn, hoy, 1)["periodos"][0]
+    return {"inicio": p["inicio"], "fin": p["fin"]}
+
+
+def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: str, moneda_base: str, tasa_usd_mxn: float) -> Dict[str, Any]:
+    """Gastos normales y fijos del rango agrupados por categoría (sin metas), en la moneda base."""
+    filas = conn.execute(
+        """
+        SELECT COALESCE(c.nombre, 'Sin categoría') AS categoria, SUM(t.monto) AS total
+        FROM transacciones t
+        LEFT JOIN categorias c ON c.id = t.categoria_id
+        WHERE t.tipo = 'gasto' AND t.apartado_id IS NULL AND substr(t.fecha, 1, 10) BETWEEN ? AND ?
+        GROUP BY t.categoria_id
+        ORDER BY total DESC
+        """,
+        (desde, hasta),
+    ).fetchall()
+    categorias = [
+        {"categoria": f["categoria"], "total": round(convertir(float(f["total"] or 0), "MXN", moneda_base, tasa_usd_mxn), 2)}
+        for f in filas
+    ]
+    return {
+        "desde": desde,
+        "hasta": hasta,
+        "moneda_base": moneda_base,
+        "total": round(sum(c["total"] for c in categorias), 2),
+        "categorias": categorias,
+    }
+
+
 def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: float, hoy: date) -> Dict[str, Any]:
     """
     Resumen patrimonial en la moneda base.

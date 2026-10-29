@@ -58,12 +58,11 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Ingresos / gastos del mes | Historial mensual | Solo transacciones **sin** apartado. Los depósitos a metas no son gasto. |
 | Periodo | Resumen, Movimientos | Lo marca el ingreso fijo de mayor monto mensual: del día de cobro al día anterior al siguiente cobro. Sin ingreso fijo, meses calendario. `calcular_periodos` devuelve el periodo en curso y los siguientes. |
 | Ingreso del periodo | Resumen, Movimientos | Ingresos con fecha dentro del periodo: recibidos más los fijos aún por recibir. |
-| Gastos del periodo | Resumen, Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |
+| Gastos del periodo | Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |
 | A metas | Movimientos | Depósitos menos retiros de metas del periodo, incluidos los aportes recurrentes programados. |
-| Remanente del periodo | Movimientos | Ingreso del periodo menos gastos menos aportes a metas. |
 | Saldo al cierre | Movimientos | Saldo inicial del periodo más su remanente; es el saldo inicial del siguiente periodo. |
 | Libre hasta el cobro | Resumen (periodo) | Disponible menos los cargos que faltan en el periodo más los ingresos que aún llegan en él: el saldo al cierre del periodo en curso. |
-| Deuda MSI | Resumen, Movimientos y fijos | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
+| Deuda MSI | Fijos y MSI | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
 | Rubro del movimiento | Resumen, Movimientos | Se guarda en la propia transacción (`transacciones.rubro`: fijos, msi, normales, ingreso o metas). No depende del enlace a `recurrentes`, que al borrar un fijo pasa a NULL. |
 | Pagos del presupuesto | Presupuesto | La frecuencia activa 4 (semanal), 2 (quincenal) o 1 (mensual) pagos. Cada pago tiene su día de cobro y sus tarjetas (`presupuesto_tarjetas.unidad_orden`). Un pago con tarjetas exige fecha, y las fechas van en orden creciente. Las tarjetas siempre pertenecen a un pago: desde la versión 15 no hay tablero general, y las tarjetas sueltas pasaron al pago 1. Ninguno puede asignar más que su ingreso. |
 | Exportación del presupuesto | Fijos y Movimientos | Reemplazo total: se borran todos los fijos, incluidas las compras a meses que no estén en el presupuesto (también los hechos a mano y los aportes a metas) y se crean los del presupuesto. Un fijo del presupuesto que sigue vigente se actualiza en su lugar, así renombrar una tarjeta no duplica el cargo del mes. Cada tarjeta de un pago es un fijo mensual en su día. |

@@ -250,22 +250,24 @@ def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
 
 
 def test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base):
-    """Ambas pestañas pintan el periodo en curso de la nómina quincenal (cifras de escenario.ESPERADO)."""
+    """Resumen y Movimientos pintan el periodo en curso de la nómina quincenal, sin cifras repetidas."""
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         page.wait_for_selector("#periodo-libre:not(:empty)")
-        page.wait_for_function("document.getElementById('lbl-dash-mes-gastos').textContent === '$299.00'", timeout=10000)
-        assert page.inner_text("#lbl-dash-mes-ingresos") == "$14,000.00", page.inner_text("#lbl-dash-mes-ingresos")
+        assert page.locator("#lbl-dash-mes-ingresos").count() == 0, "Ingresos del periodo debe vivir solo en Movimientos"
         _ir(page, "tab-movimientos")
         page.wait_for_function("document.querySelectorAll('#tabla-periodos-body tr').length >= 3", timeout=10000)
-        tarjetas = {i: page.inner_text(f"#{i}") for i in ("lbl-rec-ingreso", "lbl-rec-gastos-normales", "lbl-rec-gasto", "lbl-rec-libre")}
+        tarjetas = {i: page.inner_text(f"#{i}") for i in ("lbl-rec-ingreso", "lbl-rec-gastos-normales", "lbl-rec-gasto")}
         assert tarjetas == {"lbl-rec-ingreso": "$14,000.00", "lbl-rec-gastos-normales": "$0.00",
-                            "lbl-rec-gasto": "$299.00", "lbl-rec-libre": "$6,701.00"}, tarjetas
-        assert "$8,103.00" in page.inner_text("#lbl-rec-libre-sub"), page.inner_text("#lbl-rec-libre-sub")
+                            "lbl-rec-gasto": "$299.00"}, tarjetas
+        assert page.locator("#lbl-rec-libre").count() == 0, "el remanente se muestra solo como Libre en el Resumen"
+        assert page.locator("#tabla-periodos-body th, #tabla-periodos-body td").count() >= 0
+        encabezados = page.locator(".movs-periodos thead th").all_inner_texts()
+        assert "Remanente" not in encabezados and "Saldo al cierre" in encabezados, encabezados
         filas = page.locator("#tabla-periodos-body tr")
         primera, segunda = filas.nth(0).inner_text(), filas.nth(1).inner_text()
-        assert "15 oct al 30 oct" in primera and "$6,701.00" in primera and "$8,103.00" in primera, primera
-        assert "$2,500.00" in segunda and "$10,603.00" in segunda, segunda
+        assert "15 oct al 30 oct" in primera and "$14,000.00" in primera and "$8,103.00" in primera, primera
+        assert "$11,500.00" in segunda and "$10,603.00" in segunda, segunda
         _sin_desbordamiento(page, "laptop/movimientos-periodos")
         assert not errores, errores
     finally:
@@ -355,11 +357,15 @@ def test_pagos_se_adaptan_a_la_frecuencia(navegador, base):
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
-        page.wait_for_selector("#lista-proximos .rec-item")
-        proximos = page.inner_text("#lista-proximos")
-        assert "MSI 3/12" in proximos, proximos
-        assert "2026-11-15" in proximos, proximos          # próximo cargo de Netflix tras el 15 de octubre
-        assert "2026-10-31" in proximos, proximos          # próxima nómina
+        _ir(page, "tab-movimientos")
+        page.click("#btn-subtab-fijos")
+        page.wait_for_selector("#lista-msi .rec-item")
+        msi = page.inner_text("#lista-msi")
+        assert "Laptop a 12 MSI" in msi, msi
+        assert page.inner_text("#lbl-fijos-deuda") != "$0.00", "la deuda MSI debe mostrarse en Fijos y MSI"
+        fijos = page.inner_text("#lista-fijos")
+        assert "2026-11-15" in fijos, fijos          # próximo cargo de Netflix tras el 15 de octubre
+        assert "2026-10-31" in fijos, fijos          # próxima nómina
         assert not errores, errores
     finally:
         ctx.close()

@@ -15,7 +15,9 @@ from finanzas_core import (
     ahora_local,
     clase_movimiento,
     calcular_resumen,
+    gastos_por_categoria_periodo,
     resumen_mensual_core,
+    ventana_periodo_actual,
     deficit_al_eliminar_lote,
     revertir_movimiento_apartado,
     convertir,
@@ -327,34 +329,10 @@ def crear_categoria(c: CategoriaCreate, conn: sqlite3.Connection = Depends(get_t
     return {"id": cursor.lastrowid, "nombre": nombre, "tipo": c.tipo}
 
 
-@router.get("/api/gastos-por-categoria", summary="Gastos del mes agrupados por categoría")
-def gastos_por_categoria(mes: Optional[str] = None, moneda_base: str = "MXN",
-                         conn: sqlite3.Connection = Depends(get_tenant_db)):
-    hoy = ahora_local()
-    mes = mes or f"{hoy.year:04d}-{hoy.month:02d}"
-    if not re.match(r"^\d{4}-\d{2}$", mes):
-        raise HTTPException(status_code=400, detail="El mes debe tener formato YYYY-MM.")
-    base = moneda_base.upper()
+@router.get("/api/gastos-por-categoria", summary="Gastos del periodo de cobro agrupados por categoría")
+def gastos_por_categoria(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
+    hoy = ahora_local().date()
+    materializar_recurrentes(conn, hoy)
+    ventana = ventana_periodo_actual(conn, hoy)
     tasa = obtener_tasas_cambio().get("MXN", 18.40)
-    cursor = conn.cursor()
-    filas = cursor.execute(
-        """
-        SELECT COALESCE(c.nombre, 'Sin categoría') AS categoria, SUM(t.monto) AS total
-        FROM transacciones t
-        LEFT JOIN categorias c ON c.id = t.categoria_id
-        WHERE t.tipo = 'gasto' AND t.apartado_id IS NULL AND strftime('%Y-%m', t.fecha) = ?
-        GROUP BY t.categoria_id
-        ORDER BY total DESC
-        """,
-        (mes,)
-    ).fetchall()
-    categorias = [
-        {"categoria": f["categoria"], "total": round(convertir(float(f["total"] or 0), "MXN", base, tasa), 2)}
-        for f in filas
-    ]
-    return {
-        "mes": mes,
-        "moneda_base": base,
-        "total": round(sum(c["total"] for c in categorias), 2),
-        "categorias": categorias,
-    }
+    return gastos_por_categoria_periodo(conn, ventana["inicio"], ventana["fin"], moneda_base.upper(), tasa)

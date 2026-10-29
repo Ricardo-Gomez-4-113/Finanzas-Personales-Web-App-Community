@@ -262,7 +262,7 @@ export function cerrarSesionLimpia(errorMsg = '') {
     if (tAdm) tAdm.innerHTML = '';
 
     // Restablecer etiquetas numéricas a cero
-    document.querySelectorAll('[id^="lbl-dash-"], [id^="lbl-inv-"], #lbl-balance, #lbl-ingresos, #lbl-gastos, #lbl-apartados-total-acum').forEach(el => {
+    document.querySelectorAll('[id^="lbl-dash-"], [id^="lbl-inv-"], #lbl-apartados-total-acum').forEach(el => {
         el.textContent = '$0.00';
     });
 

@@ -91,7 +91,7 @@ function actualizarPreview() {
     const libre = margenPeriodos();
     const baseTxt = `${meses} pagos de ${fmt(cuota)} al mes`;
     if (libre !== null && cuota > libre) {
-        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${fmt(cuota)}) supera el remanente de tu periodo más ajustado (${fmt(libre)}). Ese periodo quedaría en déficit.</span>`;
+        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${fmt(cuota)}) supera el libre de tu periodo más ajustado (${fmt(libre)}). Ese periodo quedaría en déficit.</span>`;
     } else {
         prev.textContent = baseTxt;
     }
@@ -116,7 +116,7 @@ async function guardarRecurrente(e) {
         const cuota = Math.round((total / meses) * 100) / 100;
         const libre = margenPeriodos();
         if (libre !== null && cuota > libre) {
-            const confirmar = confirm(`Esta compra a meses generará una cuota de ${fmt(cuota)} al mes, que supera el remanente de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`);
+            const confirmar = confirm(`Esta compra a meses generará una cuota de ${fmt(cuota)} al mes, que supera el libre de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`);
             if (!confirmar) return;
         }
         body = { descripcion, monto_total: total, meses, fecha_inicio: fecha, categoria_id: categoriaId };
@@ -531,7 +531,7 @@ function renderTablaPeriodos(periodos) {
     const cuerpo = document.getElementById('tabla-periodos-body');
     if (!cuerpo) return;
     if (periodos.length === 0) {
-        cuerpo.innerHTML = '<tr><td colspan="6" class="empty-state">Sin periodos que mostrar.</td></tr>';
+        cuerpo.innerHTML = '<tr><td colspan="5" class="empty-state">Sin periodos que mostrar.</td></tr>';
         return;
     }
     const negativo = v => (v < 0 ? ' text-gasto' : '');
@@ -540,7 +540,6 @@ function renderTablaPeriodos(periodos) {
             <td class="num">${fmt(p.ingresos.total)}</td>
             <td class="num">${fmt(p.gastos.total)}</td>
             <td class="num">${fmt(p.metas)}</td>
-            <td class="num${negativo(p.remanente)}">${fmt(p.remanente)}</td>
             <td class="num${negativo(p.saldo_final)}">${fmt(p.saldo_final)}</td>
         </tr>`).join('');
 }
@@ -569,38 +568,13 @@ export async function cargarRecurrentes() {
             setTxt('lbl-rec-ingreso', actual.ingresos.total);
             setTxt('lbl-rec-gastos-normales', actual.gastos.normales);
             setTxt('lbl-rec-gasto', actual.gastos.fijos_y_msi);
-            setTxt('lbl-rec-libre', actual.remanente);
             setPlain('lbl-rec-ingreso-sub', `Recibido ${fmt(actual.ingresos.recibido)} · por recibir ${fmt(actual.ingresos.por_recibir)}`);
             const cobro = resumen.periodo && resumen.periodo.cobro;
             setPlain('lbl-rec-periodo', `Periodo del ${rangoPeriodo(actual)} · ${cobro ? `marcado por ${cobro.descripcion}` : 'mes calendario (sin ingreso fijo)'}`);
-
-            // Alerta visual de déficit si gastos y aportes superan el ingreso del periodo
-            const cardLibre = document.getElementById('lbl-rec-libre')?.closest('.card');
-            if (cardLibre) cardLibre.classList.toggle('card-deficit', actual.remanente < 0);
-            setPlain('lbl-rec-libre-sub', actual.remanente < 0
-                ? `Déficit: gastos y aportes superan el ingreso. Saldo al cierre: ${fmt(actual.saldo_final)}`
-                : `Saldo al cierre: ${fmt(actual.saldo_final)}`);
         }
-        setTxt('lbl-rec-deuda', resumen.deuda_msi || 0);
+        setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
         renderTablaPeriodos(periodos);
 
-        // Sincronizar etiquetas de caja en la pestaña unificada
-        if (resumen.balance !== undefined) {
-            setTxt('lbl-balance', resumen.balance);
-            const elBal = document.getElementById('lbl-balance');
-            if (elBal) {
-                const cardBal = elBal.closest('.card');
-                if (cardBal) {
-                    if (Number(resumen.balance) < 0) {
-                        cardBal.classList.add('card-deficit');
-                    } else {
-                        cardBal.classList.remove('card-deficit');
-                    }
-                }
-            }
-        }
-        if (resumen.ingresos !== undefined) setTxt('lbl-ingresos', resumen.ingresos);
-        if (resumen.gastos !== undefined) setTxt('lbl-gastos', resumen.gastos);
 
         renderListaMsi(items.filter(r => r.es_msi && r.cuotas_generadas < r.total_cuotas));
         renderListaFijos(items.filter(r => !r.es_msi));

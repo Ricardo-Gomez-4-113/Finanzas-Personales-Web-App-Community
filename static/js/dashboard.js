@@ -187,28 +187,3 @@ export function renderPeriodo(p) {
 }
 
 
-export function renderProximos() {
-    const cont = document.getElementById('lista-proximos');
-    if (!cont) return;
-    const activos = (estado.cache.recurrentes || [])
-        .filter(r => r.activo && !(r.es_msi && r.cuotas_generadas >= r.total_cuotas))
-        .sort((a, b) => String(a.proxima_fecha).localeCompare(String(b.proxima_fecha)))
-        .slice(0, 5);
-    if (activos.length === 0) {
-        cont.innerHTML = '<p class="empty-state">Sin pagos programados. Agrega tu nómina o tus gastos fijos en Fijos y MSI.</p>';
-        return;
-    }
-    cont.innerHTML = activos.map(r => {
-        const signo = r.tipo === 'ingreso' ? '+' : '−';
-        const clase = r.tipo === 'ingreso' ? 'text-ingreso' : 'text-gasto';
-        const etiqueta = r.es_msi ? `MSI ${r.cuotas_generadas + 1}/${r.total_cuotas}` : (r.frecuencia.charAt(0).toUpperCase() + r.frecuencia.slice(1));
-        return `<div class="rec-item proximo-item">
-            <div class="rec-item-head">
-                <span><strong>${escapeHTML(r.descripcion)}</strong> <span class="badge-tag ${r.es_msi ? 'badge-msi' : 'badge-fijo'}">${escapeHTML(etiqueta)}</span></span>
-                <span class="${clase}">${signo}${fmt(r.monto)}</span>
-            </div>
-            <div class="rec-item-meta"><span>Próximo: ${escapeHTML(r.proxima_fecha)}</span></div>
-        </div>`;
-    }).join('');
-}
-
