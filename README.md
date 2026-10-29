@@ -63,6 +63,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * **Periodos según tu ingreso fijo:** el corte lo marca tu ingreso fijo de mayor monto (quincenal, semanal o mensual). Cada periodo va del día de cobro al día anterior al siguiente. Sin ingreso fijo, se usan meses calendario.
 * **Tarjetas del periodo:** ingreso (recibido y por recibir), gastos normales, fijos y MSI, remanente y saldo al cierre. Los aportes a metas se muestran aparte y no cuentan como gasto.
 * **Tabla de periodos:** los periodos en curso y los siguientes, con el saldo que se arrastra de uno a otro.
+* **Lista de movimientos por periodo:** por defecto muestra solo el periodo de cobro en curso, el mismo de las tarjetas. «Todo el historial» quita el corte, y el filtro de mes lo reemplaza.
 * Sobres libres de ahorro y metas con barra de progreso porcentual.
 * Transferencias protegidas contra depósitos que excedan el balance disponible.
 

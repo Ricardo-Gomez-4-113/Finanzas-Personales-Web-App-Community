@@ -272,6 +272,27 @@ def test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base):
         ctx.close()
 
 
+def test_lista_de_movimientos_sigue_el_periodo_de_cobro(navegador, base):
+    """La lista de movimientos muestra por defecto el periodo en curso y 'Todo el historial' lo amplía."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        _ir(page, "tab-movimientos")
+        page.wait_for_function("document.getElementById('lbl-ventana-movimientos').textContent.startsWith('Periodo del')", timeout=10000)
+        inicio, fin = page.evaluate("""() => fetch('/api/resumen?moneda_base=MXN', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
+            .then(r => r.json()).then(d => { const p = d.periodos.find(x => x.en_curso); return [p.inicio, p.fin]; })""")
+        celdas = page.locator("#tabla-movimientos td.td-fecha")
+        fechas_periodo = [celdas.nth(i).get_attribute("title")[:10] for i in range(celdas.count())]
+        assert fechas_periodo, "el periodo en curso no tiene movimientos en el escenario"
+        assert all(inicio <= f <= fin for f in fechas_periodo), (inicio, fin, fechas_periodo)
+        page.select_option("#filtro-ventana", "todo")
+        page.wait_for_function("document.getElementById('lbl-ventana-movimientos').textContent === 'Todo el historial'", timeout=10000)
+        assert page.locator("#tabla-movimientos td.td-fecha").count() >= len(fechas_periodo)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -444,6 +465,7 @@ if __name__ == "__main__":
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
                 (test_resumen_muestra_las_cifras_del_escenario, lambda: test_resumen_muestra_las_cifras_del_escenario(navegador, base)),
                 (test_movimientos_y_resumen_muestran_el_mismo_periodo, lambda: test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base)),
+                (test_lista_de_movimientos_sigue_el_periodo_de_cobro, lambda: test_lista_de_movimientos_sigue_el_periodo_de_cobro(navegador, base)),
                 (test_doble_clic_al_guardar_tarjeta_no_duplica, lambda: test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base)),
                 (test_pagos_se_adaptan_a_la_frecuencia, lambda: test_pagos_se_adaptan_a_la_frecuencia(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),

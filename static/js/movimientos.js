@@ -139,9 +139,22 @@ export function renderTablaMovimientos() {
     const tipo = document.getElementById('filtro-tipo')?.value || '';
     const categoria = document.getElementById('filtro-categoria')?.value || '';
     const texto = (document.getElementById('filtro-buscar')?.value || '').trim().toLowerCase();
+    // Por defecto la lista sigue el periodo de cobro en curso, el mismo que muestran las tarjetas del resumen
+    const ventana = estado.cache.ventana;
+    const usarVentana = !mes && (document.getElementById('filtro-ventana')?.value || 'periodo') === 'periodo' && !!ventana;
+    const lblVentana = document.getElementById('lbl-ventana-movimientos');
+    if (lblVentana) {
+        lblVentana.textContent = mes ? '' : usarVentana
+            ? `Periodo del ${fechaTabla(ventana.inicio)} al ${fechaTabla(ventana.fin)}`
+            : 'Todo el historial';
+    }
 
     const lista = (estado.cache.listaTransacciones || []).filter(t => {
         if (mes && !String(t.fecha).startsWith(mes)) return false;
+        if (usarVentana) {
+            const dia = String(t.fecha).slice(0, 10);
+            if (dia < ventana.inicio || dia > ventana.fin) return false;
+        }
         if (tipo && t.tipo !== tipo) return false;
         if (categoria && String(t.categoria_id) !== categoria) return false;
         if (texto && !(t.descripcion || '').toLowerCase().includes(texto)) return false;
@@ -152,7 +165,9 @@ export function renderTablaMovimientos() {
     if (lista.length === 0) {
         const mensaje = (estado.cache.listaTransacciones || []).length === 0
             ? 'No hay movimientos. Registra tu primer movimiento o agrega tu nómina en Fijos y MSI.'
-            : 'Ningún movimiento coincide con los filtros.';
+            : usarVentana
+                ? 'No hay movimientos en este periodo. Elige «Todo el historial» para verlos.'
+                : 'Ningún movimiento coincide con los filtros.';
         tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${mensaje}</td></tr>`;
         actualizarSeleccionMovimientos();
         return;
@@ -596,7 +611,7 @@ function inicializarMovimientos() {
     const catModal = document.getElementById('modal-edit-trans-categoria');
     if (catModal) catModal.addEventListener('change', () => manejarNuevaCategoria(catModal));
 
-    ['filtro-mes', 'filtro-tipo', 'filtro-categoria', 'filtro-buscar'].forEach(id => {
+    ['filtro-ventana', 'filtro-mes', 'filtro-tipo', 'filtro-categoria', 'filtro-buscar'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener(el.type === 'search' ? 'input' : 'change', renderTablaMovimientos);

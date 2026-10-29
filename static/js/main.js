@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=5014e3f22d';
+import { cargarRecurrentes } from './recurrentes.js?v=ab5a73cb4c';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=5014e3f22d';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=ab5a73cb4c';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -64,6 +64,12 @@ export async function cargarDatos() {
         }
 
         renderPeriodo(dataResumen.periodo);
+
+        // La lista de movimientos se acota al periodo en curso, el mismo corte que las tarjetas del resumen
+        const periodosResumen = dataResumen.periodos || [];
+        const periodoActual = periodosResumen.find(p => p.en_curso) || periodosResumen[0];
+        estado.cache.ventana = periodoActual ? { inicio: periodoActual.inicio, fin: periodoActual.fin } : null;
+        renderTablaMovimientos();
 
         // Tarjetas del periodo en curso: mismas cifras que Movimientos (periodicidad del ingreso fijo)
         const actual = (dataResumen.periodos || [])[0];

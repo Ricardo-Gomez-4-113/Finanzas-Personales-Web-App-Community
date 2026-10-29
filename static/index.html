@@ -42,11 +42,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=5014e3f22d">
-    <link rel="stylesheet" href="/static/css/layout.css?v=5014e3f22d">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=5014e3f22d">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=5014e3f22d">
-    <link rel="stylesheet" href="/static/css/tema.css?v=5014e3f22d">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=ab5a73cb4c">
+    <link rel="stylesheet" href="/static/css/layout.css?v=ab5a73cb4c">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=ab5a73cb4c">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=ab5a73cb4c">
+    <link rel="stylesheet" href="/static/css/tema.css?v=ab5a73cb4c">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -686,6 +686,10 @@
                             <span>Todos los movimientos</span>
                         </h2>
                         <div class="filtros-movimientos">
+                            <select id="filtro-ventana" aria-label="Ventana de fechas">
+                                <option value="periodo">Periodo de cobro actual</option>
+                                <option value="todo">Todo el historial</option>
+                            </select>
                             <input type="month" id="filtro-mes" aria-label="Filtrar por mes">
                             <select id="filtro-tipo" aria-label="Filtrar por tipo">
                                 <option value="">Todos los tipos</option>
@@ -697,6 +701,7 @@
                             </select>
                             <input type="search" id="filtro-buscar" placeholder="Buscar descripción..." aria-label="Buscar descripción">
                         </div>
+                        <p class="card-subtext" id="lbl-ventana-movimientos"></p>
                         <div id="barra-lote-movimientos" class="barra-lote" style="display: none;">
                             <div class="barra-lote-info">
                                 <span id="lbl-mov-seleccionados">0 seleccionados</span>
@@ -2206,7 +2211,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=5014e3f22d"></script>
+    <script type="module" src="/static/js/main.js?v=ab5a73cb4c"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
