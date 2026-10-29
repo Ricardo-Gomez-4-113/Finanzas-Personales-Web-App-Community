@@ -183,13 +183,6 @@ def eliminar_mi_cuenta(current_user: Dict[str, Any] = Depends(verify_token)):
 # ENDPOINTS: RECUPERACIÓN DE CONTRASEÑA POR EMAIL
 # =============================================================================
 
-@router.get("/api/public/email-status", summary="Consultar estado de configuración del correo")
-@router.get("/auth/email-status", summary="Consultar estado de configuración del correo (alias)")
-def get_email_status():
-    """Retorna si el servicio de correo transaccional (API o SMTP) está configurado en el servidor."""
-    from email_service import esta_configurado_servicio_correo
-    return {"configured": esta_configurado_servicio_correo()}
-
 @router.post("/auth/forgot-password", summary="Solicitar código de restablecimiento de contraseña")
 def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks, request: Request):
     """

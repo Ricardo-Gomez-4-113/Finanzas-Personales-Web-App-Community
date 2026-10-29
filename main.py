@@ -110,25 +110,33 @@ async def sqlite_operational_error_handler(request: Request, exc: sqlite3.Operat
 async def add_security_and_cache_headers(request: Request, call_next):
     """Agrega cabeceras de seguridad HTTP (HSTS, CSP, nosniff, etc.) y políticas anti-caché."""
     response = await call_next(request)
-    return _aplicar_cabeceras(response, request.url.path)
+    return _aplicar_cabeceras(response, request.url.path, _es_https(request))
 
 @app.exception_handler(Exception)
 async def manejar_error_inesperado(request: Request, exc: Exception):
     """Un error no capturado responde 500 genérico con las mismas cabeceras (el middleware no lo cubre)."""
     response = JSONResponse(status_code=500, content={"detail": "Error interno del servidor."})
-    return _aplicar_cabeceras(response, request.url.path)
+    return _aplicar_cabeceras(response, request.url.path, _es_https(request))
 
-def _aplicar_cabeceras(response, path: str):
+def _es_https(request: Request) -> bool:
+    """La petición llegó por HTTPS, directo o a través del túnel/proxy (X-Forwarded-Proto)."""
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    # Cloudflare Tunnel entrega la petición al origen por HTTP y anota el esquema original en CF-Visitor
+    return request.url.scheme == "https" or proto == "https" or '"scheme":"https"' in request.headers.get("cf-visitor", "")
+
+def _aplicar_cabeceras(response, path: str, es_https: bool):
     """Cabeceras de seguridad y políticas anti-caché. Se usa en el middleware y en los errores 500."""
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    if es_https:
+        # HSTS solo tiene sentido sobre HTTPS: en HTTP local fijaría la política en el navegador sin efecto
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: https:; "

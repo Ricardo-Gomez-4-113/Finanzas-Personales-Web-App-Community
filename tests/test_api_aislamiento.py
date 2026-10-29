@@ -61,7 +61,7 @@ def _token_forjado(user, **extra):
 
 
 # Rutas públicas aprobadas a conciencia (sin datos de usuario). Una ruta nueva debe agregarse aquí a propósito.
-RUTAS_PUBLICAS = {"/api/public/tipo-cambio", "/api/public/email-status"}
+RUTAS_PUBLICAS = {"/api/public/tipo-cambio"}
 
 MOV = {"fecha": "2026-01-15", "monto": 100.0, "tipo": "gasto", "categoria_id": 1, "descripcion": "secreto-de-A"}
 
@@ -272,6 +272,44 @@ def test_excel_no_convierte_texto_en_formula(client, ha):
     assert tipos and all(t == "s" for t in tipos), tipos
 
 
+def test_restore_rechaza_triggers_y_textos_enormes(client, hb):
+    antes = client.get("/api/transacciones", headers=hb).json()
+    respaldo = client.get("/api/backup", headers=hb).content
+
+    def _variante(nombre, sql):
+        ruta = os.path.join(TMP, nombre)
+        with open(ruta, "wb") as f:
+            f.write(respaldo)
+        con = sqlite3.connect(ruta)
+        con.execute(sql)
+        con.commit()
+        con.close()
+        with open(ruta, "rb") as f:
+            return f.read()
+
+    casos = {
+        "trigger": _variante("con_trigger.db", "CREATE TRIGGER t AFTER INSERT ON transacciones BEGIN SELECT 1; END"),
+        "texto enorme": _variante("texto_enorme.db", "UPDATE transacciones SET descripcion = substr(hex(randomblob(4000)), 1, 3000)"),
+    }
+    for nombre, contenido in casos.items():
+        r = client.post("/api/restore", files={"file": ("respaldo.db", contenido, "application/octet-stream")}, headers=hb)
+        assert r.status_code == 400, (nombre, r.status_code, r.text)
+    assert client.get("/api/transacciones", headers=hb).json() == antes
+
+
+def test_hsts_solo_sobre_https(client):
+    assert "strict-transport-security" not in client.get("/login").headers
+    assert "strict-transport-security" in client.get("/login", headers={"X-Forwarded-Proto": "https"}).headers
+    assert "strict-transport-security" in client.get("/login", headers={"CF-Visitor": '{"scheme":"https"}'}).headers
+
+
+def test_csp_no_permite_scripts_inline(client):
+    csp = client.get("/login").headers["content-security-policy"]
+    script_src = next(d for d in csp.split(";") if d.strip().startswith("script-src"))
+    assert "'unsafe-inline'" not in script_src and "'unsafe-eval'" not in script_src, script_src
+    assert "default-src 'self'" in csp
+
+
 def test_arranque_define_la_ruta_de_clave_inicial(client):
     """La rutina de arranque escribe admin_inicial.txt en DATA_DIR; main debe importar ese símbolo."""
     import database
@@ -306,6 +344,9 @@ if __name__ == "__main__":
             (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
+            (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
+            (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
+            (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
             (test_token_deja_de_valer_tras_cambiar_contrasena, lambda: test_token_deja_de_valer_tras_cambiar_contrasena(client, ua)),
         ]

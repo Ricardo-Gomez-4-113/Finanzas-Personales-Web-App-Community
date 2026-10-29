@@ -10,4 +10,5 @@ docker run --rm --ipc=host -v "$PWD":/src:ro "$IMAGEN" bash -c '
   pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 2>&1 | grep -v "notice\|WARNING: Running pip" || true
   cp -r /src /tmp/app && cd /tmp/app
   echo "== test_frontend.py =="; python3 tests/test_frontend.py
+  if [ -f tests/test_landing.py ]; then echo "== test_landing.py =="; python3 tests/test_landing.py; fi
 '

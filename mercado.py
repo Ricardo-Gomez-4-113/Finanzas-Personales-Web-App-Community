@@ -15,9 +15,10 @@ from typing import Dict, List, Optional, Tuple
 
 def consultar_precio_y_moneda_mercado(ticker: str):
     ticker_clean = ticker.strip().upper()
+    ticker_ruta = urllib.parse.quote(ticker_clean, safe="=^-.")
     urls = [
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_clean}?interval=1d&range=1d",
-        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker_clean}?interval=1d&range=1d"
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_ruta}?interval=1d&range=1d",
+        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker_ruta}?interval=1d&range=1d"
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -106,21 +107,26 @@ def _refrescar_tasas_cambio():
     }
     try:
         precio_mxn = consultar_precio_mercado("USDMXN=X")
-        if precio_mxn and precio_mxn > 0:
-            tasas["MXN"] = round(precio_mxn, 4)
-            
         precio_eur = consultar_precio_mercado("EURUSD=X")
-        if precio_eur and precio_eur > 0:
-            tasas["EUR"] = round(1.0 / precio_eur, 4)
-
-        _CACHE_TASAS["datos"] = tasas
-        _CACHE_TASAS["expira_en"] = ahora + 300
     except Exception:
-        if _CACHE_TASAS["datos"] is not None:
-            return _CACHE_TASAS["datos"]
-        _CACHE_TASAS["datos"] = tasas
-        _CACHE_TASAS["expira_en"] = ahora + 60
+        precio_mxn = precio_eur = None
 
+    obtuvo_mxn = bool(precio_mxn and precio_mxn > 0)
+    obtuvo_eur = bool(precio_eur and precio_eur > 0)
+    if obtuvo_mxn:
+        tasas["MXN"] = round(precio_mxn, 4)
+    if obtuvo_eur:
+        tasas["EUR"] = round(1.0 / precio_eur, 4)
+
+    # Sin ninguna cotización nueva, se conserva lo último bueno y se reintenta pronto.
+    # Solo se cachean 300 s cuando llegaron las dos tasas; los valores por defecto caducan en 60 s.
+    if not (obtuvo_mxn or obtuvo_eur) and _CACHE_TASAS["datos"] is not None:
+        _CACHE_TASAS["expira_en"] = ahora + 60
+        return _CACHE_TASAS["datos"]
+
+    completas = obtuvo_mxn and obtuvo_eur
+    _CACHE_TASAS["datos"] = tasas
+    _CACHE_TASAS["expira_en"] = ahora + (300 if completas else 60)
     return _CACHE_TASAS["datos"]
 
 

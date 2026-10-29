@@ -25,7 +25,7 @@ export async function cargarApartados() {
         contenedor.innerHTML = '';
 
         if (!apartados || apartados.length === 0) {
-            contenedor.innerHTML = '<div class="empty-state">No hay apartados o metas aún. <br><button type="button" class="btn-primary btn-sm" onclick="abrirModalCrearApartado()">+ Crear primer apartado</button></div>';
+            contenedor.innerHTML = '<div class="empty-state">No hay apartados o metas aún. <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;abrirModalCrearApartado&quot;]]">+ Crear primer apartado</button></div>';
             return;
         }
 
@@ -48,7 +48,7 @@ export async function cargarApartados() {
             }
 
             card.innerHTML = `
-                <button type="button" class="btn-eliminar-apartado" onclick="eliminarApartado(${item.id})" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">×</button>
+                <button type="button" class="btn-eliminar-apartado" data-on-click="${escapeHTML(JSON.stringify([["eliminarApartado", item.id]]))}" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">×</button>
                 <div class="apartado-cabecera">
                     <h3 class="apartado-nombre">${escapeHTML(item.nombre)}</h3>
                     <span class="badge-tag ${item.tipo === 'meta' ? 'badge-fijo' : ''}">${item.tipo === 'meta' ? 'Meta' : 'Sobre libre'}</span>
@@ -57,8 +57,8 @@ export async function cargarApartados() {
                 ${contenidoMeta}
                 <div class="acciones-apartado">
                     <input type="number" id="monto-acc-${item.id}" step="0.01" min="0.01" placeholder="Monto">
-                    <button type="button" class="btn-secondary" onclick="realizarMovimiento(${item.id}, 'depositar')">Depositar</button>
-                    <button type="button" class="btn-secondary" onclick="realizarMovimiento(${item.id}, 'retirar')">Retirar</button>
+                    <button type="button" class="btn-secondary" data-on-click="${escapeHTML(JSON.stringify([["realizarMovimiento", item.id, "depositar"]]))}">Depositar</button>
+                    <button type="button" class="btn-secondary" data-on-click="${escapeHTML(JSON.stringify([["realizarMovimiento", item.id, "retirar"]]))}">Retirar</button>
                 </div>
             `;
             contenedor.appendChild(card);

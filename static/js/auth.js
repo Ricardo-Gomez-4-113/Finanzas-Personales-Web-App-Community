@@ -307,24 +307,6 @@ export function abrirModalRecuperarPassword() {
     identificadorRecuperacionEnProceso = '';
     modal.classList.remove('hidden');
     if (inputIdentifier) inputIdentifier.focus();
-
-    // Comprobar si el servicio de correo está configurado en el servidor para advertir al usuario
-    fetch('/api/public/email-status')
-        .then(r => r.json())
-        .then(data => {
-            const alerta = document.getElementById('alerta-email-no-configurado');
-            const form1 = document.getElementById('form-solicitar-codigo');
-            const form2 = document.getElementById('form-restablecer-password');
-            if (data && data.configured === false) {
-                if (alerta) alerta.classList.remove('hidden');
-                if (form1) form1.classList.add('hidden');
-                if (form2) form2.classList.add('hidden');
-            } else {
-                if (alerta) alerta.classList.add('hidden');
-                if (form1) form1.classList.remove('hidden');
-            }
-        })
-        .catch(() => {});
 }
 
 

@@ -93,7 +93,7 @@ export async function cargarDatosAdmin() {
                     const esAdminPrincipal = (u.id === 1 || (u.username && u.username.toLowerCase() === 'admin'));
                     
                     let accionesHtml = `
-                        <button type="button" class="btn-user-action btn-edit-user" onclick="abrirModalEditarUsuarioPorId(${u.id})" title="Editar usuario">
+                        <button type="button" class="btn-user-action btn-edit-user" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarUsuarioPorId", u.id]]))}" title="Editar usuario">
                             <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             <span class="btn-action-label">Editar</span>
                         </button>
@@ -107,7 +107,7 @@ export async function cargarDatosAdmin() {
                             : `<svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
                         const claseToggle = u.is_active ? 'btn-status-suspend' : 'btn-status-activate';
                         accionesHtml += `
-                            <button type="button" class="btn-user-action btn-status-toggle ${claseToggle}" onclick="cambiarEstadoUsuario(${u.id}, ${nuevoEstado})" title="${textoToggle} usuario">
+                            <button type="button" class="btn-user-action btn-status-toggle ${claseToggle}" data-on-click="${escapeHTML(JSON.stringify([["cambiarEstadoUsuario", u.id, nuevoEstado]]))}" title="${textoToggle} usuario">
                                 ${iconoToggle}
                                 <span class="btn-action-label">${textoToggle}</span>
                             </button>
@@ -123,7 +123,7 @@ export async function cargarDatosAdmin() {
                         `;
                     } else {
                         accionesHtml += `
-                            <button type="button" class="btn-user-action btn-delete-user" onclick="eliminarUsuarioTenantPorId(${u.id})" title="Eliminar usuario y su base de datos">
+                            <button type="button" class="btn-user-action btn-delete-user" data-on-click="${escapeHTML(JSON.stringify([["eliminarUsuarioTenantPorId", u.id]]))}" title="Eliminar usuario y su base de datos">
                                 <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 <span class="btn-action-label">Eliminar</span>
                             </button>

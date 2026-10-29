@@ -8,6 +8,7 @@ import sqlite3
 import os
 import shutil
 import tempfile
+from functools import lru_cache
 
 from database import (
     init_tenant_db, 
@@ -23,6 +24,54 @@ from security import (
 )
 
 router = APIRouter()
+
+# Longitud máxima de un valor de texto restaurado: los campos de la app son cortos y un valor enorme
+# no tiene sentido de negocio, así que se rechaza antes de que llegue a la interfaz.
+LIMITE_TEXTO_RESTAURADO = 2000
+
+@lru_cache(maxsize=1)
+def _esquema_referencia() -> Dict[str, list]:
+    """Tablas del esquema actual y sus columnas de texto, leídas de una base recién creada."""
+    fd, ruta = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        init_tenant_db(ruta)
+        conn = sqlite3.connect(ruta)
+        try:
+            return {
+                nombre: [fila[1] for fila in conn.execute(f'PRAGMA table_info("{nombre}")') if "TEXT" in (fila[2] or "").upper()]
+                for (nombre,) in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            }
+        finally:
+            conn.close()
+    finally:
+        os.unlink(ruta)
+
+def _validar_contenido_respaldo(conn: sqlite3.Connection) -> None:
+    """Rechaza triggers, vistas, tablas ajenas al esquema y textos fuera de límite en un respaldo ya migrado."""
+    if conn.execute("SELECT count(*) FROM sqlite_master WHERE type IN ('trigger', 'view')").fetchone()[0]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El respaldo contiene triggers o vistas, que no forman parte del esquema de la aplicación."
+        )
+    referencia = _esquema_referencia()
+    tablas = [fila[0] for fila in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+    for nombre in tablas:
+        if nombre not in referencia:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El respaldo contiene tablas que no pertenecen al esquema de la aplicación."
+            )
+        columnas_respaldo = {fila[1] for fila in conn.execute(f'PRAGMA table_info("{nombre}")')}
+        for columna in referencia[nombre]:
+            if columna not in columnas_respaldo:
+                continue
+            (mayor,) = conn.execute(f'SELECT COALESCE(MAX(length(CAST("{columna}" AS TEXT))), 0) FROM "{nombre}"').fetchone()
+            if mayor > LIMITE_TEXTO_RESTAURADO:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El campo {nombre}.{columna} supera el límite de {LIMITE_TEXTO_RESTAURADO} caracteres."
+                )
 
 # =============================================================================
 # RESPALDO AISLADO Y EXPORTACIÓN A EXCEL POR TENANT
@@ -131,6 +180,13 @@ def restaurar_backup(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El respaldo no se pudo migrar al esquema actual de la aplicación."
             )
+
+        # 3b. Contenido: sin triggers, vistas ni tablas ajenas, y textos dentro de límite
+        chequeo = sqlite3.connect(tmp_path)
+        try:
+            _validar_contenido_respaldo(chequeo)
+        finally:
+            chequeo.close()
 
         # 4. Copia de seguridad automática preventiva de la BD actual
         db_name = current_user.get("db_name", "user_1.db")

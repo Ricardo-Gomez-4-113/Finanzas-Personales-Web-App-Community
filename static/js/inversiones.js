@@ -42,7 +42,7 @@ export async function cargarInversiones() {
         if (tbody) {
             tbody.innerHTML = '';
             if (posiciones.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Sin posiciones registradas. ¡Añade tu primer ETF o acción! <br><button type="button" class="btn-primary btn-sm" onclick="document.getElementById(\'inv-ticker\').focus()">Registrar posición</button></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Sin posiciones registradas. ¡Añade tu primer ETF o acción! <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;enfocarTickerInversion&quot;]]">Registrar posición</button></td></tr>';
             } else {
                 posiciones.forEach(pos => {
                     const tr = document.createElement('tr');
@@ -69,8 +69,8 @@ export async function cargarInversiones() {
                         <td class="${clasePnl}">${signoPosMonto}${fmt(Math.abs(pos.pnl))} (${signoPos}${pos.pnl_porcentaje.toFixed(2)}%)</td>
                         <td><span class="badge-peso">${pos.peso_porcentaje.toFixed(1)}%</span></td>
                         <td class="col-acciones">
-                            <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditarInversionPorId(${pos.id})" title="Editar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-                            <button type="button" class="btn-accion btn-eliminar" onclick="eliminarInversion(${pos.id})" title="Eliminar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            <button type="button" class="btn-accion btn-editar" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarInversionPorId", pos.id]]))}" title="Editar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+                            <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarInversion", pos.id]]))}" title="Eliminar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </td>
                     `;
                     tbody.appendChild(tr);

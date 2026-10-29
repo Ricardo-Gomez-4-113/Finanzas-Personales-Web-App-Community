@@ -342,9 +342,9 @@ function renderGridTarjetas(tarjetas, cfg) {
                 <h3>Aún no has creado tarjetas de presupuesto</h3>
                 <p>Divide tu dinero para saber con exactitud cuánto destinas a gastos fijos, inversión en ETFs, ahorro y diversión.</p>
                 <div class="pres-empty-actions">
-                    <button type="button" class="btn-primary" onclick="abrirModalCrearTarjeta()">+ Crear Primera Tarjeta</button>
-                    <button type="button" class="btn-secondary" onclick="aplicarPlantillaPresupuesto('50-30-20')">Plantilla Regla 50/30/20</button>
-                    <button type="button" class="btn-secondary" onclick="aplicarPlantillaPresupuesto('inversionista')">Plantilla Perfil Inversionista</button>
+                    <button type="button" class="btn-primary" data-on-click="[[&quot;abrirModalCrearTarjeta&quot;]]">+ Crear Primera Tarjeta</button>
+                    <button type="button" class="btn-secondary" data-on-click="[[&quot;aplicarPlantillaPresupuesto&quot;, &quot;50-30-20&quot;]]">Plantilla Regla 50/30/20</button>
+                    <button type="button" class="btn-secondary" data-on-click="[[&quot;aplicarPlantillaPresupuesto&quot;, &quot;inversionista&quot;]]">Plantilla Perfil Inversionista</button>
                 </div>
             </div>`;
         return;
