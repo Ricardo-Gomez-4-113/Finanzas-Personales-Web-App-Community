@@ -297,6 +297,30 @@ def test_restore_rechaza_triggers_y_textos_enormes(client, hb):
     assert client.get("/api/transacciones", headers=hb).json() == antes
 
 
+def test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha):
+    cfg_original = client.get("/api/presupuesto", headers=ha).json()["config"]
+    try:
+        r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
+        assert r.status_code == 200, r.text
+        # La interfaz envía monto 0 y porcentaje 25: manda el porcentaje
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Pct prueba", "monto": 0, "porcentaje": 25}, headers=ha)
+        assert r.status_code == 201 and r.json()["monto"] == 2500.0 and r.json()["porcentaje"] == 25.0, r.text
+        tid = r.json()["id"]
+        r = client.patch(f"/api/presupuesto/tarjetas/{tid}", json={"nombre": "Pct prueba 2", "monto": 0, "porcentaje": 10}, headers=ha)
+        assert r.status_code == 200 and r.json()["monto"] == 1000.0, r.text
+        # Más de 100% se rechaza con 422
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Alto", "porcentaje": 120}, headers=ha)
+        assert r.status_code == 422, r.text
+        # Sin ingreso base no se puede convertir un porcentaje: error claro, no una tarjeta en 0%
+        client.put("/api/presupuesto/config", json={"ingreso_base": 0, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Sin ingreso", "monto": 0, "porcentaje": 25}, headers=ha)
+        assert r.status_code == 422 and "ingreso fijo base" in r.text, r.text
+        client.delete(f"/api/presupuesto/tarjetas/{tid}", headers=ha)
+    finally:
+        client.put("/api/presupuesto/config", json={"ingreso_base": cfg_original["ingreso_base"], "frecuencia": cfg_original["frecuencia"],
+                                                    "subdivision_tipo": cfg_original.get("subdivision_tipo") or "ninguna"}, headers=ha)
+
+
 def test_hsts_solo_sobre_https(client):
     assert "strict-transport-security" not in client.get("/login").headers
     assert "strict-transport-security" in client.get("/login", headers={"X-Forwarded-Proto": "https"}).headers
@@ -345,6 +369,7 @@ if __name__ == "__main__":
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
+            (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),

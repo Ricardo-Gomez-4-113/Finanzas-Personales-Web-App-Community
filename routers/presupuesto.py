@@ -349,22 +349,25 @@ def aplicar_plantilla(req: PlantillaRequest, conn: sqlite3.Connection = Depends(
     return get_presupuesto(conn)
 
 
+def _resolver_montos(monto, porcentaje, ingreso):
+    """Monto y porcentaje coherentes. Un monto vacío o en cero con porcentaje manda el porcentaje
+    (la interfaz envía los dos campos). Sin ingreso base no se puede convertir un porcentaje."""
+    if porcentaje and not monto:
+        if ingreso <= 0:
+            raise HTTPException(status_code=422, detail="Define primero tu ingreso fijo base para asignar tarjetas por porcentaje.")
+        monto = round(ingreso * (porcentaje / 100.0), 2)
+    if monto is None:
+        return 0.0, 0.0
+    return round(monto, 2), (round((monto / ingreso) * 100.0, 2) if ingreso > 0 else 0.0)
+
+
 @router.post("/api/presupuesto/tarjetas", status_code=201, summary="Crear tarjeta de presupuesto")
 def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     cfg = obtener_config_presupuesto(cursor)
     ingreso = float(cfg["ingreso_base"])
 
-    monto = req.monto
-    porcentaje = req.porcentaje
-
-    if monto is not None:
-        porcentaje = round((monto / ingreso) * 100.0, 2) if ingreso > 0 else 0.0
-    elif porcentaje is not None:
-        monto = round(ingreso * (porcentaje / 100.0), 2) if ingreso > 0 else 0.0
-    else:
-        porcentaje = 0.0
-        monto = 0.0
+    monto, porcentaje = _resolver_montos(req.monto, req.porcentaje, ingreso)
 
     # Normalizar distribucion_subperiodos y sincronizar dia_pago si es de un solo sub-período activo
     dist_list = None
@@ -449,16 +452,10 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("dia_pago = ?"); valores.append(dia_efectivo)
 
     # Si se actualiza monto o porcentaje, priorizar monto explícito y sincronizar el otro campo
-    if req.monto is not None:
-        monto = round(req.monto, 2)
-        pct = round((monto / ingreso) * 100.0, 2) if ingreso > 0 else 0.0
+    if req.monto is not None or req.porcentaje is not None:
+        monto, pct = _resolver_montos(req.monto, req.porcentaje, ingreso)
         campos.extend(["monto = ?", "porcentaje = ?"])
         valores.extend([monto, pct])
-    elif req.porcentaje is not None:
-        pct = round(req.porcentaje, 2)
-        monto = round(ingreso * (pct / 100.0), 2) if ingreso > 0 else 0.0
-        campos.extend(["porcentaje = ?", "monto = ?"])
-        valores.extend([pct, monto])
 
     if campos:
         valores.append(tarjeta_id)

@@ -4,7 +4,7 @@
  * y sub-dividir el presupuesto en 2 quincenas, 4 semanas o de manera personalizada.
  */
 
-import { apiFetch, escapeHTML, fmt, toast } from './core.js';
+import { apiFetch, escapeHTML, fmt, formatErrorDetail, toast } from './core.js';
 
 let cachePresupuesto = null;
 let subperiodoActivoId = 'total';
@@ -961,8 +961,14 @@ export function aplicarPresetChip(nombre, icono, color, notasSugeridas, pctSuger
     }
 }
 
+let guardandoTarjeta = false;
+
 export async function guardarTarjetaPresupuesto(e) {
     e.preventDefault();
+    // Un segundo envío mientras se guarda crearía otra tarjeta: se ignora
+    if (guardandoTarjeta) return;
+    // Se captura antes de cualquier await: al cerrar el modal la variable global pasa a null
+    const idEditar = idTarjetaEditando;
     const nombre = document.getElementById('tarjeta-pres-nombre').value.trim();
     let monto = parseFloat(document.getElementById('tarjeta-pres-monto').value) || 0;
     let porcentaje = parseFloat(document.getElementById('tarjeta-pres-pct').value) || 0;
@@ -979,6 +985,14 @@ export async function guardarTarjetaPresupuesto(e) {
     const dia_pago = diaRaw ? parseInt(diaRaw, 10) : null;
 
     const ingreso = Number(cachePresupuesto?.config?.ingreso_base) || 0;
+    if (porcentaje > 100) {
+        toast('El porcentaje no puede pasar de 100%.', 'error');
+        return;
+    }
+    if (ingreso <= 0 && porcentaje > 0 && monto === 0) {
+        toast('Define primero tu ingreso fijo base para asignar tarjetas por porcentaje.', 'error');
+        return;
+    }
     let distribucion_subperiodos = undefined;
 
     const inputsSub = document.querySelectorAll('.input-subperiodo-tarjeta');
@@ -1027,10 +1041,11 @@ export async function guardarTarjetaPresupuesto(e) {
         body.distribucion_subperiodos = distribucion_subperiodos;
     }
 
+    guardandoTarjeta = true;
     try {
         let res;
-        if (idTarjetaEditando) {
-            res = await apiFetch(`/api/presupuesto/tarjetas/${idTarjetaEditando}`, {
+        if (idEditar) {
+            res = await apiFetch(`/api/presupuesto/tarjetas/${idEditar}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -1044,15 +1059,18 @@ export async function guardarTarjetaPresupuesto(e) {
         }
 
         if (!res.ok) {
-            toast('No se pudo guardar la tarjeta.', 'error');
+            const err = await res.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, 'No se pudo guardar la tarjeta.'), 'error');
             return;
         }
 
-        toast(idTarjetaEditando ? 'Tarjeta actualizada.' : 'Tarjeta agregada al presupuesto.', 'ok');
+        toast(idEditar ? 'Tarjeta actualizada.' : 'Tarjeta agregada al presupuesto.', 'ok');
         cerrarModalTarjetaPresupuesto();
         cargarPresupuesto();
     } catch (err) {
         toast('Error de conexión.', 'error');
+    } finally {
+        guardandoTarjeta = false;
     }
 }
 

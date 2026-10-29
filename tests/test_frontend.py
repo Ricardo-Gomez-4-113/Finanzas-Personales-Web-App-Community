@@ -272,6 +272,28 @@ def test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base):
         ctx.close()
 
 
+def test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-presupuesto")
+        page.evaluate("document.querySelector(\"[data-on-click*='abrirModalCrearTarjeta']\").click()")
+        page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
+        page.fill("#tarjeta-pres-nombre", "Doble prueba")
+        page.fill("#tarjeta-pres-monto", "500")
+        page.dispatch_event("#tarjeta-pres-monto", "input")
+        page.dblclick("#form-tarjeta-presupuesto [type=submit]")
+        page.wait_for_timeout(2000)
+        nombres = page.evaluate("[...document.querySelectorAll('#grid-tarjetas-presupuesto .card')].map(c => c.innerText)")
+        creadas = [n for n in nombres if "Doble prueba" in n]
+        assert len(creadas) == 1, nombres
+        page.evaluate("""fetch('/api/presupuesto', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
+            .then(r => r.json()).then(d => d.tarjetas.filter(t => t.nombre === 'Doble prueba').forEach(t =>
+                fetch('/api/presupuesto/tarjetas/' + t.id, {method: 'DELETE', headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})))""")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_fijos_y_msi_aparecen_con_su_avance(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -385,6 +407,7 @@ if __name__ == "__main__":
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
                 (test_resumen_muestra_las_cifras_del_escenario, lambda: test_resumen_muestra_las_cifras_del_escenario(navegador, base)),
                 (test_movimientos_y_resumen_muestran_el_mismo_periodo, lambda: test_movimientos_y_resumen_muestran_el_mismo_periodo(navegador, base)),
+                (test_doble_clic_al_guardar_tarjeta_no_duplica, lambda: test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
