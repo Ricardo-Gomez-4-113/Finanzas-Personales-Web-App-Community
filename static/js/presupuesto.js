@@ -120,7 +120,7 @@ function renderKPIs(data) {
             badgeDisp.textContent = 'Algún pago está excedido';
             badgeDisp.className = 'pnl-badge badge-danger';
         } else {
-            badgeDisp.textContent = `${pctDisponible.toFixed(1)}% libre`;
+            badgeDisp.textContent = `${pctDisponible.toFixed(1)}% sin asignar`;
             badgeDisp.className = 'pnl-badge badge-success';
         }
     }
@@ -137,7 +137,7 @@ function renderKPIs(data) {
 function nombrePago(orden, frecuencia) {
     if (frecuencia === 'semanal') return `Semana ${orden}`;
     if (frecuencia === 'quincenal') return `Quincena ${orden}`;
-    return 'Pago del mes';
+    return 'Pago mensual';
 }
 
 // Distribución del ingreso de un pago: cada tarjeta es un tramo, y lo que queda es el libre

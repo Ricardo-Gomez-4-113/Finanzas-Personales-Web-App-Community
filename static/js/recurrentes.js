@@ -205,7 +205,7 @@ function renderListaFijos(items) {
     const cont = document.getElementById('lista-fijos');
     if (!cont) return;
     if (items.length === 0) {
-        cont.innerHTML = '<p class="empty-state">Aún no tienes ingresos ni gastos fijos. Agrega tu nómina o tu renta para ver tu libre al mes.</p>';
+        cont.innerHTML = '<p class="empty-state">Aún no tienes ingresos ni gastos fijos. Agrega tu nómina o tu renta para ver tu libre del periodo.</p>';
         return;
     }
     cont.innerHTML = '';
@@ -374,7 +374,7 @@ export function abrirModalEditarRecurrente(id) {
     // Título dinámico
     if (tituloEl) {
         if (item.es_msi) {
-            tituloEl.textContent = 'Editar Compra a Meses (MSI)';
+            tituloEl.textContent = 'Editar compra a meses';
         } else if (item.tipo === 'ingreso') {
             tituloEl.textContent = 'Editar Ingreso Fijo';
         } else {

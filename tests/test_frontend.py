@@ -340,7 +340,7 @@ def test_pagos_se_adaptan_a_la_frecuencia(navegador, base):
             # El modal de un pago no pide día ni subdivisión: el día es el del pago
             page.evaluate("document.querySelector('#pres-pagos-lista .pres-pago-add').click()")
             page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
-            assert "Pago del mes" in page.inner_text("#modal-tarjeta-pres-title"), page.inner_text("#modal-tarjeta-pres-title")
+            assert "Pago mensual" in page.inner_text("#modal-tarjeta-pres-title"), page.inner_text("#modal-tarjeta-pres-title")
             assert not page.is_visible("#tarjeta-pres-dia"), "el día no debe pedirse en una tarjeta de pago"
             page.keyboard.press("Escape")
         finally:
