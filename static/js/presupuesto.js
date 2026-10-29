@@ -1,16 +1,16 @@
 /**
- * static/js/presupuesto.js - Organizador de Presupuesto por Tarjetas y Porcentajes
- * Permite dividir el ingreso fijo (semanal, quincenal, mensual) en tarjetas con sincronización $ ⇄ %,
- * y sub-dividir el presupuesto en 2 quincenas, 4 semanas o de manera personalizada.
+ * static/js/presupuesto.js - Presupuesto por pagos del periodo
+ * Cada pago (semana, quincena o mes, según la frecuencia del ingreso) tiene su día de cobro,
+ * su distribución del ingreso y sus tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en su día.
  */
 
 import { apiFetch, escapeHTML, fmt, formatErrorDetail, toast } from './core.js';
 
 let cachePresupuesto = null;
-let subperiodoActivoId = 'total';
-let editorSubperiodosTemp = [];
-// Pago al que pertenece la tarjeta del modal (null para el tablero general)
+// Pago al que pertenece la tarjeta del modal (null cuando se edita fuera de un pago)
 let pagoTarjetaEditando = null;
+let idTarjetaEditando = null;
+let guardandoTarjeta = false;
 
 const ICONOS_SVG = {
     'home': `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -30,6 +30,7 @@ const FRECUENCIA_LABEL = {
     'semanal': 'por semana'
 };
 
+
 export async function cargarPresupuesto() {
     try {
         const res = await apiFetch('/api/presupuesto');
@@ -42,44 +43,6 @@ export async function cargarPresupuesto() {
     }
 }
 
-function actualizarOpcionesSubdivisionSelect(frecuencia, subTipoActual) {
-    const sel = document.getElementById('pres-subdivision-tipo');
-    const wrap = document.getElementById('wrap-pres-subdivision');
-    const btnGear = document.getElementById('btn-custom-subdivision');
-    if (!sel) return;
-
-    if (frecuencia === 'semanal') {
-        if (wrap) wrap.classList.add('hidden');
-        sel.innerHTML = `<option value="ninguna" selected>Sin división (Semanal)</option>`;
-        if (btnGear) btnGear.classList.add('hidden');
-        return;
-    }
-
-    if (wrap) wrap.classList.remove('hidden');
-
-    let optionsHtml = `<option value="ninguna">Sin división (Periodo completo)</option>`;
-    if (frecuencia === 'mensual') {
-        optionsHtml += `
-            <option value="quincenas">2 Quincenas</option>
-            <option value="semanas">4 Semanas</option>
-            <option value="personalizada">Personalizada</option>
-        `;
-    } else if (frecuencia === 'quincenal') {
-        optionsHtml += `
-            <option value="semanas">2 Semanas</option>
-            <option value="personalizada">Personalizada</option>
-        `;
-    }
-
-    sel.innerHTML = optionsHtml;
-    // Si el tipo actual existe en las opciones, seleccionarlo; de lo contrario 'ninguna'
-    const existe = Array.from(sel.options).some(o => o.value === subTipoActual);
-    sel.value = existe ? subTipoActual : 'ninguna';
-
-    if (btnGear) {
-        btnGear.classList.toggle('hidden', sel.value === 'ninguna');
-    }
-}
 
 function renderizarVistaPresupuesto(data) {
     const cfg = data.config;
@@ -87,15 +50,13 @@ function renderizarVistaPresupuesto(data) {
     const tarjetas = data.tarjetas || [];
     const fijos = data.fijos_detectados || {};
 
-    // 1. Inputs de configuración de ingreso base y sub-división
+    // 1. Inputs de configuración de ingreso base y frecuencia
     const inpIngreso = document.getElementById('pres-ingreso-base');
     const selFrecuencia = document.getElementById('pres-frecuencia');
     const inpDia = document.getElementById('pres-ingreso-dia');
     if (inpIngreso && document.activeElement !== inpIngreso) inpIngreso.value = cfg.ingreso_base || '';
     if (selFrecuencia && document.activeElement !== selFrecuencia) selFrecuencia.value = cfg.frecuencia || 'mensual';
     if (inpDia && document.activeElement !== inpDia) inpDia.value = (cfg.dia_pago !== undefined && cfg.dia_pago !== null) ? cfg.dia_pago : '';
-
-    actualizarOpcionesSubdivisionSelect(cfg.frecuencia || 'mensual', cfg.subdivision_tipo || 'ninguna');
 
     // Equivalencias de ingreso en el subtítulo
     const lblEq = document.getElementById('pres-ingreso-equivalentes');
@@ -121,214 +82,55 @@ function renderizarVistaPresupuesto(data) {
         }
     }
 
-    // 2. Barra de Navegación por Sub-periodos
-    renderBarraSubperiodos(cfg);
-
-    // 3. Tarjetas KPI de Resumen (adaptativas al sub-periodo activo)
-    renderKPIs(cfg, res, tarjetas);
-
-    // 4. Barra visual segmentada de asignación (100% allocation track)
-    renderBarraDistribucion(tarjetas, res, cfg);
-
-    // 5. Pagos del periodo y tablero general
+    // 2. KPI de resumen (suma de todos los pagos) y bloques de pago con su distribución
+    renderKPIs(data);
     renderPagos(data);
-    renderGridTarjetas(tarjetas, cfg);
 }
 
-function renderBarraSubperiodos(cfg) {
-    const navBar = document.getElementById('pres-subperiodos-bar');
-    const pillsWrap = document.getElementById('pres-subperiodos-pills');
-    const badgeDesc = document.getElementById('pres-subperiodo-active-badge');
-    if (!navBar || !pillsWrap) return;
-
-    const subperiodos = cfg.subdivision_config || [];
-    const activo = (cfg.subdivision_tipo !== 'ninguna' && subperiodos.length > 0);
-
-    if (!activo) {
-        navBar.classList.add('hidden');
-        subperiodoActivoId = 'total';
-        return;
-    }
-
-    navBar.classList.remove('hidden');
-
-    // Validar que el subperiodoActivoId siga existiendo en la lista
-    if (subperiodoActivoId !== 'total' && !subperiodos.some(sp => sp.id === subperiodoActivoId)) {
-        subperiodoActivoId = 'total';
-    }
-
-    pillsWrap.innerHTML = '';
-
-    // Pill: Periodo Completo
-    const pillTotal = document.createElement('button');
-    pillTotal.type = 'button';
-    pillTotal.className = `pres-subperiodo-pill ${subperiodoActivoId === 'total' ? 'active' : ''}`;
-    pillTotal.innerHTML = `<span>Periodo Completo (${fmt(cfg.ingreso_base)})</span>`;
-    pillTotal.onclick = () => {
-        subperiodoActivoId = 'total';
-        renderizarVistaPresupuesto(cachePresupuesto);
-    };
-    pillsWrap.appendChild(pillTotal);
-
-    // Pills de cada sub-periodo
-    subperiodos.forEach(sp => {
-        const pill = document.createElement('button');
-        pill.type = 'button';
-        pill.className = `pres-subperiodo-pill ${subperiodoActivoId === sp.id ? 'active' : ''}`;
-        pill.innerHTML = `<span>${escapeHTML(sp.nombre)} (${sp.porcentaje}% · ${fmt(sp.monto)})</span>`;
-        pill.onclick = () => {
-            subperiodoActivoId = sp.id;
-            renderizarVistaPresupuesto(cachePresupuesto);
-        };
-        pillsWrap.appendChild(pill);
-    });
-
-    if (badgeDesc) {
-        if (subperiodoActivoId === 'total') {
-            badgeDesc.textContent = `Mostrando asignación general (${cfg.frecuencia})`;
-        } else {
-            const spActual = subperiodos.find(sp => sp.id === subperiodoActivoId);
-            badgeDesc.innerHTML = spActual ? `Mostrando flujo de <strong>${escapeHTML(spActual.nombre)}</strong>` : '';
-        }
-    }
+function esInversion(nombre) {
+    const n = nombre.toLowerCase();
+    return ['inversión', 'inversion', 'etf', 'ahorro', 'cetes', 'fondo', 'renta fija'].some(p => n.includes(p));
 }
 
-function renderKPIs(cfg, res, tarjetas) {
+// Los KPI suman todos los pagos activos: cada uno tiene su propio ingreso
+function renderKPIs(data) {
     const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    const subperiodos = cfg.subdivision_config || [];
-    const spActivo = (subperiodoActivoId !== 'total') ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
+    const cfg = data.config;
+    const res = data.resumen;
+    const pagos = (data.unidades || []).filter(u => u.activa).length;
+    const ingreso = res.ingreso_total;
+    const asignado = res.total_asignado_monto;
+    const pctAsignado = ingreso > 0 ? (asignado / ingreso) * 100 : 0;
+    const pctDisponible = Math.max(0, 100 - pctAsignado);
 
-    let ingresoMostrar = cfg.ingreso_base;
-    let asignadoMostrar = res.total_asignado_monto;
-    let disponibleMostrar = res.disponible_monto;
-    let tagSub = `${cfg.frecuencia.toUpperCase()} · 100.0%`;
-    let esExcedido = res.excedido;
-    let pctAsignadoMostrar = res.total_asignado_pct;
-    let pctDisponibleMostrar = res.disponible_pct;
+    setEl('lbl-pres-kpi-ingreso', fmt(ingreso));
+    setEl('lbl-pres-kpi-ingreso-sub', `${(cfg.frecuencia || '').toUpperCase()} · ${pagos} ${pagos === 1 ? 'pago' : 'pagos'}`);
 
-    if (spActivo) {
-        ingresoMostrar = spActivo.monto;
-        let sumaAsigSub = 0;
-        tarjetas.forEach(t => {
-            const spItem = (t.subdivision || []).find(s => s.id === spActivo.id);
-            const m = (spItem && spItem.monto !== undefined) ? Number(spItem.monto) : (t.monto * (spActivo.porcentaje / 100.0));
-            sumaAsigSub += m;
-        });
-        asignadoMostrar = Math.round(sumaAsigSub * 100) / 100;
-        disponibleMostrar = Math.max(0, Math.round((ingresoMostrar - asignadoMostrar) * 100) / 100);
-        esExcedido = (asignadoMostrar > ingresoMostrar);
-        pctAsignadoMostrar = ingresoMostrar > 0 ? (asignadoMostrar / ingresoMostrar) * 100 : 0;
-        pctDisponibleMostrar = Math.max(0, 100.0 - pctAsignadoMostrar);
-        tagSub = `${spActivo.nombre.toUpperCase()} · ${spActivo.porcentaje}%`;
-    }
-
-    setEl('lbl-pres-kpi-ingreso', fmt(ingresoMostrar));
-    setEl('lbl-pres-kpi-ingreso-sub', tagSub);
-
-    setEl('lbl-pres-kpi-asignado', fmt(asignadoMostrar));
+    setEl('lbl-pres-kpi-asignado', fmt(asignado));
     const badgeAsig = document.getElementById('badge-pres-asignado');
     if (badgeAsig) {
-        badgeAsig.textContent = `${pctAsignadoMostrar.toFixed(1)}% ${spActivo ? 'del sub-periodo' : 'del total'}`;
-        badgeAsig.className = `pnl-badge ${esExcedido ? 'badge-danger' : 'badge-gold'}`;
+        badgeAsig.textContent = `${pctAsignado.toFixed(1)}% del ingreso`;
+        badgeAsig.className = `pnl-badge ${res.excedido ? 'badge-danger' : 'badge-gold'}`;
     }
 
-    setEl('lbl-pres-kpi-disponible', fmt(disponibleMostrar));
+    setEl('lbl-pres-kpi-disponible', fmt(res.disponible_monto));
     const badgeDisp = document.getElementById('badge-pres-disponible');
     if (badgeDisp) {
-        if (esExcedido) {
-            badgeDisp.textContent = `Excedido en ${(pctAsignadoMostrar - 100).toFixed(1)}%`;
+        if (res.excedido) {
+            badgeDisp.textContent = 'Algún pago está excedido';
             badgeDisp.className = 'pnl-badge badge-danger';
         } else {
-            badgeDisp.textContent = `${pctDisponibleMostrar.toFixed(1)}% libre`;
+            badgeDisp.textContent = `${pctDisponible.toFixed(1)}% libre`;
             badgeDisp.className = 'pnl-badge badge-success';
         }
     }
 
-    // Calcular ahorro / inversión proyectada
-    let ahorroInvMonto = 0;
-    let ahorroInvPct = 0;
-    tarjetas.forEach(t => {
-        const n = t.nombre.toLowerCase();
-        if (n.includes('inversión') || n.includes('inversion') || n.includes('etf') || n.includes('ahorro') || n.includes('cetes') || n.includes('fondo') || n.includes('renta fija')) {
-            const spItem = spActivo ? (t.subdivision || []).find(s => s.id === spActivo.id) : null;
-            const montoT = spItem ? Number(spItem.monto) : (spActivo ? (t.monto * (spActivo.porcentaje / 100.0)) : t.monto);
-            ahorroInvMonto += montoT;
-        }
-    });
-    ahorroInvPct = ingresoMostrar > 0 ? (ahorroInvMonto / ingresoMostrar) * 100 : 0;
-    setEl('lbl-pres-kpi-inv', fmt(ahorroInvMonto));
+    const inversion = data.tarjetas.reduce((acc, t) => acc + (esInversion(t.nombre) ? t.monto : 0), 0);
+    setEl('lbl-pres-kpi-inv', fmt(inversion));
     const badgeInv = document.getElementById('badge-pres-inv');
     if (badgeInv) {
-        badgeInv.textContent = `${ahorroInvPct.toFixed(1)}% tasa ahorro/inv.`;
+        badgeInv.textContent = `${(ingreso > 0 ? (inversion / ingreso) * 100 : 0).toFixed(1)}% tasa ahorro/inv.`;
         badgeInv.className = 'pnl-badge badge-success';
-    }
-}
-
-function renderBarraDistribucion(tarjetas, res, cfg) {
-    const track = document.getElementById('presupuesto-alloc-track');
-    const legend = document.getElementById('presupuesto-alloc-legend');
-    if (!track) return;
-
-    track.innerHTML = '';
-    if (legend) legend.innerHTML = '';
-
-    if (tarjetas.length === 0) {
-        track.innerHTML = `<div class="pres-alloc-slice pres-slice-empty" style="width: 100%;" title="Sin tarjetas configuradas (100% sin asignar)"></div>`;
-        return;
-    }
-
-    const subperiodos = cfg.subdivision_config || [];
-    const esSubperiodo = (subperiodoActivoId !== 'total');
-    const spActivo = esSubperiodo ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
-
-    let ingresoBaseRef = cfg.ingreso_base;
-    if (spActivo && spActivo.monto > 0) {
-        ingresoBaseRef = spActivo.monto;
-    }
-
-    let sumaSlices = 0;
-    tarjetas.forEach(t => {
-        let montoCard = t.monto;
-        let pct = t.porcentaje;
-        if (spActivo) {
-            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
-            montoCard = (spItem && spItem.monto !== undefined) ? Number(spItem.monto) : (t.monto * (spActivo.porcentaje / 100.0));
-            pct = ingresoBaseRef > 0 ? (montoCard / ingresoBaseRef) * 100 : 0;
-        }
-        pct = Math.max(0, Math.min(100, pct));
-        if (pct <= 0) return;
-        sumaSlices += pct;
-
-        const slice = document.createElement('div');
-        slice.className = `pres-alloc-slice pres-color-${escapeHTML(t.color)}`;
-        slice.style.width = `${pct}%`;
-        slice.title = `${t.nombre}: ${pct.toFixed(1)}% (${fmt(montoCard)})`;
-        track.appendChild(slice);
-
-        if (legend) {
-            const item = document.createElement('div');
-            item.className = 'pres-legend-item';
-            item.innerHTML = `<span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${fmt(montoCard)})</span>`;
-            legend.appendChild(item);
-        }
-    });
-
-    const librePct = Math.max(0, Math.round((100.0 - sumaSlices) * 10) / 10);
-    const libreMonto = Math.max(0, Math.round((ingresoBaseRef - (ingresoBaseRef * (sumaSlices / 100))) * 100) / 100);
-
-    if (librePct > 0) {
-        const sliceDisp = document.createElement('div');
-        sliceDisp.className = 'pres-alloc-slice pres-slice-libre';
-        sliceDisp.style.width = `${librePct}%`;
-        sliceDisp.title = `Disponible sin asignar: ${librePct.toFixed(1)}% (${fmt(libreMonto)})`;
-        track.appendChild(sliceDisp);
-
-        if (legend) {
-            const item = document.createElement('div');
-            item.className = 'pres-legend-item pres-legend-libre';
-            item.innerHTML = `<span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${fmt(libreMonto)})</span>`;
-            legend.appendChild(item);
-        }
     }
 }
 
@@ -338,7 +140,34 @@ function nombrePago(orden, frecuencia) {
     return 'Pago del mes';
 }
 
-// Un bloque por pago activo: día de cobro, ingreso del pago, lo asignado y sus tarjetas
+// Distribución del ingreso de un pago: cada tarjeta es un tramo, y lo que queda es el libre
+function renderDistribucionPago(u) {
+    if (u.ingreso <= 0) {
+        return '<p class="pres-pago-vacio">Define tu ingreso fijo base para repartirlo entre tus tarjetas.</p>';
+    }
+    const tramos = u.tarjetas.filter(t => t.monto > 0).map(t => ({ t, pct: (t.monto / u.ingreso) * 100 }));
+    const sumaPct = tramos.reduce((acc, tr) => acc + tr.pct, 0);
+    // Si el pago está excedido, los tramos se reescalan para que quepan en la barra
+    const escala = sumaPct > 100 ? 100 / sumaPct : 1;
+    const librePct = Math.max(0, 100 - sumaPct);
+    const libreMonto = Math.max(0, u.ingreso - u.total_asignado);
+
+    const slices = tramos.map(({ t, pct }) => `
+        <div class="pres-alloc-slice pres-color-${escapeHTML(t.color)}" style="width: ${(pct * escala).toFixed(2)}%" title="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}% (${fmt(t.monto)})"></div>`).join('');
+    const leyenda = tramos.map(({ t, pct }) => `
+        <span class="pres-legend-item"><span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${fmt(t.monto)})</span></span>`).join('');
+    const sliceLibre = librePct > 0 ? `<div class="pres-alloc-slice pres-slice-libre" style="width: ${librePct.toFixed(2)}%" title="Por asignar: ${librePct.toFixed(1)}% (${fmt(libreMonto)})"></div>` : '';
+    const legendLibre = librePct > 0 ? `<span class="pres-legend-item pres-legend-libre"><span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${fmt(libreMonto)})</span></span>` : '';
+
+    return `
+        <div class="pres-pago-dist">
+            <div class="pres-pago-dist-head"><span>Distribución del ingreso</span>${u.excedido ? '<span class="pres-pago-excedido">Excedido</span>' : ''}</div>
+            <div class="pres-alloc-track-wrap"><div class="pres-alloc-track">${slices}${sliceLibre}</div></div>
+            <div class="pres-alloc-legend">${leyenda}${legendLibre}</div>
+        </div>`;
+}
+
+// Un bloque por pago activo: día de cobro, distribución del ingreso y tarjetas de ese pago
 function renderPagos(data) {
     const lista = document.getElementById('pres-pagos-lista');
     if (!lista) return;
@@ -363,18 +192,83 @@ function renderPagos(data) {
                     <select class="select-calc pres-pago-dia" aria-label="Día de cobro de ${escapeHTML(nombre)}">${opcionesDia}</select>
                 </label>
             </div>
+            ${renderDistribucionPago(u)}
             <div class="pres-pago-stats">
                 <span>Asignado: <strong>${fmt(u.total_asignado)}</strong></span>
                 <span>Libre: <strong>${fmt(u.libre)}</strong></span>
-                ${u.excedido ? '<span class="pres-pago-excedido">Las tarjetas superan el ingreso de este pago</span>' : ''}
             </div>
             <div class="grid-presupuesto pres-pago-grid"></div>
             <button type="button" class="btn-secondary pres-pago-add">Añadir tarjeta a ${escapeHTML(nombre)}</button>
         `;
         bloque.querySelector('.pres-pago-dia').addEventListener('change', (e) => guardarDiaPago(u.orden, e.target.value));
         bloque.querySelector('.pres-pago-add').addEventListener('click', () => abrirModalCrearTarjeta(u.orden));
-        renderGridTarjetas(u.tarjetas, cfg, bloque.querySelector('.pres-pago-grid'), u);
+        renderGridTarjetas(u, bloque.querySelector('.pres-pago-grid'));
         lista.appendChild(bloque);
+    });
+}
+
+// Tarjetas de un pago: el monto se compara con el ingreso de ese pago y el día es el suyo
+function renderGridTarjetas(pago, grid) {
+    if (pago.tarjetas.length === 0) {
+        grid.innerHTML = `<p class="pres-pago-vacio">Sin tarjetas en este pago.</p>`;
+        return;
+    }
+
+    grid.innerHTML = '';
+    pago.tarjetas.forEach(t => {
+        const card = document.createElement('div');
+        card.className = `card pres-card pres-card-accent-${escapeHTML(t.color)}`;
+        const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
+        const eq = t.equivalentes || {};
+        const pctPago = pago.ingreso > 0 ? (t.monto / pago.ingreso) * 100 : 0;
+        const diaBadge = pago.dia_pago ? `
+            <span class="pres-card-dia-badge" title="Día de cargo de este pago: ${pago.dia_pago}">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Día ${pago.dia_pago}
+            </span>` : '';
+
+        card.innerHTML = `
+            <div class="pres-card-header">
+                <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)}">
+                    ${iconSvg}
+                </div>
+                <div class="pres-card-titles">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
+                        ${diaBadge}
+                    </div>
+                    ${t.notas ? `<p class="pres-card-notes">${escapeHTML(t.notas)}</p>` : ''}
+                </div>
+                <div class="pres-card-actions">
+                    <button type="button" class="btn-icon-edit" title="Editar tarjeta">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button type="button" class="btn-icon-del" title="Eliminar tarjeta">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pres-card-metric-block">
+                <div class="pres-card-pct-badge pres-badge-${escapeHTML(t.color)}">${pctPago.toFixed(1)}% de este pago</div>
+                <div class="pres-card-amount">${fmt(t.monto)}</div>
+                <div class="pres-card-freq-tag">en este pago</div>
+            </div>
+
+            <div class="pres-card-progress-bar">
+                <div class="pres-card-progress-fill pres-color-${escapeHTML(t.color)}" style="width: ${Math.min(100, pctPago).toFixed(2)}%"></div>
+            </div>
+
+            <div class="pres-card-equivalences">
+                <span>Mensual: <strong>${fmt(eq.mensual)}</strong></span>
+                <span>Quincenal: <strong>${fmt(eq.quincenal)}</strong></span>
+                <span>Semanal: <strong>${fmt(eq.semanal)}</strong></span>
+            </div>
+        `;
+
+        card.querySelector('.btn-icon-edit').addEventListener('click', () => abrirModalEditarTarjeta(t));
+        card.querySelector('.btn-icon-del').addEventListener('click', () => eliminarTarjetaPresupuesto(t.id, t.nombre));
+        grid.appendChild(card);
     });
 }
 
@@ -399,200 +293,23 @@ async function guardarDiaPago(orden, valor) {
     }
 }
 
-// Con `pago` (el pago activo) el grid muestra solo sus tarjetas y el día que cuenta es el del pago
-function renderGridTarjetas(tarjetas, cfg, grid = document.getElementById('grid-tarjetas-presupuesto'), pago = null) {
-    if (!grid) return;
-
-    if (pago && tarjetas.length === 0) {
-        grid.innerHTML = `<p class="pres-pago-vacio">Sin tarjetas en este pago.</p>`;
-        return;
-    }
-
-    if (tarjetas.length === 0) {
-        grid.innerHTML = `
-            <div class="pres-empty-state">
-                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-                </svg>
-                <h3>Aún no has creado tarjetas de presupuesto</h3>
-                <p>Divide tu dinero para saber con exactitud cuánto destinas a gastos fijos, inversión en ETFs, ahorro y diversión.</p>
-                <div class="pres-empty-actions">
-                    <button type="button" class="btn-primary" data-on-click="[[&quot;abrirModalCrearTarjeta&quot;]]">+ Crear Primera Tarjeta</button>
-                    <button type="button" class="btn-secondary" data-on-click="[[&quot;aplicarPlantillaPresupuesto&quot;, &quot;50-30-20&quot;]]">Plantilla Regla 50/30/20</button>
-                    <button type="button" class="btn-secondary" data-on-click="[[&quot;aplicarPlantillaPresupuesto&quot;, &quot;inversionista&quot;]]">Plantilla Perfil Inversionista</button>
-                </div>
-            </div>`;
-        return;
-    }
-
-    const subperiodos = cfg.subdivision_config || [];
-    const esSubperiodo = !pago && (subperiodoActivoId !== 'total');
-    const spActivo = esSubperiodo ? subperiodos.find(sp => sp.id === subperiodoActivoId) : null;
-
-    grid.innerHTML = '';
-    tarjetas.forEach(t => {
-        const card = document.createElement('div');
-        card.className = `card pres-card pres-card-accent-${escapeHTML(t.color)}`;
-        const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
-        const eq = t.equivalentes || {};
-
-        let montoMostrar = t.monto;
-        let tagFreq = FRECUENCIA_LABEL[cfg.frecuencia] || '';
-        let badgePctTxt = `${t.porcentaje.toFixed(1)}%`;
-        if (pago) tagFreq = 'en este pago';
-
-        if (spActivo) {
-            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
-            montoMostrar = spItem ? spItem.monto : Math.round(t.monto * (spActivo.porcentaje / 100.0) * 100) / 100;
-            const diaTag = (spItem && spItem.dia) ? ` · Día ${spItem.dia}` : (t.dia_pago ? ` · Día ${t.dia_pago}` : '');
-            tagFreq = `en ${spActivo.nombre}${diaTag}`;
-            badgePctTxt = `${t.porcentaje.toFixed(1)}% (${spActivo.porcentaje}% de periodo)`;
-        }
-
-        // Mini fila de desglose de sub-periodos si está en vista 'total' y hay subdivisión activa
-        let miniDesgloseHtml = '';
-        if (!esSubperiodo && t.subdivision && t.subdivision.length > 0) {
-            miniDesgloseHtml = `
-                <div class="pres-card-subperiodo-breakdown">
-                    <div class="pres-card-sub-pills-row">
-                        ${t.subdivision.map(sp => {
-                            const mostrarDiaSp = sp.monto > 0 && sp.dia;
-                            return `
-                            <span class="pres-card-sub-pill" title="${escapeHTML(sp.nombre)}: ${sp.porcentaje}%${mostrarDiaSp ? ' · Día ' + sp.dia : ''}">
-                                ${escapeHTML(sp.nombre)}: <strong>${fmt(sp.monto)}</strong>${mostrarDiaSp ? ` · <span class="pres-sub-pill-dia">Día ${sp.dia}</span>` : ''}
-                            </span>
-                        `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        let diaBadgeHtml = '';
-        if (spActivo) {
-            const spItem = (t.subdivision || []).find(s => s.id === subperiodoActivoId);
-            const diaActivo = (spItem && spItem.monto > 0 && spItem.dia) ? spItem.dia : ((spItem && spItem.monto > 0) ? t.dia_pago : null);
-            if (diaActivo) {
-                diaBadgeHtml = `
-                    <span class="pres-card-dia-badge" title="Día de cargo en ${escapeHTML(spActivo.nombre)}: ${diaActivo}">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                        Día ${diaActivo}
-                    </span>
-                `;
-            }
-        } else {
-            const subsConDia = (t.subdivision || []).filter(s => s.monto > 0 && s.dia);
-            if (subsConDia.length > 1) {
-                const diasSub = subsConDia.map(s => s.dia);
-                diaBadgeHtml = `
-                    <span class="pres-card-dia-badge" title="Días de cargo por sub-período: ${diasSub.join(', ')}">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                        Días ${diasSub.join(', ')}
-                    </span>
-                `;
-            } else {
-                const diaUnico = pago ? pago.dia_pago : (subsConDia.length === 1 ? subsConDia[0].dia : t.dia_pago);
-                if (diaUnico) {
-                    diaBadgeHtml = `
-                        <span class="pres-card-dia-badge" title="Día de cargo mensual programado: ${diaUnico}">
-                            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Día ${diaUnico}
-                        </span>
-                    `;
-                }
-            }
-        }
-
-        card.innerHTML = `
-            <div class="pres-card-header">
-                <div class="pres-card-icon-wrap pres-icon-${escapeHTML(t.color)}">
-                    ${iconSvg}
-                </div>
-                <div class="pres-card-titles">
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
-                        ${diaBadgeHtml}
-                    </div>
-                    ${t.notas ? `<p class="pres-card-notes">${escapeHTML(t.notas)}</p>` : ''}
-                </div>
-                <div class="pres-card-actions">
-                    <button type="button" class="btn-icon-edit" data-id="${t.id}" title="Editar tarjeta">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                    <button type="button" class="btn-icon-del" data-id="${t.id}" title="Eliminar tarjeta">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="pres-card-metric-block">
-                <div class="pres-card-pct-badge pres-badge-${escapeHTML(t.color)}">${badgePctTxt}</div>
-                <div class="pres-card-amount">${fmt(montoMostrar)}</div>
-                <div class="pres-card-freq-tag">${tagFreq}</div>
-            </div>
-
-            <div class="pres-card-progress-bar">
-                <div class="pres-card-progress-fill pres-color-${escapeHTML(t.color)}" style="width: ${Math.min(100, t.porcentaje)}%"></div>
-            </div>
-
-            ${miniDesgloseHtml}
-
-            <div class="pres-card-equivalences">
-                <span>Mensual: <strong>${fmt(eq.mensual)}</strong></span>
-                <span>Quincenal: <strong>${fmt(eq.quincenal)}</strong></span>
-                <span>Semanal: <strong>${fmt(eq.semanal)}</strong></span>
-            </div>
-        `;
-
-        card.querySelector('.btn-icon-edit').addEventListener('click', () => abrirModalEditarTarjeta(t));
-        card.querySelector('.btn-icon-del').addEventListener('click', () => eliminarTarjetaPresupuesto(t.id, t.nombre));
-        grid.appendChild(card);
-    });
-}
-
-// -----------------------------------------------------------------------------
-// Sincronización de Ingreso Base, Frecuencia y Subdivisión
-// -----------------------------------------------------------------------------
 
 export async function guardarConfigPresupuesto(e) {
     if (e && e.preventDefault) e.preventDefault();
     const inp = document.getElementById('pres-ingreso-base');
     const selFrec = document.getElementById('pres-frecuencia');
-    const selSub = document.getElementById('pres-subdivision-tipo');
     const inpDia = document.getElementById('pres-ingreso-dia');
     if (!inp || !selFrec) return;
 
     const ingreso_base = parseFloat(inp.value) || 0;
     const frecuencia = selFrec.value;
-    const subdivision_tipo = selSub ? selSub.value : 'ninguna';
     const dia_pago = (inpDia && inpDia.value) ? parseInt(inpDia.value, 10) : null;
-
-    // Si seleccionó personalizada pero aún no tiene periodos, abrir el modal
-    if (subdivision_tipo === 'personalizada' && (!cachePresupuesto?.config?.subdivision_config?.length || cachePresupuesto.config.subdivision_tipo !== 'personalizada')) {
-        abrirModalSubdivisionPersonalizada();
-        return;
-    }
 
     try {
         const res = await apiFetch('/api/presupuesto/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingreso_base, frecuencia, subdivision_tipo, dia_pago })
+            body: JSON.stringify({ ingreso_base, frecuencia, dia_pago })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -606,23 +323,10 @@ export async function guardarConfigPresupuesto(e) {
     }
 }
 
-// Manejador del cambio de frecuencia en el selector
-export function alCambiarFrecuenciaPresupuesto() {
-    const selFrec = document.getElementById('pres-frecuencia');
-    if (!selFrec) return;
-    actualizarOpcionesSubdivisionSelect(selFrec.value, 'ninguna');
-    guardarConfigPresupuesto();
-}
 
-// Manejador del cambio de subdivisión en el selector
-export function alCambiarSubdivisionSelect() {
-    const selSub = document.getElementById('pres-subdivision-tipo');
-    if (!selSub) return;
-    if (selSub.value === 'personalizada') {
-        abrirModalSubdivisionPersonalizada();
-    } else {
-        guardarConfigPresupuesto();
-    }
+export function alCambiarFrecuenciaPresupuesto() {
+    if (!document.getElementById('pres-frecuencia')) return;
+    guardarConfigPresupuesto();
 }
 
 export function abrirModalExportarPresupuesto() {
@@ -663,13 +367,6 @@ export function abrirModalExportarPresupuesto() {
         } else {
             contItems.innerHTML = tarjetas.map(t => {
                 const iconSvg = ICONOS_SVG[t.icono] || ICONOS_SVG['wallet'];
-                let subDivididoTxt = '';
-                if (t.distribucion_subperiodos && Array.isArray(t.distribucion_subperiodos)) {
-                    const subsPositivos = t.distribucion_subperiodos.filter(s => (parseFloat(s.monto) || 0) > 0);
-                    if (subsPositivos.length > 1) {
-                        subDivididoTxt = ` · <span style="color: var(--cyan-color); font-weight: 500;">Dividida en ${subsPositivos.length} cargos</span>`;
-                    }
-                }
                 return `
                     <div class="pres-import-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; margin-bottom: 0;">
@@ -682,7 +379,7 @@ export function abrirModalExportarPresupuesto() {
                                     ${escapeHTML(t.nombre)}
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted);">
-                                    ${t.unidad_orden ? escapeHTML(nombrePago(t.unidad_orden, cfg.frecuencia)) + ' · ' : ''}${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>${subDivididoTxt}
+                                    ${t.unidad_orden ? escapeHTML(nombrePago(t.unidad_orden, cfg.frecuencia)) + ' · ' : ''}${t.notas ? escapeHTML(t.notas) + ' · ' : ''}Periodicidad: <strong>${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia}</strong>
                                 </div>
                             </div>
                         </label>
@@ -728,6 +425,7 @@ export function abrirModalExportarPresupuesto() {
 
     modal.classList.remove('hidden');
 }
+
 
 export function cerrarModalExportarPresupuesto() {
     const modal = document.getElementById('modal-exportar-presupuesto');
@@ -822,118 +520,11 @@ export async function ejecutarExportarPresupuesto() {
     }
 }
 
-export async function aplicarPlantillaPresupuesto(plantillaNombre) {
-    if (!confirm(`¿Deseas aplicar la plantilla "${plantillaNombre === '50-30-20' ? 'Regla 50/30/20' : 'Perfil Inversionista'}"? Se reemplazarán las tarjetas existentes.`)) {
-        return;
-    }
-    try {
-        const res = await apiFetch('/api/presupuesto/plantilla', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plantilla: plantillaNombre })
-        });
-        if (!res.ok) {
-            toast('No se pudo aplicar la plantilla.', 'error');
-            return;
-        }
-        toast('Plantilla aplicada con éxito.', 'ok');
-        cargarPresupuesto();
-    } catch (err) {
-        toast('Error al aplicar plantilla.', 'error');
-    }
-}
 
-// -----------------------------------------------------------------------------
-// Modal Crear / Editar Tarjeta con sincronización $ ⇄ %
-// -----------------------------------------------------------------------------
-
-let idTarjetaEditando = null;
-
-function renderSubperiodosInputsTarjeta(tarjeta) {
-    const wrap = document.getElementById('tarjeta-pres-subdivision-wrapper');
-    const cont = document.getElementById('tarjeta-pres-subdivision-items');
-    if (!wrap || !cont) return;
-
-    const subTipo = cachePresupuesto?.config?.subdivision_tipo;
-    const subConfig = cachePresupuesto?.config?.subdivision_config || [];
-
-    if (!subTipo || subTipo === 'ninguna' || subConfig.length === 0) {
-        wrap.classList.add('hidden');
-        cont.innerHTML = '';
-        return;
-    }
-
-    wrap.classList.remove('hidden');
-    cont.innerHTML = '';
-
-    const montoTotal = tarjeta ? Number(tarjeta.monto) : (parseFloat(document.getElementById('tarjeta-pres-monto')?.value) || 0);
-    const distribucionExistente = (tarjeta && tarjeta.subdivision) ? tarjeta.subdivision : [];
-
-    subConfig.forEach((sp, idx) => {
-        let valAsignado = '';
-        let valDia = '';
-        if (distribucionExistente.length > idx) {
-            if (distribucionExistente[idx].monto !== undefined && distribucionExistente[idx].monto !== null) {
-                valAsignado = distribucionExistente[idx].monto;
-            }
-            if (distribucionExistente[idx].dia !== undefined && distribucionExistente[idx].dia !== null) {
-                valDia = distribucionExistente[idx].dia;
-            }
-        } else if (montoTotal > 0) {
-            valAsignado = (Math.round(montoTotal * (Number(sp.porcentaje || 0) / 100) * 100) / 100).toFixed(2);
-        }
-
-        const row = document.createElement('div');
-        row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;';
-        row.innerHTML = `
-            <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 500; min-width: 80px;">${escapeHTML(sp.nombre)}:</span>
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end;">
-                <div class="calc-input-adornment" style="max-width: 130px;">
-                    <span class="calc-adornment-prefix">$</span>
-                    <input type="number" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix input-subperiodo-tarjeta"
-                        data-sub-id="${escapeHTML(sp.id)}" data-sub-nombre="${escapeHTML(sp.nombre)}" value="${valAsignado !== '' ? valAsignado : ''}">
-                </div>
-                <div class="calc-input-adornment" style="max-width: 96px;" title="Día de cargo mensual para este sub-período (1-31)">
-                    <span class="calc-adornment-prefix">Día</span>
-                    <input type="number" min="1" max="31" placeholder="--" class="input-calc calc-has-prefix-dia input-subperiodo-dia"
-                        data-sub-id="${escapeHTML(sp.id)}" value="${valDia !== '' ? valDia : ''}">
-                </div>
-            </div>
-        `;
-        cont.appendChild(row);
-    });
-
-    const subInputs = cont.querySelectorAll('.input-subperiodo-tarjeta');
-    subInputs.forEach(inp => {
-        inp.addEventListener('input', () => {
-            let total = 0;
-            let anyEntered = false;
-            subInputs.forEach(i => {
-                if (i.value !== '') {
-                    anyEntered = true;
-                    total += parseFloat(i.value) || 0;
-                }
-            });
-            if (anyEntered) {
-                const inpMonto = document.getElementById('tarjeta-pres-monto');
-                if (inpMonto) {
-                    inpMonto.value = total.toFixed(2);
-                    const ingreso = Number(cachePresupuesto?.config?.ingreso_base) || 0;
-                    const inpPct = document.getElementById('tarjeta-pres-pct');
-                    if (inpPct) {
-                        inpPct.value = (ingreso > 0 && total > 0) ? ((total / ingreso) * 100).toFixed(1) : '';
-                    }
-                }
-            }
-        });
-    });
-}
-
-// Una tarjeta de pago toma el día y no se subdivide: se ocultan esos campos
+// Una tarjeta de pago toma el día del pago: el campo de día no se muestra
 function ajustarModalParaPago(esPago) {
     const campoDia = document.getElementById('tarjeta-pres-dia')?.closest('.form-group');
     if (campoDia) campoDia.classList.toggle('hidden', esPago);
-    if (esPago) document.getElementById('tarjeta-pres-subdivision-wrapper')?.classList.add('hidden');
 }
 
 export function abrirModalCrearTarjeta(pago = null) {
@@ -952,9 +543,8 @@ export function abrirModalCrearTarjeta(pago = null) {
     if (titulo) {
         titulo.textContent = pagoTarjetaEditando
             ? `Nueva tarjeta · ${nombrePago(pagoTarjetaEditando, cachePresupuesto?.config?.frecuencia)}`
-            : 'Nueva Tarjeta de Presupuesto';
+            : 'Nueva tarjeta de presupuesto';
     }
-    renderSubperiodosInputsTarjeta(null);
     ajustarModalParaPago(pagoTarjetaEditando !== null);
     modal.classList.remove('hidden');
 
@@ -978,8 +568,7 @@ export function abrirModalEditarTarjeta(t) {
     const inpDia = document.getElementById('tarjeta-pres-dia');
     if (inpDia) inpDia.value = (t.dia_pago !== undefined && t.dia_pago !== null) ? t.dia_pago : '';
 
-    if (titulo) titulo.textContent = 'Editar Tarjeta de Presupuesto';
-    renderSubperiodosInputsTarjeta(t);
+    if (titulo) titulo.textContent = 'Editar tarjeta de presupuesto';
     ajustarModalParaPago(pagoTarjetaEditando !== null);
     modal.classList.remove('hidden');
 }
@@ -991,28 +580,6 @@ export function cerrarModalTarjetaPresupuesto() {
     pagoTarjetaEditando = null;
 }
 
-function sincronizarSubperiodosDesdeMonto(montoTotal) {
-    const inputsSub = document.querySelectorAll('.input-subperiodo-tarjeta');
-    if (inputsSub.length === 0) return;
-    const subConfig = cachePresupuesto?.config?.subdivision_config || [];
-
-    let sumaActual = 0;
-    inputsSub.forEach(inp => {
-        sumaActual += (parseFloat(inp.value) || 0);
-    });
-
-    inputsSub.forEach((inp, idx) => {
-        let ratio = 0;
-        if (sumaActual > 0) {
-            ratio = (parseFloat(inp.value) || 0) / sumaActual;
-        } else if (subConfig[idx] && subConfig[idx].porcentaje) {
-            ratio = Number(subConfig[idx].porcentaje) / 100.0;
-        } else {
-            ratio = 1.0 / inputsSub.length;
-        }
-        inp.value = montoTotal > 0 ? (Math.round(montoTotal * ratio * 100) / 100).toFixed(2) : '';
-    });
-}
 
 function sincronizarInputsModal(origen) {
     if (!cachePresupuesto) return;
@@ -1040,24 +607,8 @@ function sincronizarInputsModal(origen) {
             inpMonto.value = monto.toFixed(2);
         }
     }
-
-    if (origen === 'monto' || origen === 'pct') {
-        sincronizarSubperiodosDesdeMonto(monto);
-    }
 }
 
-export function aplicarPresetChip(nombre, icono, color, notasSugeridas, pctSugerido) {
-    document.getElementById('tarjeta-pres-nombre').value = nombre;
-    document.getElementById('tarjeta-pres-icono').value = icono;
-    document.getElementById('tarjeta-pres-color').value = color;
-    document.getElementById('tarjeta-pres-notas').value = notasSugeridas;
-    if (pctSugerido) {
-        document.getElementById('tarjeta-pres-pct').value = pctSugerido;
-        sincronizarInputsModal('pct');
-    }
-}
-
-let guardandoTarjeta = false;
 
 export async function guardarTarjetaPresupuesto(e) {
     e.preventDefault();
@@ -1090,54 +641,8 @@ export async function guardarTarjetaPresupuesto(e) {
         toast('Define primero tu ingreso fijo base para asignar tarjetas por porcentaje.', 'error');
         return;
     }
-    let distribucion_subperiodos = undefined;
-
-    const inputsSub = document.querySelectorAll('.input-subperiodo-tarjeta');
-    if (inputsSub.length > 0) {
-        const subItems = [];
-        let anyCustomDay = false;
-        let anyCustomMonto = false;
-        const subConfig = cachePresupuesto?.config?.subdivision_config || [];
-
-        inputsSub.forEach((inp, idx) => {
-            const val = parseFloat(inp.value) || 0;
-            const diaInp = document.querySelector(`.input-subperiodo-dia[data-sub-id="${inp.dataset.subId}"]`);
-            const diaVal = (val > 0 && diaInp && diaInp.value) ? parseInt(diaInp.value, 10) : null;
-            if (diaVal !== null) anyCustomDay = true;
-
-            const expectedMonto = (subConfig[idx] && monto > 0) ? Math.round(monto * (Number(subConfig[idx].porcentaje || 0) / 100) * 100) / 100 : 0;
-            if (Math.abs(val - expectedMonto) > 0.05) {
-                anyCustomMonto = true;
-            }
-
-            subItems.push({
-                id: inp.dataset.subId,
-                nombre: inp.dataset.subNombre,
-                monto: Math.round(val * 100) / 100,
-                porcentaje: monto > 0 ? Number(((val / monto) * 100).toFixed(1)) : 0,
-                dia: diaVal
-            });
-        });
-
-        // Si solo hay un sub-período con monto > 0 y el usuario definió Día de Cargo General, sincronizarlo
-        const activos = subItems.filter(s => s.monto > 0);
-        if (activos.length === 1 && dia_pago !== null) {
-            activos[0].dia = dia_pago;
-            anyCustomDay = true;
-        }
-
-        if (anyCustomDay || anyCustomMonto) {
-            distribucion_subperiodos = subItems;
-        } else {
-            distribucion_subperiodos = null;
-        }
-    }
-
     const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago };
     if (!idEditar && pagoCrear !== null) body.unidad_orden = pagoCrear;
-    if (distribucion_subperiodos !== undefined) {
-        body.distribucion_subperiodos = distribucion_subperiodos;
-    }
 
     guardandoTarjeta = true;
     try {
@@ -1172,6 +677,7 @@ export async function guardarTarjetaPresupuesto(e) {
     }
 }
 
+
 export async function eliminarTarjetaPresupuesto(id, nombre) {
     if (!confirm(`¿Eliminar la tarjeta "${nombre}" del presupuesto?`)) return;
     try {
@@ -1187,173 +693,6 @@ export async function eliminarTarjetaPresupuesto(id, nombre) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Modal: Editor de Sub-periodos Personalizados
-// -----------------------------------------------------------------------------
-
-export function abrirModalSubdivisionPersonalizada() {
-    const modal = document.getElementById('modal-subdivision-personalizada');
-    if (!modal) return;
-
-    const cfg = cachePresupuesto?.config || {};
-    const subperiodos = cfg.subdivision_config || [];
-
-    if (subperiodos.length > 0) {
-        editorSubperiodosTemp = subperiodos.map(sp => ({
-            id: sp.id || ('sp_' + Math.random().toString(36).substr(2, 6)),
-            nombre: sp.nombre,
-            porcentaje: sp.porcentaje
-        }));
-    } else {
-        // Pre-cargar por defecto según la frecuencia
-        if (cfg.frecuencia === 'quincenal') {
-            editorSubperiodosTemp = [
-                { id: 's1', nombre: 'Semana 1', porcentaje: 50.0 },
-                { id: 's2', nombre: 'Semana 2', porcentaje: 50.0 }
-            ];
-        } else {
-            editorSubperiodosTemp = [
-                { id: 'q1', nombre: 'Quincena 1', porcentaje: 50.0 },
-                { id: 'q2', nombre: 'Quincena 2', porcentaje: 50.0 }
-            ];
-        }
-    }
-
-    renderFilasEditorSubperiodos();
-    modal.classList.remove('hidden');
-}
-
-export function cerrarModalSubdivisionPersonalizada() {
-    const modal = document.getElementById('modal-subdivision-personalizada');
-    if (modal) modal.classList.add('hidden');
-}
-
-function renderFilasEditorSubperiodos() {
-    const contenedor = document.getElementById('lista-subperiodos-editor');
-    const badgeSuma = document.getElementById('subperiodos-suma-badge');
-    if (!contenedor) return;
-
-    contenedor.innerHTML = '';
-    let suma = 0;
-
-    editorSubperiodosTemp.forEach((sp, idx) => {
-        suma += Number(sp.porcentaje) || 0;
-        const row = document.createElement('div');
-        row.className = 'subperiodo-editor-row';
-        row.innerHTML = `
-            <input type="text" class="subperiodo-editor-input-name" value="${escapeHTML(sp.nombre)}" placeholder="Nombre del periodo" data-idx="${idx}">
-            <div class="calc-input-adornment" style="width: 105px;">
-                <input type="number" min="0" max="100" step="any" class="subperiodo-editor-input-pct" value="${sp.porcentaje}" data-idx="${idx}">
-                <span class="calc-adornment-suffix">%</span>
-            </div>
-            ${editorSubperiodosTemp.length > 2 ? `
-                <button type="button" class="btn-remove-subperiodo" data-idx="${idx}" title="Eliminar periodo">&times;</button>
-            ` : '<div style="width: 32px;"></div>'}
-        `;
-
-        row.querySelector('.subperiodo-editor-input-name').addEventListener('input', (e) => {
-            editorSubperiodosTemp[idx].nombre = e.target.value.trim() || `Periodo ${idx + 1}`;
-        });
-
-        row.querySelector('.subperiodo-editor-input-pct').addEventListener('input', (e) => {
-            editorSubperiodosTemp[idx].porcentaje = parseFloat(e.target.value) || 0;
-            actualizarSumaBadgeEditor();
-        });
-
-        const btnDel = row.querySelector('.btn-remove-subperiodo');
-        if (btnDel) {
-            btnDel.addEventListener('click', () => {
-                editorSubperiodosTemp.splice(idx, 1);
-                renderFilasEditorSubperiodos();
-            });
-        }
-
-        contenedor.appendChild(row);
-    });
-
-    actualizarSumaBadgeEditor();
-}
-
-function actualizarSumaBadgeEditor() {
-    const badgeSuma = document.getElementById('subperiodos-suma-badge');
-    if (!badgeSuma) return;
-
-    const suma = editorSubperiodosTemp.reduce((acc, cur) => acc + (Number(cur.porcentaje) || 0), 0);
-    const sumaRed = Math.round(suma * 10) / 10;
-    const esValido = Math.abs(sumaRed - 100.0) <= 0.1;
-
-    badgeSuma.textContent = `Suma: ${sumaRed}% ${esValido ? '✓' : '(Debe ser 100%)'}`;
-    badgeSuma.className = `pnl-badge ${esValido ? 'badge-success' : 'badge-danger'}`;
-}
-
-export function agregarPeriodoEditor() {
-    if (editorSubperiodosTemp.length >= 8) {
-        toast('Máximo 8 sub-periodos permitidos.', 'error');
-        return;
-    }
-    const n = editorSubperiodosTemp.length + 1;
-    editorSubperiodosTemp.push({
-        id: 'sp_' + Date.now() + '_' + n,
-        nombre: `Periodo ${n}`,
-        porcentaje: 0.0
-    });
-    renderFilasEditorSubperiodos();
-}
-
-export function equilibrarPeriodosEditor() {
-    const count = editorSubperiodosTemp.length;
-    if (count <= 0) return;
-
-    const basePct = Math.floor((100.0 / count) * 10) / 10;
-    let sumaAcum = 0;
-    editorSubperiodosTemp.forEach((sp, i) => {
-        if (i === count - 1) {
-            sp.porcentaje = Math.round((100.0 - sumaAcum) * 10) / 10;
-        } else {
-            sp.porcentaje = basePct;
-            sumaAcum += basePct;
-        }
-    });
-    renderFilasEditorSubperiodos();
-}
-
-export async function guardarSubdivisionPersonalizada() {
-    const suma = editorSubperiodosTemp.reduce((acc, cur) => acc + (Number(cur.porcentaje) || 0), 0);
-    if (Math.abs(suma - 100.0) > 0.2) {
-        toast(`La suma de los periodos debe ser exactamente 100% (suma actual: ${Math.round(suma * 10) / 10}%).`, 'error');
-        return;
-    }
-
-    const cfg = cachePresupuesto?.config || {};
-    try {
-        const res = await apiFetch('/api/presupuesto/config', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ingreso_base: cfg.ingreso_base,
-                frecuencia: cfg.frecuencia,
-                subdivision_tipo: 'personalizada',
-                subdivision_config: editorSubperiodosTemp
-            })
-        });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            toast(err.detail || 'Error al guardar la subdivisión.', 'error');
-            return;
-        }
-
-        toast('Sub-división personalizada aplicada.', 'ok');
-        cerrarModalSubdivisionPersonalizada();
-        cargarPresupuesto();
-    } catch (e) {
-        toast('Error de conexión al guardar subdivisión.', 'error');
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Inicialización de Listeners y Window Exports
-// -----------------------------------------------------------------------------
 
 export function inicializarPresupuesto() {
     const formConfig = document.getElementById('form-presupuesto-config');
@@ -1362,27 +701,13 @@ export function inicializarPresupuesto() {
     const selFrec = document.getElementById('pres-frecuencia');
     if (selFrec) selFrec.addEventListener('change', alCambiarFrecuenciaPresupuesto);
 
-    const selSub = document.getElementById('pres-subdivision-tipo');
-    if (selSub) selSub.addEventListener('change', alCambiarSubdivisionSelect);
-
     const formTarjeta = document.getElementById('form-tarjeta-presupuesto');
     if (formTarjeta) formTarjeta.addEventListener('submit', guardarTarjetaPresupuesto);
 
     const inpMonto = document.getElementById('tarjeta-pres-monto');
     const inpPct = document.getElementById('tarjeta-pres-pct');
-    const inpDiaGen = document.getElementById('tarjeta-pres-dia');
     if (inpMonto) inpMonto.addEventListener('input', () => sincronizarInputsModal('monto'));
     if (inpPct) inpPct.addEventListener('input', () => sincronizarInputsModal('pct'));
-    if (inpDiaGen) {
-        inpDiaGen.addEventListener('input', () => {
-            const inputsSub = Array.from(document.querySelectorAll('.input-subperiodo-tarjeta'));
-            const activos = inputsSub.filter(i => (parseFloat(i.value) || 0) > 0);
-            if (activos.length === 1) {
-                const diaInp = document.querySelector(`.input-subperiodo-dia[data-sub-id="${activos[0].dataset.subId}"]`);
-                if (diaInp) diaInp.value = inpDiaGen.value;
-            }
-        });
-    }
 }
 
 export function cerrarBannerFijosPresupuesto() {
@@ -1392,16 +717,10 @@ export function cerrarBannerFijosPresupuesto() {
     if (boxFijos) boxFijos.classList.add('hidden');
 }
 
+
 Object.assign(window, {
     abrirModalCrearTarjeta,
     cerrarModalTarjetaPresupuesto,
-    abrirModalSubdivisionPersonalizada,
-    cerrarModalSubdivisionPersonalizada,
-    agregarPeriodoEditor,
-    equilibrarPeriodosEditor,
-    guardarSubdivisionPersonalizada,
-    aplicarPresetChip,
-    aplicarPlantillaPresupuesto,
     abrirModalExportarPresupuesto,
     cerrarModalExportarPresupuesto,
     cambiarInicioCargosExportar,

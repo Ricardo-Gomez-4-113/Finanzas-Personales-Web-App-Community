@@ -760,8 +760,8 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
     # 2. En tarjetas KPI del presupuesto (get_presupuesto): resumen asignado y disponible excluyen tarjetas eliminadas
     cursor.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0 WHERE id = 1")
     cursor.execute("""
-        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden)
-        VALUES ('Suscripciones', 'film', 'purple', 10.0, 1000.0, 1)
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden, unidad_orden)
+        VALUES ('Suscripciones', 'film', 'purple', 10.0, 1000.0, 1, 1)
     """)
     t_id = cursor.lastrowid
     conn.commit()

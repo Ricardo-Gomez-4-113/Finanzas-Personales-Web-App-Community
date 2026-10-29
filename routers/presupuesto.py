@@ -55,7 +55,7 @@ class TarjetaPresupuestoCreate(BaseModel):
     notas: Optional[str] = Field("", max_length=255)
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
     distribucion_subperiodos: Optional[List[dict]] = None
-    unidad_orden: Optional[int] = Field(None, ge=1, le=4, description="Pago al que pertenece la tarjeta; vacío para el tablero general")
+    unidad_orden: int = Field(..., ge=1, le=4, description="Pago al que pertenece la tarjeta (1 a 4)")
 
 
 class UnidadPagoUpdate(BaseModel):
@@ -72,10 +72,6 @@ class TarjetaPresupuestoUpdate(BaseModel):
     orden: Optional[int] = None
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
     distribucion_subperiodos: Optional[List[dict]] = None
-
-
-class PlantillaRequest(BaseModel):
-    plantilla: Literal['50-30-20', 'inversionista']
 
 
 class ImportarFijosRequest(BaseModel):
@@ -224,27 +220,28 @@ def get_presupuesto(conn: sqlite3.Connection = Depends(get_tenant_db)):
     fijos = detectar_fijos_recurrentes(cursor, frecuencia)
 
     subperiodos = cfg["subdivision_config"] if cfg["subdivision_tipo"] != 'ninguna' else []
-    filas_tarjetas = cursor.execute(
-        "SELECT * FROM presupuesto_tarjetas WHERE unidad_orden IS NULL ORDER BY orden ASC, id ASC"
-    ).fetchall()
-    tarjetas = [serializar_tarjeta(t, ingreso_base, frecuencia, subperiodos) for t in filas_tarjetas]
-
-    total_monto = sum(t["monto"] for t in tarjetas)
-    total_pct = sum(t["porcentaje"] for t in tarjetas)
-    disponible_monto = max(0.0, round(ingreso_base - total_monto, 2))
-    disponible_pct = max(0.0, round(100.0 - total_pct, 2)) if ingreso_base > 0 else 0.0
+    unidades = _estado_unidades(cursor, cfg)
+    # Los totales suman todos los pagos activos: cada uno tiene su propio ingreso
+    activas = [u for u in unidades if u["activa"]]
+    tarjetas = [t for u in activas for t in u["tarjetas"]]
+    ingreso_total = round(ingreso_base * len(activas), 2)
+    total_monto = round(sum(t["monto"] for t in tarjetas), 2)
+    total_pct = round(sum(t["porcentaje"] for t in tarjetas), 2)
+    disponible_monto = max(0.0, round(ingreso_total - total_monto, 2))
+    disponible_pct = max(0.0, round(100.0 - total_pct, 2)) if ingreso_total > 0 else 0.0
 
     return {
         "config": cfg,
         "fijos_detectados": fijos,
         "tarjetas": tarjetas,
-        "unidades": _estado_unidades(cursor, cfg),
+        "unidades": unidades,
         "resumen": {
-            "total_asignado_monto": round(total_monto, 2),
-            "total_asignado_pct": round(total_pct, 2),
+            "ingreso_total": ingreso_total,
+            "total_asignado_monto": total_monto,
+            "total_asignado_pct": total_pct,
             "disponible_monto": disponible_monto,
             "disponible_pct": disponible_pct,
-            "excedido": total_pct > 100.0 or (ingreso_base > 0 and total_monto > ingreso_base)
+            "excedido": any(u["excedido"] for u in activas),
         }
     }
 
@@ -399,40 +396,6 @@ def exportar_presupuesto_a_fijos(
     res["fecha_inicio_cargos"] = fecha_inicio_efectiva.isoformat()
     res["inicio_cargos_modo"] = req.inicio_cargos or 'natural'
     return res
-
-
-@router.post("/api/presupuesto/plantilla", summary="Aplicar plantilla predeterminada de presupuesto")
-def aplicar_plantilla(req: PlantillaRequest, conn: sqlite3.Connection = Depends(get_tenant_db)):
-    cursor = conn.cursor()
-    cfg = obtener_config_presupuesto(cursor)
-    ingreso = float(cfg["ingreso_base"])
-
-    # Limpiar las tarjetas del tablero general (las de cada pago se conservan)
-    cursor.execute("DELETE FROM presupuesto_tarjetas WHERE unidad_orden IS NULL")
-
-    if req.plantilla == '50-30-20':
-        plantillas = [
-            ("Gastos Fijos y Necesidades", "home", "blue", 50.0, "Vivienda, comida, transporte y servicios", 1),
-            ("Estilo de Vida y Ocio", "smile", "purple", 30.0, "Salidas, compras personales, streaming", 2),
-            ("Inversión en ETFs y Ahorro", "trending-up", "emerald", 20.0, "Portafolio bursátil y fondos", 3),
-        ]
-    else:  # 'inversionista'
-        plantillas = [
-            ("Gastos Fijos", "home", "blue", 50.0, "Costos de vida esenciales", 1),
-            ("Inversión en ETFs", "trending-up", "emerald", 25.0, "VOO, QQQ, Fibras y bolsa", 2),
-            ("Fondo Renta Fija / CETES", "shield", "gold", 15.0, "CETES, Nu, pagarés y fondo de emergencia", 3),
-            ("Libre / Ocio", "smile", "purple", 10.0, "Gastos personales flexibles", 4),
-        ]
-
-    for nombre, icono, color, pct, notas, orden in plantillas:
-        monto = round(ingreso * (pct / 100.0), 2) if ingreso > 0 else 0.0
-        cursor.execute("""
-            INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (nombre, icono, color, pct, monto, notas, orden))
-
-    conn.commit()
-    return get_presupuesto(conn)
 
 
 def _resolver_montos(monto, porcentaje, ingreso):

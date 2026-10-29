@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 14
+CURRENT_TENANT_SCHEMA_VERSION = 15
 
 
 # =============================================================================
@@ -448,6 +448,23 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_presupuesto_unidad ON presupuesto_tarjetas(unidad_orden);")
         cursor.execute("PRAGMA user_version = 14;")
         current_version = 14
+
+    # -------------------------------------------------------------
+    # Versión 15: sin tablero general. Cada tarjeta pertenece a un pago; las que quedaban fuera pasan
+    # al pago 1 (con el día del ingreso fijo si el pago aún no tiene fecha). La subdivisión del
+    # presupuesto desaparece: cada pago reparte su propio ingreso.
+    # -------------------------------------------------------------
+    if current_version < 15 and CURRENT_TENANT_SCHEMA_VERSION >= 15:
+        cursor.execute("""
+            UPDATE presupuesto_unidades SET dia_pago = (SELECT dia_pago FROM presupuesto_config WHERE id = 1)
+            WHERE orden = 1 AND dia_pago IS NULL
+              AND EXISTS (SELECT 1 FROM presupuesto_tarjetas WHERE unidad_orden IS NULL)
+              AND (SELECT dia_pago FROM presupuesto_config WHERE id = 1) IS NOT NULL;
+        """)
+        cursor.execute("UPDATE presupuesto_tarjetas SET unidad_orden = 1, distribucion_subperiodos = NULL WHERE unidad_orden IS NULL;")
+        cursor.execute("UPDATE presupuesto_config SET subdivision_tipo = 'ninguna', subdivision_config = '[]' WHERE id = 1;")
+        cursor.execute("PRAGMA user_version = 15;")
+        current_version = 15
 
     conn.commit()
 

@@ -86,12 +86,11 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * **Categorías:** cada movimiento tiene categoría; el dashboard muestra el gasto del mes por categoría.
 * **Saltar pagos:** un fijo puede saltarse una vez y una cuota MSI puede contabilizarse o aplazarse.
 
-### 9. 🧮 Presupuesto por Subperiodos
+### 9. 🧮 Presupuesto por Pagos
 * Tarjetas de presupuesto por categoría con reparto por quincenas o semanas (simétrico o personalizado).
-* Los repartos se calculan en centavos: la suma de los subperiodos siempre coincide exactamente con el total.
-* En un presupuesto quincenal, cada monto es por quincena: al exportarlo a fijos, cada cargo se repite en su día y en el de la otra quincena, así el mes cuadra con el equivalente mensual de la tarjeta.
+* Los repartos se calculan en centavos: la suma de las tarjetas de un pago siempre coincide exactamente con su ingreso.
 * Pagos del periodo: según la frecuencia del ingreso (semanal 4, quincenal 2, mensual 1), aparecen bloques de pago con su día de cobro y sus propias tarjetas. Cada pago muestra su ingreso, lo asignado y lo libre, y no puede asignar más que su ingreso.
-* El tablero general sigue disponible para tarjetas que no pertenecen a un pago.
+* Cada pago tiene su propia distribución del ingreso: una barra con sus tarjetas y lo que queda libre.
 * Exportación del presupuesto a gastos fijos con fecha de inicio configurable. Es un reemplazo total: borra todos los fijos (salvo las compras a meses) y crea los del presupuesto. Cada tarjeta de un pago es un fijo mensual en el día de su pago.
 
 ### 10. 🩺 Respaldo Automático y Monitoreo
@@ -113,7 +112,7 @@ Finanzas-Personales-Web-App-Community/
 │   ├── recurrentes.py   # Fijos y compras a meses (MSI)
 │   ├── apartados.py     # Sobres y metas de ahorro
 │   ├── inversiones.py   # Posiciones bursátiles, cuentas con rendimiento y tipos de cambio
-│   ├── presupuesto.py   # Presupuesto por tarjetas y subperiodos, exportación a fijos
+│   ├── presupuesto.py   # Presupuesto por pagos del periodo, exportación a fijos
 │   ├── respaldo.py      # Respaldo, restauración y exportación a Excel
 │   └── salud.py         # Endpoint /health para Docker y monitoreo
 ├── finanzas_core.py     # Lógica financiera pura: conversión, resumen, recurrentes, MSI y rendimiento
@@ -276,7 +275,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `PATCH` | `/api/recurrentes/{id}` | `verify_token` | Editar descripción, monto (solo fijos), categoría o pausar/reanudar |
 | `DELETE` | `/api/recurrentes/{id}` | `verify_token` | Eliminar registro; los movimientos ya generados se conservan |
 | `POST` | `/api/recurrentes/{id}/saltar` | `verify_token` | Saltar un pago o aplazar una cuota MSI |
-| `GET` | `/api/presupuesto` | `verify_token` | Presupuesto con tarjetas y repartos por subperiodo |
+| `GET` | `/api/presupuesto` | `verify_token` | Presupuesto con pagos, sus tarjetas y los totales de todos los pagos |
 | `PUT` | `/api/presupuesto/config` | `verify_token` | Configurar ingreso base, frecuencia y subdivisión |
 | `POST` / `PATCH` / `DELETE` | `/api/presupuesto/tarjetas[/{id}]` | `verify_token` | Crear, editar o eliminar tarjetas de presupuesto |
 | `PUT` | `/api/presupuesto/unidades/{orden}` | `verify_token` | Fijar el día de cobro de un pago (1 a 4) |

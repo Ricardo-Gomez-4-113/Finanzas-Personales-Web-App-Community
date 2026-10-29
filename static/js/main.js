@@ -8,11 +8,11 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, escapeHTML, estado, fmt } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo, renderProximos } from './dashboard.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=f0e34f3651';
+import { cargarRecurrentes } from './recurrentes.js?v=ff02a02728';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, cerrarModalSubdivisionPersonalizada, inicializarPresupuesto } from './presupuesto.js?v=f0e34f3651';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=ff02a02728';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -140,7 +140,6 @@ window.addEventListener('keydown', (e) => {
         cerrarModalRecuperarPassword();
         cerrarModalLegal();
         cerrarModalTarjetaPresupuesto();
-        cerrarModalSubdivisionPersonalizada();
     }
 });
 
@@ -211,3 +210,4 @@ inicializarPresupuesto();
 verificarSesionInicial();
 
 document.addEventListener('recargar', cargarDatos);
+document.addEventListener('activar-presupuesto', cargarPresupuesto);

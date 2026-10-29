@@ -162,6 +162,24 @@ def test_v13_rellena_el_rubro_de_los_movimientos_existentes():
         assert _version(conn) == 13
 
 
+def test_v15_pasa_las_tarjetas_del_tablero_general_al_pago_1():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 14)
+        conn.execute("UPDATE presupuesto_config SET ingreso_base = 9000, frecuencia = 'quincenal', dia_pago = 15, subdivision_tipo = 'quincenas', subdivision_config = '[{\"id\": \"q1\"}]' WHERE id = 1")
+        conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos) VALUES ('Renta', 'home', 'blue', 50, 4500, '', 1, 10, '[{\"id\": \"q1\"}]')")
+        conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES ('Luz', 'x', 'amber', 10, 900, '', 1, 2)")
+        conn.commit()
+        _migrar_hasta(conn, 15)
+        assert _version(conn) == 15
+        tarjetas = dict(conn.execute("SELECT nombre, unidad_orden FROM presupuesto_tarjetas").fetchall())
+        assert tarjetas == {"Renta": 1, "Luz": 2}, tarjetas
+        # El pago 1 toma el día del ingreso fijo; la subdivisión deja de existir
+        assert conn.execute("SELECT dia_pago FROM presupuesto_unidades WHERE orden = 1").fetchone()[0] == 15
+        assert conn.execute("SELECT subdivision_tipo FROM presupuesto_config WHERE id = 1").fetchone()[0] == "ninguna"
+        assert conn.execute("SELECT distribucion_subperiodos FROM presupuesto_tarjetas WHERE nombre = 'Renta'").fetchone()[0] is None
+        _migrar_hasta(conn, 15)  # idempotente
+        assert _version(conn) == 15
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

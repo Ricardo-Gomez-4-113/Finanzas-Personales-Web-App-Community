@@ -42,11 +42,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=f0e34f3651">
-    <link rel="stylesheet" href="/static/css/layout.css?v=f0e34f3651">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=f0e34f3651">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=f0e34f3651">
-    <link rel="stylesheet" href="/static/css/tema.css?v=f0e34f3651">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=ff02a02728">
+    <link rel="stylesheet" href="/static/css/layout.css?v=ff02a02728">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=ff02a02728">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=ff02a02728">
+    <link rel="stylesheet" href="/static/css/tema.css?v=ff02a02728">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
     <!-- Datos Estructurados Schema.org (JSON-LD) para Rich Snippets en Buscadores -->
@@ -895,20 +895,6 @@
                                     <input type="number" id="pres-ingreso-dia" min="1" max="31" placeholder="15" class="input-calc calc-has-prefix-dia" title="Día del mes de cobro del ingreso fijo (1 a 31)">
                                 </div>
                             </div>
-                            <div class="form-group pres-fg-subdiv" id="wrap-pres-subdivision">
-                                <label for="pres-subdivision-tipo">Dividir presupuesto en</label>
-                                <div class="pres-subdiv-input-group">
-                                    <select id="pres-subdivision-tipo" class="select-calc">
-                                        <option value="ninguna">Sin división (periodo completo)</option>
-                                        <option value="quincenas">2 Quincenas</option>
-                                        <option value="semanas">4 Semanas</option>
-                                        <option value="personalizada">Personalizada</option>
-                                    </select>
-                                    <button type="button" id="btn-custom-subdivision" class="btn-subdiv-gear hidden" title="Ajustar porcentajes de sub-periodos" data-on-click='[["abrirModalSubdivisionPersonalizada"]]'>
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                                    </button>
-                                </div>
-                            </div>
                             <div class="form-group pres-fg-btn">
                                 <button type="submit" class="btn-primary btn-calc-action">
                                     <span>Guardar ingreso</span>
@@ -954,62 +940,12 @@
                     </div>
                 </div>
 
-                <!-- Barra Visual de Distribución 100% -->
-                <div class="pres-alloc-section">
-                    <div class="pres-alloc-header">
-                        <h3 class="panel-subheading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                            <span>Distribución del ingreso (100%)</span>
-                        </h3>
-                        <div class="pres-templates-wrap">
-                            <span class="pres-templates-label">Plantillas:</span>
-                            <button type="button" class="btn-chip-tpl" data-on-click='[["aplicarPlantillaPresupuesto", "50-30-20"]]'>Regla 50 / 30 / 20</button>
-                            <button type="button" class="btn-chip-tpl" data-on-click='[["aplicarPlantillaPresupuesto", "inversionista"]]'>Perfil inversionista</button>
-                        </div>
-                    </div>
-                    <div class="pres-alloc-track-wrap">
-                        <div class="pres-alloc-track" id="presupuesto-alloc-track"></div>
-                    </div>
-                    <div class="pres-alloc-legend" id="presupuesto-alloc-legend"></div>
-                </div>
-
-                <!-- Barra de Opciones Sugeridas Rápidas -->
-                <div class="pres-suggested-bar">
-                    <span class="pres-suggested-label">Opciones sugeridas para agregar:</span>
-                    <div class="pres-chips-wrap">
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Gastos Fijos", "home", "blue", "Renta, despensa y servicios esenciales", 50]]'>+ Gastos fijos</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Inversión en ETFs", "trending-up", "emerald", "VOO, QQQ, Fibras y bolsa", 20]]'>+ Inversión en ETFs</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Fondo Renta Fija / CETES", "shield", "gold", "CETES, Nu, pagarés y fondo de emergencia", 10]]'>+ Renta fija / CETES</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Compras a Meses (MSI)", "credit-card", "amber", "Tarjetas de crédito y mensualidades", 10]]'>+ Pagos MSI</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Ocio y Estilo de Vida", "smile", "purple", "Salidas, entretenimiento y gustos", 10]]'>+ Ocio y gustos</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"], ["aplicarPresetChip", "Educación y Cursos", "book", "cyan", "Libros, cursos y desarrollo profesional", 5]]'>+ Educación</button>
-                        <button type="button" class="pres-chip" data-on-click='[["abrirModalCrearTarjeta"]]'>+ Personalizada</button>
-                    </div>
-                </div>
-
-                <!-- Barra de Navegación de Sub-periodos (Quincenas / Semanas / Todo) -->
-                <div id="pres-subperiodos-bar" class="pres-subperiodos-nav hidden">
-                    <div class="pres-subperiodos-nav-left">
-                        <span class="pres-subperiodos-title">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            <span>Vista por periodo:</span>
-                        </span>
-                        <div class="pres-subperiodos-pills" id="pres-subperiodos-pills"></div>
-                    </div>
-                    <div class="pres-subperiodo-info-badge" id="pres-subperiodo-active-badge"></div>
-                </div>
-
                 <!-- Pagos del periodo: cada pago tiene su día de cobro y sus propias tarjetas -->
                 <div id="pres-pagos" class="pres-pagos">
                     <h4 class="pres-seccion-titulo">Pagos del periodo</h4>
                     <p class="pres-seccion-ayuda">Cada pago reparte su ingreso en sus propias tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en el día de ese pago.</p>
                     <div id="pres-pagos-lista" class="pres-pagos-lista"></div>
                 </div>
-
-                <!-- Tablero general: tarjetas que no pertenecen a un pago concreto -->
-                <h4 class="pres-seccion-titulo">Tablero general</h4>
-                <div id="grid-tarjetas-presupuesto" class="grid-presupuesto"></div>
-
             </div>
         </section>
 
@@ -1856,12 +1792,6 @@
                     <small class="pres-modal-hint s-color-var-text-muted s-font-size-0-78rem s-display-block" style="margin-top: 4px;">Día del mes programado para este cargo. Si tienes sub-períodos, puedes asignar un día a cada quincena o semana abajo.</small>
                 </div>
 
-                <div id="tarjeta-pres-subdivision-wrapper" class="form-group hidden" style="margin-top: 10px; padding: 10px; background: var(--surface-subtle); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block;">Asignación y fechas por sub-período (opcional)</label>
-                    <small style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 8px;">Distribuye libremente montos y selecciona en qué fecha o día (1 al 31) se hace cada cargo dentro de esta tarjeta.</small>
-                    <div id="tarjeta-pres-subdivision-items"></div>
-                </div>
-
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-on-click='[["cerrarModalTarjetaPresupuesto"]]'>Cancelar</button>
                     <button type="submit" class="btn-primary">
@@ -1873,33 +1803,6 @@
     </div>
 
     <!-- ======================================================== -->
-    <!-- MODAL: PERSONALIZAR SUB-PERIODOS (QUINCENAS / SEMANAS)   -->
-    <!-- ======================================================== -->
-    <div id="modal-subdivision-personalizada" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-subdiv-title" data-on-click='[["cerrarModalSubdivisionPersonalizada"]]' data-solo-fondo>
-        <div class="modal-card modal-subdiv-card">
-            <div class="modal-header">
-                <h3 id="modal-subdiv-title" class="s-display-flex s-align-items-center s-gap-8px">
-                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Configurar división del presupuesto</span>
-                </h3>
-                <button type="button" class="btn-modal-close" aria-label="Cerrar modal" data-on-click='[["cerrarModalSubdivisionPersonalizada"]]'>&times;</button>
-            </div>
-            <div class="modal-body">
-                <p class="modal-instruction">Ajusta los porcentajes (%) de cada sub-periodo respecto al ingreso total. La suma debe sumar exactamente <strong>100%</strong>.</p>
-                <div id="lista-subperiodos-editor" class="subperiodos-editor-list"></div>
-                <div class="subperiodos-editor-actions">
-                    <button type="button" class="btn-sm btn-secondary" data-on-click='[["agregarPeriodoEditor"]]'>+ Añadir periodo</button>
-                    <button type="button" class="btn-sm btn-ghost" data-on-click='[["equilibrarPeriodosEditor"]]'>Equitativo (=)</button>
-                    <span id="subperiodos-suma-badge" class="pnl-badge badge-gold">Suma: 100%</span>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn-secondary" data-on-click='[["cerrarModalSubdivisionPersonalizada"]]'>Cancelar</button>
-                <button type="button" class="btn-primary" data-on-click='[["guardarSubdivisionPersonalizada"]]'>Guardar y aplicar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ======================================================== -->
     <!-- MODAL: EXPORTAR PRESUPUESTO A MOVIMIENTOS Y FIJOS        -->
     <!-- ======================================================== -->
@@ -2291,7 +2194,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=f0e34f3651"></script>
+    <script type="module" src="/static/js/main.js?v=ff02a02728"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

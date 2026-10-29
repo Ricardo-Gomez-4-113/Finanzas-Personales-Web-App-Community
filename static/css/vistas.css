@@ -3522,3 +3522,15 @@ input[type="number"].subperiodo-editor-input-pct {
 .pres-pago-add {
     justify-self: start;
 }
+.pres-pago-dist {
+    display: grid;
+    gap: 8px;
+}
+.pres-pago-dist-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}

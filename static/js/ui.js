@@ -6,7 +6,6 @@ import { cargarDatosAdmin } from './admin.js';
 import { estado } from './core.js';
 import { cargarRecurrentes } from './recurrentes.js';
 import { renderTablaMovimientos } from './movimientos.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto } from './presupuesto.js';
 import { cargarInversiones } from './inversiones.js';
 import { repintarGraficas } from './dashboard.js';
 
@@ -180,7 +179,8 @@ export function cambiarPestana(tabId) {
         renderTablaMovimientos();
     }
     if (tabId === 'tab-presupuesto') {
-        cargarPresupuesto();
+        // El módulo de presupuesto lo carga main.js: así existe una sola instancia del módulo
+        document.dispatchEvent(new Event('activar-presupuesto'));
     }
     if (tabId === 'tab-inversiones') {
         cargarInversiones();

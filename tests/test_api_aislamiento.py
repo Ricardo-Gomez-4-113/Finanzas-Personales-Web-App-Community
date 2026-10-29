@@ -303,17 +303,17 @@ def test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha):
         r = client.put("/api/presupuesto/config", json={"ingreso_base": 10000, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
         assert r.status_code == 200, r.text
         # La interfaz envía monto 0 y porcentaje 25: manda el porcentaje
-        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Pct prueba", "monto": 0, "porcentaje": 25}, headers=ha)
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Pct prueba", "unidad_orden": 1, "monto": 0, "porcentaje": 25}, headers=ha)
         assert r.status_code == 201 and r.json()["monto"] == 2500.0 and r.json()["porcentaje"] == 25.0, r.text
         tid = r.json()["id"]
         r = client.patch(f"/api/presupuesto/tarjetas/{tid}", json={"nombre": "Pct prueba 2", "monto": 0, "porcentaje": 10}, headers=ha)
         assert r.status_code == 200 and r.json()["monto"] == 1000.0, r.text
         # Más de 100% se rechaza con 422
-        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Alto", "porcentaje": 120}, headers=ha)
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Alto", "unidad_orden": 1, "porcentaje": 120}, headers=ha)
         assert r.status_code == 422, r.text
         # Sin ingreso base no se puede convertir un porcentaje: error claro, no una tarjeta en 0%
         client.put("/api/presupuesto/config", json={"ingreso_base": 0, "frecuencia": "mensual", "subdivision_tipo": "ninguna"}, headers=ha)
-        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Sin ingreso", "monto": 0, "porcentaje": 25}, headers=ha)
+        r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Sin ingreso", "unidad_orden": 1, "monto": 0, "porcentaje": 25}, headers=ha)
         assert r.status_code == 422 and "ingreso fijo base" in r.text, r.text
         client.delete(f"/api/presupuesto/tarjetas/{tid}", headers=ha)
     finally:
@@ -353,7 +353,7 @@ def test_pagos_del_presupuesto_por_api(client, ha):
         estado = client.get("/api/presupuesto", headers=ha).json()
         pago1 = next(u for u in estado["unidades"] if u["orden"] == 1)
         assert [t["nombre"] for t in pago1["tarjetas"]] == ["Renta semana"], pago1
-        assert all(t["nombre"] != "Renta semana" for t in estado["tarjetas"])
+        assert [t["nombre"] for t in estado["tarjetas"]].count("Renta semana") == 1, estado["tarjetas"]
         client.delete(f"/api/presupuesto/tarjetas/{tid}", headers=ha)
     finally:
         for orden in range(1, 5):

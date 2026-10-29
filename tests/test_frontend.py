@@ -276,14 +276,19 @@ def test_doble_clic_al_guardar_tarjeta_no_duplica(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         _ir(page, "tab-presupuesto")
-        page.evaluate("document.querySelector(\"[data-on-click*='abrirModalCrearTarjeta']\").click()")
+        # Cada tarjeta cabe en el ingreso de su pago: el escenario necesita un ingreso base
+        estado_cfg = page.evaluate("""() => fetch('/api/presupuesto/config', {method: 'PUT',
+            headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},
+            body: JSON.stringify({ingreso_base: 10000, frecuencia: 'mensual', subdivision_tipo: 'ninguna'})}).then(async r => r.status + ' ' + await r.text())""")
+        assert estado_cfg.startswith('200'), estado_cfg
+        page.evaluate("document.querySelector('#pres-pagos-lista .pres-pago-add').click()")
         page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
         page.fill("#tarjeta-pres-nombre", "Doble prueba")
         page.fill("#tarjeta-pres-monto", "500")
         page.dispatch_event("#tarjeta-pres-monto", "input")
         page.dblclick("#form-tarjeta-presupuesto [type=submit]")
         page.wait_for_timeout(2000)
-        nombres = page.evaluate("[...document.querySelectorAll('#grid-tarjetas-presupuesto .card')].map(c => c.innerText)")
+        nombres = page.evaluate("[...document.querySelectorAll('#pres-pagos-lista .pres-card')].map(c => c.innerText)")
         creadas = [n for n in nombres if "Doble prueba" in n]
         assert len(creadas) == 1, nombres
         page.evaluate("""fetch('/api/presupuesto', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
