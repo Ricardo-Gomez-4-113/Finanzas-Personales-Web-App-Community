@@ -1151,6 +1151,13 @@
     pointer-events: none;
 }
 
+/* Administración no registra movimientos: el FAB y la moneda base no aplican ahí */
+:root:has(#tab-admin.active) .fab { display: none; }
+
+@media (max-width: 720px) {
+    :root:has(#tab-admin.active) .select-moneda-topbar { display: none; }
+}
+
 :root .empty-state { color: var(--text-muted); }
 
 /* ---------- Acceso ---------- */
@@ -1316,6 +1323,7 @@
 
 :root .admin-titulo {
     margin: 0;
+    text-align: left;
     font-family: var(--font-num);
     font-size: var(--fs-xl);
     font-weight: 500;
@@ -1601,6 +1609,7 @@
 /* En móvil cada usuario es una tarjeta: el encabezado de la tabla desaparece y cada celda lleva su etiqueta */
 @media (max-width: 720px) {
     :root .admin-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+    :root .admin-barra { margin-bottom: 4px; }
     :root .admin-cifras > div:nth-child(odd) { border-left: 0; padding-left: 0; }
 
     :root .admin-tabla,
