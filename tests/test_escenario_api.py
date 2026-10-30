@@ -194,6 +194,71 @@ def test_respaldo_se_restaura_identico():
     assert CLIENT.get("/api/resumen-mensual", headers=h).json() == historial_antes
 
 
+def _usuario_flujos():
+    """Usuario aparte para los flujos que cambian datos (las cifras del escenario no se tocan).
+    Con un sueldo fijo activo: sin ingreso fijo no se admiten gastos fijos."""
+    if "flujos" in ESTADO:
+        return ESTADO["flujos"]
+    master_db.create_user_entry("flujos", security.hash_password(escenario.CLAVE), email="flujos@test.local")
+    r = CLIENT.post("/auth/login", json={"username": "flujos", "password": escenario.CLAVE})
+    assert r.status_code == 200, r.text
+    ESTADO["flujos"] = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    _fijo(ESTADO["flujos"], descripcion="Sueldo", tipo="ingreso", frecuencia="mensual", monto=20000, fecha_inicio="2026-10-01")
+    return ESTADO["flujos"]
+
+
+def _fijo(h, **cuerpo):
+    r = CLIENT.post("/api/recurrentes", json=cuerpo, headers=h)
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def _cargos(h, rid):
+    return sorted(m["fecha"] for m in CLIENT.get("/api/transacciones", headers=h).json() if m["recurrente_id"] == rid)
+
+
+def _fila(h, rid):
+    return next(f for f in CLIENT.get("/api/recurrentes", headers=h).json() if f["id"] == rid)
+
+
+def test_flujo_fijo_pausado_y_reanudado_no_cobra_atrasado():
+    h = _usuario_flujos()
+    # Al crear un fijo con fecha pasada se cargan sus cargos vencidos (agosto a octubre)
+    rid = _fijo(h, descripcion="Gimnasio", tipo="gasto", frecuencia="mensual", monto=500, fecha_inicio="2026-08-05")
+    assert _cargos(h, rid) == ["2026-08-05", "2026-09-05", "2026-10-05"], _cargos(h, rid)
+    CLIENT.patch(f"/api/recurrentes/{rid}", json={"activo": False}, headers=h)
+    CLIENT.patch(f"/api/recurrentes/{rid}", json={"activo": True}, headers=h)
+    # Pausar y reanudar no duplica cargos ni cobra el hueco: el próximo cargo es el de noviembre
+    assert _cargos(h, rid) == ["2026-08-05", "2026-09-05", "2026-10-05"], _cargos(h, rid)
+    assert _fila(h, rid)["proxima_fecha"] == "2026-11-05", _fila(h, rid)
+
+
+def test_flujo_frecuencia_anual_se_rechaza_sin_romper_el_fijo():
+    # 'anual' no está en el CHECK de la tabla: no se guarda (antes respondía 500). Requiere migración v18.
+    h = _usuario_flujos()
+    rid = _fijo(h, descripcion="Seguro de auto", tipo="gasto", frecuencia="mensual", monto=1200, fecha_inicio="2026-08-01")
+    r = CLIENT.patch(f"/api/recurrentes/{rid}", json={"frecuencia": "anual"}, headers=h)
+    assert r.status_code == 400, (r.status_code, r.text)
+    assert _fila(h, rid)["frecuencia"] == "mensual", _fila(h, rid)
+
+
+def test_flujo_msi_futura_aparece_en_su_periodo():
+    h = _usuario_flujos()
+    _fijo(h, descripcion="Televisor", tipo="gasto", monto_total=3000, meses=3, fecha_inicio="2026-11-10")
+    periodos = CLIENT.get("/api/recurrentes/periodos?n=3", headers=h).json()["periodos"]
+    # Cuotas el 10 de noviembre y el 10 de diciembre: octubre no tiene nada, noviembre y diciembre 1,000 cada uno
+    assert [p["totales"]["msi"] for p in periodos] == [0.0, 1000.0, 1000.0], [p["totales"] for p in periodos]
+
+
+def test_flujo_moneda_global_convierte_el_patrimonio():
+    from mercado import obtener_tasas_cambio
+    mxn = _resumen()
+    usd = CLIENT.get("/api/resumen?moneda_base=USD", headers=ESTADO["h"]).json()
+    tasa = obtener_tasas_cambio()["MXN"]
+    assert abs(usd["patrimonio_neto"] * tasa - mxn["patrimonio_neto"]) < 1.0, (usd["patrimonio_neto"], tasa, mxn["patrimonio_neto"])
+    assert abs(usd["balance"] * tasa - mxn["balance"]) < 1.0, (usd["balance"], mxn["balance"])
+
+
 if __name__ == "__main__":
     from ejecutor import ejecutar, verificar_cobertura  # noqa: E402
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -213,6 +278,10 @@ if __name__ == "__main__":
             (test_borrar_el_retiro_de_la_meta_restaura_el_saldo, test_borrar_el_retiro_de_la_meta_restaura_el_saldo),
             (test_disponible_igual_a_lo_que_entro_menos_lo_que_salio, test_disponible_igual_a_lo_que_entro_menos_lo_que_salio),
             (test_saltar_una_cuota_msi_aplaza_sin_cobrar, test_saltar_una_cuota_msi_aplaza_sin_cobrar),
+            (test_flujo_fijo_pausado_y_reanudado_no_cobra_atrasado, test_flujo_fijo_pausado_y_reanudado_no_cobra_atrasado),
+            (test_flujo_frecuencia_anual_se_rechaza_sin_romper_el_fijo, test_flujo_frecuencia_anual_se_rechaza_sin_romper_el_fijo),
+            (test_flujo_msi_futura_aparece_en_su_periodo, test_flujo_msi_futura_aparece_en_su_periodo),
+            (test_flujo_moneda_global_convierte_el_patrimonio, test_flujo_moneda_global_convierte_el_patrimonio),
             (test_excel_coincide_con_el_resumen, test_excel_coincide_con_el_resumen),
             (test_respaldo_se_restaura_identico, test_respaldo_se_restaura_identico),
         ]
