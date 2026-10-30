@@ -2429,6 +2429,23 @@ def test_periodos_invariantes_con_escenarios_aleatorios():
         assert abs(sum(p["gastos"]["pagado"] for p in ps) - gas_db) < 0.02, seed
 
 
+def test_anual_avanza_un_ano_y_no_un_mes():
+    from finanzas_core import siguiente_fecha, mensualizar, _ingreso_principal
+    # Un cargo anual cae cada año, en el mismo mes y día ancla; nunca un mes después
+    assert siguiente_fecha(date(2026, 3, 15), 'anual', 15) == date(2027, 3, 15)
+    # Un 29 de febrero se limita al 28 en años no bisiestos y vuelve al 29 cuando puede
+    assert siguiente_fecha(date(2028, 2, 29), 'anual', 29) == date(2029, 2, 28)
+    assert siguiente_fecha(date(2029, 2, 28), 'anual', 29) == date(2030, 2, 28)
+    assert siguiente_fecha(date(2031, 2, 28), 'anual', 29) == date(2032, 2, 29)
+    # El equivalente mensual de un anual es una doceava parte
+    assert mensualizar(1200, 'anual') == 100.0
+    # Un anual nunca marca la periodicidad de la quincena o del mes: no es el ingreso principal
+    anual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-01", "monto": 50000.0, "frecuencia": "anual"}
+    mensual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-15", "monto": 3000.0, "frecuencia": "mensual"}
+    assert _ingreso_principal([anual, mensual]) is mensual
+    assert _ingreso_principal([anual]) is None
+
+
 def test_editar_proximo_cargo_no_cambia_el_dia_ancla_si_cae_a_fin_de_mes():
     from finanzas_core import ancla_al_editar_proximo_cargo
     # Un mensual del 31 que se edita al último día de febrero conserva el 31: marzo vuelve a caer el 31
