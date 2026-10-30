@@ -243,7 +243,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
     if req.frecuencia is not None:
         if es_msi:
             raise HTTPException(status_code=400, detail="Una compra a meses no admite cambiar la periodicidad.")
-        if req.frecuencia not in ('semanal', 'quincenal', 'mensual', 'anual'):
+        if req.frecuencia not in ('semanal', 'quincenal', 'mensual'):
             raise HTTPException(status_code=400, detail="Periodicidad no válida.")
         campos.append("frecuencia = ?"); valores.append(req.frecuencia)
     if req.proxima_fecha is not None:
