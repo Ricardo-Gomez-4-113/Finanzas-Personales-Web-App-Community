@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=dfcecede74">
-    <link rel="stylesheet" href="/static/css/layout.css?v=dfcecede74">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=dfcecede74">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=dfcecede74">
-    <link rel="stylesheet" href="/static/css/tema.css?v=dfcecede74">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=9d3067d14f">
+    <link rel="stylesheet" href="/static/css/layout.css?v=9d3067d14f">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=9d3067d14f">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=9d3067d14f">
+    <link rel="stylesheet" href="/static/css/tema.css?v=9d3067d14f">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -1111,83 +1111,86 @@
         <!-- PESTAÑA 5: PANEL DE ADMINISTRACIÓN (SOLO ADMIN)-->
         <!-- ============================================== -->
         <section id="tab-admin" class="tab-content">
-            <div class="panel">
-                <div class="admin-header-wrap">
-                    <div>
-                        <h2 class="panel-heading s-margin-0">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            <span>Panel de administración multi-Tenant</span>
-                        </h2>
-                        <p class="s-margin-5px-0-0-0 s-color-var-text-muted s-font-size-0-9rem">
-                            Control de acceso, aislamiento de bases de datos por usuario y auditoría global.
-                        </p>
-                    </div>
-                    <button type="button" class="btn-primary" data-on-click='[["abrirModalCrearUsuario"]]'>+ Crear usuario</button>
+            <header class="admin-cabecera">
+                <div>
+                    <h2 class="admin-titulo">Usuarios</h2>
+                    <p class="admin-subtitulo">Quién tiene acceso y cuándo entró por última vez.</p>
                 </div>
+                <button type="button" class="btn-primary" data-on-click='[["abrirModalCrearUsuario"]]'>Crear usuario</button>
+            </header>
 
-                <!-- Banner de advertencia si el correo no está configurado -->
-                <div id="admin-banner-email-warning" class="alert-warning-banner hidden">
-                    <div class="s-display-flex s-justify-content-space-between s-align-items-center s-gap-14px s-flex-wrap-wrap">
-                        <div class="s-display-flex s-gap-10px s-align-items-flex-start s-flex-1 s-min-width-260px">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" class="s-flex-shrink-0 s-margin-top-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            <span><strong>Aviso de correo (modo autónomo):</strong> El servicio de correo no está configurado en el archivo <code>.env</code> (falta <code>RESEND_API_KEY</code> o <code>SMTP</code>). La plataforma opera normalmente sin envíos de correo. Puedes gestionar o restablecer contraseñas manualmente desde la tabla de abajo.</span>
-                        </div>
-                        <button type="button" class="btn-warning-dismiss" data-on-click='[["aceptarAvisoCorreoAdmin"]]'>
-                            Aceptar
-                        </button>
-                    </div>
-                </div>
+            <div id="admin-banner-email-warning" class="admin-aviso hidden">
+                <p>El correo no está configurado: los códigos de recuperación de contraseña no se enviarán.</p>
+                <details class="admin-aviso-detalle">
+                    <summary>Cómo configurarlo</summary>
+                    <p>Agrega <code>RESEND_API_KEY</code> o los datos de <code>SMTP</code> en el archivo <code>.env</code> y reinicia el servidor. Mientras tanto, puedes restablecer contraseñas desde la tabla.</p>
+                </details>
+                <button type="button" class="btn-secondary btn-sm" data-on-click='[["aceptarAvisoCorreoAdmin"]]'>Entendido</button>
+            </div>
 
-                <!-- Tarjetas Rápidas de Métricas (KPIs de Administración) -->
-                <div class="cards cards-admin">
-                    <div class="card card-kpi">
-                        <h3>Total usuarios</h3>
-                        <p id="lbl-kpi-total-users">0</p>
-                    </div>
-                    <div class="card card-kpi">
-                        <h3>Activos hoy / 7 días</h3>
-                        <p><span id="lbl-kpi-active-today">0</span> <small class="s-font-size-0-85rem s-color-var-text-muted">/ <span id="lbl-kpi-active-7d">0</span> (7d)</small></p>
-                    </div>
-                    <div class="card card-kpi">
-                        <h3>Usuarios inactivos</h3>
-                        <p id="lbl-kpi-inactive" class="s-color-var-danger-color">0</p>
-                    </div>
-                    <div class="card card-kpi">
-                        <h3>Almacenamiento total</h3>
-                        <p id="lbl-kpi-disk-total">0.0 KB</p>
-                    </div>
-                </div>
+            <dl class="admin-cifras">
+                <div><dt>Usuarios</dt><dd id="lbl-kpi-total-users">0</dd></div>
+                <div><dt>Activos hoy</dt><dd id="lbl-kpi-active-today">0</dd></div>
+                <div><dt>Activos en 7 días</dt><dd id="lbl-kpi-active-7d">0</dd></div>
+                <div><dt>Suspendidos</dt><dd id="lbl-kpi-inactive">0</dd></div>
+                <div><dt>Almacenamiento</dt><dd id="lbl-kpi-disk-total">0 KB</dd></div>
+            </dl>
 
-                <!-- Tabla de Gestión de Usuarios y Tenants -->
-                <div class="admin-table-wrap">
-                    <h3 class="panel-subheading s-margin-top-14px s-margin-bottom-8px s-font-size-1rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        <span>Directorio de usuarios y tenants</span>
-                    </h3>
-                    <div class="table-responsive admin-table-responsive">
-                        <table class="table-admin-users" id="tabla-usuarios-admin-full">
-                            <thead>
-                                <tr>
-                                    <th class="th-user-id">ID</th>
-                                    <th class="th-user-name">Usuario</th>
-                                    <th class="th-user-email">Correo electrónico</th>
-                                    <th class="th-user-role">Rol</th>
-                                    <th class="th-user-status">Estado</th>
-                                    <th class="th-user-created">Creado</th>
-                                    <th class="th-user-access">Último acceso</th>
-                                    <th class="th-user-logins">Logins</th>
-                                    <th class="th-user-size">Peso BD</th>
-                                    <th class="th-user-actions">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-usuarios-admin">
-                                <tr><td colspan="10" class="s-text-align-center s-color-var-text-muted">Cargando directorio...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <div class="admin-barra">
+                <input type="search" id="admin-buscar" class="admin-buscar" placeholder="Buscar por nombre o correo" aria-label="Buscar por nombre o correo" autocomplete="off">
+                <div class="admin-filtros" role="group" aria-label="Filtrar por estado">
+                    <button type="button" class="admin-filtro is-on" aria-pressed="true" data-on-click='[["filtrarUsuariosAdmin", "todos", "$this"]]'>Todos <span id="cnt-admin-todos">0</span></button>
+                    <button type="button" class="admin-filtro" aria-pressed="false" data-on-click='[["filtrarUsuariosAdmin", "activos", "$this"]]'>Activos <span id="cnt-admin-activos">0</span></button>
+                    <button type="button" class="admin-filtro" aria-pressed="false" data-on-click='[["filtrarUsuariosAdmin", "suspendidos", "$this"]]'>Suspendidos <span id="cnt-admin-suspendidos">0</span></button>
                 </div>
+                <label class="admin-orden">
+                    <span>Ordenar por</span>
+                    <select id="admin-orden" data-on-change='[["ordenarUsuariosAdmin", "$value"]]'>
+                        <option value="acceso">Último acceso</option>
+                        <option value="nombre">Nombre</option>
+                        <option value="creado">Fecha de creación</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="admin-table-responsive">
+                <table class="admin-tabla" id="tabla-usuarios-admin-full">
+                    <thead>
+                        <tr>
+                            <th scope="col">Usuario</th>
+                            <th scope="col">Rol</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Último acceso</th>
+                            <th scope="col">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-usuarios-admin">
+                        <tr><td colspan="5" class="admin-vacio">Cargando usuarios…</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
+
+        <div id="modal-eliminar-usuario" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-eliminar-usuario-titulo" data-on-click='[["cerrarModalEliminarUsuario"]]' data-solo-fondo>
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3 id="modal-eliminar-usuario-titulo"><span>Eliminar a <span id="eliminar-usuario-nombre"></span></span></h3>
+                    <button type="button" class="btn-modal-close" aria-label="Cerrar" data-on-click='[["cerrarModalEliminarUsuario"]]'>&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-instruction">Se borrará su base de datos con todos sus movimientos, metas e inversiones. No se puede deshacer.</p>
+                    <div class="form-group">
+                        <label for="eliminar-usuario-confirmar">Escribe el nombre de usuario para confirmar</label>
+                        <input type="text" id="eliminar-usuario-confirmar" autocomplete="off">
+                    </div>
+                    <p class="modal-nota">Si solo quieres bloquear su acceso, suspende la cuenta desde el menú de la fila.</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="btn-cancelar-eliminar" data-on-click='[["cerrarModalEliminarUsuario"]]'>Cancelar</button>
+                    <button type="button" class="btn-danger-solid" id="btn-confirmar-eliminar" disabled data-on-click='[["confirmarEliminarUsuario"]]'>Eliminar usuario</button>
+                </div>
+            </div>
+        </div>
             </main>
         </div>
     </div>
@@ -1947,7 +1950,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=dfcecede74"></script>
+    <script type="module" src="/static/js/main.js?v=9d3067d14f"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

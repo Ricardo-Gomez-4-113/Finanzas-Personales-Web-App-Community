@@ -1303,3 +1303,349 @@
 :root .pres-alloc-track { border-radius: 999px; background: var(--surface-level2); }
 :root .pres-pago .pres-pago-vacio { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; color: var(--text-muted); }
 :root .pres-pago-titulo h4 { text-align: left; }
+
+/* ---------- Pestaña Admin: directorio de usuarios ---------- */
+:root .admin-cabecera {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px 24px;
+    margin-bottom: 18px;
+}
+
+:root .admin-titulo {
+    margin: 0;
+    font-family: var(--font-num);
+    font-size: var(--fs-xl);
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+:root .admin-subtitulo {
+    margin: 4px 0 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+:root .admin-aviso {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    background: var(--warning-subtle);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-m);
+}
+
+:root .admin-aviso p { margin: 0; flex: 1 1 260px; font-size: var(--fs-sm); color: var(--text-color); }
+
+:root .admin-aviso-detalle { flex: 1 1 100%; font-size: var(--fs-sm); }
+:root .admin-aviso-detalle summary { cursor: pointer; color: var(--gold-color); }
+:root .admin-aviso-detalle p { margin: 6px 0 0; color: var(--text-muted); }
+
+/* Cifras en una sola franja, separadas por filetes: no son tarjetas */
+:root .admin-cifras {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: 0 0 18px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+:root .admin-cifras > div { padding: 0 16px; }
+:root .admin-cifras > div + div { border-left: 1px solid var(--border-color); }
+:root .admin-cifras dt { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+:root .admin-cifras dd {
+    margin: 4px 0 0;
+    font-family: var(--font-num);
+    font-size: var(--fs-lg);
+    font-weight: 500;
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
+:root .admin-barra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+:root .admin-buscar { flex: 1 1 240px; min-width: 0; }
+
+:root .admin-filtros {
+    display: inline-flex;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-s);
+    overflow: hidden;
+}
+
+:root .admin-filtro {
+    height: 34px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--border-color);
+    border-radius: 0;
+    box-shadow: none;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+:root .admin-filtro:last-child { border-right: 0; }
+
+:root .btn-danger-solid:disabled { opacity: 0.45; cursor: not-allowed; }
+:root .admin-filtro span { font-variant-numeric: tabular-nums; }
+
+:root .admin-filtro.is-on {
+    color: var(--text-color);
+    background: var(--gold-subtle);
+    box-shadow: inset 0 -2px 0 var(--gold-color);
+}
+
+:root .admin-orden {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+:root .admin-orden select { width: auto; min-width: 170px; }
+
+:root .admin-table-responsive { overflow: visible; }
+
+:root .admin-tabla {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+:root .admin-tabla th {
+    padding: 10px 12px;
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    text-align: left;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+}
+
+:root .admin-tabla td {
+    padding: 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--table-border);
+    font-variant-numeric: tabular-nums;
+}
+
+:root .admin-tabla tbody tr[data-usuario]:hover { background: var(--surface-subtle); }
+
+:root .admin-tabla th:last-child { text-align: right; }
+
+:root .admin-nombre {
+    display: block;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+:root .admin-correo {
+    display: block;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+:root .admin-correo-vacio { font-style: italic; }
+
+:root .admin-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--fs-sm);
+    color: var(--text-color);
+}
+
+:root .admin-punto {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success-color);
+}
+
+:root .admin-estado-suspendido { color: var(--danger-text); }
+:root .admin-estado-suspendido .admin-punto { background: var(--danger-color); }
+
+:root .admin-celda-acceso { min-width: 170px; }
+:root .admin-acceso-txt { display: block; font-size: var(--fs-sm); color: var(--text-color); }
+
+:root .admin-traza {
+    position: relative;
+    display: block;
+    max-width: 150px;
+    height: 4px;
+    margin-top: 8px;
+    border-radius: 2px;
+    background: var(--table-border);
+}
+
+:root .admin-traza-punto {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--gold-color);
+    box-shadow: 0 0 0 3px var(--gold-subtle);
+}
+
+:root .admin-celda-acciones { white-space: nowrap; text-align: right; }
+
+:root .admin-accion {
+    height: 30px;
+    margin-left: 6px;
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: none;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+:root .admin-accion:hover { border-color: var(--gold-border); background: transparent; }
+
+:root .admin-accion-icono {
+    width: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+:root .admin-menu-wrap { position: relative; display: inline-block; text-align: left; }
+
+:root .admin-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    min-width: 210px;
+    padding: 6px;
+    background: var(--surface-modal);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-float);
+}
+
+:root .admin-menu-item {
+    display: block;
+    width: 100%;
+    height: auto;
+    padding: 8px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    box-shadow: none;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    text-align: left;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+:root .admin-menu-item:hover { background: var(--surface-level2); }
+:root .admin-menu-peligro { color: var(--danger-text); }
+
+:root .admin-menu-nota {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+:root .admin-tabla .admin-detalle td {
+    padding: 12px 14px 14px;
+    background: var(--surface-subtle);
+}
+
+:root .admin-detalle-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px 20px;
+    margin: 0;
+}
+
+:root .admin-detalle-lista dt { font-size: var(--fs-xs); color: var(--text-muted); }
+:root .admin-detalle-lista dd { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-color); }
+
+:root .admin-tabla .admin-vacio {
+    padding: 22px 12px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* En móvil cada usuario es una tarjeta: el encabezado de la tabla desaparece y cada celda lleva su etiqueta */
+@media (max-width: 720px) {
+    :root .admin-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+    :root .admin-cifras > div:nth-child(odd) { border-left: 0; padding-left: 0; }
+
+    :root .admin-tabla,
+    :root .admin-tabla tbody { display: block; width: 100%; }
+    :root .admin-tabla thead { display: none; }
+    :root .admin-tabla tbody tr[data-usuario] {
+        display: block;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--table-border);
+    }
+
+    :root .admin-tabla tbody tr[data-usuario] td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 0;
+        border: 0;
+        text-align: right;
+    }
+
+    :root .admin-tabla td::before {
+        content: attr(data-label);
+        font-size: var(--fs-xs);
+        color: var(--text-muted);
+        text-align: left;
+    }
+
+    :root .admin-tabla tbody tr[data-usuario] td.admin-celda-usuario { display: block; }
+    :root .admin-tabla tbody tr[data-usuario] td.admin-celda-acciones {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        padding-top: 10px;
+        text-align: left;
+    }
+    :root .admin-tabla tbody tr[data-usuario] td.admin-celda-usuario { text-align: left; }
+    :root .admin-celda-usuario::before,
+    :root .admin-celda-acciones::before { content: none; }
+    :root .admin-celda-acciones .admin-accion:first-child { margin-left: 0; }
+    :root .admin-correo { max-width: 100%; }
+    :root .admin-celda-acceso { min-width: 0; }
+    :root .admin-traza { width: 140px; max-width: 100%; }
+
+    :root .admin-tabla .admin-detalle[hidden] { display: none; }
+    :root .admin-tabla .admin-detalle { display: block; }
+    :root .admin-tabla .admin-detalle td { display: block; padding: 10px 0 0; }
+}

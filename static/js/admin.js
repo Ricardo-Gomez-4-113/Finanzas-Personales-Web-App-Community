@@ -69,95 +69,11 @@ export async function cargarDatosAdmin() {
         // 2. Cargar Directorio de Usuarios
         const resUsers = await apiFetch('/admin/users');
         if (resUsers.ok) {
-            const usuarios = await resUsers.json();
-            const tbody = document.getElementById('tabla-usuarios-admin');
-            tbody.innerHTML = '';
-
-            if (usuarios.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Sin usuarios registrados.</td></tr>';
-            } else {
-                usuarios.forEach(u => {
-                    const tr = document.createElement('tr');
-                    const esMismoAdmin = (estado.usuarioActual && estado.usuarioActual.id === u.id);
-                    
-                    const badgeRol = `<span class="badge-role ${u.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}">${u.role}</span>`;
-                    const badgeEstado = u.is_active 
-                        ? `<span class="badge-status badge-status-active">Activo</span>`
-                        : `<span class="badge-status badge-status-inactive">Inactivo</span>`;
-
-                    const fechaCreacion = (u.created_at || '').split(' ')[0] || '-';
-                    const ultimoAccesoRelativo = formatoTiempoRelativo(u.last_login);
-                    const detalleTitle = u.last_login ? `title="Fecha exacta: ${escapeHTML(u.last_login)}"` : '';
-
-                    estado.cache.usuarios[u.id] = u;
-                    const esAdminPrincipal = (u.id === 1 || (u.username && u.username.toLowerCase() === 'admin'));
-                    
-                    let accionesHtml = `
-                        <button type="button" class="btn-user-action btn-edit-user" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarUsuarioPorId", u.id]]))}" title="Editar usuario">
-                            <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                            <span class="btn-action-label">Editar</span>
-                        </button>
-                    `;
-
-                    if (!esMismoAdmin) {
-                        const textoToggle = u.is_active ? 'Suspender' : 'Activar';
-                        const nuevoEstado = !u.is_active;
-                        const iconoToggle = u.is_active
-                            ? `<svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>`
-                            : `<svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-                        const claseToggle = u.is_active ? 'btn-status-suspend' : 'btn-status-activate';
-                        accionesHtml += `
-                            <button type="button" class="btn-user-action btn-status-toggle ${claseToggle}" data-on-click="${escapeHTML(JSON.stringify([["cambiarEstadoUsuario", u.id, nuevoEstado]]))}" title="${textoToggle} usuario">
-                                ${iconoToggle}
-                                <span class="btn-action-label">${textoToggle}</span>
-                            </button>
-                        `;
-                    }
-
-                    if (esAdminPrincipal || esMismoAdmin) {
-                        accionesHtml += `
-                            <button type="button" class="btn-user-action btn-delete-user btn-disabled" disabled title="No se puede eliminar la cuenta principal de administración">
-                                <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                                <span class="btn-action-label">Eliminar</span>
-                            </button>
-                        `;
-                    } else {
-                        accionesHtml += `
-                            <button type="button" class="btn-user-action btn-delete-user" data-on-click="${escapeHTML(JSON.stringify([["eliminarUsuarioTenantPorId", u.id]]))}" title="Eliminar usuario y su base de datos">
-                                <svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                <span class="btn-action-label">Eliminar</span>
-                            </button>
-                        `;
-                    }
-
-                    const correoVal = u.email ? escapeHTML(u.email) : '';
-                    const correoHtml = u.email 
-                        ? `<span class="user-email-chip" title="${correoVal}">${correoVal}</span>`
-                        : `<span style="color: var(--text-muted); font-size: 0.78rem; font-style: italic;">Sin registrar</span>`;
-
-                    const primeraLetra = (u.username || 'U').charAt(0).toUpperCase();
-
-                    tr.innerHTML = `
-                        <td class="col-user-id"><span class="user-id-chip">#${u.id}</span></td>
-                        <td class="col-user-name">
-                            <div class="user-name-cell">
-                                <span class="user-avatar-mini">${escapeHTML(primeraLetra)}</span>
-                                <strong>${escapeHTML(u.username)}</strong>
-                            </div>
-                        </td>
-                        <td class="col-user-email">${correoHtml}</td>
-                        <td class="col-user-role">${badgeRol}</td>
-                        <td class="col-user-status">${badgeEstado}</td>
-                        <td class="col-user-created">${fechaCreacion}</td>
-                        <td class="col-user-access" ${detalleTitle}>${ultimoAccesoRelativo}</td>
-                        <td class="col-user-logins"><span class="login-count-chip">${u.login_count}</span></td>
-                        <td class="col-user-size"><span class="db-size-chip">${escapeHTML(u.db_size_formatted || '0 KB')}</span></td>
-                        <td class="col-user-actions col-acciones">${accionesHtml}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
+            usuariosAdmin = await resUsers.json();
+            usuariosAdmin.forEach(u => { estado.cache.usuarios[u.id] = u; });
+            renderizarUsuariosAdmin();
         }
+        prepararControlesAdmin();
     } catch (error) {
         console.error("Error al cargar datos administrativos:", error);
     }
@@ -190,27 +106,6 @@ export async function cambiarEstadoUsuario(userId, nuevoEstado) {
 /**
  * Elimina un usuario tenant y borra su archivo de base de datos físico.
  */
-export async function eliminarUsuarioTenant(userId, username) {
-    const confirmacion = confirm(`¿Estás seguro de eliminar al usuario '${username}'?\n\nADVERTENCIA: Se borrará permanentemente su base de datos y todos sus movimientos financieros.`);
-    if (!confirmacion) return;
-
-    try {
-        const res = await apiFetch(`/admin/users/${userId}`, {
-            method: 'DELETE'
-        });
-
-        if (res.ok) {
-            cargarDatosAdmin();
-        } else {
-            const err = await res.json();
-            toast(err.detail || "No se pudo eliminar el usuario.", 'error');
-        }
-    } catch (e) {
-        toast("Error de red al eliminar usuario.", 'error');
-    }
-}
-
-
 export function abrirModalCrearUsuario() {
     const modal = document.getElementById('modal-crear-usuario');
     if (modal) {
@@ -489,10 +384,223 @@ export function abrirModalEditarUsuarioPorId(id) {
 }
 
 
+// -----------------------------------------------------------------------------
+// Directorio de usuarios: búsqueda, filtro por estado, orden, detalle y menú por fila
+// -----------------------------------------------------------------------------
+
+let usuariosAdmin = [];
+let filtroAdmin = { texto: '', estado: 'todos', orden: 'acceso' };
+let usuarioEnEliminacion = null;
+let controlesAdminListos = false;
+
+const DIAS_TRAZA = 30;
+
+const accionDelegada = (...llamadas) => escapeHTML(JSON.stringify(llamadas));
+
+// Traza de acceso: el punto cae a la derecha si entró hoy y se corre a la izquierda con los días, hasta 30
+function trazaAcceso(ultimoAcceso) {
+    if (!ultimoAcceso) return '<span class="admin-traza admin-traza-vacia" aria-hidden="true"></span>';
+    const dias = (Date.now() - new Date(ultimoAcceso.replace(' ', 'T')).getTime()) / 86400000;
+    const pos = Math.min(100, Math.max(0, (1 - dias / DIAS_TRAZA) * 100));
+    return `<span class="admin-traza" aria-hidden="true"><span class="admin-traza-punto" style="left: ${pos.toFixed(1)}%"></span></span>`;
+}
+
+function usuariosVisibles() {
+    const texto = filtroAdmin.texto.trim().toLowerCase();
+    const comparadores = {
+        acceso: (a, b) => (b.last_login || '').localeCompare(a.last_login || ''),
+        nombre: (a, b) => (a.username || '').localeCompare(b.username || '', 'es'),
+        creado: (a, b) => (b.created_at || '').localeCompare(a.created_at || ''),
+    };
+    return usuariosAdmin
+        .filter(u => filtroAdmin.estado === 'todos' || (filtroAdmin.estado === 'activos') === !!u.is_active)
+        .filter(u => !texto || (u.username || '').toLowerCase().includes(texto) || (u.email || '').toLowerCase().includes(texto))
+        .sort(comparadores[filtroAdmin.orden]);
+}
+
+function filaUsuarioAdmin(u) {
+    const esMismoAdmin = !!(estado.usuarioActual && estado.usuarioActual.id === u.id);
+    const esPrincipal = u.id === 1 || (u.username || '').toLowerCase() === 'admin';
+    const menuId = `menu-usuario-${u.id}`;
+    const detalleId = `detalle-usuario-${u.id}`;
+    const nombre = escapeHTML(u.username);
+
+    const correo = u.email
+        ? `<span class="admin-correo">${escapeHTML(u.email)}</span>`
+        : '<span class="admin-correo admin-correo-vacio">Sin correo registrado</span>';
+    const estadoHtml = u.is_active
+        ? '<span class="admin-estado admin-estado-activo"><span class="admin-punto" aria-hidden="true"></span>Activo</span>'
+        : '<span class="admin-estado admin-estado-suspendido"><span class="admin-punto" aria-hidden="true"></span>Suspendido</span>';
+    const rol = `<span class="badge-role ${u.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}">${escapeHTML(u.role)}</span>`;
+    const accesoTxt = u.last_login ? formatoTiempoRelativo(u.last_login) : 'Nunca';
+
+    const itemsMenu = [];
+    if (!esMismoAdmin) {
+        itemsMenu.push(`<button type="button" class="admin-menu-item" role="menuitem" data-on-click='${accionDelegada(["cambiarEstadoUsuario", u.id, !u.is_active])}'>${u.is_active ? 'Suspender acceso' : 'Activar acceso'}</button>`);
+    }
+    if (esPrincipal || esMismoAdmin) {
+        const motivo = esMismoAdmin ? 'No puedes eliminar tu propia cuenta' : 'La cuenta principal no se puede eliminar';
+        itemsMenu.push(`<p class="admin-menu-nota">${motivo}</p>`);
+    } else {
+        itemsMenu.push(`<button type="button" class="admin-menu-item admin-menu-peligro" role="menuitem" data-on-click='${accionDelegada(["eliminarUsuarioTenantPorId", u.id])}'>Eliminar usuario</button>`);
+    }
+
+    return `
+        <tr data-usuario="${u.id}">
+            <td class="admin-celda-usuario" data-label="Usuario">
+                <span class="admin-nombre">${nombre}</span>
+                ${correo}
+            </td>
+            <td data-label="Rol">${rol}</td>
+            <td data-label="Estado">${estadoHtml}</td>
+            <td class="admin-celda-acceso" data-label="Último acceso">
+                <span class="admin-acceso-txt">${escapeHTML(accesoTxt)}</span>
+                ${trazaAcceso(u.last_login)}
+            </td>
+            <td class="admin-celda-acciones" data-label="Acciones">
+                <button type="button" class="admin-accion" aria-expanded="false" aria-controls="${detalleId}" data-on-click='${accionDelegada(["alternarDetalleUsuario", u.id, "$this"])}'>Detalles</button>
+                <button type="button" class="admin-accion" data-on-click='${accionDelegada(["abrirModalEditarUsuarioPorId", u.id])}'>Editar</button>
+                <div class="admin-menu-wrap">
+                    <button type="button" class="admin-accion admin-accion-icono" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" aria-label="Más acciones para ${nombre}" data-on-click='${accionDelegada(["alternarMenuUsuario", u.id, "$this"])}'>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+                    </button>
+                    <div class="admin-menu" id="${menuId}" role="menu" hidden>${itemsMenu.join('')}</div>
+                </div>
+            </td>
+        </tr>
+        <tr class="admin-detalle" id="${detalleId}" hidden>
+            <td colspan="5">
+                <dl class="admin-detalle-lista">
+                    <div><dt>Cuenta</dt><dd>#${u.id}</dd></div>
+                    <div><dt>Creada</dt><dd>${escapeHTML((u.created_at || '').split(' ')[0] || '-')}</dd></div>
+                    <div><dt>Inicios de sesión</dt><dd>${escapeHTML(String(u.login_count ?? 0))}</dd></div>
+                    <div><dt>Base de datos</dt><dd>${escapeHTML(u.db_size_formatted || '0 KB')}</dd></div>
+                    <div><dt>Último acceso exacto</dt><dd>${escapeHTML(u.last_login || 'Nunca')}</dd></div>
+                </dl>
+            </td>
+        </tr>`;
+}
+
+function renderizarUsuariosAdmin() {
+    const tbody = document.getElementById('tabla-usuarios-admin');
+    if (!tbody) return;
+    const texto = (id, valor) => { const el = document.getElementById(id); if (el) el.textContent = valor; };
+    texto('cnt-admin-todos', usuariosAdmin.length);
+    texto('cnt-admin-activos', usuariosAdmin.filter(u => u.is_active).length);
+    texto('cnt-admin-suspendidos', usuariosAdmin.filter(u => !u.is_active).length);
+
+    if (usuariosAdmin.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="admin-vacio">Todavía no hay usuarios registrados.</td></tr>';
+        return;
+    }
+    const lista = usuariosVisibles();
+    if (lista.length === 0) {
+        const buscado = filtroAdmin.texto.trim();
+        const mensaje = buscado
+            ? `Ningún usuario coincide con «${escapeHTML(buscado)}». Borra la búsqueda o cambia el filtro.`
+            : 'Ningún usuario tiene este estado.';
+        tbody.innerHTML = `<tr><td colspan="5" class="admin-vacio">${mensaje}</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = lista.map(filaUsuarioAdmin).join('');
+}
+
+function cerrarMenusAdmin() {
+    document.querySelectorAll('.admin-menu:not([hidden])').forEach(m => { m.hidden = true; });
+    document.querySelectorAll('[aria-haspopup="menu"][aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+
+function prepararControlesAdmin() {
+    if (controlesAdminListos) return;
+    controlesAdminListos = true;
+
+    document.getElementById('admin-buscar')?.addEventListener('input', e => {
+        filtroAdmin.texto = e.target.value;
+        renderizarUsuariosAdmin();
+    });
+
+    const campoConfirmar = document.getElementById('eliminar-usuario-confirmar');
+    campoConfirmar?.addEventListener('input', e => {
+        const coincide = !!usuarioEnEliminacion && e.target.value === usuarioEnEliminacion.username;
+        document.getElementById('btn-confirmar-eliminar').disabled = !coincide;
+    });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarMenusAdmin(); });
+    document.addEventListener('click', e => { if (!e.target.closest('.admin-menu-wrap')) cerrarMenusAdmin(); });
+}
+
+export function alternarDetalleUsuario(id, boton) {
+    const fila = document.getElementById(`detalle-usuario-${id}`);
+    if (!fila) return;
+    const abrir = fila.hidden;
+    fila.hidden = !abrir;
+    boton.setAttribute('aria-expanded', String(abrir));
+}
+
+export function alternarMenuUsuario(id, boton) {
+    const menu = document.getElementById(`menu-usuario-${id}`);
+    if (!menu) return;
+    const abrir = menu.hidden;
+    cerrarMenusAdmin();
+    menu.hidden = !abrir;
+    boton.setAttribute('aria-expanded', String(abrir));
+}
+
+export function filtrarUsuariosAdmin(estadoFiltro, boton) {
+    filtroAdmin.estado = estadoFiltro;
+    document.querySelectorAll('.admin-filtro').forEach(b => {
+        const on = b === boton;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-pressed', String(on));
+    });
+    renderizarUsuariosAdmin();
+}
+
+export function ordenarUsuariosAdmin(orden) {
+    filtroAdmin.orden = orden;
+    renderizarUsuariosAdmin();
+}
+
+// Eliminar borra la base del usuario: se confirma escribiendo su nombre, no con un diálogo del navegador
 export function eliminarUsuarioTenantPorId(id) {
     const u = estado.cache.usuarios[id];
     if (!u) return;
-    eliminarUsuarioTenant(u.id, u.username);
+    cerrarMenusAdmin();
+    usuarioEnEliminacion = u;
+    document.getElementById('eliminar-usuario-nombre').textContent = u.username;
+    document.getElementById('eliminar-usuario-confirmar').value = '';
+    document.getElementById('btn-confirmar-eliminar').disabled = true;
+    document.getElementById('modal-eliminar-usuario').classList.remove('hidden');
+    document.getElementById('btn-cancelar-eliminar').focus();
+}
+
+export function cerrarModalEliminarUsuario() {
+    document.getElementById('modal-eliminar-usuario')?.classList.add('hidden');
+    usuarioEnEliminacion = null;
+}
+
+export async function confirmarEliminarUsuario() {
+    const u = usuarioEnEliminacion;
+    if (!u || document.getElementById('eliminar-usuario-confirmar').value !== u.username) return;
+    await eliminarUsuarioTenant(u.id);
+    cerrarModalEliminarUsuario();
+}
+
+export async function eliminarUsuarioTenant(userId) {
+    try {
+        const res = await apiFetch(`/admin/users/${userId}`, {
+            method: 'DELETE'
+        });
+
+        if (res.ok) {
+            cargarDatosAdmin();
+        } else {
+            const err = await res.json();
+            toast(err.detail || "No se pudo eliminar el usuario.", 'error');
+        }
+    } catch (e) {
+        toast("Error de red al eliminar usuario.", 'error');
+    }
 }
 
 Object.assign(window, {
@@ -505,6 +613,12 @@ Object.assign(window, {
     cerrarModalEditarUsuario,
     eliminarUsuarioTenant,
     eliminarUsuarioTenantPorId,
+    alternarDetalleUsuario,
+    alternarMenuUsuario,
+    cerrarModalEliminarUsuario,
+    confirmarEliminarUsuario,
+    filtrarUsuariosAdmin,
+    ordenarUsuariosAdmin,
     guardarEdicionUsuario,
     guardarNuevoUsuario,
     solicitarEliminarMiCuenta

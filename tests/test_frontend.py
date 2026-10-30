@@ -478,6 +478,46 @@ def test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base):
         ctx.close()
 
 
+def test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base):
+    admin, otro = "admprueba", "anaprueba"
+    master_db.create_user_entry(admin, security.hash_password(CLAVE), role="admin", email=f"{admin}@test.local")
+    master_db.create_user_entry(otro, security.hash_password(CLAVE), role="user", email=f"{otro}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, admin, CLAVE)
+        _ir(page, "tab-admin")
+        page.wait_for_selector("#tabla-usuarios-admin tr[data-usuario]")
+        filas = page.locator("#tabla-usuarios-admin tr[data-usuario]")
+        assert filas.count() >= 3, filas.count()
+
+        page.fill("#admin-buscar", "zz-no-existe")
+        assert "Ningún usuario coincide" in page.inner_text("#tabla-usuarios-admin"), page.inner_text("#tabla-usuarios-admin")
+        page.fill("#admin-buscar", otro)
+        assert filas.count() == 1 and otro in filas.first.inner_text(), filas.count()
+        page.fill("#admin-buscar", "")
+
+        page.click(".admin-filtro:has-text('Suspendidos')")
+        assert "Ningún usuario tiene este estado" in page.inner_text("#tabla-usuarios-admin")
+        page.click(".admin-filtro:has-text('Todos')")
+        assert filas.count() >= 3
+
+        fila = page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=otro)
+        fila.locator("button[aria-haspopup='menu']").click()
+        page.locator(".admin-menu:not([hidden]) .admin-menu-peligro").click()
+        page.wait_for_selector("#modal-eliminar-usuario:not(.hidden)")
+        assert page.is_disabled("#btn-confirmar-eliminar"), "sin el nombre exacto no se puede eliminar"
+        page.fill("#eliminar-usuario-confirmar", otro[:-1])
+        assert page.is_disabled("#btn-confirmar-eliminar"), "un nombre parcial no habilita el botón"
+        page.fill("#eliminar-usuario-confirmar", otro)
+        assert page.is_enabled("#btn-confirmar-eliminar")
+        page.click("#btn-cancelar-eliminar")
+        page.wait_for_selector("#modal-eliminar-usuario.hidden", state="attached")
+        assert page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=otro).count() == 1, "cancelar no borra"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -587,6 +627,7 @@ if __name__ == "__main__":
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
                 (test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual, lambda: test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base)),
                 (test_fab_se_oculta_al_bajar_y_vuelve_al_subir, lambda: test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base)),
+                (test_admin_busca_filtra_y_pide_el_nombre_para_eliminar, lambda: test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),
