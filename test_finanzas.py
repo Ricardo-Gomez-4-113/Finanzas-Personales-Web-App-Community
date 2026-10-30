@@ -2429,6 +2429,31 @@ def test_periodos_invariantes_con_escenarios_aleatorios():
         assert abs(sum(p["gastos"]["pagado"] for p in ps) - gas_db) < 0.02, seed
 
 
+def test_msi_cuotas_suman_el_total_sin_importar_cuando_se_materialice():
+    """Cualquier secuencia de materializaciones deja N cuotas exactas que suman monto_total, la última ajustada."""
+    import random
+    from datetime import timedelta
+    from finanzas_core import materializar_recurrentes
+    for seed in range(80):
+        rng = random.Random(seed)
+        conn = nueva_bd()
+        total = rng.randint(2, 18)
+        monto = round(rng.uniform(50, 900), 2)
+        monto_total = round(monto * total + rng.uniform(-monto * 0.4, monto * 0.4), 2)
+        inicio = date(2026, 1, 1) + timedelta(days=rng.randint(0, 200))
+        insertar_recurrente(conn, "Compra", 'gasto', monto, 'mensual', inicio.day, inicio, total=total, monto_total=monto_total)
+        hoy = inicio
+        for _ in range(rng.randint(1, 30)):
+            hoy += timedelta(days=rng.randint(0, 45))
+            materializar_recurrentes(conn, hoy)
+        materializar_recurrentes(conn, date(2030, 1, 1))  # al final todas las cuotas ya deben existir
+        cuotas = conn.execute("SELECT monto, descripcion FROM transacciones WHERE recurrente_id = 1 ORDER BY fecha").fetchall()
+        assert len(cuotas) == total, (seed, total, len(cuotas))
+        assert abs(sum(c["monto"] for c in cuotas) - monto_total) < 0.02, (seed, monto_total, sum(c["monto"] for c in cuotas))
+        assert [c["descripcion"].split("(")[-1] for c in cuotas] == [f"{i}/{total})" for i in range(1, total + 1)], seed
+        assert conn.execute("SELECT activo FROM recurrentes WHERE id = 1").fetchone()["activo"] == 0, seed
+
+
 def test_anual_avanza_un_ano_y_no_un_mes():
     from finanzas_core import siguiente_fecha, mensualizar, _ingreso_principal
     # Un cargo anual cae cada año, en el mismo mes y día ancla; nunca un mes después
