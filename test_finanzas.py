@@ -2429,6 +2429,24 @@ def test_periodos_invariantes_con_escenarios_aleatorios():
         assert abs(sum(p["gastos"]["pagado"] for p in ps) - gas_db) < 0.02, seed
 
 
+def test_editar_proximo_cargo_no_cambia_el_dia_ancla_si_cae_a_fin_de_mes():
+    from finanzas_core import ancla_al_editar_proximo_cargo
+    # Un mensual del 31 que se edita al último día de febrero conserva el 31: marzo vuelve a caer el 31
+    assert ancla_al_editar_proximo_cargo(31, date(2027, 2, 28), 'mensual') == 31
+    assert ancla_al_editar_proximo_cargo(31, date(2027, 3, 31), 'mensual') == 31
+    assert ancla_al_editar_proximo_cargo(30, date(2027, 2, 28), 'mensual') == 30
+    # Una fecha elegida a mano que no es fin de mes sí cambia el ancla
+    assert ancla_al_editar_proximo_cargo(31, date(2027, 2, 20), 'mensual') == 20
+    # Si el ancla ya era el día de la fecha elegida, o es fin de mes con ancla menor, se usa esa fecha
+    assert ancla_al_editar_proximo_cargo(15, date(2027, 2, 28), 'mensual') == 28
+    assert ancla_al_editar_proximo_cargo(None, date(2027, 2, 28), 'mensual') == 28
+    # Quincenal no usa ancla: el día es el de la fecha guardada
+    assert ancla_al_editar_proximo_cargo(31, date(2027, 2, 28), 'quincenal') == 28
+    # Y el ciclo siguiente confirma que el cargo sigue en el ancla
+    from finanzas_core import siguiente_fecha
+    assert siguiente_fecha(date(2027, 2, 28), 'mensual', 31) == date(2027, 3, 31)
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

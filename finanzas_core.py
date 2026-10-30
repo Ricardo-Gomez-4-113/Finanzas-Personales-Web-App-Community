@@ -152,6 +152,16 @@ def proxima_fecha_vigente(fecha_anterior: date, frecuencia: str, dia: Optional[i
     return prox
 
 
+def ancla_al_editar_proximo_cargo(dia_guardado: Optional[int], nueva_fecha: date, frecuencia: str) -> int:
+    """Día ancla de un recurrente tras fijar a mano su próximo cargo.
+    Un mensual del 31 movido al último día de un mes corto (28 feb) conserva el 31: el ancla no es esa fecha,
+    solo está limitada por el mes. Cualquier otra fecha elegida pasa a ser el nuevo ancla."""
+    if frecuencia == 'mensual' and dia_guardado and nueva_fecha.day == ultimo_dia_mes(nueva_fecha.year, nueva_fecha.month) \
+            and dia_guardado > nueva_fecha.day:
+        return dia_guardado
+    return nueva_fecha.day
+
+
 def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
     """
     Inserta en `transacciones` las ocurrencias de recurrentes cuya fecha ya llegó.

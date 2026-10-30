@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from finanzas_core import (
     validar_fecha_operativa,
     ahora_local,
+    ancla_al_editar_proximo_cargo,
     deuda_pendiente,
     fijos_por_periodo,
     materializar_recurrentes,
@@ -266,7 +267,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
                 )
 
         campos.append("proxima_fecha = ?"); valores.append(nueva_fecha.isoformat())
-        campos.append("dia = ?"); valores.append(nueva_fecha.day)
+        campos.append("dia = ?"); valores.append(ancla_al_editar_proximo_cargo(fila["dia"], nueva_fecha, req.frecuencia or fila["frecuencia"]))
     if "apartado_id" in req.model_fields_set:
         validar_apartado(cursor, req.apartado_id)
         if req.apartado_id is not None and fila["tipo"] == 'ingreso':
@@ -295,7 +296,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
                 fecha_nueva = proxima_fecha_vigente(base, req.frecuencia or fila["frecuencia"], fila["dia"], hoy)
         if fecha_nueva is not None and fecha_nueva != fecha_guardada:
             campos.append("proxima_fecha = ?"); valores.append(fecha_nueva.isoformat())
-            campos.append("dia = ?"); valores.append(fecha_nueva.day)
+            campos.append("dia = ?"); valores.append(ancla_al_editar_proximo_cargo(fila["dia"], fecha_nueva, req.frecuencia or fila["frecuencia"]))
     if req.categoria_id is not None:
         campos.append("categoria_id = ?"); valores.append(req.categoria_id)
     if "presupuesto_tarjeta_id" in req.model_fields_set:

@@ -365,6 +365,21 @@ def test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo(client, ha):
     client.delete(f"/api/recurrentes/{rid}", headers=ha)
 
 
+def test_editar_al_fin_de_febrero_no_corre_el_mensual_del_31(client, ha):
+    r = client.post("/api/recurrentes", json={"descripcion": "Ingreso del 31 prueba", "tipo": "ingreso", "frecuencia": "mensual",
+                                              "monto": 300, "fecha_inicio": "2027-01-31"}, headers=ha)
+    assert r.status_code == 201, r.text
+    rid = r.json()["id"]
+    try:
+        # Se mueve el próximo cargo al último día de febrero: el ancla del 31 no debe cambiar
+        r = client.patch(f"/api/recurrentes/{rid}", json={"proxima_fecha": "2027-02-28"}, headers=ha)
+        assert r.status_code == 200 and r.json()["proxima_fecha"] == "2027-02-28", r.text
+        fila = next(f for f in client.get("/api/recurrentes", headers=ha).json() if f["id"] == rid)
+        assert fila["dia"] == 31 and fila["proxima_fecha"] == "2027-02-28", fila
+    finally:
+        client.delete(f"/api/recurrentes/{rid}", headers=ha)
+
+
 def test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha):
     estado = client.get("/api/presupuesto", headers=ha).json()
     cfg_original, dia_original = estado["config"], estado["unidades"][0]["dia_pago"]
@@ -476,6 +491,7 @@ if __name__ == "__main__":
             (test_msi_en_el_presupuesto_por_api, lambda: test_msi_en_el_presupuesto_por_api(client, ha)),
             (test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes, lambda: test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha)),
             (test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo, lambda: test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo(client, ha)),
+            (test_editar_al_fin_de_febrero_no_corre_el_mensual_del_31, lambda: test_editar_al_fin_de_febrero_no_corre_el_mensual_del_31(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
