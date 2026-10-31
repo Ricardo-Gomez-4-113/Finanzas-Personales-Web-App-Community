@@ -86,8 +86,9 @@ _CACHE_TASAS = {
 
 _LOCK_TASAS = threading.Lock()
 
-# Tipo de cambio USD→MXN de respaldo cuando no hay cotización en vivo ni caché
+# Tipos de cambio de respaldo cuando no hay cotización en vivo ni caché (unidades por USD)
 TASA_MXN_RESPALDO = 18.40
+TASA_EUR_RESPALDO = 0.89
 
 def obtener_tasas_cambio():
     ahora = time.time()
@@ -106,7 +107,7 @@ def _refrescar_tasas_cambio():
     tasas = {
         "USD": 1.0,
         "MXN": TASA_MXN_RESPALDO,
-        "EUR": 0.89
+        "EUR": TASA_EUR_RESPALDO
     }
     try:
         precio_mxn = consultar_precio_mercado("USDMXN=X")

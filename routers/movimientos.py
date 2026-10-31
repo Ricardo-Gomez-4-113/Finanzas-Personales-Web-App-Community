@@ -28,7 +28,7 @@ from finanzas_core import (
     validar_limite_cargos_ventana,
     obtener_total_apartados,
 )
-from mercado import obtener_tasas_cambio, TASA_MXN_RESPALDO
+from mercado import obtener_tasas_cambio, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
     get_tenant_db
 )
@@ -279,8 +279,8 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
 def obtener_resumen(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     materializar_recurrentes(conn, hoy)
-    tasa_usd_mxn = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
-    return calcular_resumen(conn, moneda_base, tasa_usd_mxn, hoy)
+    tasas = obtener_tasas_cambio()
+    return calcular_resumen(conn, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), hoy, tasas.get("EUR", TASA_EUR_RESPALDO))
 
 @router.get("/api/resumen-mensual", summary="Historial agrupado por mes")
 def resumen_mensual(conn: sqlite3.Connection = Depends(get_tenant_db)):

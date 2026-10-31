@@ -71,6 +71,7 @@ import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
 from finanzas_core import (
     convertir,
+    valorar_posiciones,
     fijos_por_periodo,
     calcular_resumen,
     siguiente_fecha,
@@ -1836,8 +1837,16 @@ def test_frecuencias_ida_y_vuelta():
 
 def test_convertir_y_rendimiento_casos_borde():
     assert convertir(100, 'usd', 'mxn', 18) == 1800
-    assert convertir(100, 'EUR', 'MXN', 18) == 100
+    # EUR pasa por USD: 100 EUR = 111.11 USD = 2000 MXN con 0.9 EUR por USD y 18 MXN por USD
+    assert round(convertir(100, 'EUR', 'MXN', 18, 0.9), 2) == 2000.0
+    assert round(convertir(2000, 'MXN', 'EUR', 18, 0.9), 2) == 100.0
     assert convertir(100, 'MXN', 'USD', 0) == 100
+    try:
+        convertir(100, 'EUR', 'MXN', 18)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("un monto en EUR sin tasa no debe convertirse en silencio")
     d = date(2026, 1, 1)
     assert valor_rendimiento(10000, 10, d, d - timedelta(days=30)) == 10000
     assert valor_rendimiento(10000, 0, d, d + timedelta(days=365)) == 10000
@@ -2487,6 +2496,20 @@ def test_editar_proximo_cargo_no_cambia_el_dia_ancla_si_cae_a_fin_de_mes():
     # Y el ciclo siguiente confirma que el cargo sigue en el ancla
     from finanzas_core import siguiente_fecha
     assert siguiente_fecha(date(2027, 2, 28), 'mensual', 31) == date(2027, 3, 31)
+
+
+def test_portafolio_en_eur_se_valua_con_su_tasa():
+    # 10 acciones a 100 EUR = 1000 EUR = 2000 USD = 40000 MXN, con 0.5 EUR por USD y 20 MXN por USD
+    filas = [{"cantidad": 10, "precio_promedio": 100, "precio_actual": 100, "moneda": "EUR"}]
+    v = valorar_posiciones(filas, "MXN", 20, 0.5)
+    assert v["posiciones"][0]["valor_actual"] == 40000.0, v
+    assert v["resumen"]["total_valor_actual"] == 40000.0, v
+    try:
+        valorar_posiciones(filas, "MXN", 20)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("un portafolio en EUR sin tasa no debe valuarse en silencio")
 
 
 if __name__ == '__main__':

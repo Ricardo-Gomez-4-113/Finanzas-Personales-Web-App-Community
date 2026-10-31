@@ -10,7 +10,7 @@ import sqlite3
 from datetime import date
 
 from finanzas_core import ahora_local, convertir, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
-from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO
+from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
     verify_token,
     get_tenant_db
@@ -41,8 +41,8 @@ class InversionUpdate(BaseModel):
 def listar_inversiones(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
-    tasa_usd_mxn = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
-    return valorar_posiciones(filas, moneda_base, tasa_usd_mxn)
+    tasas = obtener_tasas_cambio()
+    return valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
 
 @router.post("/api/inversiones", status_code=status.HTTP_201_CREATED, summary="Registrar posición bursátil")
 def crear_inversion(item: InversionCreate, conn: sqlite3.Connection = Depends(get_tenant_db)):
@@ -217,7 +217,7 @@ class RendimientoUpdate(BaseModel):
     tasa_anual: Optional[float] = Field(None, ge=0, le=100)
 
 
-def _cuenta_valorada(fila, hoy: date, base: str, tasa_fx: float) -> Dict[str, Any]:
+def _cuenta_valorada(fila, hoy: date, base: str, tasa_fx: float, tasa_eur: float) -> Dict[str, Any]:
     capital = float(fila["capital"])
     tasa = float(fila["tasa_anual"])
     valor = valor_rendimiento(capital, tasa, date.fromisoformat(fila["fecha_base"]), hoy)
@@ -228,10 +228,10 @@ def _cuenta_valorada(fila, hoy: date, base: str, tasa_fx: float) -> Dict[str, An
         "nombre": fila["nombre"],
         "tasa_anual": tasa,
         "fecha_base": fila["fecha_base"],
-        "capital": round(convertir(capital, "MXN", base, tasa_fx), 2),
-        "valor_actual": round(convertir(valor, "MXN", base, tasa_fx), 2),
-        "interes_generado": round(convertir(interes, "MXN", base, tasa_fx), 2),
-        "ganancia_mensual_estimada": round(convertir(ganancia_mes, "MXN", base, tasa_fx), 2),
+        "capital": round(convertir(capital, "MXN", base, tasa_fx, tasa_eur), 2),
+        "valor_actual": round(convertir(valor, "MXN", base, tasa_fx, tasa_eur), 2),
+        "interes_generado": round(convertir(interes, "MXN", base, tasa_fx, tasa_eur), 2),
+        "ganancia_mensual_estimada": round(convertir(ganancia_mes, "MXN", base, tasa_fx, tasa_eur), 2),
     }
 
 
@@ -255,9 +255,9 @@ def _obtener_cuenta(cursor, cuenta_id: int):
 def listar_rendimiento(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     base = moneda_base.upper()
-    tasa_fx = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
+    tasas = obtener_tasas_cambio()
     filas = conn.execute("SELECT * FROM cuentas_rendimiento ORDER BY id").fetchall()
-    cuentas = [_cuenta_valorada(f, hoy, base, tasa_fx) for f in filas]
+    cuentas = [_cuenta_valorada(f, hoy, base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO)) for f in filas]
     total = {
         "valor_actual": round(sum(c["valor_actual"] for c in cuentas), 2),
         "interes_generado": round(sum(c["interes_generado"] for c in cuentas), 2),

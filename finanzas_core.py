@@ -34,18 +34,33 @@ def ahora_local() -> datetime:
     return datetime.now(zona) if zona else datetime.now()
 
 
-def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: float) -> float:
-    """Convierte un monto entre USD y MXN. Cualquier otro par devuelve el monto sin cambios."""
+def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> float:
+    """Convierte un monto entre USD, MXN y EUR pasando por USD. Las tasas son unidades de moneda por USD.
+    Un monto en EUR sin tasa_usd_eur es un error: sin ella el valor sería nominal y el total saldría mal."""
     origen = moneda_origen.upper()
     base = moneda_base.upper()
-    if origen == "USD" and base == "MXN":
-        return monto * tasa_usd_mxn
-    if origen == "MXN" and base == "USD":
-        return monto / tasa_usd_mxn if tasa_usd_mxn > 0 else monto
+    if origen == base:
+        return monto
+    if "EUR" in (origen, base) and not tasa_usd_eur:
+        raise ValueError("Falta el tipo de cambio USD/EUR para convertir montos en EUR.")
+    if origen == "USD":
+        usd = monto
+    elif origen == "MXN":
+        usd = monto / tasa_usd_mxn if tasa_usd_mxn > 0 else monto
+    elif origen == "EUR":
+        usd = monto / tasa_usd_eur
+    else:
+        return monto
+    if base == "USD":
+        return usd
+    if base == "MXN":
+        return usd * tasa_usd_mxn
+    if base == "EUR":
+        return usd * tasa_usd_eur
     return monto
 
 
-def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: float) -> Dict[str, Any]:
+def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Dict[str, Any]:
     """Valúa las posiciones bursátiles en la moneda base y calcula el PnL del portafolio."""
     moneda_base_upper = moneda_base.upper()
 
@@ -63,8 +78,8 @@ def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: flo
         cap_invertido_orig = round(cant * costo_prom, 2)
         val_act_orig = round(cant * precio_act, 2)
 
-        cap_invertido_base = round(convertir(cap_invertido_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn), 2)
-        val_act_base = round(convertir(val_act_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn), 2)
+        cap_invertido_base = round(convertir(cap_invertido_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur), 2)
+        val_act_base = round(convertir(val_act_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur), 2)
         pnl_base = round(val_act_base - cap_invertido_base, 2)
         pnl_pct = round(((val_act_orig - cap_invertido_orig) / cap_invertido_orig) * 100, 2) if cap_invertido_orig > 0 else 0.0
 
@@ -72,7 +87,7 @@ def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: flo
         total_valor_actual += val_act_base
 
         item["moneda"] = moneda_activo
-        item["factor_conversion"] = convertir(1.0, moneda_activo, moneda_base_upper, tasa_usd_mxn)
+        item["factor_conversion"] = convertir(1.0, moneda_activo, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur)
         item["capital_invertido_orig"] = cap_invertido_orig
         item["valor_actual_orig"] = val_act_orig
         item["capital_invertido"] = cap_invertido_base
@@ -1914,7 +1929,7 @@ def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: st
     }
 
 
-def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: float, hoy: date) -> Dict[str, Any]:
+def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: float, hoy: date, tasa_usd_eur: Optional[float] = None) -> Dict[str, Any]:
     """
     Resumen patrimonial en la moneda base.
     - balance: transacciones materializadas (las cuotas MSI bajan el balance solo al vencer).
@@ -1927,7 +1942,7 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     cursor = conn.cursor()
 
     def conv(monto: float, origen: str = "MXN") -> float:
-        return convertir(monto, origen, moneda_base_upper, tasa_usd_mxn)
+        return convertir(monto, origen, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur)
 
     cursor.execute("SELECT SUM(monto) as total FROM transacciones WHERE tipo='ingreso'")
     ingresos = cursor.fetchone()["total"] or 0.0
@@ -1942,7 +1957,7 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     inversiones_total = 0.0
     for inv in filas_inv:
         val = float(inv["cantidad"]) * float(inv["precio_actual"])
-        inversiones_total += convertir(val, (inv["moneda"] or "USD").upper(), moneda_base_upper, tasa_usd_mxn)
+        inversiones_total += convertir(val, (inv["moneda"] or "USD").upper(), moneda_base_upper, tasa_usd_mxn, tasa_usd_eur)
 
     # Pausadas incluidas: una compra a meses pausada sigue debiéndose
     deuda_msi = sum(deuda_pendiente(r) for r in cursor.execute("SELECT * FROM recurrentes").fetchall())
