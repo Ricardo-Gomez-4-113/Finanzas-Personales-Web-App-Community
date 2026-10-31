@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 try:
@@ -682,6 +683,209 @@ def test_menu_usuario_teclado_y_hoja_movil(navegador, base):
         ctx.close()
 
 
+def _usuario_nuevo(sufijo):
+    """Usuario propio de una prueba que modifica datos: el escenario compartido conserva sus cifras fijas."""
+    nombre, clave = f"fr_{sufijo}", "Passw0rd#Nuevo1"
+    master_db.create_user_entry(nombre, security.hash_password(clave), email=f"{nombre}@test.local")
+    return nombre, clave
+
+
+def _api(base, usuario, clave):
+    """Cliente HTTP ya autenticado, para preparar o comprobar datos sin pasar por la pantalla."""
+    body = json.dumps({"username": usuario, "password": clave}).encode()
+    req = urllib.request.Request(base + "/auth/login", data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        token = json.loads(r.read())["access_token"]
+    return _ClienteHttp(base, token)
+
+
+def _abrir_mi_perfil(page):
+    page.click("#btn-user-menu-trigger")
+    page.wait_for_selector("#user-dropdown-menu.show")
+    page.locator("#user-dropdown-menu button", has_text="Mi perfil").click()
+    page.wait_for_selector("#modal-editar-usuario:not(.hidden)")
+
+
+def test_inversion_nueva_aparece_en_el_portafolio(navegador, base):
+    usuario, clave = _usuario_nuevo("inv")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-inversiones")
+        page.fill("#inv-ticker", "VOO")
+        page.fill("#inv-cantidad", "2")
+        page.fill("#inv-precio-promedio", "100")
+        page.fill("#inv-precio-actual", "110")
+        page.click("#form-inversion [type=submit]")
+        _esperar(page, "[...document.querySelectorAll('#tabla-inversiones tr')].some(tr => tr.textContent.includes('VOO'))")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base):
+    usuario, clave = _usuario_nuevo("rec")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        page.evaluate("document.getElementById('btn-subtab-fijos').click()")  # clic por JS: la barra superior tapa el botón
+        page.evaluate("document.querySelector('input[name=rec-modo][value=ingreso]').click()")
+        page.fill("#rec-desc", "Nomina")
+        page.fill("#rec-monto", "14000")
+        page.select_option("#rec-frecuencia", "quincenal")
+        page.fill("#rec-fecha", "2026-10-01")
+        page.select_option("#rec-categoria", index=0)
+        page.click("#btn-guardar-recurrente")
+        _esperar(page, "document.getElementById('fijos-periodos').textContent.includes('Nomina')")
+
+        page.evaluate("document.querySelector('input[name=rec-modo][value=gasto]').click()")
+        page.fill("#rec-desc", "Gimnasio")
+        page.fill("#rec-monto", "450")
+        page.select_option("#rec-frecuencia", "quincenal")
+        page.fill("#rec-fecha", "2026-10-01")
+        page.select_option("#rec-categoria", index=0)
+        page.click("#btn-guardar-recurrente")
+        _esperar(page, "document.getElementById('fijos-periodos').textContent.includes('Gimnasio')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base):
+    usuario, clave = _usuario_nuevo("resp")
+    api = _api(base, usuario, clave)
+    r = api.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "sueldo"})
+    assert r.status_code in (200, 201), r.text
+    r = api.post("/api/transacciones", json={"fecha": "2026-10-05", "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "antes-del-respaldo"})
+    assert r.status_code in (200, 201), r.text
+    carpeta = tempfile.mkdtemp(dir=TMP)
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    page.on("dialog", lambda d: d.accept())  # confirmación de la restauración
+    try:
+        _entrar(page, base, usuario, clave)
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        with page.expect_download() as descarga:
+            page.click(".btn-backup")
+        copia = os.path.join(carpeta, "copia.db")
+        descarga.value.save_as(copia)
+        with open(copia, "rb") as f:
+            assert f.read(16) == b"SQLite format 3\x00", "la descarga debe ser una base SQLite"
+
+        r = api.post("/api/transacciones", json={"fecha": "2026-10-06", "monto": 50, "tipo": "gasto", "categoria_id": 2, "descripcion": "despues-del-respaldo"})
+        assert r.status_code in (200, 201), r.text
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        with page.expect_file_chooser() as eleccion:
+            page.click(".btn-restore")
+        eleccion.value.set_files(copia)
+
+        descripciones = lambda: [t["descripcion"] for t in api.get("/api/transacciones").json()]
+        for _ in range(100):
+            if "despues-del-respaldo" not in descripciones():
+                break
+            page.wait_for_timeout(100)
+        assert "despues-del-respaldo" not in descripciones(), "la restauración debe quitar lo hecho después del respaldo"
+        assert "antes-del-respaldo" in descripciones()
+
+        # Un respaldo de una versión más nueva se rechaza con su motivo y no toca los datos.
+        import sqlite3 as _sqlite
+        futura = os.path.join(carpeta, "futura.db")
+        shutil.copy(copia, futura)
+        con = _sqlite.connect(futura)
+        con.execute("PRAGMA user_version = 99")
+        con.commit()
+        con.close()
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        with page.expect_file_chooser() as eleccion:
+            page.click(".btn-restore")
+        eleccion.value.set_files(futura)
+        page.wait_for_selector(".toast-error", timeout=10000)
+        assert "más nueva" in page.inner_text(".toast-error"), page.inner_text(".toast-error")
+        assert "antes-del-respaldo" in descripciones()
+        assert not errores, errores
+    finally:
+        ctx.close()
+        shutil.rmtree(carpeta, ignore_errors=True)
+
+
+def test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base):
+    usuario, clave = _usuario_nuevo("pwd")
+    nueva = "Nueva#Clave2026"
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _abrir_mi_perfil(page)
+        page.fill("#edit-user-password", nueva)
+        page.click("#form-editar-usuario [type=submit]")
+        page.wait_for_selector(".toast-error", timeout=10000)
+        assert "contraseña actual" in page.inner_text(".toast-error"), page.inner_text(".toast-error")
+        page.wait_for_timeout(3500)  # el toast tapa al siguiente: esperamos a que se vaya
+
+        page.fill("#edit-user-current-password", "Incorrecta#1")
+        page.click("#form-editar-usuario [type=submit]")
+        page.wait_for_selector(".toast-error", timeout=10000)
+        assert "no es correcta" in page.inner_text(".toast-error"), page.inner_text(".toast-error")
+        page.wait_for_timeout(3500)
+
+        page.fill("#edit-user-current-password", clave)
+        page.click("#form-editar-usuario [type=submit]")
+        page.wait_for_selector("#modal-editar-usuario.hidden", state="attached", timeout=10000)
+        assert not errores, errores
+    finally:
+        ctx.close()
+    _api(base, usuario, nueva)  # la nueva contraseña entra
+    try:
+        _api(base, usuario, clave)
+        raise AssertionError("la contraseña anterior debe dejar de funcionar")
+    except urllib.error.HTTPError as e:
+        assert e.code == 401, e.code
+
+
+def test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base):
+    usuario, clave = _usuario_nuevo("del")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _abrir_mi_perfil(page)
+        page.wait_for_selector("#danger-zone-eliminar-cuenta:not(.hidden)")
+        page.click("#danger-zone-eliminar-cuenta summary")
+        boton = "#btn-eliminar-cuenta-confirmar"
+        assert page.is_disabled(boton), "sin escribir el usuario no se puede eliminar"
+        page.fill("#eliminar-cuenta-confirmar", usuario + "x")
+        assert page.is_disabled(boton), "un nombre parecido no basta"
+        page.fill("#eliminar-cuenta-confirmar", usuario)
+        _esperar(page, "!document.getElementById('btn-eliminar-cuenta-confirmar').disabled")
+        page.click(boton)
+        page.wait_for_selector("#form-login", state="visible", timeout=15000)
+        assert not errores, errores
+    finally:
+        ctx.close()
+    try:
+        _api(base, usuario, clave)
+        raise AssertionError("la cuenta eliminada no debe poder entrar")
+    except urllib.error.HTTPError as e:
+        assert e.code == 401, e.code
+
+
+def test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-calculadora-rf")
+        page.fill("#calc-rf-monto", "10000")
+        page.fill("#calc-rf-tasa", "10")
+        page.click("#btn-calcular-rf")
+        _esperar(page, "document.getElementById('calc-rf-res-anio').textContent.includes('1,000.00')")
+        _esperar(page, "document.getElementById('calc-rf-res-dia').textContent.includes('2.74')")
+        page.fill("#calc-rf-tasa", "150")
+        assert page.evaluate("document.getElementById('calc-rf-tasa').validity.rangeOverflow"), "una tasa de 150% no es válida"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -718,6 +922,12 @@ if __name__ == "__main__":
                 (test_403_de_cuenta_desactivada_cierra_la_sesion, lambda: test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base)),
                 (test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin, lambda: test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base)),
                 (test_menu_usuario_teclado_y_hoja_movil, lambda: test_menu_usuario_teclado_y_hoja_movil(navegador, base)),
+                (test_inversion_nueva_aparece_en_el_portafolio, lambda: test_inversion_nueva_aparece_en_el_portafolio(navegador, base)),
+                (test_fijo_quincenal_y_gasto_con_su_ingreso, lambda: test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base)),
+                (test_respaldo_desde_el_menu_se_descarga_y_se_restaura, lambda: test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base)),
+                (test_mi_perfil_exige_contrasena_actual_para_cambiarla, lambda: test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base)),
+                (test_eliminar_cuenta_exige_escribir_el_usuario, lambda: test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base)),
+                (test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango, lambda: test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
