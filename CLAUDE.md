@@ -52,7 +52,9 @@ Cada entrada indica el commit y qué incluye.
 
 - Pruebas rápidas de finanzas: `python3 test_finanzas.py`. Requiere las dependencias de `requirements.txt` (`pydantic==2.14.1` en particular); en Python del sistema con PEP 668 conviene un entorno virtual.
 - Suites de backend en Docker: `./tests/run_tests.sh` (finanzas, migraciones, respaldo, mercado, acciones, aislamiento de API y escenario de API).
-- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Repetir la ejecución hasta ver `OK: 19 pruebas`.
+- Batería completa, con cobertura y navegador: `./tests/run_todo.sh` (unos 6 minutos).
+- Cobertura de `routers/`: `./tests/run_cobertura.sh`. Mínimo actual 58 %; solo debe subir. Subirlo en el propio script al añadir pruebas.
+- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 36 pruebas`.
 
 Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraciones 8, respaldo 2, mercado 4, acciones 2, aislamiento 33, escenario 18) y frontend 19 de 19.
 
