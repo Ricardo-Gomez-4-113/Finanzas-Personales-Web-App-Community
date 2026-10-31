@@ -86,13 +86,6 @@ class TarjetaPresupuestoUpdate(BaseModel):
     msi_cuotas: Optional[int] = Field(None, ge=2, le=60)
 
 
-class ImportarFijosRequest(BaseModel):
-    modo: Optional[Literal['individual', 'categoria', 'unificado']] = 'individual'
-    recurrentes_ids: Optional[List[int]] = Field(None, max_length=1000)
-    actualizar_ingreso: bool = True
-    reemplazar: bool = False
-
-
 class ExportarFijosRequest(BaseModel):
     tarjetas_ids: Optional[List[int]] = Field(None, max_length=1000)
     incluir_ingreso: bool = True
@@ -360,17 +353,6 @@ def actualizar_unidad_pago(orden: int, req: UnidadPagoUpdate, conn: sqlite3.Conn
         raise HTTPException(status_code=422, detail="Las fechas de pago deben ir en orden creciente: cada pago después del anterior.")
     conn.commit()
     return get_presupuesto(conn)
-
-
-@router.post("/api/presupuesto/importar-fijos", summary="Importar nómina y gastos de Fijos y MSI")
-def importar_fijos_a_presupuesto(
-    req: Optional[ImportarFijosRequest] = None,
-    conn: sqlite3.Connection = Depends(get_tenant_db)
-):
-    raise HTTPException(
-        status_code=400,
-        detail="Operación bloqueada: El flujo de importación es estrictamente unidireccional (Presupuesto -> Gastos Fijos). El presupuesto es una herramienta de planeación estratégica y no permite sobreescribirse automáticamente desde los gastos fijos."
-    )
 
 
 @router.post("/api/presupuesto/exportar-a-fijos", summary="Exportar tarjetas de presupuesto a Movimientos y Fijos con la misma periodicidad")

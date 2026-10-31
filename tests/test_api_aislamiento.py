@@ -535,7 +535,7 @@ def test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha):
     """Listas de IDs acotadas (422 si exceden el tope) y la moneda del nombre de archivo nunca llega sin normalizar."""
     r = client.post("/api/transacciones/eliminar-lote", json={"ids": list(range(1001))}, headers=ha)
     assert r.status_code == 422, r.text
-    r = client.post("/api/presupuesto/importar-fijos", json={"recurrentes_ids": list(range(1001))}, headers=ha)
+    r = client.post("/api/presupuesto/exportar-a-fijos", json={"tarjetas_ids": list(range(1001))}, headers=ha)
     assert r.status_code == 422, r.text
     r = client.get('/api/exportar-excel?moneda_base=XX%22%3Bx', headers=ha)
     assert r.status_code == 200, r.text

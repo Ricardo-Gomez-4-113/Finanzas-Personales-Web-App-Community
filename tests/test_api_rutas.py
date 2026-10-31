@@ -165,16 +165,9 @@ def test_presupuesto_config_unidades_y_tarjetas(client):
     assert client.delete(f"/api/presupuesto/tarjetas/{tarjeta}", headers=h).status_code == 404
 
 
-def test_presupuesto_importa_y_exporta_fijos(client):
+def test_presupuesto_exporta_fijos(client):
     _crear_usuario("ruta_pres_fijos")
     h = _login(client, "ruta_pres_fijos")
-    ingreso = client.post("/api/recurrentes", json={"descripcion": "Nomina", "tipo": "ingreso", "monto": 14000, "frecuencia": "quincenal", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=h)
-    assert ingreso.status_code in (200, 201), ingreso.text
-    gasto = client.post("/api/recurrentes", json={"descripcion": "Renta", "tipo": "gasto", "monto": 9000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 4}, headers=h)
-    assert gasto.status_code in (200, 201), gasto.text
-    # La importación hacia el presupuesto está deshabilitada a propósito: el flujo válido es exportar.
-    r = client.post("/api/presupuesto/importar-fijos", json={"recurrentes_ids": [ingreso.json()["id"], gasto.json()["id"]]}, headers=h)
-    assert r.status_code == 400 and "unidireccional" in r.text, r.text
     assert client.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "quincenal", "dia_pago": 15, "subdivision_tipo": "ninguna"}, headers=h).status_code == 200
     r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Hogar", "porcentaje": 30, "notas": "", "unidad_orden": 2}, headers=h)
     assert r.status_code in (200, 201), r.text
@@ -351,7 +344,7 @@ if __name__ == "__main__":
             (test_tipo_de_cambio_privado_y_publico, lambda: test_tipo_de_cambio_privado_y_publico(client)),
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),
             (test_presupuesto_config_unidades_y_tarjetas, lambda: test_presupuesto_config_unidades_y_tarjetas(client)),
-            (test_presupuesto_importa_y_exporta_fijos, lambda: test_presupuesto_importa_y_exporta_fijos(client)),
+            (test_presupuesto_exporta_fijos, lambda: test_presupuesto_exporta_fijos(client)),
             (test_recurrentes_listar_editar_saltar_y_borrar, lambda: test_recurrentes_listar_editar_saltar_y_borrar(client)),
             (test_admin_lista_edita_suspende_y_elimina, lambda: test_admin_lista_edita_suspende_y_elimina(client, hadmin)),
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),

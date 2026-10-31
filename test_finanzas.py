@@ -783,21 +783,11 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
 
 
 def test_importacion_presupuesto_a_fijos_estricta():
-    from fastapi import HTTPException
-    from routers.presupuesto import importar_fijos_a_presupuesto
     from finanzas_core import exportar_presupuesto_a_fijos_core
 
     conn = nueva_bd()
 
-    # 1. Bloqueo estricto de Fijos -> Presupuesto con HTTP 400
-    try:
-        importar_fijos_a_presupuesto(None, conn)
-        assert False, "Debió rechazar la importación de fijos a presupuesto con HTTP 400"
-    except HTTPException as exc:
-        assert exc.status_code == 400
-        assert "estrictamente unidireccional" in exc.detail
-
-    # 2. Flujo permitido y estricto de Presupuesto -> Fijos
+    # Flujo permitido y estricto de Presupuesto -> Fijos
     conn.execute("UPDATE presupuesto_config SET ingreso_base = 15000.0, frecuencia = 'quincenal' WHERE id = 1")
     conn.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
