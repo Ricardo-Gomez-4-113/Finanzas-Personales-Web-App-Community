@@ -895,8 +895,7 @@ def test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(nave
         page.click("#btn-inicio-vacio")
         page.wait_for_selector("#tab-movimientos.active")
         _api(base, usuario, clave).post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 500, "tipo": "ingreso", "categoria_id": 12, "descripcion": "primer-ingreso"})
-        page.reload()
-        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")  # recarga los datos sin salir de la sesión
         _esperar(page, "document.getElementById('inicio-vacio').classList.contains('hidden')")
         assert not errores, errores
     finally:
