@@ -64,7 +64,8 @@ def _token_forjado(user, **extra):
 
 
 # Rutas públicas aprobadas a conciencia (sin datos de usuario). Una ruta nueva debe agregarse aquí a propósito.
-RUTAS_PUBLICAS = {"/api/public/tipo-cambio"}
+# El reporte del navegador es público: también hay que ver fallos en el inicio de sesión (routers/diagnostico.py)
+RUTAS_PUBLICAS = {"/api/public/tipo-cambio", "/api/diagnostico/cliente"}
 
 MOV = {"fecha": "2026-01-15", "monto": 100.0, "tipo": "gasto", "categoria_id": 1, "descripcion": "secreto-de-A"}
 

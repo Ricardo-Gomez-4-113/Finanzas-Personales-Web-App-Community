@@ -40,6 +40,7 @@ import security  # noqa: E402
 USUARIO, CLAVE = "front_user", "Passw0rd#Front1"
 PESTANAS = ["tab-dashboard", "tab-movimientos", "tab-apartados", "tab-inversiones", "tab-presupuesto", "tab-calculadora-rf"]
 VIEWPORTS = {"laptop": {"width": 1366, "height": 768}, "movil": {"width": 390, "height": 844}}
+LOGS = tempfile.mkdtemp(prefix="finanzas_logs_front_")  # el servidor de la prueba escribe aquí su registro
 
 
 def _puerto_libre():
@@ -53,6 +54,7 @@ def _arrancar_servidor():
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(puerto)],
         cwd=TMP, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+        env={**os.environ, "FINANZAS_LOG_DIR": LOGS},
     )
     base = f"http://127.0.0.1:{puerto}"
     for _ in range(60):
@@ -1008,6 +1010,57 @@ def test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base):
         ctx.close()
 
 
+def _esperar_en_registro(texto, evento, tiempo=10.0):
+    """Espera a que el registro del servidor tenga una línea de ese evento que contenga el texto."""
+    ruta = os.path.join(LOGS, "app.log")
+    limite = time.time() + tiempo
+    while time.time() < limite:
+        if os.path.exists(ruta):
+            with open(ruta, encoding="utf-8") as archivo:
+                for linea in archivo:
+                    registro = json.loads(linea)
+                    if registro.get("evento") == evento and texto in json.dumps(registro, ensure_ascii=False):
+                        return registro
+        time.sleep(0.25)
+    # Sin la línea esperada, el fallo muestra lo que sí llegó al registro
+    contenido = open(ruta, encoding="utf-8").read()[-1500:] if os.path.exists(ruta) else "(el registro está vacío)"
+    raise AssertionError(f"el registro no tiene '{texto}' con evento {evento}. Últimas líneas:\n{contenido}")
+
+
+def test_error_de_javascript_llega_al_registro(navegador, base):
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base)
+        page.evaluate("setTimeout(() => { throw new Error('fallo-js-provocado') }, 0)")
+        registro = _esperar_en_registro("fallo-js-provocado", "cliente")
+        assert registro["tipo"] == "js" and registro["ruta"], registro
+        # El error sí aparece en la consola del navegador: el registro no lo oculta
+        assert [e for e in errores if "fallo-js-provocado" not in e] == [], errores
+    finally:
+        ctx.close()
+
+
+def test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base):
+    usuario, clave = _usuario_nuevo("reg500")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        page.wait_for_load_state("networkidle")  # la carga inicial termina antes de interceptar la API
+        page.route("**/api/resumen**", lambda route: route.fulfill(
+            status=500, content_type="application/json",
+            headers={"X-Request-Id": "0123456789abcdef"}, body='{"detail": "Error interno del servidor."}'))
+        with page.expect_response(lambda r: "/api/resumen" in r.url, timeout=15000) as respuesta:
+            page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        assert respuesta.value.status == 500, respuesta.value.status
+        registro = _esperar_en_registro("500 GET /api/resumen", "cliente")
+        assert registro["tipo"] == "api" and registro["id_peticion"] == "0123456789abcdef", registro
+        page.unroute("**/api/resumen**")
+        ignorados = ("Failed to load resource", "Error al actualizar datos")
+        assert [e for e in errores if not any(i in e for i in ignorados)] == [], errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -1072,6 +1125,8 @@ if __name__ == "__main__":
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
                 (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),
+                (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
+                (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
@@ -1079,4 +1134,5 @@ if __name__ == "__main__":
     finally:
         proc.terminate()
         shutil.rmtree(TMP, ignore_errors=True)
+        shutil.rmtree(LOGS, ignore_errors=True)
     sys.exit(codigo)

@@ -9,13 +9,14 @@ import { apiFetch, escapeHTML, estado, fmt, leerJson, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=d652950ea5';
+import { cargarRecurrentes } from './recurrentes.js?v=8c1c94536d';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=d652950ea5';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=8c1c94536d';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
+import { inicializarDiagnostico } from './diagnostico.js';
 
 activarAccionesDelegadas();
 document.getElementById('btn-inicio-vacio')?.addEventListener('click', () => document.querySelector('[data-tab="tab-movimientos"]')?.click());
@@ -204,6 +205,7 @@ window.addEventListener('popstate', () => {
 // =============================================================================
 document.addEventListener('sesion-expirada', (e) => cerrarSesionLimpia(e.detail));
 
+inicializarDiagnostico();
 inicializarTabs();
 inicializarFab();
 inicializarMenuUsuario();

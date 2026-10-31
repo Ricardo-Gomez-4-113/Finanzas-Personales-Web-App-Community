@@ -22,10 +22,11 @@ from database import (
     DATA_DIR
 )
 import master_db
+import observabilidad
 from security import (
     hash_password
 )
-from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud
+from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +62,9 @@ async def lifespan(app: FastAPI):
         print("[EMAIL ADVERTENCIA] El servicio de envío de correos NO está configurado en .env. La recuperación de contraseñas por correo permanecerá inactiva hasta definir RESEND_API_KEY o credenciales SMTP.")
     yield
 
+# Registro de fallos en data/logs/app.log (o FINANZAS_LOG_DIR). Antes de crear la app, para registrar también el arranque.
+observabilidad.configurar(observabilidad.directorio_por_defecto())
+
 # Control de exposición de documentación técnica (Swagger UI / ReDoc / OpenAPI)
 # Por seguridad en producción, queda completamente deshabilitado (404) a menos que ENABLE_DOCS=true
 ENABLE_DOCS = os.environ.get("ENABLE_DOCS", "false").strip().lower() in ("true", "1", "yes")
@@ -88,11 +92,16 @@ app.include_router(respaldo.router)
 app.include_router(recurrentes.router)
 app.include_router(presupuesto.router)
 app.include_router(salud.router)
+app.include_router(diagnostico.router)
 
 @app.exception_handler(sqlite3.OperationalError)
 async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):
     """Manejo controlado de contención y bloqueos temporales en SQLite (evita 500 no capturado)."""
     err_str = str(exc).lower()
+    if "locked" not in err_str and "busy" not in err_str:
+        observabilidad.registrar_error_servidor(
+            "error_base_datos", "Error de SQLite no esperado", excepcion=exc,
+            id_peticion=getattr(request.state, "id_peticion", None), ruta=request.url.path)
     if "locked" in err_str or "busy" in err_str:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -105,6 +114,9 @@ async def sqlite_operational_error_handler(request: Request, exc: sqlite3.Operat
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Error interno de base de datos."}
     )
+
+# Se registra antes que las cabeceras: así las cabeceras de seguridad también llegan a las respuestas 500 del registro
+app.middleware("http")(observabilidad.registrar_peticion)
 
 @app.middleware("http")
 async def add_security_and_cache_headers(request: Request, call_next):

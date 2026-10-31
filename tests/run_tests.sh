@@ -2,11 +2,14 @@
 # Ejecuta toda la batería de pruebas en un contenedor efímero (no toca el contenedor en producción ni data/).
 # Corre todas las suites aunque una falle, muestra un resumen y sale con 1 si alguna falló.
 # Uso: ./tests/run_tests.sh
+# El registro de fallos de todas las suites queda en .logs_pruebas/app.log (resumen: python3 scripts/resumen_logs.py .logs_pruebas).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 IMAGEN="${TEST_IMAGE:-python:3.11-slim}"
-docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" "$IMAGEN" bash -c '
+rm -rf "$PWD/.logs_pruebas" && mkdir -p "$PWD/.logs_pruebas"
+estado_docker=0
+docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINANZAS_LOG_DIR=/logs_pruebas -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" "$IMAGEN" bash -c '
   if ! pip install -q --no-cache-dir -r /src/requirements.txt httpx >/tmp/pip.log 2>&1; then
     echo "ERROR: no se pudieron instalar las dependencias (pip)"; tail -5 /tmp/pip.log; exit 1
   fi
@@ -27,7 +30,10 @@ docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" 
   paso test_escenario_api   python3 tests/test_escenario_api.py
   paso test_durabilidad     python3 tests/test_durabilidad.py
   paso test_api_rutas       python3 tests/test_api_rutas.py
+  paso test_observabilidad  python3 tests/test_observabilidad.py
   echo
   if [ "$estado" -eq 0 ]; then echo "RESULTADO: todas las suites OK"; else echo "RESULTADO: hay suites con fallos"; fi
   exit "$estado"
-'
+' || estado_docker=$?
+echo "Registro de fallos de esta ejecución: .logs_pruebas/app.log (resumen: python3 scripts/resumen_logs.py .logs_pruebas)"
+exit "$estado_docker"

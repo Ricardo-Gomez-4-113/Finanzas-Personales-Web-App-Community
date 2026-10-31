@@ -1,7 +1,9 @@
 /**
  * core.js - Estado compartido, cliente HTTP y helpers base del frontend.
- * Sin dependencias de otros módulos (evita imports circulares).
+ * Solo depende de diagnostico.js, que no importa nada (evita imports circulares).
  */
+
+import { reportarFallo } from './diagnostico.js';
 
 // =============================================================================
 // 1. ESTADO COMPARTIDO DE LA APLICACIÓN
@@ -66,6 +68,12 @@ export async function apiFetch(url, options = {}) {
     } catch (error) {
         toast('Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.', 'error');
         throw error;
+    }
+
+    // Un 5xx es un fallo del servidor: se reporta con el id de la petición para cruzarlo con el registro
+    if (response.status >= 500) {
+        const ruta = url.split('?')[0];
+        reportarFallo('api', `${response.status} ${(options.method || 'GET').toUpperCase()} ${ruta}`, { id_peticion: response.headers.get('X-Request-Id') || undefined });
     }
 
     // Un 401 es sesión vencida. Un 403 solo cierra sesión si la cuenta está desactivada o suspendida;

@@ -11,3 +11,6 @@ __pycache__/
 # Grafo de conocimiento de graphify (local, no se versiona)
 graphify-out/
 .gitattributes
+
+# Registro de fallos de las pruebas (scripts/resumen_logs.py)
+.logs_pruebas/
