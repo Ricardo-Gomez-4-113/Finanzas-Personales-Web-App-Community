@@ -600,6 +600,49 @@ def test_meta_depositar_y_retirar(navegador, base):
         ctx.close()
 
 
+def test_fallo_de_red_avisa_al_usuario(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.route("**/api/**", lambda route: route.abort())
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.wait_for_selector(".toast-error", timeout=10000)
+        texto = page.inner_text(".toast-error")
+        assert "Sin conexión" in texto, texto
+        page.unroute("**/api/**")
+    finally:
+        ctx.close()
+
+
+def test_403_de_permisos_no_cierra_la_sesion(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.route("**/api/resumen**", lambda route: route.fulfill(
+            status=403, content_type="application/json",
+            body='{"detail": "Acceso restringido exclusivamente a administradores."}'))
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.wait_for_timeout(1500)
+        assert page.is_visible("#vista-app"), "un 403 de permisos no debe cerrar la sesión"
+        page.unroute("**/api/resumen**")
+    finally:
+        ctx.close()
+
+
+def test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.route("**/api/**", lambda route: route.fulfill(
+            status=403, content_type="application/json",
+            body='{"detail": "Tu cuenta ha sido desactivada por el administrador."}'))
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.wait_for_selector("#form-login", state="visible", timeout=10000)
+        page.unroute("**/api/**")
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -631,6 +674,9 @@ if __name__ == "__main__":
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),
+                (test_fallo_de_red_avisa_al_usuario, lambda: test_fallo_de_red_avisa_al_usuario(navegador, base)),
+                (test_403_de_permisos_no_cierra_la_sesion, lambda: test_403_de_permisos_no_cierra_la_sesion(navegador, base)),
+                (test_403_de_cuenta_desactivada_cierra_la_sesion, lambda: test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

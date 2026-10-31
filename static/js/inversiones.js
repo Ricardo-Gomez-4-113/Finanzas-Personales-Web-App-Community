@@ -343,7 +343,7 @@ export async function buscarCotizacionTicker() {
     btn.disabled = true;
 
     try {
-        const res = await apiFetch(`/api/inversiones/cotizar/${ticker}`);
+        const res = await apiFetch(`/api/inversiones/cotizar/${encodeURIComponent(ticker)}`);
         if (res.ok) {
             const data = await res.json();
             inputActual.value = data.precio;
