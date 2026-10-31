@@ -1315,12 +1315,6 @@
 }
 
 @media (max-width: 480px) {
-    .user-dropdown-popover {
-        width: calc(100vw - 28px);
-        max-width: 270px;
-        right: 0;
-    }
-
     .select-moneda-topbar {
         padding: 0 22px 0 8px !important;
         font-size: 0.76rem;

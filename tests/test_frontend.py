@@ -657,6 +657,31 @@ def test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, ba
         ctx.close()
 
 
+def test_menu_usuario_teclado_y_hoja_movil(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        primero = page.evaluate("document.activeElement.textContent.trim()")
+        page.keyboard.press("ArrowDown")
+        assert page.evaluate("document.activeElement.getAttribute('role')") == "menuitem"
+        assert page.evaluate("document.activeElement.textContent.trim()") != primero, "las flechas deben cambiar de opción"
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        assert page.evaluate("document.activeElement.id") == "btn-user-menu-trigger", "Escape devuelve el foco al botón"
+    finally:
+        ctx.close()
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        _login(page, base)
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        assert page.evaluate("document.getElementById('user-dropdown-menu').parentElement === document.body"), "en móvil el menú es una hoja fuera de la barra"
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -692,6 +717,7 @@ if __name__ == "__main__":
                 (test_403_de_permisos_no_cierra_la_sesion, lambda: test_403_de_permisos_no_cierra_la_sesion(navegador, base)),
                 (test_403_de_cuenta_desactivada_cierra_la_sesion, lambda: test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base)),
                 (test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin, lambda: test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base)),
+                (test_menu_usuario_teclado_y_hoja_movil, lambda: test_menu_usuario_teclado_y_hoja_movil(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

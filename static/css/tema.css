@@ -1157,6 +1157,8 @@
 
 /* Administración no registra movimientos: el FAB y la moneda base no aplican ahí */
 :root:has(#tab-admin.active) .fab { display: none; }
+/* Con el menú de usuario abierto como hoja, el FAB no debe quedar encima de sus opciones */
+:root:has(#user-dropdown-menu.show) .fab { display: none; }
 
 @media (max-width: 720px) {
     :root:has(#tab-admin.active) .select-moneda-topbar { display: none; }

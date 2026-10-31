@@ -658,13 +658,26 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
     justify-content: center;
 }
 
+/* Las opciones se leen de izquierda a derecha, como en cualquier menú */
+.user-dropdown-popover .dropdown-action-btn {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+/* Cerrar sesión es neutro: no es destructivo. Sobrescribe el estilo rojo de .btn-logout (sidebar) */
 .dropdown-action-btn.dropdown-btn-logout {
-    color: var(--danger-text);
+    color: var(--text-main);
+    background-color: transparent;
+    border: none;
+    height: auto;
+    font-size: inherit;
+    font-weight: inherit;
 }
 
 .dropdown-action-btn.dropdown-btn-logout:hover {
-    background-color: var(--danger-subtle);
-    color: var(--danger-text);
+    background-color: var(--surface-level2);
+    border: none;
+    color: var(--text-main);
 }
 
 .dropdown-action-btn.dropdown-btn-danger {
@@ -918,5 +931,28 @@ body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
 @media (max-width: 768px) {
     .fab { display: flex; }
     .toast-root { bottom: 88px; }
+
+    /* Menú de usuario como hoja inferior: se desliza desde abajo, con las opciones a un pulgar de distancia */
+    .user-dropdown-popover {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: auto;
+        max-height: 80vh;
+        overflow-y: auto;
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+        box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--overlay-scrim) 45%, transparent);
+    }
+
+    .user-dropdown-popover.show {
+        transform: translateY(0);
+    }
+
+    .user-dropdown-popover .dropdown-action-btn {
+        min-height: 44px;
+    }
 }
 

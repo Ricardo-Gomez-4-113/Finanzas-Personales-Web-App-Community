@@ -284,6 +284,16 @@ export function inicializarEstadoSidebar() {
 }
 
 
+// En móvil el menú es una hoja inferior: se mueve al body porque la barra superior tiene
+// backdrop-filter y eso recortaría cualquier elemento fijo que esté dentro de ella.
+const MENU_USUARIO_MOVIL = window.matchMedia('(max-width: 768px)');
+
+function elementosMenuUsuario() {
+    const menu = document.getElementById('user-dropdown-menu');
+    if (!menu) return [];
+    return [...menu.querySelectorAll('[role="menuitem"]')].filter(el => el.offsetParent !== null);
+}
+
 export function toggleUserDropdown(event) {
     if (event) event.stopPropagation();
     const menu = document.getElementById('user-dropdown-menu');
@@ -292,7 +302,10 @@ export function toggleUserDropdown(event) {
     const isHidden = menu.classList.contains('hidden') || !menu.classList.contains('show');
     if (isHidden) {
         menu.classList.remove('hidden');
-        setTimeout(() => menu.classList.add('show'), 10);
+        setTimeout(() => {
+            menu.classList.add('show');
+            elementosMenuUsuario()[0]?.focus();
+        }, 10);
         if (trigger) trigger.setAttribute('aria-expanded', 'true');
     } else {
         cerrarUserDropdown();
@@ -300,7 +313,8 @@ export function toggleUserDropdown(event) {
 }
 
 
-export function cerrarUserDropdown() {
+/** Cierra el menú. Con `devolverFoco` (p. ej. tras Escape) el foco vuelve al botón que lo abrió. */
+export function cerrarUserDropdown(devolverFoco = false) {
     const menu = document.getElementById('user-dropdown-menu');
     const trigger = document.getElementById('btn-user-menu-trigger');
     if (menu) {
@@ -310,6 +324,55 @@ export function cerrarUserDropdown() {
         }, 150);
     }
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    if (devolverFoco === true && trigger) trigger.focus();
+}
+
+
+/** Roles ARIA, navegación con flechas/Inicio/Fin y colocación del menú según el tamaño de pantalla. */
+export function inicializarMenuUsuario() {
+    const menu = document.getElementById('user-dropdown-menu');
+    const trigger = document.getElementById('btn-user-menu-trigger');
+    if (!menu || !trigger) return;
+    const hueco = menu.parentElement;
+
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Opciones de usuario');
+    menu.querySelectorAll('.dropdown-action-btn').forEach(boton => boton.setAttribute('role', 'menuitem'));
+    trigger.setAttribute('aria-controls', 'user-dropdown-menu');
+
+    menu.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            cerrarUserDropdown(true);
+            return;
+        }
+        if (e.key === 'Tab') {
+            cerrarUserDropdown();
+            return;
+        }
+        const items = elementosMenuUsuario();
+        if (items.length === 0) return;
+        const actual = items.indexOf(document.activeElement);
+        let destino = null;
+        if (e.key === 'ArrowDown') destino = items[(actual + 1) % items.length];
+        else if (e.key === 'ArrowUp') destino = items[(actual - 1 + items.length) % items.length];
+        else if (e.key === 'Home') destino = items[0];
+        else if (e.key === 'End') destino = items[items.length - 1];
+        if (destino) {
+            e.preventDefault();
+            destino.focus();
+        }
+    });
+
+    const colocar = () => {
+        if (MENU_USUARIO_MOVIL.matches) {
+            if (menu.parentElement !== document.body) document.body.appendChild(menu);
+        } else if (menu.parentElement !== hueco) {
+            hueco.appendChild(menu);
+        }
+    };
+    MENU_USUARIO_MOVIL.addEventListener('change', colocar);
+    colocar();
 }
 
 
