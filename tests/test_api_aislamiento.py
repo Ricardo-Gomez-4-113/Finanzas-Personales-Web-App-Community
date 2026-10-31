@@ -39,6 +39,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 import master_db  # noqa: E402
 import security  # noqa: E402
 from main import app  # noqa: E402
+import routers.inversiones as rinversiones  # noqa: E402
+import routers.salud as rsalud  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
 
 PASS = "Passw0rd#Test1"
 
@@ -521,6 +524,105 @@ def test_moneda_base_solo_acepta_monedas_soportadas(client, ha):
     assert r.status_code == 200, r.text
 
 
+@contextmanager
+def _parchar(modulo, **reemplazos):
+    """Sustituye funciones de un módulo (p. ej. el mercado) y las restaura al salir, incluso si la prueba falla."""
+    originales = {nombre: getattr(modulo, nombre) for nombre in reemplazos}
+    for nombre, valor in reemplazos.items():
+        setattr(modulo, nombre, valor)
+    try:
+        yield
+    finally:
+        for nombre, valor in originales.items():
+            setattr(modulo, nombre, valor)
+
+
+def test_inversion_se_valora_en_cada_moneda_base(client, ha):
+    """Con tasas fijas, cada posición se convierte a la moneda base pedida (USD->MXN, USD->EUR, MXN->USD)."""
+    creadas = []
+    with _parchar(rinversiones, obtener_tasas_cambio=lambda: {"MXN": 20.0, "EUR": 0.5}):
+        try:
+            for datos in (
+                {"ticker": "VALUSD", "cantidad": 2, "precio_promedio": 100, "precio_actual": 110, "moneda": "USD"},
+                {"ticker": "VALMX.MX", "cantidad": 10, "precio_promedio": 40, "precio_actual": 50, "moneda": "MXN"},
+            ):
+                r = client.post("/api/inversiones", json=datos, headers=ha)
+                assert r.status_code == 201, r.text
+                creadas.append(r.json()["id"])
+            # USD: 2 x 110 = 220 ; MXN: 10 x 50 = 500 MXN = 25 USD = 12.5 EUR
+            esperado = {"MXN": 4900.0, "USD": 245.0, "EUR": 122.5}
+            for base, total in esperado.items():
+                r = client.get(f"/api/inversiones?moneda_base={base}", headers=ha)
+                assert r.status_code == 200, r.text
+                obtenido = r.json()["resumen"]["total_valor_actual"]
+                assert abs(obtenido - total) < 0.01, (base, obtenido, total)
+        finally:
+            for inv_id in creadas:
+                client.delete(f"/api/inversiones/{inv_id}", headers=ha)
+
+
+def test_fallo_del_mercado_no_rompe_alta_ni_sincronizacion(client, hb):
+    """Sin respuesta del proveedor: el alta usa el precio de compra y la sincronización lo reporta sin error 500."""
+    sin_mercado = {
+        "consultar_precio_y_moneda_mercado": lambda ticker: (None, None),
+        "cotizar_varios": lambda tickers: {t: (None, None) for t in tickers},
+    }
+    with _parchar(rinversiones, **sin_mercado):
+        r = client.post("/api/inversiones", json={"ticker": "SINPRECIO", "cantidad": 3, "precio_promedio": 25, "moneda": "USD"}, headers=hb)
+        assert r.status_code == 201, r.text
+        inv_id = r.json()["id"]
+        try:
+            posicion = next(p for p in client.get("/api/inversiones", headers=hb).json()["posiciones"] if p["id"] == inv_id)
+            assert posicion["precio_actual"] == 25, posicion
+            r = client.post("/api/inversiones/sincronizar", headers=hb)
+            assert r.status_code == 200, r.text
+            assert "SINPRECIO" in r.json()["no_actualizados"] and r.json()["actualizados"] == [], r.text
+        finally:
+            client.delete(f"/api/inversiones/{inv_id}", headers=hb)
+
+
+def test_cotizacion_sin_respuesta_del_mercado_da_404(client, ha):
+    with _parchar(rinversiones, consultar_precio_y_moneda_mercado=lambda ticker: (None, None)):
+        r = client.get("/api/inversiones/cotizar/NOEXISTE", headers=ha)
+    assert r.status_code == 404, r.text
+
+
+def test_posicion_de_otro_usuario_no_se_edita_ni_borra(client, ha, hb):
+    inv_id = client.post("/api/inversiones", json={"ticker": "AJENA", "cantidad": 1, "precio_promedio": 10, "precio_actual": 10, "moneda": "USD"}, headers=ha).json()["id"]
+    try:
+        assert client.put(f"/api/inversiones/{inv_id}", json={"cantidad": 999}, headers=hb).status_code == 404
+        assert client.delete(f"/api/inversiones/{inv_id}", headers=hb).status_code == 404
+        posicion = next(p for p in client.get("/api/inversiones", headers=ha).json()["posiciones"] if p["id"] == inv_id)
+        assert posicion["cantidad"] == 1, posicion
+    finally:
+        client.delete(f"/api/inversiones/{inv_id}", headers=ha)
+
+
+def test_health_responde_503_si_la_base_maestra_cae(client):
+    def caida():
+        raise sqlite3.OperationalError("disk I/O error")
+
+    with _parchar(rsalud, get_master_conn=caida):
+        r = client.get("/health")
+    assert r.status_code == 503, r.text
+    assert r.json()["status"] == "error" and r.json()["base_maestra"] == "error", r.json()
+
+
+def test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin):
+    corta = client.post("/admin/users", json={"username": "corta_test", "password": "1234567", "role": "user"}, headers=hadmin)
+    assert corta.status_code == 422, corta.text
+
+    nombre = f"nuevo_{time.time_ns() % 10**9}"
+    cuerpo = {"username": nombre, "password": PASS, "role": "user"}
+    r = client.post("/admin/users", json=cuerpo, headers=hadmin)
+    assert r.status_code == 201, r.text
+    try:
+        dup = client.post("/admin/users", json=cuerpo, headers=hadmin)
+        assert dup.status_code == 400, dup.text
+    finally:
+        client.delete(f"/admin/users/{r.json()['user']['id']}", headers=hadmin)
+
+
 def test_tenant_sin_db_name_falla_cerrado():
     """Sin db_name en la sesión la dependencia debe fallar, nunca abrir la base del admin (user_1.db)."""
     gen = security.get_tenant_db({"id": 2, "sub": "2"})
@@ -561,6 +663,12 @@ if __name__ == "__main__":
             (test_distribucion_subperiodos_se_valida_al_guardar, lambda: test_distribucion_subperiodos_se_valida_al_guardar(client, ha)),
             (test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro, lambda: test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha)),
             (test_moneda_base_solo_acepta_monedas_soportadas, lambda: test_moneda_base_solo_acepta_monedas_soportadas(client, ha)),
+            (test_inversion_se_valora_en_cada_moneda_base, lambda: test_inversion_se_valora_en_cada_moneda_base(client, ha)),
+            (test_fallo_del_mercado_no_rompe_alta_ni_sincronizacion, lambda: test_fallo_del_mercado_no_rompe_alta_ni_sincronizacion(client, hb)),
+            (test_cotizacion_sin_respuesta_del_mercado_da_404, lambda: test_cotizacion_sin_respuesta_del_mercado_da_404(client, ha)),
+            (test_posicion_de_otro_usuario_no_se_edita_ni_borra, lambda: test_posicion_de_otro_usuario_no_se_edita_ni_borra(client, ha, hb)),
+            (test_health_responde_503_si_la_base_maestra_cae, lambda: test_health_responde_503_si_la_base_maestra_cae(client)),
+            (test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar, lambda: test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
