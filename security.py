@@ -218,7 +218,7 @@ def get_tenant_db(current_user: Dict[str, Any] = Depends(verify_token)) -> Gener
     específica del tenant autenticado ('data/tenants/{db_name}') gestionada por el caché LRU.
     Garantiza rollback automático en caso de error y liberación adecuada.
     """
-    db_name = current_user.get("db_name", "user_1.db")
+    db_name = current_user["db_name"]
     conn = get_tenant_conn(db_name)
     try:
         yield conn

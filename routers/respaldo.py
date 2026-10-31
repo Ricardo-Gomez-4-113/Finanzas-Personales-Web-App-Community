@@ -80,7 +80,7 @@ def _validar_contenido_respaldo(conn: sqlite3.Connection) -> None:
 @router.get("/api/backup", summary="Descargar respaldo directo de base de datos del tenant")
 def descargar_backup(background_tasks: BackgroundTasks, current_user: Dict[str, Any] = Depends(verify_token)):
     """Descarga una copia consistente en SQLite propio del usuario autenticado incluyendo cambios en WAL."""
-    db_name = current_user.get("db_name", "user_1.db")
+    db_name = current_user["db_name"]
     db_path = get_tenant_path(db_name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Base de datos del usuario no encontrada.")
@@ -189,7 +189,7 @@ def restaurar_backup(
             chequeo.close()
 
         # 4. Copia de seguridad automática preventiva de la BD actual
-        db_name = current_user.get("db_name", "user_1.db")
+        db_name = current_user["db_name"]
         target_path = get_tenant_path(db_name)
         if os.path.exists(target_path):
             bak_path = target_path + ".bak"
@@ -237,7 +237,7 @@ def exportar_excel(
     buf = generar_reporte_excel(
         moneda_base=moneda_base,
         conn=conn,
-        db_name=current_user.get("db_name", "user_1.db")
+        db_name=current_user["db_name"]
     )
     fecha_str = ahora_local().strftime("%Y%m%d_%H%M%S")
     username_safe = "".join(c for c in current_user.get("username", "user") if c.isalnum() or c in ("-", "_"))
