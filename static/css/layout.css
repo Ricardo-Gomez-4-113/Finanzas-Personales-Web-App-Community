@@ -51,6 +51,7 @@
 }
 
 .sidebar-header {
+    flex-shrink: 0;
     min-height: var(--topbar-height);
     display: flex;
     align-items: center;
@@ -77,6 +78,7 @@
 .sidebar-brand .brand-text-wrap {
     display: block;
     min-width: 0;
+    line-height: 1.15;
 }
 
 .brand-logo-wrap {
@@ -305,6 +307,8 @@
 
 /* Barra Superior Fija (Topbar) */
 .app-topbar {
+    /* Sin flex-shrink: si el contenido no cabe, la barra encogía a ~37px y no coincidía con el sidebar */
+    flex-shrink: 0;
     height: var(--topbar-height);
     background-color: var(--panel-bg);
     border-bottom: 1px solid var(--border-color);
