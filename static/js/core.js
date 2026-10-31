@@ -48,8 +48,9 @@ export function formatErrorDetail(detail, fallback = "Ocurrió un error inespera
 /**
  * Cliente HTTP centralizado que intercepta todas las peticiones hacia la API:
  * 1. Inyecta la cabecera 'Authorization: Bearer <token>' automáticamente.
- * 2. Si el servidor responde 401 Unauthorized o 403 Forbidden, purga la sesión
+ * 2. Si el servidor responde 401, o 403 por cuenta desactivada o suspendida, purga la sesión
  *    y redirige de inmediato a la pantalla de login.
+ * 3. Si no hay conexión, avisa con un toast y propaga el error.
  */
 export async function apiFetch(url, options = {}) {
     const token = localStorage.getItem('jwt_token');
@@ -59,10 +60,17 @@ export async function apiFetch(url, options = {}) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    let response;
+    try {
+        response = await fetch(url, { ...options, headers });
+    } catch (error) {
+        toast('Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.', 'error');
+        throw error;
+    }
 
-    // Si el token expiró o la cuenta fue suspendida en master_db
-    if (response.status === 401 || response.status === 403) {
+    // Un 401 es sesión vencida. Un 403 solo cierra sesión si la cuenta está desactivada o suspendida;
+    // en otros casos (p. ej. una ruta solo de administradores) el llamador muestra el motivo.
+    if (response.status === 401 || (response.status === 403 && await cuentaInactiva(response))) {
         if (!url.includes('/auth/login')) {
             document.dispatchEvent(new CustomEvent('sesion-expirada', { detail: "Tu sesión ha expirado o tu cuenta ha sido suspendida." }));
             throw new Error("No autorizado");
@@ -70,6 +78,11 @@ export async function apiFetch(url, options = {}) {
     }
 
     return response;
+}
+
+async function cuentaInactiva(response) {
+    const cuerpo = await response.clone().json().catch(() => ({}));
+    return /desactivada|suspendida|cancelada/i.test(cuerpo.detail || '');
 }
 
 // =============================================================================
