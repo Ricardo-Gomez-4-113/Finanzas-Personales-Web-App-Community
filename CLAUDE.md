@@ -54,7 +54,7 @@ Cada entrada indica el commit y qué incluye.
 - Suites de backend en Docker: `./tests/run_tests.sh` (finanzas, migraciones, respaldo, mercado, acciones, aislamiento de API y escenario de API).
 - Batería completa, con cobertura y navegador: `./tests/run_todo.sh` (unos 6 minutos).
 - Cobertura de `routers/`: `./tests/run_cobertura.sh`. Mínimo 80 %; solo debe subir. Subirlo en el propio script al añadir pruebas.
-- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 37 pruebas`.
+- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 39 pruebas`.
 
 Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraciones 8, respaldo 2, mercado 4, acciones 2, aislamiento 33, escenario 18) y frontend 19 de 19.
 
@@ -68,17 +68,17 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 
 ## Plan restante
 
-Orden de ejecución; la Fase 6 es el último paso.
+Fases 1 a 6 cerradas. Pendiente sin decidir:
 
-- **Antes de la Fase 6:** destino del endpoint desactivado `importar-fijos` (sigue en 400 por diseño; decidir si se quita).
+- **`importar-fijos`:** el endpoint sigue desactivado (400 por diseño, fijado por una prueba). Decidir si se quita.
 - **Conflicto entre pestañas (hecho):** cada movimiento tiene `version` (migración 18). El formulario envía la versión con la que se abrió; si no coincide, la API responde 409, el modal se cierra, se recarga la lista y se avisa. El PUT sin `version_esperada` conserva la última escritura para clientes antiguos. Cubierto por `test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409` y por la prueba de navegador `test_otra_pestana_cambio_el_movimiento_y_no_se_pisa`. La cláusula `AND version = ?` del UPDATE solo se ejercita en una carrera real; no tiene prueba propia.
-- **Fase 6, sistema de log (último paso):** registrar los fallos para revisarlos y alimentar las pruebas de versiones futuras. Diseño propuesto, por confirmar al empezar:
-  - Backend: módulo `logs` con `logging` estándar, archivo rotativo en `data/logs/` y salida JSON por línea (marca de tiempo, nivel, ruta, método, estado, `id_peticion`, usuario como id numérico, duración, excepción con traza). Middleware que asigna `id_peticion` y registra toda respuesta 5xx y las 4xx relevantes (401/403 repetidos).
-  - Qué no se registra: contraseñas, tokens, cuerpos de petición ni importes; solo identificadores y códigos de estado.
-  - Frontend: captura de `window.onerror`, promesas rechazadas y fallos de `apiFetch`, enviados a un endpoint de reporte con límite de frecuencia y tamaño; el mismo `id_peticion` enlaza el fallo del navegador con el del servidor.
-  - Revisión: script `tests/ver_logs.sh` (o similar) que resume por tipo de fallo y ruta, y las suites de pruebas dejan sus logs en una carpeta fácil de abrir cuando algo falla.
-  - Operación: rotación y retención acotadas para no llenar el disco; el log nunca debe romper una petición (fallar en silencio hacia stderr).
-  - Pruebas: un fallo provocado queda en el log con su `id_peticion`, no aparece ningún dato sensible, y el log sigue funcionando con la carpeta sin permisos.
+- **Fase 6, sistema de log (hecho):**
+  - Backend: `observabilidad.py` escribe `data/logs/app.log` (o `FINANZAS_LOG_DIR`) con una línea JSON por evento. Cada petición lleva `id_peticion` en la cabecera `X-Request-Id`. Se registran los 5xx (con traza si hubo excepción), los 401/403 y los fallos de SQLite. Rotación de 5 MB con 5 archivos.
+  - Qué no se guarda: contraseñas, tokens, cuerpos de petición, importes ni la cadena de consulta. Solo ids y códigos de estado.
+  - Navegador: `static/js/diagnostico.js` reporta errores de JavaScript, promesas rechazadas y respuestas 5xx de `apiFetch` (con el `id_peticion`) a `POST /api/diagnostico/cliente`. Sin autenticación a propósito, con límites de tamaño y máximo 20 envíos por sesión.
+  - Revisión: `python3 scripts/resumen_logs.py [carpeta]` resume fallos por evento, método, ruta y estado, y muestra los últimos con su id. `./tests/run_tests.sh` deja el registro de todas sus suites en `.logs_pruebas/app.log`, que es ignorado por git.
+  - Pruebas: `tests/test_observabilidad.py` (7 pruebas) y dos pruebas de navegador (`test_error_de_javascript_llega_al_registro`, `test_respuesta_500_de_la_api_se_reporta_con_su_id`).
+  - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
 ## Criterio de hecho
