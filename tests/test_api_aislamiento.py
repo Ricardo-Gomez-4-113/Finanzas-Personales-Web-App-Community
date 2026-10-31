@@ -650,6 +650,33 @@ def test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin)
         client.delete(f"/admin/users/{r.json()['user']['id']}", headers=hadmin)
 
 
+def test_lote_que_falla_a_mitad_no_deja_cambios_a_medias(client):
+    """Si un movimiento del lote no se puede deshacer, el lote entero se revierte: ninguna meta cambia de saldo."""
+    _crear_usuario("usuario_lote")
+    h = _login(client, "usuario_lote")
+    assert client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 10000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h).status_code in (200, 201)
+    fondo = client.post("/api/apartados", json={"nombre": "Fondo atomico", "tipo": "meta", "meta_monto": 5000}, headers=h).json()["id"]
+    viaje = client.post("/api/apartados", json={"nombre": "Viaje atomico", "tipo": "meta", "meta_monto": 5000}, headers=h).json()["id"]
+    assert client.post(f"/api/apartados/{fondo}/movimiento", json={"monto": 200, "accion": "depositar"}, headers=h).status_code in (200, 201)
+    assert client.post(f"/api/apartados/{viaje}/movimiento", json={"monto": 1000, "accion": "depositar"}, headers=h).status_code in (200, 201)
+    assert client.post(f"/api/apartados/{viaje}/movimiento", json={"monto": 600, "accion": "retirar"}, headers=h).status_code in (200, 201)
+
+    movs = client.get("/api/transacciones", headers=h).json()
+    deposito_fondo = [t["id"] for t in movs if t.get("apartado_id") == fondo and t["tipo"] == "gasto"][0]
+    deposito_viaje = [t["id"] for t in movs if t.get("apartado_id") == viaje and t["tipo"] == "gasto"][0]
+
+    def saldo(apartado_id):
+        return next(a["monto_actual"] for a in client.get("/api/apartados", headers=h).json() if a["id"] == apartado_id)
+
+    antes = (saldo(fondo), saldo(viaje))
+    # El depósito del fondo sí se puede borrar; el del viaje no (ya se retiró parte). Va después: el primero se aplicó antes de fallar.
+    r = client.post("/api/transacciones/eliminar-lote", json={"ids": [deposito_fondo, deposito_viaje], "forzar": True}, headers=h)
+    assert r.status_code == 422 and "ya se retiró" in r.text, r.text
+    assert (saldo(fondo), saldo(viaje)) == antes, "un lote fallido no debe cambiar ninguna meta"
+    ids_despues = {t["id"] for t in client.get("/api/transacciones", headers=h).json()}
+    assert deposito_fondo in ids_despues and deposito_viaje in ids_despues, "los movimientos siguen ahí"
+
+
 def test_tenant_sin_db_name_falla_cerrado():
     """Sin db_name en la sesión la dependencia debe fallar, nunca abrir la base del admin (user_1.db)."""
     gen = security.get_tenant_db({"id": 2, "sub": "2"})
@@ -697,6 +724,7 @@ if __name__ == "__main__":
             (test_posicion_de_otro_usuario_no_se_edita_ni_borra, lambda: test_posicion_de_otro_usuario_no_se_edita_ni_borra(client, ha, hb)),
             (test_health_responde_503_si_la_base_maestra_cae, lambda: test_health_responde_503_si_la_base_maestra_cae(client)),
             (test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar, lambda: test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin)),
+            (test_lote_que_falla_a_mitad_no_deja_cambios_a_medias, lambda: test_lote_que_falla_a_mitad_no_deja_cambios_a_medias(client)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),

@@ -946,6 +946,51 @@ def test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base):
         ctx.close()
 
 
+def test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base):
+    usuario, clave = _usuario_nuevo("red")
+    _api(base, usuario, clave).post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "sueldo"})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        page.fill("#fecha", "2026-10-02")
+        page.select_option("#tipo", "gasto")
+        page.fill("#monto", "75")
+        page.fill("#descripcion", "cafe-con-red-caida")
+        opciones = page.locator("#categoria option").evaluate_all("os => os.map(o => o.value).filter(v => v)")
+        if opciones:
+            page.select_option("#categoria", opciones[0])
+        page.route("**/api/transacciones", lambda route: route.abort() if route.request.method == "POST" else route.continue_())
+        page.click("#transaccion-form [type=submit]")
+        page.wait_for_selector(".toast-error", timeout=10000)
+        assert "Sin conexión" in page.inner_text(".toast-error"), page.inner_text(".toast-error")
+        page.unroute("**/api/transacciones")
+        page.click("#transaccion-form [type=submit]")
+        _esperar(page, "[...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('cafe-con-red-caida'))")
+        page.wait_for_timeout(800)
+        repeticiones = _api(base, usuario, clave).get("/api/transacciones").json()
+        assert sum(1 for t in repeticiones if t["descripcion"] == "cafe-con-red-caida") == 1, "el reintento no debe duplicar el movimiento"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
+    usuario, clave = _usuario_nuevo("expira")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        page.route("**/api/**", lambda route: route.fulfill(
+            status=401, content_type="application/json", body='{"detail": "Could not validate credentials"}'))
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.wait_for_selector("#form-login", state="visible", timeout=10000)
+        page.unroute("**/api/**")
+        # El aviso de consola por la sesión vencida es esperado; cualquier otro error sí cuenta.
+        assert not [e for e in errores if "No autorizado" not in e], errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -992,6 +1037,8 @@ if __name__ == "__main__":
                 (test_importe_grande_no_se_parte_en_movil, lambda: test_importe_grande_no_se_parte_en_movil(navegador, base)),
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
+                (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
+                (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
