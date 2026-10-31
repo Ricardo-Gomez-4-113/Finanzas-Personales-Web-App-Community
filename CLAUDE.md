@@ -61,7 +61,7 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 - **Migraciones:** los `ALTER TABLE ADD COLUMN` están en `try/except sqlite3.OperationalError`. Son idempotentes (se verificó re-migrando desde versión 0), pero ese `except` también oculta errores de SQL reales. No se modifican migraciones pasadas.
 - **Reparto de MSI en `routers/recurrentes.py`:** calcula la cuota con `round(total / meses, 2)`. La última cuota se ajusta en `finanzas_core.py` para que el total cuadre. Mover esa regla a `finanzas_core.py` es una limpieza, no un bug.
 - **`mensualizar`:** una frecuencia desconocida se trata como mensual. La API no lo permite porque la frecuencia es un `Literal`.
-- **Fase 2, frontend:** pendiente. Revisión de manejo de errores de red y de sesión, estados vacíos, escape de HTML en datos del usuario y reglas visuales de la guía de estilo.
+- **Fase 2, frontend (parcial):** hecho: `apiFetch` cierra sesión solo con 401 o con 403 de cuenta desactivada o suspendida (antes cualquier 403, incluida una ruta solo de admin), y avisa con un toast cuando no hay conexión; colores literales (`#22d3ee`, `#F6F2EA`, overlay del modal) sustituidos por tokens. Muestra de `innerHTML` revisada: los datos del usuario pasan por `escapeHTML`, sin hallazgos en lo muestreado. Pendiente: auditoría completa de `innerHTML`, estados vacíos y de carga en las vistas, cinco llamadas a `apiFetch` sin comprobar `res.ok`, revisión visual con capturas en claro y oscuro, y pruebas de Playwright para el 403 y el fallo de red.
 
 ## Directivas de trabajo
 
