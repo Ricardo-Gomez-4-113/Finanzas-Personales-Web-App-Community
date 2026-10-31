@@ -195,6 +195,33 @@ def test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb):
     assert client.get("/api/transacciones", headers=hb).json() == antes
 
 
+def test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles(client, hb):
+    """Un respaldo que la app no puede usar sin romper cosas se rechaza y no toca los datos del usuario."""
+    antes = client.get("/api/transacciones", headers=hb).json()
+    respaldo = client.get("/api/backup", headers=hb).content
+
+    def _variante(nombre, sql):
+        ruta = os.path.join(TMP, nombre)
+        with open(ruta, "wb") as f:
+            f.write(respaldo)
+        con = sqlite3.connect(ruta)
+        con.execute(sql)
+        con.commit()
+        con.close()
+        with open(ruta, "rb") as f:
+            return f.read()
+
+    casos = {
+        "esquema de una versión futura": _variante("esquema_futuro.db", "PRAGMA user_version = 99"),
+        "columna que no es del esquema": _variante("columna_extra.db", "ALTER TABLE transacciones ADD COLUMN extra TEXT NOT NULL DEFAULT ''"),
+        "texto donde va un monto": _variante("monto_texto.db", "UPDATE transacciones SET monto = 'abc'"),
+    }
+    for nombre, contenido in casos.items():
+        r = client.post("/api/restore", files={"file": ("respaldo.db", contenido, "application/octet-stream")}, headers=hb)
+        assert r.status_code == 400, (nombre, r.status_code, r.text)
+    assert client.get("/api/transacciones", headers=hb).json() == antes
+
+
 def test_restore_solo_afecta_al_propio_tenant(client, ha, hb):
     datos_a = client.get("/api/transacciones", headers=ha).json()
     respaldo_b = client.get("/api/backup", headers=hb).content
@@ -652,6 +679,7 @@ if __name__ == "__main__":
             (test_exportar_presupuesto_con_fecha_base_no_da_500, lambda: test_exportar_presupuesto_con_fecha_base_no_da_500(client, ha)),
             (test_jwt_alg_none_y_algoritmos_ajenos_rechazados, lambda: test_jwt_alg_none_y_algoritmos_ajenos_rechazados(client, ua)),
             (test_restore_rechaza_archivos_malos_sin_tocar_datos, lambda: test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)),
+            (test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles, lambda: test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles(client, hb)),
             (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
             (test_health_publico_y_sin_datos_de_usuarios, lambda: test_health_publico_y_sin_datos_de_usuarios(client)),
             (test_borrar_retiro_de_meta_devuelve_el_dinero, lambda: test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)),

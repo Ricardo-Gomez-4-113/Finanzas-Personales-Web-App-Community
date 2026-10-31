@@ -11,6 +11,7 @@ import tempfile
 from functools import lru_cache
 
 from database import (
+    CURRENT_TENANT_SCHEMA_VERSION,
     init_tenant_db, 
     get_tenant_conn, 
     get_tenant_path, 
@@ -30,8 +31,8 @@ router = APIRouter()
 LIMITE_TEXTO_RESTAURADO = 2000
 
 @lru_cache(maxsize=1)
-def _esquema_referencia() -> Dict[str, list]:
-    """Tablas del esquema actual y sus columnas de texto, leídas de una base recién creada."""
+def _esquema_referencia() -> Dict[str, Dict[str, str]]:
+    """Tablas del esquema actual con el tipo declarado de cada columna, leídas de una base recién creada."""
     fd, ruta = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:
@@ -39,13 +40,24 @@ def _esquema_referencia() -> Dict[str, list]:
         conn = sqlite3.connect(ruta)
         try:
             return {
-                nombre: [fila[1] for fila in conn.execute(f'PRAGMA table_info("{nombre}")') if "TEXT" in (fila[2] or "").upper()]
+                nombre: {fila[1]: (fila[2] or "").upper() for fila in conn.execute(f'PRAGMA table_info("{nombre}")')}
                 for (nombre,) in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
             }
         finally:
             conn.close()
     finally:
         os.unlink(ruta)
+
+def _tipos_permitidos(tipo_declarado: str):
+    """Tipos de almacenamiento (typeof) que la app escribe en una columna, según su tipo declarado."""
+    if "INT" in tipo_declarado:
+        return ("integer", "null")
+    if "REAL" in tipo_declarado:
+        return ("integer", "real", "null")
+    if "TEXT" in tipo_declarado:
+        return ("text", "null")
+    # TIMESTAMP y similares guardan fechas como texto o como número; nunca como blob.
+    return ("text", "integer", "real", "null")
 
 def _validar_contenido_respaldo(conn: sqlite3.Connection) -> None:
     """Rechaza triggers, vistas, tablas ajenas al esquema y textos fuera de límite en un respaldo ya migrado."""
@@ -62,11 +74,28 @@ def _validar_contenido_respaldo(conn: sqlite3.Connection) -> None:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El respaldo contiene tablas que no pertenecen al esquema de la aplicación."
             )
-        columnas_respaldo = {fila[1] for fila in conn.execute(f'PRAGMA table_info("{nombre}")')}
-        for columna in referencia[nombre]:
-            if columna not in columnas_respaldo:
+        # Después de migrar, las columnas del respaldo son las del esquema actual; cualquier otra sobra y rompería los INSERT.
+        columnas_respaldo = [fila[1] for fila in conn.execute(f'PRAGMA table_info("{nombre}")')]
+        for columna in columnas_respaldo:
+            if columna not in referencia[nombre]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El respaldo tiene una columna que no pertenece al esquema: {nombre}.{columna}."
+                )
+        for columna in columnas_respaldo:
+            permitidos = _tipos_permitidos(referencia[nombre][columna])
+            marcas = ",".join("?" * len(permitidos))
+            (incompatibles,) = conn.execute(
+                f'SELECT COUNT(*) FROM "{nombre}" WHERE typeof("{columna}") NOT IN ({marcas})', permitidos
+            ).fetchone()
+            if incompatibles:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El campo {nombre}.{columna} tiene valores de un tipo que la aplicación no puede leer."
+                )
+            if "TEXT" not in referencia[nombre][columna]:
                 continue
-            (mayor,) = conn.execute(f'SELECT COALESCE(MAX(length(CAST("{columna}" AS TEXT))), 0) FROM "{nombre}"').fetchone()
+            (mayor,) = conn.execute(f'SELECT COALESCE(MAX(length("{columna}")), 0) FROM "{nombre}"').fetchone()
             if mayor > LIMITE_TEXTO_RESTAURADO:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -152,6 +181,14 @@ def restaurar_backup(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="La base de datos presenta errores de integridad interna o corrupción."
+                )
+
+            # Un respaldo de una versión posterior tiene columnas que esta app no conoce y se saltaría sus migraciones.
+            (version_respaldo,) = cursor_test.execute("PRAGMA user_version;").fetchone()
+            if version_respaldo > CURRENT_TENANT_SCHEMA_VERSION:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El respaldo es de una versión más nueva de la aplicación (esquema {version_respaldo}; esta app usa el {CURRENT_TENANT_SCHEMA_VERSION})."
                 )
 
             # 2. Comprobar que contiene el esquema de la aplicación
