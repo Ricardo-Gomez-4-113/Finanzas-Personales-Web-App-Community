@@ -1104,7 +1104,7 @@
 
 /* ---------- Modales ---------- */
 :root .modal-overlay {
-    background: color-mix(in srgb, #080A0D 64%, transparent);
+    background: color-mix(in srgb, var(--overlay-scrim) 64%, transparent);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
 }

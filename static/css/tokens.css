@@ -32,6 +32,7 @@
 
     /* ---- Modo claro: porcelana y tinta ---- */
     --bg-color: #EEF0F3;
+    --overlay-scrim: #080A0D;
     --panel-bg: #FFFFFF;
     --surface-level2: #F5F6F8;
     --surface-subtle: #F5F6F8;
