@@ -241,7 +241,9 @@ def exportar_excel(
     )
     fecha_str = ahora_local().strftime("%Y%m%d_%H%M%S")
     username_safe = "".join(c for c in current_user.get("username", "user") if c.isalnum() or c in ("-", "_"))
-    nombre_archivo = f"reporte_{username_safe}_{moneda_base.upper()}_{fecha_str}.xlsx"
+    # Misma regla que el generador: solo MXN o USD; cualquier otro valor cae a MXN
+    moneda_archivo = "USD" if moneda_base.strip().upper() == "USD" else "MXN"
+    nombre_archivo = f"reporte_{username_safe}_{moneda_archivo}_{fecha_str}.xlsx"
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

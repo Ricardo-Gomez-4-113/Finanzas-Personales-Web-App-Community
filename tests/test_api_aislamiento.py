@@ -473,6 +473,18 @@ def test_distribucion_subperiodos_se_valida_al_guardar(client, ha):
     client.delete(f"/api/presupuesto/tarjetas/{r.json()['id']}", headers=ha)
 
 
+def test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha):
+    """Listas de IDs acotadas (422 si exceden el tope) y la moneda del nombre de archivo nunca llega sin normalizar."""
+    r = client.post("/api/transacciones/eliminar-lote", json={"ids": list(range(1001))}, headers=ha)
+    assert r.status_code == 422, r.text
+    r = client.post("/api/presupuesto/importar-fijos", json={"recurrentes_ids": list(range(1001))}, headers=ha)
+    assert r.status_code == 422, r.text
+    r = client.get('/api/exportar-excel?moneda_base=XX%22%3Bx', headers=ha)
+    assert r.status_code == 200, r.text
+    cabecera = r.headers["content-disposition"]
+    assert "_MXN_" in cabecera and "XX" not in cabecera, cabecera
+
+
 def test_tenant_sin_db_name_falla_cerrado():
     """Sin db_name en la sesión la dependencia debe fallar, nunca abrir la base del admin (user_1.db)."""
     gen = security.get_tenant_db({"id": 2, "sub": "2"})
@@ -511,6 +523,7 @@ if __name__ == "__main__":
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_distribucion_subperiodos_se_valida_al_guardar, lambda: test_distribucion_subperiodos_se_valida_al_guardar(client, ha)),
+            (test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro, lambda: test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),

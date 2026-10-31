@@ -36,7 +36,7 @@ from security import (
 router = APIRouter()
 
 class EliminarLoteRequest(BaseModel):
-    ids: Optional[List[int]] = None
+    ids: Optional[List[int]] = Field(None, max_length=1000)
     todos: bool = False
     forzar: bool = False
 

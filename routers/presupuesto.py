@@ -50,7 +50,7 @@ class ConfigPresupuestoUpdate(BaseModel):
     frecuencia: Literal['semanal', 'quincenal', 'mensual'] = Field(..., description="Frecuencia del ingreso")
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes de cobro del ingreso fijo")
     subdivision_tipo: Optional[Literal['ninguna', 'quincenas', 'semanas', 'personalizada']] = 'ninguna'
-    subdivision_config: Optional[List[SubperiodoItem]] = None
+    subdivision_config: Optional[List[SubperiodoItem]] = Field(None, max_length=31)
 
 
 
@@ -88,13 +88,13 @@ class TarjetaPresupuestoUpdate(BaseModel):
 
 class ImportarFijosRequest(BaseModel):
     modo: Optional[Literal['individual', 'categoria', 'unificado']] = 'individual'
-    recurrentes_ids: Optional[List[int]] = None
+    recurrentes_ids: Optional[List[int]] = Field(None, max_length=1000)
     actualizar_ingreso: bool = True
     reemplazar: bool = False
 
 
 class ExportarFijosRequest(BaseModel):
-    tarjetas_ids: Optional[List[int]] = None
+    tarjetas_ids: Optional[List[int]] = Field(None, max_length=1000)
     incluir_ingreso: bool = True
     inicio_cargos: Optional[Literal['natural', 'siguiente_quincena', 'proximo_mes', 'personalizada']] = 'natural'
     fecha_base: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
