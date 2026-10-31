@@ -244,6 +244,8 @@ _candado_login = threading.Lock()
 _MAX_CLAVES_LOGIN = 10000
 _VENTANA_LOGIN_SEG = 300
 _MAX_INTENTOS_LOGIN = 5
+# Tope por IP entre todas las cuentas: frena el password spraying (una contraseña común en muchas cuentas)
+_MAX_INTENTOS_IP_LOGIN = 20
 
 def _purgar_intentos(ahora: float) -> None:
     """Quita claves vencidas y, si siguen siendo demasiadas, descarta primero las que no están bloqueadas.
@@ -263,13 +265,13 @@ def _purgar_intentos(ahora: float) -> None:
         for k in sin_bloqueo[: _MAX_CLAVES_LOGIN // 2]:
             del _intentos_fallidos_login[k]
 
-def reservar_intento_login(clave: str) -> None:
+def reservar_intento_login(clave: str, limite: int = _MAX_INTENTOS_LOGIN) -> float:
     """Comprueba el límite y anota el intento en un solo paso, antes de verificar la contraseña.
     Así una ráfaga concurrente no evalúa más de _MAX_INTENTOS_LOGIN contraseñas por ventana."""
     ahora = time.time()
     with _candado_login:
         intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
-        if len(intentos) >= _MAX_INTENTOS_LOGIN:
+        if len(intentos) >= limite:
             _intentos_fallidos_login[clave] = intentos
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -284,6 +286,23 @@ def reservar_intento_login(clave: str) -> None:
                 )
         intentos.append(ahora)
         _intentos_fallidos_login[clave] = intentos
+        return ahora
+
+def devolver_intento_login(clave: str, marca: float) -> None:
+    """Quita un intento reservado que terminó bien. Así solo cuentan los fallos para el tope."""
+    with _candado_login:
+        intentos = _intentos_fallidos_login.get(clave)
+        if intentos and marca in intentos:
+            intentos.remove(marca)
+            if not intentos:
+                _intentos_fallidos_login.pop(clave, None)
+
+def reservar_intento_login_ip(ip: str) -> float:
+    """Tope de intentos desde una IP, sin importar la cuenta probada."""
+    return reservar_intento_login(f"ip-login:{ip}", limite=_MAX_INTENTOS_IP_LOGIN)
+
+def devolver_intento_login_ip(ip: str, marca: float) -> None:
+    devolver_intento_login(f"ip-login:{ip}", marca)
 
 def limpiar_fallos_login(clave: str):
     with _candado_login:

@@ -40,6 +40,7 @@ from main import app  # noqa: E402
 PASS = "Passw0rd#Test1"
 CLAVE_MAL = "Equivocada#Clave9"
 LIMITE = 5
+LIMITE_IP = 20  # intentos por IP entre todas las cuentas en la ventana
 
 
 def _crear_usuario(nombre):
@@ -148,6 +149,54 @@ def test_bloqueo_se_mantiene_y_un_acierto_limpia_el_contador():
     _vaciar_contadores()
 
 
+def test_spraying_desde_una_ip_se_frena_entre_cuentas():
+    """Una IP que prueba una contraseña común contra muchas cuentas recibe 429 antes de agotar la lista."""
+    _vaciar_contadores()
+    hash_comun = security.hash_password(PASS)
+    for i in range(40):
+        master_db.create_user_entry(f"seg_spray{i:02d}", hash_comun, email=f"spray{i}@test.local")
+    evaluadas = []
+    original = rauth.verify_password
+
+    def verificar_rapido(clave, hash_guardado):
+        evaluadas.append(clave)
+        return original(clave, hash_guardado)
+
+    cliente = TestClient(app)
+    with _parchar(rauth, verify_password=verificar_rapido):
+        codigos = [cliente.post("/auth/login", json={"username": f"seg_spray{i:02d}", "password": CLAVE_MAL}).status_code for i in range(40)]
+    assert 429 in codigos, f"40 cuentas probadas desde una IP sin ningún 429: {codigos}"
+    assert len(evaluadas) <= LIMITE_IP, f"{len(evaluadas)} contraseñas evaluadas desde una IP"
+    _vaciar_contadores()
+
+
+def test_aciertos_no_cuentan_para_el_tope_de_la_ip():
+    """Una IP compartida con muchas cuentas válidas no se bloquea por sus inicios de sesión correctos."""
+    _vaciar_contadores()
+    hash_comun = security.hash_password(PASS)
+    for i in range(LIMITE_IP + 5):
+        master_db.create_user_entry(f"seg_ok{i:02d}", hash_comun, email=f"ok{i}@test.local")
+    original = rauth.verify_password
+    cliente = TestClient(app, client=("127.0.0.1", 50003), headers={"CF-Connecting-IP": "198.51.100.30"})
+    with _parchar(rauth, verify_password=lambda clave, h: clave == PASS or original(clave, h)):
+        codigos = [cliente.post("/auth/login", json={"username": f"seg_ok{i:02d}", "password": PASS}).status_code for i in range(LIMITE_IP + 5)]
+    assert codigos == [200] * (LIMITE_IP + 5), codigos
+    _vaciar_contadores()
+
+
+def test_tope_de_una_ip_no_afecta_a_otra():
+    """El tope por IP es por origen: una IP bloqueada no impide entrar desde otra."""
+    _crear_usuario("seg_otra_ip")
+    _vaciar_contadores()
+    atacante = TestClient(app, client=("127.0.0.1", 50001), headers={"CF-Connecting-IP": "198.51.100.10"})
+    for i in range(LIMITE_IP + 2):
+        atacante.post("/auth/login", json={"username": f"seg_nadie{i}", "password": CLAVE_MAL})
+    assert atacante.post("/auth/login", json={"username": "seg_otra_ip", "password": PASS}).status_code == 429
+    legitimo = TestClient(app, client=("127.0.0.1", 50002), headers={"CF-Connecting-IP": "198.51.100.20"})
+    assert legitimo.post("/auth/login", json={"username": "seg_otra_ip", "password": PASS}).status_code == 200
+    _vaciar_contadores()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -156,6 +205,9 @@ if __name__ == "__main__":
         (test_rafaga_concurrente_no_evalua_mas_que_el_limite, test_rafaga_concurrente_no_evalua_mas_que_el_limite),
         (test_flujo_de_claves_nuevas_no_libera_una_cuenta_bloqueada, test_flujo_de_claves_nuevas_no_libera_una_cuenta_bloqueada),
         (test_bloqueo_se_mantiene_y_un_acierto_limpia_el_contador, test_bloqueo_se_mantiene_y_un_acierto_limpia_el_contador),
+        (test_spraying_desde_una_ip_se_frena_entre_cuentas, test_spraying_desde_una_ip_se_frena_entre_cuentas),
+        (test_tope_de_una_ip_no_afecta_a_otra, test_tope_de_una_ip_no_afecta_a_otra),
+        (test_aciertos_no_cuentan_para_el_tope_de_la_ip, test_aciertos_no_cuentan_para_el_tope_de_la_ip),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")

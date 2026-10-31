@@ -11,6 +11,8 @@ from security import (
     hash_senuelo,
     huella_clave,
     reservar_intento_login,
+    reservar_intento_login_ip,
+    devolver_intento_login_ip,
     limpiar_fallos_login,
     obtener_ip_cliente,
     hash_password,
@@ -81,6 +83,7 @@ def login(credentials: LoginRequest, request: Request):
     5. Emite el token JWT firmado con sub, username, role y db_name.
     """
     client_ip = obtener_ip_cliente(request)
+    marca_ip = reservar_intento_login_ip(client_ip)
     clave_tasa = f"{client_ip}:{credentials.username.strip().lower()}"
     reservar_intento_login(clave_tasa)
 
@@ -94,7 +97,9 @@ def login(credentials: LoginRequest, request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos."
         )
-        
+
+    # Una contraseña correcta no cuenta para el tope por IP: una IP compartida no debe bloquearse por aciertos
+    devolver_intento_login_ip(client_ip, marca_ip)
     limpiar_fallos_login(clave_tasa)
 
     if not user["is_active"]:
