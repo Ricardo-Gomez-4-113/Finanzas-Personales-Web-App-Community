@@ -17,6 +17,8 @@ _mkdtemp_original, _rmtree_original = tempfile.mkdtemp, shutil.rmtree
 
 def _mkdtemp(suffix=None, prefix=None, dir=None):
     if prefix and prefix.startswith("finanzas_"):
+        # Cada suite empieza en limpio: la base de una anterior no debe contar como usuarios existentes.
+        _rmtree_original(CARPETA_FIJA, ignore_errors=True)
         os.makedirs(CARPETA_FIJA, exist_ok=True)
         return CARPETA_FIJA
     return _mkdtemp_original(suffix=suffix, prefix=prefix, dir=dir)

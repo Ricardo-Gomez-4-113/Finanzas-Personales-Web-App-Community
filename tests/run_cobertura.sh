@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-MINIMO_ROUTERS=58
+MINIMO_ROUTERS=80
 IMAGEN="${TEST_IMAGE:-python:3.11-slim}"
 docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" -e MINIMO_ROUTERS="$MINIMO_ROUTERS" "$IMAGEN" bash -c '
   if ! pip install -q --no-cache-dir -r /src/requirements.txt httpx coverage >/tmp/pip.log 2>&1; then
@@ -14,7 +14,7 @@ docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" 
   cp -r /src /tmp/app && cd /tmp/app
   printf "[run]\nsource =\n    /tmp/app\n    /tmp/app_run\n[paths]\ncodigo =\n    /tmp/app/\n    /tmp/app_run/\n" > .coveragerc
   for suite in test_finanzas.py tests/test_migraciones.py tests/test_respaldo_automatico.py tests/test_mercado.py \
-               tests/test_acciones.py tests/test_api_aislamiento.py tests/test_escenario_api.py tests/test_durabilidad.py; do
+               tests/test_acciones.py tests/test_api_aislamiento.py tests/test_escenario_api.py tests/test_durabilidad.py tests/test_api_rutas.py; do
     if ! coverage run -a --rcfile=.coveragerc tests/cov_run.py "$suite" >/tmp/suite.log 2>&1; then
       echo "FALLO: $suite"; tail -5 /tmp/suite.log; exit 1
     fi

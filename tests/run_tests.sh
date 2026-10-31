@@ -26,6 +26,7 @@ docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" 
   paso test_api_aislamiento python3 tests/test_api_aislamiento.py
   paso test_escenario_api   python3 tests/test_escenario_api.py
   paso test_durabilidad     python3 tests/test_durabilidad.py
+  paso test_api_rutas       python3 tests/test_api_rutas.py
   echo
   if [ "$estado" -eq 0 ]; then echo "RESULTADO: todas las suites OK"; else echo "RESULTADO: hay suites con fallos"; fi
   exit "$estado"
