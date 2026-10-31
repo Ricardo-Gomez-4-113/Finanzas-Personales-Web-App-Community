@@ -11,6 +11,7 @@ Este módulo implementa:
 """
 
 import os
+import threading
 import time
 import hashlib
 import ipaddress
@@ -237,12 +238,17 @@ def get_tenant_db(current_user: Dict[str, Any] = Depends(verify_token)) -> Gener
 
 # Control en memoria de intentos fallidos de autenticación (freno anti fuerza bruta)
 _intentos_fallidos_login: Dict[str, List[float]] = {}
+# Comprobar y anotar un intento es un solo paso: peticiones concurrentes no lo pueden entrelazar
+_candado_login = threading.Lock()
 
 _MAX_CLAVES_LOGIN = 10000
 _VENTANA_LOGIN_SEG = 300
+_MAX_INTENTOS_LOGIN = 5
 
 def _purgar_intentos(ahora: float) -> None:
-    """Quita claves vencidas y, si siguen siendo demasiadas, descarta las más antiguas."""
+    """Quita claves vencidas y, si siguen siendo demasiadas, descarta primero las que no están bloqueadas.
+    Una clave con el límite agotado no se expulsa: si pudiera expulsarse, un flujo de claves nuevas
+    reiniciaría el contador de un ataque en curso."""
     for k in list(_intentos_fallidos_login):
         vivos = [t for t in _intentos_fallidos_login[k] if ahora - t < _VENTANA_LOGIN_SEG]
         if vivos:
@@ -250,32 +256,38 @@ def _purgar_intentos(ahora: float) -> None:
         else:
             del _intentos_fallidos_login[k]
     if len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
-        for k in sorted(_intentos_fallidos_login, key=lambda c: _intentos_fallidos_login[c][-1])[: _MAX_CLAVES_LOGIN // 2]:
+        sin_bloqueo = sorted(
+            (k for k, v in _intentos_fallidos_login.items() if len(v) < _MAX_INTENTOS_LOGIN),
+            key=lambda c: _intentos_fallidos_login[c][-1],
+        )
+        for k in sin_bloqueo[: _MAX_CLAVES_LOGIN // 2]:
             del _intentos_fallidos_login[k]
 
-def registrar_fallo_login(clave: str):
+def reservar_intento_login(clave: str) -> None:
+    """Comprueba el límite y anota el intento en un solo paso, antes de verificar la contraseña.
+    Así una ráfaga concurrente no evalúa más de _MAX_INTENTOS_LOGIN contraseñas por ventana."""
     ahora = time.time()
-    if len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
-        _purgar_intentos(ahora)
-    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
-    intentos.append(ahora)
-    _intentos_fallidos_login[clave] = intentos
-
-def verificar_tasa_login(clave: str):
-    ahora = time.time()
-    intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
-    if intentos:
+    with _candado_login:
+        intentos = [t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]
+        if len(intentos) >= _MAX_INTENTOS_LOGIN:
+            _intentos_fallidos_login[clave] = intentos
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Demasiados intentos fallidos. Por seguridad, espera 5 minutos antes de volver a intentar."
+            )
+        if clave not in _intentos_fallidos_login and len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
+            _purgar_intentos(ahora)
+            if len(_intentos_fallidos_login) >= _MAX_CLAVES_LOGIN:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Demasiados intentos desde distintas cuentas. Intenta de nuevo más tarde."
+                )
+        intentos.append(ahora)
         _intentos_fallidos_login[clave] = intentos
-    else:
-        _intentos_fallidos_login.pop(clave, None)
-    if len(intentos) >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiados intentos fallidos. Por seguridad, espera 5 minutos antes de volver a intentar."
-        )
 
 def limpiar_fallos_login(clave: str):
-    _intentos_fallidos_login.pop(clave, None)
+    with _candado_login:
+        _intentos_fallidos_login.pop(clave, None)
 
 
 def es_ip_privada_o_loopback(ip_str: str) -> bool:

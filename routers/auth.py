@@ -10,8 +10,7 @@ from security import (
     claims_sesion,
     hash_senuelo,
     huella_clave,
-    registrar_fallo_login, 
-    verificar_tasa_login, 
+    reservar_intento_login,
     limpiar_fallos_login,
     obtener_ip_cliente,
     hash_password,
@@ -60,10 +59,9 @@ class ResetPasswordRequest(BaseModel):
 def exigir_contrasena_actual(user_id: int, contrasena_actual: Optional[str]) -> None:
     """Cambiar la propia contraseña exige la actual. Los intentos fallidos comparten el control de tasa del login."""
     clave_tasa = f"perfil:{user_id}"
-    verificar_tasa_login(clave_tasa)
+    reservar_intento_login(clave_tasa)
     usuario = master_db.get_user_by_id(user_id)
     if not contrasena_actual or not usuario or not verify_password(contrasena_actual, usuario["password_hash"]):
-        registrar_fallo_login(clave_tasa)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual no es correcta.")
     limpiar_fallos_login(clave_tasa)
 
@@ -84,7 +82,7 @@ def login(credentials: LoginRequest, request: Request):
     """
     client_ip = obtener_ip_cliente(request)
     clave_tasa = f"{client_ip}:{credentials.username.strip().lower()}"
-    verificar_tasa_login(clave_tasa)
+    reservar_intento_login(clave_tasa)
 
     username = credentials.username.strip()
     user = master_db.get_user_by_username(username)
@@ -92,7 +90,6 @@ def login(credentials: LoginRequest, request: Request):
     # Se verifica siempre (contra un hash señuelo si no hay usuario) para igualar el tiempo de respuesta
     clave_valida = verify_password(credentials.password, user["password_hash"] if user else hash_senuelo())
     if not user or not clave_valida:
-        registrar_fallo_login(clave_tasa)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos."
@@ -216,9 +213,8 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
 
     client_ip = obtener_ip_cliente(request)
     clave_tasa = f"forgot:{client_ip}:{req.identifier.strip().lower()}"
-    verificar_tasa_login(clave_tasa)
     # Cada solicitud cuenta igual, exista o no la cuenta: no hay oráculo ni bloqueo por tercero
-    registrar_fallo_login(clave_tasa)
+    reservar_intento_login(clave_tasa)
 
     user = master_db.get_user_by_identifier(req.identifier)
     if user and user.get("email") and user.get("is_active"):
@@ -242,11 +238,10 @@ def reset_password(req: ResetPasswordRequest, request: Request):
     """
     client_ip = obtener_ip_cliente(request)
     clave_tasa = f"reset:{client_ip}:{req.identifier.strip().lower()}"
-    verificar_tasa_login(clave_tasa)
+    reservar_intento_login(clave_tasa)
 
     user, error_msg = master_db.verify_reset_code(req.identifier, req.code)
     if not user:
-        registrar_fallo_login(clave_tasa)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg or master_db.MENSAJE_CODIGO_INVALIDO
