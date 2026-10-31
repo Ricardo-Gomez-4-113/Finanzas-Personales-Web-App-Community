@@ -7,3 +7,7 @@ data/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Grafo de conocimiento de graphify (local, no se versiona)
+graphify-out/
+.gitattributes
