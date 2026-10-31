@@ -298,17 +298,43 @@ def test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client):
 
 
 
-def test_dos_ediciones_del_mismo_movimiento_gana_la_ultima(client):
-    """Dos pestañas editan el mismo movimiento: ninguna recibe error ni se mezclan campos; gana la última escritura."""
+def test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client):
+    """Con versión, una edición vieja no pisa el cambio de otra pestaña; al recargar y repetir, guarda."""
     _crear_usuario("ruta_dos_pestanas")
     h = _login(client, "ruta_dos_pestanas")
     client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h)
     assert client.post("/api/transacciones", json={"fecha": "2026-10-02", "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "original"}, headers=h).status_code in (200, 201)
+    mov = next(t for t in client.get("/api/transacciones", headers=h).json() if t["descripcion"] == "original")
+    version_inicial = mov["version"]
+
+    # Ambas pestañas abrieron el movimiento con la misma versión
+    r = client.put(f"/api/transacciones/{mov['id']}", json={"monto": 150, "version_esperada": version_inicial}, headers=h)
+    assert r.status_code == 200, r.text
+    r = client.put(f"/api/transacciones/{mov['id']}", json={"monto": 175, "descripcion": "de-la-otra-pestana", "version_esperada": version_inicial}, headers=h)
+    assert r.status_code == 409, r.text
+    assert "cambió" in r.json()["detail"]
+    tras_conflicto = next(t for t in client.get("/api/transacciones", headers=h).json() if t["id"] == mov["id"])
+    assert tras_conflicto["monto"] == 150 and tras_conflicto["descripcion"] == "original", tras_conflicto
+    assert tras_conflicto["version"] == version_inicial + 1
+
+    # Al recargar, la pestaña ve la versión actual y guarda sin conflicto
+    r = client.put(f"/api/transacciones/{mov['id']}", json={"monto": 175, "descripcion": "de-la-otra-pestana", "version_esperada": tras_conflicto["version"]}, headers=h)
+    assert r.status_code == 200, r.text
+    final = next(t for t in client.get("/api/transacciones", headers=h).json() if t["id"] == mov["id"])
+    assert final["monto"] == 175 and final["descripcion"] == "de-la-otra-pestana", final
+
+
+def test_edicion_sin_version_conserva_la_ultima_escritura(client):
+    """Clientes que no envían version_esperada siguen con el comportamiento anterior: gana la última escritura."""
+    _crear_usuario("ruta_sin_version")
+    h = _login(client, "ruta_sin_version")
+    client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h)
+    client.post("/api/transacciones", json={"fecha": "2026-10-02", "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "original"}, headers=h)
     mov = next(t["id"] for t in client.get("/api/transacciones", headers=h).json() if t["descripcion"] == "original")
     assert client.put(f"/api/transacciones/{mov}", json={"monto": 150}, headers=h).status_code == 200
-    assert client.put(f"/api/transacciones/{mov}", json={"monto": 175, "descripcion": "de-la-otra-pestana"}, headers=h).status_code == 200
+    assert client.put(f"/api/transacciones/{mov}", json={"monto": 175}, headers=h).status_code == 200
     final = next(t for t in client.get("/api/transacciones", headers=h).json() if t["id"] == mov)
-    assert final["monto"] == 175 and final["descripcion"] == "de-la-otra-pestana", final
+    assert final["monto"] == 175, final
 
 
 
@@ -333,7 +359,8 @@ if __name__ == "__main__":
             (test_cuenta_propia_se_elimina_y_deja_de_entrar, lambda: test_cuenta_propia_se_elimina_y_deja_de_entrar(client)),
             (test_salud_degradada_si_el_respaldo_vence, lambda: test_salud_degradada_si_el_respaldo_vence(client)),
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
-            (test_dos_ediciones_del_mismo_movimiento_gana_la_ultima, lambda: test_dos_ediciones_del_mismo_movimiento_gana_la_ultima(client)),
+            (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
+            (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
             (test_salud_lee_la_antiguedad_del_ultimo_respaldo, lambda: test_salud_lee_la_antiguedad_del_ultimo_respaldo(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
         ]

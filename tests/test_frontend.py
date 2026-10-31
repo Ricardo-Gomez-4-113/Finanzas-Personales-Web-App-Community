@@ -179,6 +179,9 @@ class _ClienteHttp:
     def get(self, ruta, headers=None):
         return self._req("GET", ruta)
 
+    def put(self, ruta, json=None, headers=None):
+        return self._req("PUT", ruta, json)
+
 
 class _Respuesta:
     def __init__(self, status_code, cuerpo):
@@ -975,6 +978,36 @@ def test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base):
         ctx.close()
 
 
+def test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base):
+    """Pestaña A abre el formulario; pestaña B guarda otro monto; al guardar A, se avisa y queda el monto de B."""
+    usuario, clave = _usuario_nuevo("conflicto")
+    api = _api(base, usuario, clave)
+    api.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"})
+    api.post("/api/transacciones", json={"fecha": "2026-10-02", "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "conflicto-cafe"})
+    mov = next(t for t in api.get("/api/transacciones").json() if t["descripcion"] == "conflicto-cafe")
+
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        fila = page.locator("#tabla-movimientos tr", has_text="conflicto-cafe")
+        fila.wait_for()
+        fila.locator(".btn-editar").click()  # la pestaña A abre el formulario con la versión actual
+        page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
+        page.fill("#modal-edit-trans-monto", "200")
+
+        # Otra pestaña del mismo usuario guarda primero
+        assert api.put(f"/api/transacciones/{mov['id']}", json={"monto": 300}).status_code == 200
+
+        page.click("#form-editar-transaccion [type=submit]")
+        page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
+        page.wait_for_selector("#toast-root :text('cambió desde que lo abriste')", timeout=10000)
+        _esperar(page, "[...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('conflicto-cafe') && tr.textContent.includes('$300.00'))")
+        assert not [e for e in errores if "Failed to load resource" not in e], errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -1039,6 +1072,7 @@ if __name__ == "__main__":
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
                 (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),
+                (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

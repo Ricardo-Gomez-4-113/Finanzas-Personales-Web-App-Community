@@ -488,6 +488,7 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
     }
 
     document.getElementById('modal-edit-trans-id').value = id;
+    document.getElementById('modal-edit-trans-version').value = itemCompleto?.version ?? '';
     document.getElementById('modal-edit-trans-fecha').value = fecha || '';
     document.getElementById('modal-edit-trans-tipo').value = tipo || 'gasto';
     document.getElementById('modal-edit-trans-monto').value = (monto !== undefined && monto !== null) ? monto : '';
@@ -576,16 +577,24 @@ export async function guardarEdicionTransaccion(e) {
         return;
     }
 
+    const versionEsperada = Number(document.getElementById('modal-edit-trans-version').value);
+
     try {
         const res = await apiFetch(`/api/transacciones/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fecha, tipo, monto, descripcion, categoria_id: categoriaId })
+            body: JSON.stringify({ fecha, tipo, monto, descripcion, categoria_id: categoriaId, version_esperada: versionEsperada || undefined })
         });
 
         if (res.ok) {
             cerrarModalEditarTransaccion();
             await recargar();
+        } else if (res.status === 409) {
+            // Otra pestaña cambió el movimiento: se cierra el formulario para no pisar ese cambio y se muestra el actual
+            cerrarModalEditarTransaccion();
+            await recargar();
+            const err = await res.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, "Este movimiento cambió en otra pestaña."), 'error');
         } else {
             const err = await res.json();
             toast(formatErrorDetail(err.detail, "Error al actualizar el movimiento."), 'error');

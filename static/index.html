@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1df168ac35">
-    <link rel="stylesheet" href="/static/css/layout.css?v=1df168ac35">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=1df168ac35">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=1df168ac35">
-    <link rel="stylesheet" href="/static/css/tema.css?v=1df168ac35">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=d652950ea5">
+    <link rel="stylesheet" href="/static/css/layout.css?v=d652950ea5">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=d652950ea5">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=d652950ea5">
+    <link rel="stylesheet" href="/static/css/tema.css?v=d652950ea5">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -1242,6 +1242,7 @@
             <div id="modal-edit-trans-subperiodos-info" class="hidden"></div>
             <form id="form-editar-transaccion" data-on-submit='[["guardarEdicionTransaccion", "$event"]]'>
                 <input type="hidden" id="modal-edit-trans-id">
+                <input type="hidden" id="modal-edit-trans-version">
 
                 <div class="form-row-2col">
                     <div class="form-group">
@@ -1948,7 +1949,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=1df168ac35"></script>
+    <script type="module" src="/static/js/main.js?v=d652950ea5"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

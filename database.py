@@ -28,7 +28,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 17
+CURRENT_TENANT_SCHEMA_VERSION = 18
 
 
 # =============================================================================
@@ -502,6 +502,16 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             )
         cursor.execute("PRAGMA user_version = 17;")
         current_version = 17
+
+    # Versión 18: versión por movimiento. Cada edición sube el contador y una edición con una versión vieja
+    # (otra pestaña la cambió antes) se rechaza en vez de pisar el cambio. Se verifica con PRAGMA table_info,
+    # sin try/except, para que un error real de SQL no quede oculto.
+    if current_version < 18 and CURRENT_TENANT_SCHEMA_VERSION >= 18:
+        columnas = {fila[1] for fila in cursor.execute("PRAGMA table_info(transacciones);").fetchall()}
+        if "version" not in columnas:
+            cursor.execute("ALTER TABLE transacciones ADD COLUMN version INTEGER NOT NULL DEFAULT 1;")
+        cursor.execute("PRAGMA user_version = 18;")
+        current_version = 18
 
     conn.commit()
 

@@ -219,6 +219,20 @@ def test_v17_normaliza_quincenales_y_no_toca_mensuales():
         _migrar_hasta(conn, 17)  # idempotente
         assert _version(conn) == 17
 
+def test_v18_agrega_version_a_los_movimientos_existentes():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 17)
+        conn.execute(
+            "INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) "
+            "VALUES ('2026-10-02', 100, 'gasto', 'previo', 2)")
+        conn.commit()
+        _migrar_hasta(conn, 18)
+        assert _version(conn) == 18
+        assert conn.execute("SELECT version FROM transacciones WHERE descripcion = 'previo'").fetchone()[0] == 1
+        _migrar_hasta(conn, 18)  # idempotente
+        assert _version(conn) == 18
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

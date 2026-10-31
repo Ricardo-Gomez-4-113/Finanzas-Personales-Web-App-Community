@@ -73,6 +73,8 @@ class TransaccionUpdate(BaseModel):
     tipo: Optional[Literal['gasto', 'ingreso']] = None
     categoria_id: Optional[int] = None
     descripcion: Optional[str] = Field(None, max_length=255)
+    # Versión con la que el formulario abrió el movimiento. Si ya no coincide, otra pestaña lo cambió antes.
+    version_esperada: Optional[int] = None
 
 
 # =============================================================================
@@ -264,14 +266,26 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
 
     # El rubro cambia solo si cambia el tipo; un fijo o una MSI conservan su rubro aunque se borre el enlace
     nuevo_rubro = trans["rubro"] if nuevo_tipo == trans["tipo"] else clase_movimiento(nuevo_tipo, trans["apartado_id"], trans["recurrente_id"], False)
+    if t.version_esperada is not None and t.version_esperada != trans["version"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Este movimiento cambió desde que lo abriste, en otra pestaña o dispositivo. Revísalo con sus datos actuales y guarda de nuevo."
+        )
+    # El filtro por versión cubre la carrera entre la lectura de arriba y este UPDATE
     cursor.execute(
         """
         UPDATE transacciones 
-        SET fecha = ?, monto = ?, tipo = ?, categoria_id = ?, descripcion = ?, rubro = ?
-        WHERE id = ?
+        SET fecha = ?, monto = ?, tipo = ?, categoria_id = ?, descripcion = ?, rubro = ?, version = version + 1
+        WHERE id = ? AND version = ?
         """,
-        (nueva_fecha, nuevo_monto, nuevo_tipo, nueva_cat, nueva_desc, nuevo_rubro, id_transaccion)
+        (nueva_fecha, nuevo_monto, nuevo_tipo, nueva_cat, nueva_desc, nuevo_rubro, id_transaccion, trans["version"])
     )
+    if cursor.rowcount == 0:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Este movimiento cambió mientras lo guardabas. Revísalo con sus datos actuales y guarda de nuevo."
+        )
     conn.commit()
     return {"mensaje": "Transacción actualizada con éxito"}
 
@@ -291,7 +305,7 @@ def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT t.id, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id,
+        SELECT t.id, t.version, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id,
                c.nombre AS categoria, t.recurrente_id, t.apartado_id,
                r.presupuesto_tarjeta_id, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
         FROM transacciones t
