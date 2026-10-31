@@ -131,7 +131,7 @@ export const pluginDonaPorcentajes = {
             ctx.strokeText(pctText, posX, posY);
 
             // Relleno blanco brillante
-            ctx.fillStyle = colorVar('--text-main');
+            ctx.fillStyle = colorVar('--chart-label');
             ctx.fillText(pctText, posX, posY);
         });
         ctx.restore();

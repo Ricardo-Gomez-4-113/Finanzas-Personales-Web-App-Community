@@ -33,6 +33,8 @@
     /* ---- Modo claro: porcelana y tinta ---- */
     --bg-color: #EEF0F3;
     --overlay-scrim: #080A0D;
+    /* Texto sobre las porciones de las gráficas: claro en ambos temas, porque las porciones son tonos medios y oscuros */
+    --chart-label: #F6F2EA;
     --panel-bg: #FFFFFF;
     --surface-level2: #F5F6F8;
     --surface-subtle: #F5F6F8;
