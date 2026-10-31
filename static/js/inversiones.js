@@ -105,8 +105,8 @@ export const pluginDonaPorcentajes = {
 
             const val = Number(data.datasets[0].data[index] || 0);
             const pct = (val / total) * 100;
-            // Solo dibujar el porcentaje si la rebanada es >= 3.5% para evitar empalmes
-            if (pct < 3.5) return;
+            // Solo dibujar el porcentaje en rebanadas >= 10%; las pequeñas se leen en la leyenda
+            if (pct < 10) return;
 
             let posX, posY;
             if (typeof element.tooltipPosition === 'function') {
