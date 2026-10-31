@@ -68,9 +68,9 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 
 ## Plan restante
 
-Fases 1 a 6 cerradas. Pendiente sin decidir:
+Fases 1 a 6 cerradas.
 
-- **`importar-fijos`:** el endpoint sigue desactivado (400 por diseño, fijado por una prueba). Decidir si se quita.
+- **`importar-fijos` (quitado):** la ruta y su modelo se eliminaron. El flujo vigente es solo `exportar-a-fijos` (presupuesto hacia Fijos y Movimientos).
 - **Conflicto entre pestañas (hecho):** cada movimiento tiene `version` (migración 18). El formulario envía la versión con la que se abrió; si no coincide, la API responde 409, el modal se cierra, se recarga la lista y se avisa. El PUT sin `version_esperada` conserva la última escritura para clientes antiguos. Cubierto por `test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409` y por la prueba de navegador `test_otra_pestana_cambio_el_movimiento_y_no_se_pisa`. La cláusula `AND version = ?` del UPDATE solo se ejercita en una carrera real; no tiene prueba propia.
 - **Fase 6, sistema de log (hecho):**
   - Backend: `observabilidad.py` escribe `data/logs/app.log` (o `FINANZAS_LOG_DIR`) con una línea JSON por evento. Cada petición lleva `id_peticion` en la cabecera `X-Request-Id`. Se registran los 5xx (con traza si hubo excepción), los 401/403 y los fallos de SQLite. Rotación de 5 MB con 5 archivos.
