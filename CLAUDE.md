@@ -53,7 +53,7 @@ Cada entrada indica el commit y qué incluye.
 - Pruebas rápidas de finanzas: `python3 test_finanzas.py`. Requiere las dependencias de `requirements.txt` (`pydantic==2.14.1` en particular); en Python del sistema con PEP 668 conviene un entorno virtual.
 - Suites de backend en Docker: `./tests/run_tests.sh` (finanzas, migraciones, respaldo, mercado, acciones, aislamiento de API y escenario de API).
 - Batería completa, con cobertura y navegador: `./tests/run_todo.sh` (unos 6 minutos).
-- Cobertura de `routers/`: `./tests/run_cobertura.sh`. Mínimo actual 58 %; solo debe subir. Subirlo en el propio script al añadir pruebas.
+- Cobertura de `routers/`: `./tests/run_cobertura.sh`. Mínimo 80 %; solo debe subir. Subirlo en el propio script al añadir pruebas.
 - Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 36 pruebas`.
 
 Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraciones 8, respaldo 2, mercado 4, acciones 2, aislamiento 33, escenario 18) y frontend 19 de 19.
@@ -65,6 +65,14 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 - **`mensualizar`:** una frecuencia desconocida se trata como mensual. La API no lo permite porque la frecuencia es un `Literal`.
 - **Fase 2, frontend:** hecho: `apiFetch` cierra sesión solo con 401 o con 403 de cuenta desactivada o suspendida, y avisa con un toast cuando no hay conexión; `leerJson` en `core.js` muestra el motivo del servidor cuando una carga falla (dashboard, movimientos y apartados); colores literales sustituidos por tokens (`--overlay-scrim`, `--chart-label`); la marca del sidebar se ve completa en dos líneas; el placeholder del ticker ya no sale en mayúsculas; el ticker se codifica en la URL de cotización. Revisión visual con capturas de login, resumen, movimientos, inversiones y presupuesto, en claro, oscuro y móvil. Auditoría de `innerHTML` con inventario de todas las interpolaciones: los datos del usuario pasan por `escapeHTML` y el resto son valores fijos, numéricos o construidos en el propio módulo. Pruebas de Playwright para el fallo de red y para el 403 de permisos y de cuenta desactivada (22 pruebas en total). Pendiente: ninguno bloqueante; la auditoría es estática y no sustituye una revisión de seguridad externa.
 - **Fase 3, visual:** aplicado: cabeceras del sidebar y de la barra superior a 60 px (la barra encogía por flexbox); desvanecido en la cinta de periodos en móvil; porcentajes del donut de inversiones solo en rebanadas de 10 % o más (el resto se lee en la leyenda). Descartado: ajustar el espacio del FAB, porque el contenido móvil ya tiene 88 px de padding inferior y el botón se oculta al bajar. Comprobado: `tabular-nums` en las cifras del hero. Cierre de la exploración manual: importes grandes en una línea en móvil; título de la barra en dos líneas en móvil (sin puntos suspensivos); selector de moneda sin «($)»; invitación a registrar el primer movimiento cuando no hay datos; área táctil de 44 px en botones de fila y pestañas en móvil (el tamaño visible no cambia). El foco de teclado ya es visible: el contorno dorado de 2 px.
+
+## Criterio de hecho
+
+Un cambio está terminado cuando:
+- Las suites de backend y de navegador pasan en Community (`./tests/run_todo.sh` antes de publicar).
+- Hay una prueba que falla con el código anterior: el cambio tiene su caso, no solo verde.
+- Si toca frontend, `python3 scripts/cache_bust.py` está ejecutado y el cambio se ve bien en móvil y escritorio.
+- Antes de publicar en el SaaS: `~/bin/portar-a-saas.sh <commit> --probar`, y solo después su propio commit y push.
 
 ## Directivas de trabajo
 
