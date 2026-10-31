@@ -2,7 +2,7 @@
  * static/js/apartados.js - Apartados y metas de ahorro.
  */
 
-import { apiFetch, escapeHTML, fmt, formatErrorDetail, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, fmt, formatErrorDetail, leerJson, recargar, toast } from './core.js';
 
 
 // =============================================================================
@@ -19,7 +19,7 @@ export function toggleMetaInput() {
 export async function cargarApartados() {
     try {
         const res = await apiFetch('/api/apartados');
-        const apartados = await res.json();
+        const apartados = await leerJson(res, 'No se pudieron cargar los apartados.');
         const contenedor = document.getElementById('contenedor-apartados');
         if (!contenedor) return;
         contenedor.innerHTML = '';
@@ -64,6 +64,7 @@ export async function cargarApartados() {
             contenedor.appendChild(card);
         });
     } catch (error) {
+        if (error.esHttp) toast(error.message, 'error');
         console.error("Error al cargar apartados:", error);
     }
 }

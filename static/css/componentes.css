@@ -940,6 +940,8 @@ tbody tr:hover {
 .s-text-decoration-none { text-decoration: none; }
 .s-text-decoration-underline { text-decoration: underline; }
 .s-text-transform-uppercase { text-transform: uppercase; }
+/* La transformación es para lo que escribe la persona (tickers); el placeholder sigue en tipo oración */
+.s-text-transform-uppercase::placeholder { text-transform: none; }
 .s-width-0 { width: 0%; }
 .s-width-100 { width: 100%; }
 .s-width-33-3 { width: 33.3%; }

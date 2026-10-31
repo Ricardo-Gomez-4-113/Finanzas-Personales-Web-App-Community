@@ -80,6 +80,20 @@ export async function apiFetch(url, options = {}) {
     return response;
 }
 
+/**
+ * Devuelve el JSON de una respuesta correcta. Si la respuesta es de error, lanza un Error con el
+ * motivo que dio el servidor (o `mensaje`) y marca `esHttp` para que el llamador pueda avisar.
+ */
+export async function leerJson(res, mensaje) {
+    if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        const error = new Error(formatErrorDetail(cuerpo.detail, mensaje));
+        error.esHttp = true;
+        throw error;
+    }
+    return res.json();
+}
+
 async function cuentaInactiva(response) {
     const cuerpo = await response.clone().json().catch(() => ({}));
     return /desactivada|suspendida|cancelada/i.test(cuerpo.detail || '');

@@ -51,7 +51,7 @@
 }
 
 .sidebar-header {
-    height: var(--topbar-height);
+    min-height: var(--topbar-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -63,8 +63,20 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
+}
+
+/* El nombre de la app puede ocupar dos líneas: en laptops no cabe en una sin cortarse */
+.sidebar-brand .brand-title {
+    white-space: normal;
+    line-height: 1.15;
+}
+
+.sidebar-brand .brand-text-wrap {
+    display: block;
+    min-width: 0;
 }
 
 .brand-logo-wrap {

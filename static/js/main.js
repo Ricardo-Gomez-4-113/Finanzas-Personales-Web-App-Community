@@ -5,15 +5,15 @@
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
-import { apiFetch, escapeHTML, estado, fmt } from './core.js';
+import { apiFetch, escapeHTML, estado, fmt, leerJson, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=4e1a17735c';
+import { cargarRecurrentes } from './recurrentes.js?v=a387c9fdfd';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=4e1a17735c';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=a387c9fdfd';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
@@ -21,12 +21,17 @@ activarAccionesDelegadas();
 
 
 async function cargarMovimientos() {
-    const resTrans = await apiFetch('/api/transacciones');
-    const dataTrans = await resTrans.json();
-    estado.cache.transacciones = {};
-    dataTrans.forEach(t => { estado.cache.transacciones[t.id] = t; });
-    estado.cache.listaTransacciones = dataTrans;
-    renderTablaMovimientos();
+    try {
+        const resTrans = await apiFetch('/api/transacciones');
+        const dataTrans = await leerJson(resTrans, 'No se pudieron cargar los movimientos.');
+        estado.cache.transacciones = {};
+        dataTrans.forEach(t => { estado.cache.transacciones[t.id] = t; });
+        estado.cache.listaTransacciones = dataTrans;
+        renderTablaMovimientos();
+    } catch (error) {
+        if (error.esHttp) toast(error.message, 'error');
+        console.error("Error al cargar movimientos:", error);
+    }
 }
 
 async function cargarGraficaCategorias() {
@@ -68,7 +73,8 @@ export async function cargarDatos() {
 
         // Cinta de periodos: el periodo en curso y los siguientes, con su saldo al cierre
         const resCinta = await apiFetch('/api/recurrentes/periodos?n=4');
-        renderCintaPeriodos(document.getElementById('cinta-periodos'), (await resCinta.json()).periodos);
+        const dataCinta = await leerJson(resCinta, 'No se pudo cargar la cinta de periodos.');
+        renderCintaPeriodos(document.getElementById('cinta-periodos'), dataCinta.periodos);
 
         // La lista de movimientos se acota al periodo en curso, el mismo corte que las tarjetas del resumen
         const periodosResumen = dataResumen.periodos || [];
@@ -82,7 +88,7 @@ export async function cargarDatos() {
 
         // 2. Resumen Mensual Histórico
         const resMensual = await apiFetch('/api/resumen-mensual');
-        const dataMensual = await resMensual.json();
+        const dataMensual = await leerJson(resMensual, 'No se pudo cargar el resumen mensual.');
         
         const contenedorMensual = document.getElementById('lista-resumen-mensual');
         if (contenedorMensual) {
@@ -123,6 +129,7 @@ export async function cargarDatos() {
         ]);
 
     } catch (error) {
+        if (error.esHttp) toast(error.message, 'error');
         console.error("Error al actualizar datos:", error);
     }
 }
