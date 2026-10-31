@@ -81,6 +81,14 @@ Fases 1 a 6 cerradas.
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
+## Seguridad del login (en curso)
+
+Revisión enfocada del control de fuerza bruta, validada en un espacio de red sin salida (`unshare -rn`) con usuarios dummy.
+- **C1, carrera en el control de tasa (corregido):** antes, 40 peticiones simultáneas evaluaban 40 contraseñas. Ahora `reservar_intento_login` comprueba y anota en un solo paso, bajo candado, antes de verificar: 5 evaluadas. Prueba: `tests/test_seguridad_login.py`.
+- **C2, evicción de contadores (corregido):** un flujo de claves nuevas liberaba una cuenta bloqueada. Ahora la purga descarta primero las claves sin bloqueo, y si la tabla sigue llena rechaza claves nuevas con 429. Prueba y mutación: quitar la preferencia hace fallar la prueba de flujo.
+- **Pendientes de la revisión:** C3 (spraying sin tope por IP), C4 (código de recuperación con varias IPs), C5 (sin `max_length` en el login), C6 (oráculo de tiempo en la solicitud de código). Cada uno pasa por validación local antes de corregirse.
+- Costo medido de un intento (bcrypt): unos 0,8 s en esta máquina; llenar 10 000 claves tarda del orden de minutos con concurrencia.
+
 ## Criterio de hecho
 
 Un cambio está terminado cuando:
