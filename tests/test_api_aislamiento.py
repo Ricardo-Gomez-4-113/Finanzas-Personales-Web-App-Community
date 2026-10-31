@@ -485,6 +485,15 @@ def test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha):
     assert "_MXN_" in cabecera and "XX" not in cabecera, cabecera
 
 
+def test_moneda_base_solo_acepta_monedas_soportadas(client, ha):
+    """Una moneda desconocida daría cifras sin convertir etiquetadas como tal: se rechaza con 422."""
+    for ruta in ("/api/resumen", "/api/gastos-por-categoria", "/api/inversiones", "/api/rendimiento"):
+        r = client.get(f"{ruta}?moneda_base=GBP", headers=ha)
+        assert r.status_code == 422, (ruta, r.text)
+    r = client.get("/api/resumen?moneda_base=usd", headers=ha)
+    assert r.status_code == 200, r.text
+
+
 def test_tenant_sin_db_name_falla_cerrado():
     """Sin db_name en la sesión la dependencia debe fallar, nunca abrir la base del admin (user_1.db)."""
     gen = security.get_tenant_db({"id": 2, "sub": "2"})
@@ -524,6 +533,7 @@ if __name__ == "__main__":
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_distribucion_subperiodos_se_valida_al_guardar, lambda: test_distribucion_subperiodos_se_valida_al_guardar(client, ha)),
             (test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro, lambda: test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha)),
+            (test_moneda_base_solo_acepta_monedas_soportadas, lambda: test_moneda_base_solo_acepta_monedas_soportadas(client, ha)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),

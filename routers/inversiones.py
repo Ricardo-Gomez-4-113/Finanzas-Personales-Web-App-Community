@@ -1,7 +1,7 @@
 """routers/inversiones.py - Inversiones bursátiles, cotizaciones y tipos de cambio."""
 
 from fastapi import APIRouter
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Query
 from pydantic import BaseModel, Field, field_validator
 import time
 from typing import Literal, Optional, Dict, Any
@@ -38,7 +38,7 @@ class InversionUpdate(BaseModel):
 # =============================================================================
 
 @router.get("/api/inversiones", summary="Listar portafolio con rendimientos del tenant")
-def listar_inversiones(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
+def listar_inversiones(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"), conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
     tasas = obtener_tasas_cambio()
@@ -252,7 +252,7 @@ def _obtener_cuenta(cursor, cuenta_id: int):
 
 
 @router.get("/api/rendimiento", summary="Cuentas con rendimiento y su valor actual")
-def listar_rendimiento(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
+def listar_rendimiento(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"), conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     base = moneda_base.upper()
     tasas = obtener_tasas_cambio()

@@ -1,7 +1,7 @@
 """routers/movimientos.py - Movimientos de caja y resúmenes patrimoniales."""
 
 from fastapi import APIRouter
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Query
 try:
     from fastapi import Query
 except ImportError:
@@ -276,7 +276,7 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
     return {"mensaje": "Transacción actualizada con éxito"}
 
 @router.get("/api/resumen", summary="Resumen patrimonial consolidado del tenant")
-def obtener_resumen(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
+def obtener_resumen(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"), conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     materializar_recurrentes(conn, hoy)
     tasas = obtener_tasas_cambio()
@@ -330,7 +330,7 @@ def crear_categoria(c: CategoriaCreate, conn: sqlite3.Connection = Depends(get_t
 
 
 @router.get("/api/gastos-por-categoria", summary="Gastos del periodo de cobro agrupados por categoría")
-def gastos_por_categoria(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
+def gastos_por_categoria(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"), conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     materializar_recurrentes(conn, hoy)
     ventana = ventana_periodo_actual(conn, hoy)
