@@ -51,3 +51,30 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 - **Reparto de MSI en `routers/recurrentes.py`:** calcula la cuota con `round(total / meses, 2)`. La última cuota se ajusta en `finanzas_core.py` para que el total cuadre. Mover esa regla a `finanzas_core.py` es una limpieza, no un bug.
 - **`mensualizar`:** una frecuencia desconocida se trata como mensual. La API no lo permite porque la frecuencia es un `Literal`.
 - **Fase 2, frontend:** pendiente. Revisión de manejo de errores de red y de sesión, estados vacíos, escape de HTML en datos del usuario y reglas visuales de la guía de estilo.
+
+## Directivas de trabajo
+
+- Localizar antes de leer: `grep -n "termino" ruta/archivo` para ubicar la función, ruta o selector, y luego leer solo ese bloque. No leer de una vez archivos de más de 150 líneas.
+- No hacer escaneos globales (`find`, `diff -rq`, `ls -R`) salvo petición explícita.
+- Estado de Git con `git status -s` o `git diff --stat`, sin `git diff` extensos.
+- Guía completa de desarrollo: `docs/DESARROLLO.md`.
+
+## Reglas de backend
+
+- Aislamiento: toda consulta o mutación financiera opera sobre `data/tenants/user_{id}.db` del usuario autenticado.
+- Migraciones: cada cambio de esquema es una versión nueva, secuencial e idempotente. No se modifican migraciones pasadas ni se borran bases de usuarios para forzar un esquema.
+- Lógica financiera solo en `finanzas_core.py`, con su caso en `test_finanzas.py`.
+
+## Reglas de UI y frontend
+
+- Desbordes: los wrappers principales (`.app-main-wrapper`, `.app-main-content`) llevan `overflow-x: hidden` y `max-width: 100%`. No debe haber scroll horizontal accidental.
+- Navegación: debe caber en 1366x768 o con escalado de 125% a 150%. La altura acumulada de navegación y sidebars no supera 440px, y las scrollbars se ocultan con `scrollbar-width: none`.
+- Sin scrollbars anidados: tablas de pocas filas y modales no llevan `overflow-y: auto` con alturas fijas artificiales.
+- Sistema visual "Banca privada": colores y tipografía viven en `static/css/tokens.css` (obsidiana `#0F1318`, champán `#C9B37E`, marfil `#ECE7DC`; claro en porcelana `#EEF0F3` con tinta `#161B22`). La interfaz usa Hanken Grotesk (`--font-ui`) y las cifras y titulares, Fraunces (`--font-num`). La capa de componentes está en `static/css/tema.css`, cargada al final, con reglas prefijadas `:root` para ganar sin `!important`.
+- Sin colores literales en CSS ni JS: usar tokens. Las gráficas los leen con `colorVar`. Textos en tipo oración, sin mayúsculas forzadas ni etiquetas sobre cada título.
+- Paleta: prohibidos los colores chillones, planos o saturados (amarillo mostaza, verde neón) y el negro puro `#000000`. Fondos obsidiana o slate, micro-bordes champán o cyan tenue y sombras difusas multicapa.
+- Iconos: prohibidos los emojis del sistema en botones, títulos, tarjetas y menús. Solo micro-SVG con `stroke-width: 1.8`, `stroke: currentColor` y alineación vertical.
+- Cifras: `font-variant-numeric: tabular-nums` en saldos, importes, porcentajes y celdas de tabla.
+- Contraste: el texto de estado usa `var(--success-text)`, `var(--danger-text)` y `var(--warning-text)`. Los `--*-color` quedan para fondos, bordes e iconos.
+- Cache-busting: tras cambiar CSS o JS en `static/`, ejecutar `python3 scripts/cache_bust.py`. No editar los `?v=` a mano.
+- Tras cambios de UI, correr `./tests/run_frontend.sh`.
