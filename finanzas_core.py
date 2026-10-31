@@ -324,6 +324,11 @@ def deuda_pendiente(fila) -> float:
     return max(0.0, round(float(fila["monto_total"]) - float(fila["monto"]) * generadas, 2))
 
 
+def cuota_msi(monto_total: float, meses: int) -> float:
+    """Cuota mensual de una compra a meses, a centavos. La última cuota absorbe el redondeo (ver materializar_recurrentes)."""
+    return round(monto_total / meses, 2)
+
+
 def mensualizar(monto: float, frecuencia: str) -> float:
     """Equivalente mensual de un monto periódico."""
     if frecuencia == 'quincenal':

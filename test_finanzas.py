@@ -90,6 +90,7 @@ from finanzas_core import (
     calcular_distribucion_subperiodos,
     proxima_fecha_vigente,
     mensualizar,
+    cuota_msi,
     convertir_frecuencias,
     convertir_de_mensual,
     calcular_periodo_actual,
@@ -2496,6 +2497,15 @@ def test_editar_proximo_cargo_no_cambia_el_dia_ancla_si_cae_a_fin_de_mes():
     # Y el ciclo siguiente confirma que el cargo sigue en el ancla
     from finanzas_core import siguiente_fecha
     assert siguiente_fecha(date(2027, 2, 28), 'mensual', 31) == date(2027, 3, 31)
+
+
+def test_cuota_msi_redondea_a_centavos_y_la_ultima_cuadra_el_total():
+    """Cuota base a centavos; la última (la que ajusta materializar_recurrentes) completa el total exacto."""
+    assert cuota_msi(1000, 3) == 333.33
+    assert cuota_msi(24000, 12) == 2000.0
+    total, meses = 1000.0, 3
+    cuota = cuota_msi(total, meses)
+    assert round(cuota * (meses - 1) + (total - cuota * (meses - 1)), 2) == total
 
 
 def test_portafolio_en_eur_se_valua_con_su_tasa():

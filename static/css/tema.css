@@ -1667,3 +1667,33 @@
     :root .admin-tabla .admin-detalle { display: block; }
     :root .admin-tabla .admin-detalle td { display: block; padding: 10px 0 0; }
 }
+
+/* Barra superior en teléfonos: el título se lee completo, en dos líneas si hace falta, sin puntos suspensivos */
+@media (max-width: 480px) {
+    :root .topbar-section-title { font-size: 0.98rem; line-height: 1.1; white-space: normal; }
+}
+
+/* Inicio sin movimientos: una invitación a empezar, no un resumen de ceros */
+:root .inicio-vacio {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    border: 1px solid var(--gold-border);
+    border-radius: var(--radius-s);
+    background: var(--panel-bg);
+}
+:root .inicio-vacio-texto { margin: 0; color: var(--text-muted); max-width: 52ch; }
+
+/* Móvil: el área de toque llega a 44 px sin cambiar el tamaño visible de los botones */
+@media (max-width: 768px) {
+    :root .btn-editar,
+    :root .btn-eliminar,
+    :root .tab-btn { position: relative; }
+    :root .btn-editar::after,
+    :root .btn-eliminar::after { content: ""; position: absolute; inset: -8px; }
+    :root .tab-btn::after { content: ""; position: absolute; inset: -3px 0; }
+}

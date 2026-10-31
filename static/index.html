@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=3c30d0b169">
-    <link rel="stylesheet" href="/static/css/layout.css?v=3c30d0b169">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=3c30d0b169">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=3c30d0b169">
-    <link rel="stylesheet" href="/static/css/tema.css?v=3c30d0b169">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1df168ac35">
+    <link rel="stylesheet" href="/static/css/layout.css?v=1df168ac35">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=1df168ac35">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=1df168ac35">
+    <link rel="stylesheet" href="/static/css/tema.css?v=1df168ac35">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -208,8 +208,8 @@
                     <div class="topbar-currency-wrap">
                         <label for="select-moneda-global" class="sr-only">Moneda base</label>
                         <select id="select-moneda-global" class="select-moneda-topbar" data-on-change='[["cambiarMonedaGlobal", "$value"]]' title="Cambiar moneda base de visualización">
-                            <option value="MXN" selected>MXN ($)</option>
-                            <option value="USD">USD ($)</option>
+                            <option value="MXN" selected>MXN</option>
+                            <option value="USD">USD</option>
                         </select>
                         <span id="badge-tasa-global" class="badge-tasa-topbar">1 USD ≈ $18.40 MXN</span>
                     </div>
@@ -308,6 +308,10 @@
         <!-- PESTAÑA 1: DASHBOARD GENERAL Y PATRIMONIO NETO -->
         <!-- ============================================== -->
         <section id="tab-dashboard" class="tab-content active">
+            <div id="inicio-vacio" class="inicio-vacio hidden" role="status">
+                <p class="inicio-vacio-texto">Aún no tienes movimientos. Registra tu primer ingreso y verás cuánto te queda por periodo.</p>
+                <button type="button" id="btn-inicio-vacio" class="btn-primary">Registrar un movimiento</button>
+            </div>
             <div id="periodo-hero" class="periodo-hero" aria-labelledby="periodo-titulo">
                 <div class="periodo-cabecera">
                     <div class="periodo-cifra">
@@ -1944,7 +1948,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=3c30d0b169"></script>
+    <script type="module" src="/static/js/main.js?v=1df168ac35"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

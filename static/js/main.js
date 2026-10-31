@@ -9,15 +9,16 @@ import { apiFetch, escapeHTML, estado, fmt, leerJson, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=3c30d0b169';
+import { cargarRecurrentes } from './recurrentes.js?v=1df168ac35';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=3c30d0b169';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=1df168ac35';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 
 activarAccionesDelegadas();
+document.getElementById('btn-inicio-vacio')?.addEventListener('click', () => document.querySelector('[data-tab="tab-movimientos"]')?.click());
 
 
 async function cargarMovimientos() {
@@ -27,6 +28,7 @@ async function cargarMovimientos() {
         estado.cache.transacciones = {};
         dataTrans.forEach(t => { estado.cache.transacciones[t.id] = t; });
         estado.cache.listaTransacciones = dataTrans;
+        document.getElementById('inicio-vacio')?.classList.toggle('hidden', dataTrans.length > 0);
         renderTablaMovimientos();
     } catch (error) {
         if (error.esHttp) toast(error.message, 'error');

@@ -886,6 +886,67 @@ def test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango(navegador, base):
         ctx.close()
 
 
+def test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(navegador, base):
+    usuario, clave = _usuario_nuevo("vacio")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        page.wait_for_selector("#inicio-vacio:not(.hidden)", timeout=10000)
+        page.click("#btn-inicio-vacio")
+        page.wait_for_selector("#tab-movimientos.active")
+        _api(base, usuario, clave).post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 500, "tipo": "ingreso", "categoria_id": 12, "descripcion": "primer-ingreso"})
+        page.reload()
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        _esperar(page, "document.getElementById('inicio-vacio').classList.contains('hidden')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_importe_grande_no_se_parte_en_movil(navegador, base):
+    usuario, clave = _usuario_nuevo("importe")
+    _api(base, usuario, clave).post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 5000000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "nomina-grande"})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        medidas = page.evaluate("""() => { const p = document.querySelector('.card.ingresos p');
+            const cs = getComputedStyle(p);
+            return {alto: p.getBoundingClientRect().height, fuente: parseFloat(cs.fontSize),
+                    desborda: p.scrollWidth > p.parentElement.clientWidth + 1}; }""")
+        assert medidas["alto"] < medidas["fuente"] * 1.6, f"el importe ocupa dos líneas: {medidas}"
+        assert not medidas["desborda"], medidas
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        for tab in ("tab-movimientos", "tab-presupuesto", "tab-inversiones"):
+            _ir(page, tab)
+            cortado = page.evaluate("() => { const t = document.getElementById('topbar-section-title'); return t.scrollWidth > t.clientWidth + 1; }")
+            assert not cortado, f"el título de {tab} se corta en el móvil"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#tabla-movimientos tr .btn-editar")
+        area = page.evaluate("""() => { const b = document.querySelector('#tabla-movimientos .btn-editar');
+            const cs = getComputedStyle(b, '::after');
+            return {w: b.getBoundingClientRect().width + parseFloat(cs.left) * -2, h: b.getBoundingClientRect().height + parseFloat(cs.top) * -2}; }""")
+        assert area["w"] >= 44 and area["h"] >= 44, area
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -928,6 +989,10 @@ if __name__ == "__main__":
                 (test_mi_perfil_exige_contrasena_actual_para_cambiarla, lambda: test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base)),
                 (test_eliminar_cuenta_exige_escribir_el_usuario, lambda: test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base)),
                 (test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango, lambda: test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango(navegador, base)),
+                (test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos, lambda: test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(navegador, base)),
+                (test_importe_grande_no_se_parte_en_movil, lambda: test_importe_grande_no_se_parte_en_movil(navegador, base)),
+                (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
+                (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

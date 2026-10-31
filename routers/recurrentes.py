@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from finanzas_core import (
+    cuota_msi,
     validar_fecha_operativa,
     ahora_local,
     ancla_al_editar_proximo_cargo,
@@ -127,7 +128,7 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
             raise HTTPException(status_code=400, detail="Una compra a meses requiere el monto total.")
         tipo, frecuencia = 'gasto', 'mensual'
         total_cuotas = req.meses
-        monto = round(req.monto_total / req.meses, 2)
+        monto = cuota_msi(req.monto_total, req.meses)
         monto_total = req.monto_total
         categoria_id = req.categoria_id or _categoria_compras_a_meses(cursor)
     else:
