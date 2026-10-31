@@ -10,7 +10,7 @@ import sqlite3
 from datetime import date
 
 from finanzas_core import ahora_local, convertir, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
-from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios
+from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO
 from security import (
     verify_token,
     get_tenant_db
@@ -41,7 +41,7 @@ class InversionUpdate(BaseModel):
 def listar_inversiones(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
-    tasa_usd_mxn = obtener_tasas_cambio().get("MXN", 18.40)
+    tasa_usd_mxn = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
     return valorar_posiciones(filas, moneda_base, tasa_usd_mxn)
 
 @router.post("/api/inversiones", status_code=status.HTTP_201_CREATED, summary="Registrar posición bursátil")
@@ -255,7 +255,7 @@ def _obtener_cuenta(cursor, cuenta_id: int):
 def listar_rendimiento(moneda_base: str = "MXN", conn: sqlite3.Connection = Depends(get_tenant_db)):
     hoy = ahora_local().date()
     base = moneda_base.upper()
-    tasa_fx = obtener_tasas_cambio().get("MXN", 18.40)
+    tasa_fx = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
     filas = conn.execute("SELECT * FROM cuentas_rendimiento ORDER BY id").fetchall()
     cuentas = [_cuenta_valorada(f, hoy, base, tasa_fx) for f in filas]
     total = {

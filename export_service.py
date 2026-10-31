@@ -19,7 +19,7 @@ from openpyxl.chart import PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.utils import get_column_letter
 from finanzas_core import ahora_local, convertir, deuda_pendiente, valor_rendimiento
-from mercado import obtener_tasas_cambio, cotizar_varios
+from mercado import obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO
 
 def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = None, db_name: str = "user_1.db") -> io.BytesIO:
     """
@@ -51,7 +51,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     # =========================================================================
     # Se obtienen los tipos de cambio en vivo o en caché para conversiones multimoneda.
     tasas = obtener_tasas_cambio()
-    tasa_usd_mxn = tasas.get("MXN", 18.40)
+    tasa_usd_mxn = tasas.get("MXN", TASA_MXN_RESPALDO)
     
     # Factor para convertir flujos originados en pesos mexicanos (MXN) a la divisa solicitada
     factor_mxn_a_base = (1.0 / tasa_usd_mxn) if (moneda_base == "USD" and tasa_usd_mxn > 0) else 1.0
