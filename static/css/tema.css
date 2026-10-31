@@ -1214,6 +1214,9 @@
     :root .cards .card:nth-child(even) { border-left: 1px solid var(--border-color); }
     :root .cards .card:nth-child(n + 3) { border-top: 1px solid var(--border-color); }
     :root .card p { font-size: 1.3rem; }
+    /* Importes grandes: sin cortes a mitad de cifra; el tamaño se adapta al ancho de la tarjeta */
+    :root .cards .card.ingresos p,
+    :root .cards .card.gastos p { white-space: nowrap; font-size: clamp(1.05rem, 4.6vw, 1.3rem); }
     :root .panel { padding: 18px 16px; }
     :root .panel h2,
     :root .panel-heading { font-size: var(--fs-base); }
