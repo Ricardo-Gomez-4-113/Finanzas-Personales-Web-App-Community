@@ -2464,6 +2464,11 @@ def test_anual_avanza_un_ano_y_no_un_mes():
     assert siguiente_fecha(date(2031, 2, 28), 'anual', 29) == date(2032, 2, 29)
     # El equivalente mensual de un anual es una doceava parte
     assert mensualizar(1200, 'anual') == 100.0
+    try:
+        mensualizar(100, 'diaria')  # una frecuencia fuera del CHECK de la base no debe pasar en silencio
+        assert False, "mensualizar debió rechazar una frecuencia desconocida"
+    except ValueError:
+        pass
     # Un anual nunca marca la periodicidad de la quincena o del mes: no es el ingreso principal
     anual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-01", "monto": 50000.0, "frecuencia": "anual"}
     mensual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-15", "monto": 3000.0, "frecuencia": "mensual"}

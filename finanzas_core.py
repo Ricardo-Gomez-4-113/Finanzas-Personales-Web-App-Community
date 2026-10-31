@@ -337,7 +337,10 @@ def mensualizar(monto: float, frecuencia: str) -> float:
         return round(float(monto) * 52 / 12, 2)
     if frecuencia == 'anual':
         return round(float(monto) / 12, 2)
-    return float(monto)
+    if frecuencia == 'mensual':
+        return float(monto)
+    # La base solo admite semanal, quincenal y mensual (CHECK); cualquier otro valor es un error de código
+    raise ValueError(f"Frecuencia desconocida: {frecuencia}")
 
 
 def convertir_frecuencias(monto: float, frecuencia_origen: str) -> Dict[str, float]:
