@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, escapeHTML, estado, formatErrorDetail, toast } from './core.js';
+import { renderMenuUsuario } from './menu_usuario.js';
 
 
 // =============================================================================
@@ -185,13 +186,21 @@ export function abrirModalEditarUsuario(id, username, role, email) {
     const modal = document.getElementById('modal-editar-usuario');
     if (!modal) return;
 
-    document.getElementById('lbl-edit-user-title').textContent = username;
+    // Editar la propia cuenta se presenta como "Mi perfil"; editar a otra persona (admin) conserva el nombre en el título
+    const esPropio = !!(estado.usuarioActual && estado.usuarioActual.id === id);
+    modal.dataset.propio = esPropio ? '1' : '0';
+    const tituloTexto = document.getElementById('lbl-edit-user-titulo-texto');
+    if (tituloTexto) tituloTexto.textContent = esPropio ? 'Mi perfil' : 'Editar usuario:';
+    document.getElementById('lbl-edit-user-title').textContent = esPropio ? '' : username;
     document.getElementById('edit-user-id').value = id;
     document.getElementById('edit-user-username').value = username;
     const emailInput = document.getElementById('edit-user-email');
     if (emailInput) emailInput.value = email || '';
     document.getElementById('edit-user-password').value = '';
-    
+    const actualInput = document.getElementById('edit-user-current-password');
+    if (actualInput) actualInput.value = '';
+    document.getElementById('group-edit-user-current-password')?.classList.add('hidden');
+
     const roleSelect = document.getElementById('edit-user-role');
     const roleGroup = document.getElementById('group-edit-user-role');
     
@@ -214,6 +223,11 @@ export function abrirModalEditarUsuario(id, username, role, email) {
         const esMismoUsuario = estado.usuarioActual && estado.usuarioActual.id === id;
         const esAdmin = estado.usuarioActual && (estado.usuarioActual.role === 'admin' || estado.usuarioActual.id === 1 || (estado.usuarioActual.username && estado.usuarioActual.username.toLowerCase() === 'admin'));
         dangerZone.classList.toggle('hidden', !((esMismoUsuario && !esAdmin)));
+        dangerZone.open = false;
+        const confirmar = document.getElementById('eliminar-cuenta-confirmar');
+        if (confirmar) confirmar.value = '';
+        const botonEliminar = document.getElementById('btn-eliminar-cuenta-confirmar');
+        if (botonEliminar) botonEliminar.disabled = true;
     }
 
     modal.classList.remove('hidden');
@@ -262,11 +276,20 @@ export async function guardarEdicionUsuario(e) {
         return;
     }
 
+    const esPropio = document.getElementById('modal-editar-usuario')?.dataset.propio === '1';
     const payload = { username, email: email || null };
     if (password && password.trim().length > 0) {
-        if (password.length < 4) {
-            toast("La nueva contraseña debe tener al menos 4 caracteres.", 'error');
+        if (password.length < 8) {
+            toast("La nueva contraseña debe tener al menos 8 caracteres.", 'error');
             return;
+        }
+        if (esPropio) {
+            const actual = document.getElementById('edit-user-current-password')?.value || '';
+            if (!actual) {
+                toast("Escribe tu contraseña actual para cambiarla.", 'error');
+                return;
+            }
+            payload.current_password = actual;
         }
         payload.password = password;
     }
@@ -298,25 +321,7 @@ export async function guardarEdicionUsuario(e) {
                 if (data.user) {
                     estado.usuarioActual = data.user;
                     localStorage.setItem('user_info', JSON.stringify(data.user));
-                    const lblUser = document.getElementById('lbl-username');
-                    const lblRole = document.getElementById('lbl-user-role');
-                    const dropUser = document.getElementById('dropdown-user-name');
-                    const dropRole = document.getElementById('dropdown-user-role');
-                    const dropEmail = document.getElementById('dropdown-user-email');
-                    if (lblUser) lblUser.textContent = data.user.username;
-                    if (dropUser) dropUser.textContent = data.user.username;
-                    if (dropEmail) {
-                        dropEmail.textContent = data.user.email || 'Sin correo vinculado';
-                        dropEmail.style.color = data.user.email ? 'var(--gold-color)' : 'var(--text-muted)';
-                    }
-                    if (lblRole) {
-                        lblRole.textContent = data.user.role;
-                        lblRole.className = `badge-role ${data.user.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}`;
-                    }
-                    if (dropRole) {
-                        dropRole.textContent = data.user.role === 'admin' ? 'Administrador' : 'Usuario';
-                        dropRole.className = `dropdown-role-pill ${data.user.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}`;
-                    }
+                    renderMenuUsuario(data.user);
                 }
             }
             
@@ -325,8 +330,8 @@ export async function guardarEdicionUsuario(e) {
             }
             toast(data.mensaje || "Usuario actualizado exitosamente.", 'ok');
         } else {
-            const err = await res.json();
-            toast(err.detail || "Error al actualizar el usuario.", 'error');
+            const err = await res.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, "Error al actualizar el usuario."), 'error');
         }
     } catch (error) {
         toast("Error de conexión al guardar cambios.", 'error');
@@ -335,10 +340,33 @@ export async function guardarEdicionUsuario(e) {
 
 
 /**
- * Permite a un usuario estándar eliminar definitivamente su propia cuenta y todos sus datos.
- * Bloquea la acción para administradores del sistema.
+ * Muestra el campo de contraseña actual solo cuando la persona está cambiando su propia contraseña.
  */
-export async function solicitarEliminarMiCuenta() {
+export function actualizarCamposContrasena() {
+    const modal = document.getElementById('modal-editar-usuario');
+    const grupo = document.getElementById('group-edit-user-current-password');
+    const nueva = document.getElementById('edit-user-password');
+    if (!modal || !grupo || !nueva) return;
+    grupo.classList.toggle('hidden', !(modal.dataset.propio === '1' && nueva.value.length > 0));
+}
+
+
+/**
+ * Habilita el botón de eliminar cuenta solo cuando se escribe el nombre de usuario exacto.
+ */
+export function actualizarConfirmacionEliminarCuenta() {
+    const campo = document.getElementById('eliminar-cuenta-confirmar');
+    const boton = document.getElementById('btn-eliminar-cuenta-confirmar');
+    if (!campo || !boton || !estado.usuarioActual) return;
+    boton.disabled = campo.value.trim() !== estado.usuarioActual.username;
+}
+
+
+/**
+ * Permite a un usuario estándar eliminar definitivamente su propia cuenta y todos sus datos.
+ * Bloquea la acción para administradores del sistema y exige escribir el nombre de usuario.
+ */
+export async function eliminarMiCuenta() {
     if (!estado.usuarioActual) return;
 
     if (estado.usuarioActual.role === 'admin' || estado.usuarioActual.id === 1 || (estado.usuarioActual.username && estado.usuarioActual.username.toLowerCase() === 'admin')) {
@@ -346,12 +374,9 @@ export async function solicitarEliminarMiCuenta() {
         return;
     }
 
-    const confirm1 = confirm("ATENCIÓN: ¿Estás seguro de que deseas eliminar permanentemente tu cuenta?\n\nEsta acción es irreversible y eliminará de inmediato:\n• Tu usuario y credenciales de acceso.\n• Todos tus movimientos de caja y categorías.\n• Tus apartados y metas de ahorro.\n• Tu portafolio bursátil y cotizaciones.\n\n¿Deseas continuar?");
-    if (!confirm1) return;
-
-    const respuesta = prompt("Para confirmar la eliminación definitiva de tu cuenta y todos tus datos, escribe ELIMINAR:");
-    if (!respuesta || respuesta.trim().toUpperCase() !== "ELIMINAR") {
-        toast("Operación cancelada. Tu cuenta no ha sido modificada.", 'ok');
+    const campo = document.getElementById('eliminar-cuenta-confirmar');
+    if (!campo || campo.value.trim() !== estado.usuarioActual.username) {
+        toast("Escribe tu nombre de usuario para confirmar.", 'error');
         return;
     }
 
@@ -438,12 +463,19 @@ function filaUsuarioAdmin(u) {
     if (!esMismoAdmin) {
         itemsMenu.push(`<button type="button" class="admin-menu-item" role="menuitem" data-on-click='${accionDelegada(["cambiarEstadoUsuario", u.id, !u.is_active])}'>${u.is_active ? 'Suspender acceso' : 'Activar acceso'}</button>`);
     }
-    if (esPrincipal || esMismoAdmin) {
-        const motivo = esMismoAdmin ? 'No puedes eliminar tu propia cuenta' : 'La cuenta principal no se puede eliminar';
-        itemsMenu.push(`<p class="admin-menu-nota">${motivo}</p>`);
-    } else {
+    if (esPrincipal && !esMismoAdmin) {
+        itemsMenu.push(`<p class="admin-menu-nota">La cuenta principal no se puede eliminar</p>`);
+    } else if (!esPrincipal) {
         itemsMenu.push(`<button type="button" class="admin-menu-item admin-menu-peligro" role="menuitem" data-on-click='${accionDelegada(["eliminarUsuarioTenantPorId", u.id])}'>Eliminar usuario</button>`);
     }
+    // Tu propia fila no tiene acciones de menú: su cuenta se gestiona desde Mi perfil
+    const menuFila = esMismoAdmin || itemsMenu.length === 0 ? '' : `
+                <div class="admin-menu-wrap">
+                    <button type="button" class="admin-accion admin-accion-icono" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" aria-label="Más acciones para ${nombre}" data-on-click='${accionDelegada(["alternarMenuUsuario", u.id, "$this"])}'>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+                    </button>
+                    <div class="admin-menu" id="${menuId}" role="menu" hidden>${itemsMenu.join('')}</div>
+                </div>`;
 
     return `
         <tr data-usuario="${u.id}">
@@ -460,12 +492,7 @@ function filaUsuarioAdmin(u) {
             <td class="admin-celda-acciones" data-label="Acciones">
                 <button type="button" class="admin-accion" aria-expanded="false" aria-controls="${detalleId}" data-on-click='${accionDelegada(["alternarDetalleUsuario", u.id, "$this"])}'>Detalles</button>
                 <button type="button" class="admin-accion" data-on-click='${accionDelegada(["abrirModalEditarUsuarioPorId", u.id])}'>Editar</button>
-                <div class="admin-menu-wrap">
-                    <button type="button" class="admin-accion admin-accion-icono" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" aria-label="Más acciones para ${nombre}" data-on-click='${accionDelegada(["alternarMenuUsuario", u.id, "$this"])}'>
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-                    </button>
-                    <div class="admin-menu" id="${menuId}" role="menu" hidden>${itemsMenu.join('')}</div>
-                </div>
+                ${menuFila}
             </td>
         </tr>
         <tr class="admin-detalle" id="${detalleId}" hidden>
@@ -604,6 +631,8 @@ export async function eliminarUsuarioTenant(userId) {
 }
 
 Object.assign(window, {
+    actualizarCamposContrasena,
+    actualizarConfirmacionEliminarCuenta,
     abrirModalCrearUsuario,
     abrirModalEditarMiPerfil,
     abrirModalEditarUsuario,
@@ -621,5 +650,5 @@ Object.assign(window, {
     ordenarUsuariosAdmin,
     guardarEdicionUsuario,
     guardarNuevoUsuario,
-    solicitarEliminarMiCuenta
+    eliminarMiCuenta
 });

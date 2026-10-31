@@ -233,12 +233,36 @@ def test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha):
 def test_token_deja_de_valer_tras_cambiar_contrasena(client, ua):
     h = _login(client, "usuario_a")
     assert client.get("/api/resumen", headers=h).status_code == 200
-    r = client.patch("/auth/profile", json={"password": "NuevaClave#2026"}, headers=h)
+    r = client.patch("/auth/profile", json={"password": "NuevaClave#2026", "current_password": PASS}, headers=h)
     assert r.status_code == 200, r.text
     assert client.get("/api/resumen", headers=h).status_code == 401
     # El token que devuelve el propio cambio sí sirve
     nuevo = {"Authorization": f"Bearer {r.json()['new_token']}"}
     assert client.get("/api/resumen", headers=nuevo).status_code == 200
+
+
+def test_cambiar_contrasena_exige_la_actual_y_8_caracteres(client, hadmin):
+    _crear_usuario("usuario_pwd")
+    h = _login(client, "usuario_pwd")
+    nueva = "OtraClave#2026"
+    # Sin la actual, o con una equivocada, la contraseña no cambia
+    assert client.patch("/auth/profile", json={"password": nueva}, headers=h).status_code == 400
+    r = client.patch("/auth/profile", json={"password": nueva, "current_password": "equivocada"}, headers=h)
+    assert r.status_code == 400 and "actual" in r.json()["detail"], r.text
+    # Una nueva de menos de 8 caracteres se rechaza aunque la actual sea correcta
+    assert client.patch("/auth/profile", json={"password": "Corta#7", "current_password": PASS}, headers=h).status_code == 422
+    # Con la actual correcta sí cambia, y la nueva sirve para entrar
+    r = client.patch("/auth/profile", json={"password": nueva, "current_password": PASS}, headers=h)
+    assert r.status_code == 200, r.text
+    assert client.post("/auth/login", json={"username": "usuario_pwd", "password": nueva}).status_code == 200
+    # Cambiar solo el correo no pide contraseña
+    h2 = {"Authorization": f"Bearer {r.json()['new_token']}"}
+    assert client.patch("/auth/profile", json={"email": "pwd@test.local"}, headers=h2).status_code == 200
+    # Un admin que cambia su propia contraseña por el panel también debe confirmar la actual
+    admin_id = client.get("/auth/me", headers=hadmin).json()["user"]["id"]
+    assert client.patch(f"/admin/users/{admin_id}", json={"password": "AdminNueva#2026"}, headers=hadmin).status_code == 400
+    # Crear usuarios con menos de 8 caracteres también se rechaza
+    assert client.post("/admin/users", json={"username": "corta_pwd", "password": "1234567"}, headers=hadmin).status_code == 422
 
 
 def test_reset_no_revela_existencia_de_cuenta(client):
@@ -344,13 +368,16 @@ def test_msi_en_el_presupuesto_por_api(client, ha):
 
 
 def test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha):
+    hoy = date.today()
     r = client.post("/api/recurrentes", json={"descripcion": "Nómina prueba", "tipo": "ingreso", "frecuencia": "quincenal",
-                                              "monto": 9000, "fecha_inicio": "2026-10-15"}, headers=ha)
+                                              "monto": 9000, "fecha_inicio": hoy.isoformat()}, headers=ha)
     assert r.status_code == 201, r.text
     rid = r.json()["id"]
-    # Una fecha que no es 15 ni fin de mes se lleva al primer cobro de su quincena
-    r = client.patch(f"/api/recurrentes/{rid}", json={"proxima_fecha": "2026-10-30"}, headers=ha)
-    assert r.status_code == 200 and r.json()["proxima_fecha"] == "2026-10-31", r.text
+    # El día 20 del mes siguiente no es 15 ni fin de mes: se lleva al primer cobro de su quincena (fin de mes)
+    dia_20 = (hoy.replace(day=1) + timedelta(days=32)).replace(day=20)
+    fin_de_mes = (dia_20.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    r = client.patch(f"/api/recurrentes/{rid}", json={"proxima_fecha": dia_20.isoformat()}, headers=ha)
+    assert r.status_code == 200 and r.json()["proxima_fecha"] == fin_de_mes.isoformat(), r.text
     client.delete(f"/api/recurrentes/{rid}", headers=ha)
 
 
@@ -547,6 +574,7 @@ if __name__ == "__main__":
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
             (test_token_deja_de_valer_tras_cambiar_contrasena, lambda: test_token_deja_de_valer_tras_cambiar_contrasena(client, ua)),
+            (test_cambiar_contrasena_exige_la_actual_y_8_caracteres, lambda: test_cambiar_contrasena_exige_la_actual_y_8_caracteres(client, hadmin)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_api_aislamiento")

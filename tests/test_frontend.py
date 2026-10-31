@@ -643,6 +643,20 @@ def test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base):
         ctx.close()
 
 
+def test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        assert page.locator("#btn-dropdown-eliminar-cuenta").count() == 0, "eliminar cuenta vive solo en Mi perfil"
+        assert page.is_hidden("#lbl-user-role"), "el rol solo se muestra a administradores"
+        assert page.inner_text("#btn-modo").strip() in ("Modo oscuro", "Modo claro"), page.inner_text("#btn-modo")
+        page.keyboard.press("Escape")
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -677,6 +691,7 @@ if __name__ == "__main__":
                 (test_fallo_de_red_avisa_al_usuario, lambda: test_fallo_de_red_avisa_al_usuario(navegador, base)),
                 (test_403_de_permisos_no_cierra_la_sesion, lambda: test_403_de_permisos_no_cierra_la_sesion(navegador, base)),
                 (test_403_de_cuenta_desactivada_cierra_la_sesion, lambda: test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base)),
+                (test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin, lambda: test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

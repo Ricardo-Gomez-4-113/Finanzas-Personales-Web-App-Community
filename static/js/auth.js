@@ -4,6 +4,7 @@
 
 import { cargarDatosAdmin } from './admin.js';
 import { apiFetch, cargarTiposCambio, estado, recargar, toast } from './core.js';
+import { renderMenuUsuario } from './menu_usuario.js';
 import { cambiarPestana } from './ui.js';
 
 
@@ -110,37 +111,13 @@ export function establecerSesionActiva(user, token) {
         history.pushState(null, '', '#app');
     }
 
-    // Actualizar badges de usuario en el topbar y dropdown popover
-    const lblUser = document.getElementById('lbl-username');
-    const lblRole = document.getElementById('lbl-user-role');
-    const dropUser = document.getElementById('dropdown-user-name');
-    const dropRole = document.getElementById('dropdown-user-role');
-    const dropEmail = document.getElementById('dropdown-user-email');
-    if (lblUser) lblUser.textContent = user.username;
-    if (dropUser) dropUser.textContent = user.username;
-    if (dropEmail) {
-        dropEmail.textContent = user.email || 'Sin correo vinculado';
-        dropEmail.style.color = user.email ? 'var(--gold-color)' : 'var(--text-muted)';
-    }
-    if (lblRole) {
-        lblRole.textContent = user.role;
-        lblRole.className = `badge-role ${user.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}`;
-    }
-    if (dropRole) {
-        dropRole.textContent = user.role === 'admin' ? 'Administrador' : 'Usuario';
-        dropRole.className = `dropdown-role-pill ${user.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}`;
-    }
+    // Datos de la persona en el botón y el menú de usuario
+    renderMenuUsuario(user);
 
     // Pestaña de administración: visible estrictamente para rol admin
     const btnTabAdmin = document.getElementById('btn-tab-admin');
     if (btnTabAdmin) {
         btnTabAdmin.classList.toggle('hidden', !((user.role === 'admin')));
-    }
-
-    // Botón de eliminar mi cuenta en el dropdown: solo para usuarios que NO sean admin
-    const btnDropEliminar = document.getElementById('btn-dropdown-eliminar-cuenta');
-    if (btnDropEliminar) {
-        btnDropEliminar.classList.toggle('hidden', !((user.role !== 'admin')));
     }
 
     // Si un usuario no admin tiene guardada la pestaña admin, redirigir al resumen
@@ -407,8 +384,8 @@ export async function enviarRestablecerPassword(e) {
         toast('Ingresa el código numérico de 6 dígitos que te enviamos.', 'error');
         return;
     }
-    if (new_password.length < 4) {
-        toast('La nueva contraseña debe tener al menos 4 caracteres.', 'error');
+    if (new_password.length < 8) {
+        toast('La nueva contraseña debe tener al menos 8 caracteres.', 'error');
         return;
     }
     if (new_password !== confirm_password) {

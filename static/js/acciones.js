@@ -3,7 +3,7 @@
 // Los argumentos "$this", "$event", "$value" y "$checked" se sustituyen por el elemento, el evento
 // y su valor o estado. Flags: data-prevent (preventDefault) y data-solo-fondo (solo si el clic es en el propio elemento).
 
-const EVENTOS = ['click', 'change', 'submit'];
+const EVENTOS = ['click', 'change', 'submit', 'input'];
 
 function resolverArgumento(valor, el, ev) {
     switch (valor) {

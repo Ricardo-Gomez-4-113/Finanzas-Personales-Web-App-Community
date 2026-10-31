@@ -30,7 +30,7 @@ class LoginRequest(BaseModel):
 
 class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Nombre de usuario alfanumérico")
-    password: str = Field(..., min_length=4, max_length=72, description="Contraseña de acceso")
+    password: str = Field(..., min_length=8, max_length=72, description="Contraseña de acceso (mínimo 8 caracteres)")
     role: Literal['admin', 'user'] = Field('user', description="Rol del usuario: 'admin' o 'user'")
     email: Optional[str] = Field(None, max_length=120, description="Correo electrónico para recuperación de contraseña")
 
@@ -41,7 +41,8 @@ class UserStatusRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Nuevo nombre de usuario")
-    password: Optional[str] = Field(None, min_length=4, max_length=72, description="Nueva contraseña (dejar en blanco para no cambiar)")
+    password: Optional[str] = Field(None, min_length=8, max_length=72, description="Nueva contraseña, mínimo 8 caracteres (dejar en blanco para no cambiar)")
+    current_password: Optional[str] = Field(None, max_length=72, description="Contraseña actual: obligatoria para cambiar la propia contraseña")
     role: Optional[Literal['admin', 'user']] = Field(None, description="Rol del usuario: 'admin' o 'user'")
     email: Optional[str] = Field(None, max_length=120, description="Correo electrónico del usuario")
 
@@ -53,7 +54,18 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     identifier: str = Field(..., min_length=2, max_length=120, description="Nombre de usuario o correo electrónico")
     code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="Código numérico de 6 dígitos")
-    new_password: str = Field(..., min_length=4, max_length=72, description="Nueva contraseña")
+    new_password: str = Field(..., min_length=8, max_length=72, description="Nueva contraseña (mínimo 8 caracteres)")
+
+
+def exigir_contrasena_actual(user_id: int, contrasena_actual: Optional[str]) -> None:
+    """Cambiar la propia contraseña exige la actual. Los intentos fallidos comparten el control de tasa del login."""
+    clave_tasa = f"perfil:{user_id}"
+    verificar_tasa_login(clave_tasa)
+    usuario = master_db.get_user_by_id(user_id)
+    if not contrasena_actual or not usuario or not verify_password(contrasena_actual, usuario["password_hash"]):
+        registrar_fallo_login(clave_tasa)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual no es correcta.")
+    limpiar_fallos_login(clave_tasa)
 
 
 # =============================================================================
@@ -125,6 +137,8 @@ def editar_mi_perfil(req: UserUpdateRequest, current_user: Dict[str, Any] = Depe
     """
     user_id = current_user["id"]
     pwd_hash = hash_password(req.password) if (req.password and req.password.strip()) else None
+    if pwd_hash:
+        exigir_contrasena_actual(user_id, req.current_password)
 
     try:
         user_actualizado = master_db.update_user(

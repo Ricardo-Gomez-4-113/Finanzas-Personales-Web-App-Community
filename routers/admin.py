@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, Any
 
 import master_db
-from routers.auth import UserUpdateRequest
+from routers.auth import UserUpdateRequest, exigir_contrasena_actual
 from finanzas_core import ahora_local
 from security import (
     claims_sesion,
@@ -19,7 +19,7 @@ router = APIRouter()
 
 class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Nombre de usuario alfanumérico")
-    password: str = Field(..., min_length=4, max_length=72, description="Contraseña de acceso")
+    password: str = Field(..., min_length=8, max_length=72, description="Contraseña de acceso (mínimo 8 caracteres)")
     role: Literal['admin', 'user'] = Field('user', description="Rol del usuario: 'admin' o 'user'")
     email: Optional[str] = Field(None, max_length=120, description="Correo electrónico para recuperación de contraseña")
 
@@ -121,6 +121,9 @@ def admin_editar_usuario(user_id: int, req: UserUpdateRequest, admin: Dict[str, 
             )
 
     pwd_hash = hash_password(req.password) if (req.password and req.password.strip()) else None
+    # Un admin que cambia su propia contraseña por este camino también debe confirmar la actual
+    if pwd_hash and user_id == admin["id"]:
+        exigir_contrasena_actual(user_id, req.current_password)
 
     try:
         user_actualizado = master_db.update_user(
