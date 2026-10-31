@@ -13,7 +13,7 @@ import sqlite3
 import sys
 import tempfile
 import time
-from datetime import timedelta
+from datetime import date, timedelta
 
 try:
     import httpx  # noqa: F401
@@ -355,13 +355,17 @@ def test_fijo_quincenal_editado_cae_en_dia_15_o_fin_de_mes(client, ha):
 
 
 def test_cambiar_a_quincenal_sin_fecha_reancla_el_proximo_cargo(client, ha):
+    hoy = date.today()
     r = client.post("/api/recurrentes", json={"descripcion": "Ingreso mensual prueba", "tipo": "ingreso", "frecuencia": "mensual",
-                                              "monto": 300, "fecha_inicio": "2026-10-30"}, headers=ha)
+                                              "monto": 300, "fecha_inicio": hoy.isoformat()}, headers=ha)
     assert r.status_code == 201, r.text
     rid = r.json()["id"]
-    # Sin nueva fecha, el cambio a quincenal lleva el próximo cargo al día 15 o fin de mes: el 30 pasa al 31
+    # Sin nueva fecha, el cambio a quincenal lleva el próximo cargo al día 15 o fin de mes, nunca antes de hoy
     r = client.patch(f"/api/recurrentes/{rid}", json={"frecuencia": "quincenal"}, headers=ha)
-    assert r.status_code == 200 and r.json()["proxima_fecha"] == "2026-10-31", r.text
+    assert r.status_code == 200, r.text
+    prox = date.fromisoformat(r.json()["proxima_fecha"])
+    es_fin_de_mes = (prox + timedelta(days=1)).day == 1
+    assert prox >= hoy and (prox.day == 15 or es_fin_de_mes), r.text
     client.delete(f"/api/recurrentes/{rid}", headers=ha)
 
 
