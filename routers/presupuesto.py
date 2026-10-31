@@ -37,6 +37,14 @@ class SubperiodoItem(BaseModel):
     porcentaje: float = Field(..., ge=0, le=100)
 
 
+class DistribucionSubperiodo(BaseModel):
+    id: Optional[str] = Field(None, max_length=50)
+    nombre: Optional[str] = Field(None, max_length=60)
+    monto: float = Field(0.0, ge=0, le=1e12)
+    porcentaje: Optional[float] = Field(None, ge=0, le=100)
+    dia: Optional[int] = Field(None, ge=1, le=31)
+
+
 class ConfigPresupuestoUpdate(BaseModel):
     ingreso_base: float = Field(..., ge=0, le=1e12, description="Monto del ingreso fijo por periodo")
     frecuencia: Literal['semanal', 'quincenal', 'mensual'] = Field(..., description="Frecuencia del ingreso")
@@ -54,7 +62,7 @@ class TarjetaPresupuestoCreate(BaseModel):
     monto: Optional[float] = Field(None, ge=0, le=1e12)
     notas: Optional[str] = Field("", max_length=255)
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
-    distribucion_subperiodos: Optional[List[dict]] = None
+    distribucion_subperiodos: Optional[List[DistribucionSubperiodo]] = None
     unidad_orden: int = Field(..., ge=1, le=4, description="Pago al que pertenece la tarjeta (1 a 4)")
     tipo: Literal['normal', 'msi'] = 'normal'
     msi_cuotas: Optional[int] = Field(None, ge=2, le=60, description="Plazo de la compra a meses (solo tipo msi)")
@@ -73,7 +81,7 @@ class TarjetaPresupuestoUpdate(BaseModel):
     notas: Optional[str] = Field(None, max_length=255)
     orden: Optional[int] = None
     dia_pago: Optional[int] = Field(None, ge=1, le=31, description="Día del mes programado para el cargo general (1 a 31)")
-    distribucion_subperiodos: Optional[List[dict]] = None
+    distribucion_subperiodos: Optional[List[DistribucionSubperiodo]] = None
     tipo: Optional[Literal['normal', 'msi']] = None
     msi_cuotas: Optional[int] = Field(None, ge=2, le=60)
 
@@ -449,7 +457,7 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     # Normalizar distribucion_subperiodos y sincronizar dia_pago si es de un solo sub-período activo
     dist_list = None
     if req.distribucion_subperiodos:
-        dist_list = [dict(x) for x in req.distribucion_subperiodos]
+        dist_list = [x.model_dump(exclude_unset=True) for x in req.distribucion_subperiodos]
         positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
         for sp in dist_list:
             if float(sp.get("monto", 0.0) or 0.0) <= 0:
@@ -508,7 +516,7 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
     dia_efectivo = req.dia_pago if "dia_pago" in req.model_fields_set else fila["dia_pago"]
 
     if "distribucion_subperiodos" in req.model_fields_set and not es_pago:
-        dist_list = [dict(x) for x in req.distribucion_subperiodos] if req.distribucion_subperiodos else None
+        dist_list = [x.model_dump(exclude_unset=True) for x in req.distribucion_subperiodos] if req.distribucion_subperiodos else None
         if dist_list:
             positivos = [sp for sp in dist_list if float(sp.get("monto", 0.0) or 0.0) > 0]
             for sp in dist_list:

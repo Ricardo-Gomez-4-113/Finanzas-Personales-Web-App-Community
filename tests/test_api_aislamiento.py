@@ -461,6 +461,18 @@ def test_arranque_define_la_ruta_de_clave_inicial(client):
     assert main.DATA_DIR == database.DATA_DIR
 
 
+def test_distribucion_subperiodos_se_valida_al_guardar(client, ha):
+    """Un monto no numérico o un porcentaje fuera de rango no se guarda: rompería la lectura del presupuesto."""
+    base = {"nombre": "Distribucion prueba", "unidad_orden": 1, "monto": 0}
+    r = client.post("/api/presupuesto/tarjetas", json={**base, "distribucion_subperiodos": [{"monto": "abc"}]}, headers=ha)
+    assert r.status_code == 422, r.text
+    r = client.post("/api/presupuesto/tarjetas", json={**base, "distribucion_subperiodos": [{"porcentaje": 120}]}, headers=ha)
+    assert r.status_code == 422, r.text
+    r = client.post("/api/presupuesto/tarjetas", json={**base, "distribucion_subperiodos": [{"id": "q1", "nombre": "Q1", "monto": 0, "dia": 5}]}, headers=ha)
+    assert r.status_code == 201, r.text
+    client.delete(f"/api/presupuesto/tarjetas/{r.json()['id']}", headers=ha)
+
+
 def test_tenant_sin_db_name_falla_cerrado():
     """Sin db_name en la sesión la dependencia debe fallar, nunca abrir la base del admin (user_1.db)."""
     gen = security.get_tenant_db({"id": 2, "sub": "2"})
@@ -498,6 +510,7 @@ if __name__ == "__main__":
             (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
+            (test_distribucion_subperiodos_se_valida_al_guardar, lambda: test_distribucion_subperiodos_se_valida_al_guardar(client, ha)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
