@@ -66,6 +66,20 @@ Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraci
 - **Fase 2, frontend:** hecho: `apiFetch` cierra sesión solo con 401 o con 403 de cuenta desactivada o suspendida, y avisa con un toast cuando no hay conexión; `leerJson` en `core.js` muestra el motivo del servidor cuando una carga falla (dashboard, movimientos y apartados); colores literales sustituidos por tokens (`--overlay-scrim`, `--chart-label`); la marca del sidebar se ve completa en dos líneas; el placeholder del ticker ya no sale en mayúsculas; el ticker se codifica en la URL de cotización. Revisión visual con capturas de login, resumen, movimientos, inversiones y presupuesto, en claro, oscuro y móvil. Auditoría de `innerHTML` con inventario de todas las interpolaciones: los datos del usuario pasan por `escapeHTML` y el resto son valores fijos, numéricos o construidos en el propio módulo. Pruebas de Playwright para el fallo de red y para el 403 de permisos y de cuenta desactivada (22 pruebas en total). Pendiente: ninguno bloqueante; la auditoría es estática y no sustituye una revisión de seguridad externa.
 - **Fase 3, visual:** aplicado: cabeceras del sidebar y de la barra superior a 60 px (la barra encogía por flexbox); desvanecido en la cinta de periodos en móvil; porcentajes del donut de inversiones solo en rebanadas de 10 % o más (el resto se lee en la leyenda). Descartado: ajustar el espacio del FAB, porque el contenido móvil ya tiene 88 px de padding inferior y el botón se oculta al bajar. Comprobado: `tabular-nums` en las cifras del hero. Cierre de la exploración manual: importes grandes en una línea en móvil; título de la barra en dos líneas en móvil (sin puntos suspensivos); selector de moneda sin «($)»; invitación a registrar el primer movimiento cuando no hay datos; área táctil de 44 px en botones de fila y pestañas en móvil (el tamaño visible no cambia). El foco de teclado ya es visible: el contorno dorado de 2 px.
 
+## Plan restante
+
+Orden de ejecución; la Fase 6 es el último paso.
+
+- **Antes de la Fase 6 (con decisión del usuario):** política de conflicto entre dos pestañas (aviso si el dato cambió, con columna de versión y migración nueva) y destino del endpoint desactivado `importar-fijos`.
+- **Fase 6, sistema de log (último paso):** registrar los fallos para revisarlos y alimentar las pruebas de versiones futuras. Diseño propuesto, por confirmar al empezar:
+  - Backend: módulo `logs` con `logging` estándar, archivo rotativo en `data/logs/` y salida JSON por línea (marca de tiempo, nivel, ruta, método, estado, `id_peticion`, usuario como id numérico, duración, excepción con traza). Middleware que asigna `id_peticion` y registra toda respuesta 5xx y las 4xx relevantes (401/403 repetidos).
+  - Qué no se registra: contraseñas, tokens, cuerpos de petición ni importes; solo identificadores y códigos de estado.
+  - Frontend: captura de `window.onerror`, promesas rechazadas y fallos de `apiFetch`, enviados a un endpoint de reporte con límite de frecuencia y tamaño; el mismo `id_peticion` enlaza el fallo del navegador con el del servidor.
+  - Revisión: script `tests/ver_logs.sh` (o similar) que resume por tipo de fallo y ruta, y las suites de pruebas dejan sus logs en una carpeta fácil de abrir cuando algo falla.
+  - Operación: rotación y retención acotadas para no llenar el disco; el log nunca debe romper una petición (fallar en silencio hacia stderr).
+  - Pruebas: un fallo provocado queda en el log con su `id_peticion`, no aparece ningún dato sensible, y el log sigue funcionando con la carpeta sin permisos.
+  - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
+
 ## Criterio de hecho
 
 Un cambio está terminado cuando:
