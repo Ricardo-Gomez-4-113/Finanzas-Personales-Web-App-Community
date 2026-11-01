@@ -332,6 +332,39 @@ def test_edicion_sin_version_conserva_la_ultima_escritura(client):
     assert final["monto"] == 175, final
 
 
+def test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client):
+    """Otra conexión cambia el movimiento justo después de leerlo: el UPDATE no pisa y responde 409 (cláusula AND version = ?)."""
+    import database
+    import routers.movimientos as rmovimientos
+
+    usuario = _crear_usuario("ruta_carrera")
+    h = _login(client, "ruta_carrera")
+    assert client.post("/api/transacciones", json={"fecha": "2026-10-03", "monto": 500, "tipo": "ingreso", "categoria_id": 12, "descripcion": "ingreso-carrera"}, headers=h).status_code in (200, 201)
+    mov = next(t for t in client.get("/api/transacciones", headers=h).json() if t["descripcion"] == "ingreso-carrera")
+
+    # validar_edicion_transaccion se llama entre la lectura de la versión y el UPDATE, solo en ingresos
+    original = rmovimientos.validar_edicion_transaccion
+
+    def otra_conexion_guarda_antes(*args, **kwargs):
+        resultado = original(*args, **kwargs)
+        conexion = sqlite3.connect(database.get_tenant_path_by_id(usuario["id"]))
+        try:
+            conexion.execute("UPDATE transacciones SET version = version + 1 WHERE id = ?", (mov["id"],))
+            conexion.commit()
+        finally:
+            conexion.close()
+        return resultado
+
+    rmovimientos.validar_edicion_transaccion = otra_conexion_guarda_antes
+    try:
+        r = client.put(f"/api/transacciones/{mov['id']}", json={"descripcion": "guardado-tardio", "version_esperada": mov["version"]}, headers=h)
+    finally:
+        rmovimientos.validar_edicion_transaccion = original
+    assert r.status_code == 409, r.text
+    tras = next(t for t in client.get("/api/transacciones", headers=h).json() if t["id"] == mov["id"])
+    assert tras["descripcion"] == "ingreso-carrera", tras
+    assert tras["version"] == mov["version"] + 1, tras
+
 
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -356,6 +389,7 @@ if __name__ == "__main__":
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
+            (test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409, lambda: test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client)),
             (test_salud_lee_la_antiguedad_del_ultimo_respaldo, lambda: test_salud_lee_la_antiguedad_del_ultimo_respaldo(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
         ]

@@ -28,6 +28,7 @@ from security import (
     hash_password
 )
 from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico
+from limite_cuerpo import LimiteTamanoCuerpo
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -130,6 +131,9 @@ async def add_security_and_cache_headers(request: Request, call_next):
     """Agrega cabeceras de seguridad HTTP (HSTS, CSP, nosniff, etc.) y políticas anti-caché."""
     response = await call_next(request)
     return _aplicar_cabeceras(response, request.url.path, _es_https(request))
+
+# Es el middleware más externo: rechaza el cuerpo antes de que cualquier otro lo lea
+app.add_middleware(LimiteTamanoCuerpo)
 
 @app.exception_handler(Exception)
 async def manejar_error_inesperado(request: Request, exc: Exception):

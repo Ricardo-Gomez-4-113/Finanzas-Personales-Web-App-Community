@@ -272,7 +272,10 @@ def test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada():
     _vaciar_contadores()
     cliente = TestClient(app, client=("127.0.0.1", 50030))
     antes = len(security._intentos_fallidos_login)
+    # 5 MB: lo corta el tope del cuerpo antes de validar; 100 KB: entra en el tope y lo rechaza la validación
     r = cliente.post("/auth/login", json={"username": "u" * 5_000_000, "password": "x"})
+    assert r.status_code == 413, r.status_code
+    r = cliente.post("/auth/login", json={"username": "u" * 100_000, "password": "x"})
     assert r.status_code == 422, r.status_code
     assert len(r.content) < 10_000, f"el 422 repite el valor enviado: {len(r.content)} bytes"
     r = cliente.post("/auth/login", json={"username": "seg_largo", "password": "x" * 73})

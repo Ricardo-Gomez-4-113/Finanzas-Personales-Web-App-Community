@@ -121,6 +121,7 @@ Finanzas-Personales-Web-App-Community/
 ├── database.py          # Esquema por tenant, migraciones versionadas (v1–v12) y conexión por petición
 ├── master_db.py         # Base maestra (usuarios, OTP y estadísticas admin)
 ├── security.py          # bcrypt, JWT, dependencias verify_token/verify_admin y freno anti fuerza bruta
+├── limite_cuerpo.py     # Tope del tamaño del cuerpo por petición (256 KB; 50 MB en /api/restore)
 ├── export_service.py    # Reporte Excel (.xlsx) con hojas de resumen, movimientos, inversiones, fijos y rendimientos
 ├── email_service.py     # Correos transaccionales (API o SMTP)
 ├── test_finanzas.py     # Pruebas de la lógica financiera (sin dependencias)
