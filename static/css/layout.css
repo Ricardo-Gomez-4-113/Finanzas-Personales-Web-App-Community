@@ -293,6 +293,11 @@
     padding: 12px 0;
 }
 
+/* Con el menú colapsado el icono se queda centrado: el desplazamiento del cursor lo corría 2 px */
+.app-sidebar.sidebar-collapsed .sidebar-nav .tab-btn:hover .nav-svg-icon {
+    transform: none;
+}
+
 /* Contenedor Principal (Wrapper Derecho) */
 .app-main-wrapper {
     flex: 1;

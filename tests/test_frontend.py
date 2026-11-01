@@ -1077,6 +1077,26 @@ def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
         ctx.close()
 
 
+def test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base):
+    """Con el menú colapsado, el icono sigue centrado cuando el cursor está encima (antes se corría y se agrandaba)."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.click("#btn-sidebar-collapse")
+        page.wait_for_selector("#app-sidebar.sidebar-collapsed")
+        page.hover("[data-tab='tab-dashboard']")
+        page.wait_for_timeout(350)  # la transición del icono dura 0,2 s
+        centro = page.evaluate("""() => {
+            const boton = document.querySelector('[data-tab="tab-dashboard"]').getBoundingClientRect();
+            const icono = document.querySelector('[data-tab="tab-dashboard"] .nav-svg-icon').getBoundingClientRect();
+            return {boton: boton.x + boton.width / 2, icono: icono.x + icono.width / 2};
+        }""")
+        assert abs(centro["boton"] - centro["icono"]) < 0.5, centro
+        assert not errores, "errores de JS:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1128,6 +1148,7 @@ if __name__ == "__main__":
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
+                (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
