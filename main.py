@@ -10,6 +10,7 @@ Este módulo implementa:
 """
 
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import os
@@ -93,6 +94,12 @@ app.include_router(recurrentes.router)
 app.include_router(presupuesto.router)
 app.include_router(salud.router)
 app.include_router(diagnostico.router)
+
+@app.exception_handler(RequestValidationError)
+async def errores_de_validacion(request: Request, exc: RequestValidationError):
+    """Un 422 describe el error sin repetir el valor enviado: un campo de varios MB no vuelve en la respuesta."""
+    errores = [{"loc": error.get("loc"), "msg": error.get("msg"), "type": error.get("type")} for error in exc.errors()]
+    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": errores})
 
 @app.exception_handler(sqlite3.OperationalError)
 async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):

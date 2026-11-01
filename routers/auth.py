@@ -26,8 +26,9 @@ from finanzas_core import ahora_local
 router = APIRouter()
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1, description="Nombre de usuario")
-    password: str = Field(..., min_length=1, description="Contraseña en texto plano")
+    # Mismos límites que el alta: lo que no puede existir se rechaza antes de tocar el contador o bcrypt
+    username: str = Field(..., min_length=1, max_length=50, description="Nombre de usuario")
+    password: str = Field(..., min_length=1, max_length=72, description="Contraseña en texto plano")
 
 
 class UserCreateRequest(BaseModel):

@@ -267,6 +267,21 @@ def test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta():
     _vaciar_contadores()
 
 
+def test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada():
+    """Un usuario o una contraseña mayores que los límites del alta se rechazan antes de tocar el contador."""
+    _vaciar_contadores()
+    cliente = TestClient(app, client=("127.0.0.1", 50030))
+    antes = len(security._intentos_fallidos_login)
+    r = cliente.post("/auth/login", json={"username": "u" * 5_000_000, "password": "x"})
+    assert r.status_code == 422, r.status_code
+    assert len(r.content) < 10_000, f"el 422 repite el valor enviado: {len(r.content)} bytes"
+    r = cliente.post("/auth/login", json={"username": "seg_largo", "password": "x" * 73})
+    assert r.status_code == 422, r.status_code
+    assert len(security._intentos_fallidos_login) == antes, "un campo fuera de límite no debe crear entradas en el contador"
+    assert max((len(k) for k in security._intentos_fallidos_login), default=0) < 1000
+    _vaciar_contadores()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -281,6 +296,7 @@ if __name__ == "__main__":
         (test_codigo_de_recuperacion_no_se_adivina_desde_varias_ips, test_codigo_de_recuperacion_no_se_adivina_desde_varias_ips),
         (test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion, test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion),
         (test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta, test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta),
+        (test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada, test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")
