@@ -6,7 +6,7 @@ try:
     from fastapi import Query
 except ImportError:
     def Query(default=None, *a, **kw): return default
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional, List
 import re
 import sqlite3
@@ -26,6 +26,7 @@ from finanzas_core import (
     validar_eliminacion_transaccion,
     validar_edicion_transaccion,
     validar_limite_cargos_ventana,
+    validar_fecha_operativa,
     obtener_total_apartados,
 )
 from mercado import obtener_tasas_cambio, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
@@ -46,6 +47,11 @@ class Transaccion(BaseModel):
     tipo: Literal['gasto', 'ingreso'] = Field(..., description="Tipo de movimiento")
     categoria_id: Optional[int] = Field(1, description="ID de categoría")
     descripcion: Optional[str] = Field(None, max_length=255, description="Concepto o detalle")
+
+    @field_validator("fecha")
+    @classmethod
+    def _fecha_real(cls, v: str) -> str:
+        return validar_fecha_operativa(v)
 
 
 class CategoriaCreate(BaseModel):
@@ -75,6 +81,11 @@ class TransaccionUpdate(BaseModel):
     descripcion: Optional[str] = Field(None, max_length=255)
     # Versión con la que el formulario abrió el movimiento. Si ya no coincide, otra pestaña lo cambió antes.
     version_esperada: Optional[int] = None
+
+    @field_validator("fecha")
+    @classmethod
+    def _fecha_real(cls, v: Optional[str]) -> Optional[str]:
+        return validar_fecha_operativa(v) if v is not None else v
 
 
 # =============================================================================
@@ -259,8 +270,7 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
 
     try:
         if trans["apartado_id"] is None:
-            if trans["tipo"] == 'ingreso' or nuevo_tipo == 'ingreso':
-                validar_edicion_transaccion(cursor, id_transaccion, nueva_fecha, nuevo_monto, nuevo_tipo)
+            validar_edicion_transaccion(cursor, id_transaccion, nueva_fecha, nuevo_monto, nuevo_tipo)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

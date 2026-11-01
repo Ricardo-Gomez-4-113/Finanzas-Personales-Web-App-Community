@@ -18,6 +18,7 @@ from finanzas_core import (
     calcular_fecha_inicio_exportacion,
     exportar_presupuesto_a_fijos_core,
     materializar_recurrentes,
+    NOMINA_PRESUPUESTO,
     ahora_local,
     unidades_activas,
     validar_dias_unidades,
@@ -314,12 +315,12 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
             monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
             cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (monto_recalc, t_id))
 
-    # Sincronizar nómina en recurrentes si existe
+    # Sincronizar la nómina del presupuesto, si existe. Un ingreso hecho a mano no se toca aunque diga "nómina"
     rec_nomina = cursor.execute("""
         SELECT id, dia FROM recurrentes
-        WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%')
+        WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
         LIMIT 1
-    """).fetchone()
+    """, (NOMINA_PRESUPUESTO,)).fetchone()
     if rec_nomina:
         dia_fijo = dia_pago if dia_pago is not None else rec_nomina["dia"]
         cursor.execute("""

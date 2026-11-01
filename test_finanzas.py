@@ -1234,11 +1234,22 @@ def test_edicion_transaccion_no_aumenta_gasto_permite_guardar_aunque_periodo_sup
     t2_mod = cur.execute("SELECT monto FROM transacciones WHERE id = ?", (id_t2,)).fetchone()
     assert t2_mod["monto"] == 1000.0
 
-    # Editar fecha y monto individualmente (ej. mover fecha al día 20 con nuevo monto 1500) debe permitirse
-    actualizar_transaccion(id_t2, TransaccionUpdate(fecha="2026-11-20", monto=1500.0), conn=conn)
+    # Posponer el gasto (mover la fecha al día 20 con el mismo monto) debe permitirse
+    actualizar_transaccion(id_t2, TransaccionUpdate(fecha="2026-11-20"), conn=conn)
     t2_mod2 = cur.execute("SELECT fecha, monto FROM transacciones WHERE id = ?", (id_t2,)).fetchone()
     assert t2_mod2["fecha"] == "2026-11-20"
-    assert t2_mod2["monto"] == 1500.0
+    assert t2_mod2["monto"] == 1000.0
+
+    # Subirlo sí se rechaza: no hay ingresos registrados que lo respalden (la nómina solo está programada),
+    # y crear ese gasto con ese saldo tampoco se permitiría
+    from fastapi import HTTPException
+    try:
+        actualizar_transaccion(id_t2, TransaccionUpdate(monto=1500.0), conn=conn)
+    except HTTPException as e:
+        assert e.status_code == 422 and "Fondos insuficientes" in e.detail, (e.status_code, e.detail)
+    else:
+        raise AssertionError("subir un gasto sin saldo no debe guardarse")
+    assert cur.execute("SELECT monto FROM transacciones WHERE id = ?", (id_t2,)).fetchone()["monto"] == 1000.0
 
     # Editar descripción de id_t1 manteniendo el monto debe permitirse
     actualizar_transaccion(id_t1, TransaccionUpdate(descripcion="Renta Depto"), conn=conn)
@@ -2515,6 +2526,114 @@ def test_portafolio_en_eur_se_valua_con_su_tasa():
         pass
     else:
         raise AssertionError("un portafolio en EUR sin tasa no debe valuarse en silencio")
+
+
+def test_fecha_imposible_se_rechaza_al_crear_y_editar_movimientos():
+    # Una fecha como 2026-11-31 pasaba el patrón y rompía /api/resumen (500) en cada carga
+    from pydantic import ValidationError
+    from routers.movimientos import Transaccion, TransaccionUpdate
+    for fecha in ("2026-11-31", "2026-02-30", "2027-02-29", "9999-01-01", "1999-12-31", "2101-01-01"):
+        for construir in (
+            lambda f: Transaccion(fecha=f, monto=100.0, tipo='ingreso'),
+            lambda f: Transaccion(fecha=f, monto=100.0, tipo='gasto'),
+            lambda f: TransaccionUpdate(fecha=f),
+        ):
+            try:
+                construir(fecha)
+            except ValidationError:
+                pass
+            else:
+                raise AssertionError(f"la fecha {fecha} no debe aceptarse")
+    # Los bordes válidos siguen pasando
+    for fecha in ("2000-01-01", "2028-02-29", "2100-12-31"):
+        Transaccion(fecha=fecha, monto=100.0, tipo='gasto')
+        TransaccionUpdate(fecha=fecha)
+
+
+def test_editar_gasto_no_puede_sobregirar_el_saldo():
+    # Crear un gasto sin saldo se rechazaba, pero editar uno existente a un monto enorme pasaba (balance -49 000)
+    from fastapi import HTTPException
+    from routers.movimientos import actualizar_transaccion, TransaccionUpdate
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-05', 1000.0, 'ingreso', 'Sueldo', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-10', 100.0, 'gasto', 'Súper', 1)")
+    id_g = cur.lastrowid
+    conn.commit()
+
+    def fila():
+        return cur.execute("SELECT monto, fecha, descripcion FROM transacciones WHERE id = ?", (id_g,)).fetchone()
+
+    def rechaza(**campos):
+        antes = tuple(fila())
+        try:
+            actualizar_transaccion(id_g, TransaccionUpdate(**campos), conn=conn)
+        except HTTPException as e:
+            assert e.status_code == 422 and "Fondos insuficientes" in e.detail, (campos, e.status_code, e.detail)
+        else:
+            raise AssertionError(f"debía rechazarse {campos}")
+        assert tuple(fila()) == antes, "un cambio rechazado no debe guardarse"
+
+    rechaza(monto=50000.0)
+    rechaza(monto=1000.01)                    # un centavo por encima del saldo
+    rechaza(fecha="2026-10-01")               # adelantado a antes de cobrar el sueldo
+    rechaza(monto=2000.0, fecha="2026-10-01")
+
+    # Lo que no empeora el saldo, o lo deja en cero o más, se guarda
+    actualizar_transaccion(id_g, TransaccionUpdate(monto=1000.0), conn=conn)   # saldo exacto en cero
+    assert fila()["monto"] == 1000.0
+    actualizar_transaccion(id_g, TransaccionUpdate(monto=400.0), conn=conn)    # bajar el monto
+    actualizar_transaccion(id_g, TransaccionUpdate(fecha="2026-10-20"), conn=conn)  # posponer
+    actualizar_transaccion(id_g, TransaccionUpdate(fecha="2026-10-06"), conn=conn)  # adelantar, pero con saldo
+    actualizar_transaccion(id_g, TransaccionUpdate(descripcion="Súper de la semana"), conn=conn)
+    assert (fila()["monto"], fila()["fecha"], fila()["descripcion"]) == (400.0, "2026-10-06", "Súper de la semana")
+
+    # Con un saldo ya negativo (datos anteriores) una edición inocua no se bloquea, pero subir el gasto sí
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-07', 5000.0, 'gasto', 'Antiguo', 1)")
+    id_g = cur.lastrowid
+    conn.commit()
+    actualizar_transaccion(id_g, TransaccionUpdate(descripcion="Antiguo corregido"), conn=conn)
+    actualizar_transaccion(id_g, TransaccionUpdate(monto=4000.0), conn=conn)
+    rechaza(monto=4000.5)
+
+
+def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
+    # Antes, cualquier ingreso fijo con "nómina" en el nombre se reescribía con la configuración del presupuesto
+    from routers.presupuesto import update_config_presupuesto, ConfigPresupuestoUpdate
+    from finanzas_core import NOMINA_PRESUPUESTO, obtener_ventana_corte_fecha
+    conn = nueva_bd()
+    cur = conn.cursor()
+    for desc, monto, frec, dia, prox in (
+        ('Nómina de mi pareja', 5000.0, 'mensual', 1, '2026-11-01'),
+        ('Sueldo', 30000.0, 'mensual', 5, '2026-11-05'),
+        (NOMINA_PRESUPUESTO, 10000.0, 'mensual', 15, '2026-11-15'),
+    ):
+        cur.execute(
+            "INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo) VALUES (?, 'ingreso', ?, ?, ?, ?, 1)",
+            (desc, monto, frec, dia, prox),
+        )
+    conn.commit()
+
+    def estado():
+        return {r["descripcion"]: (r["monto"], r["frecuencia"]) for r in cur.execute("SELECT * FROM recurrentes").fetchall()}
+
+    update_config_presupuesto(ConfigPresupuestoUpdate(ingreso_base=12000.0, frecuencia='quincenal', dia_pago=15), conn)
+    assert estado() == {
+        'Nómina de mi pareja': (5000.0, 'mensual'),
+        'Sueldo': (30000.0, 'mensual'),
+        NOMINA_PRESUPUESTO: (12000.0, 'quincenal'),
+    }, estado()
+
+    # Registrar un gasto consulta la ventana de cobro: tampoco puede reescribir ingresos hechos a mano
+    cur.execute("UPDATE presupuesto_config SET ingreso_base = 9000.0, frecuencia = 'mensual' WHERE id = 1")
+    conn.commit()
+    obtener_ventana_corte_fecha(cur, '2026-11-20')
+    conn.commit()
+    assert estado() == {
+        'Nómina de mi pareja': (5000.0, 'mensual'),
+        'Sueldo': (30000.0, 'mensual'),
+        NOMINA_PRESUPUESTO: (9000.0, 'mensual'),
+    }, estado()
 
 
 if __name__ == '__main__':

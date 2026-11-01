@@ -535,13 +535,11 @@ def validar_saldo_disponible_fecha(
     Invariante: Saldo Disponible Operativo(T) >= 0 para toda fecha T.
     Saldo Disponible Operativo = Saldo en Cuenta (externo) - sum(Apartados Activos).
     """
-    if tipo == 'ingreso':
-        if transaccion_id is not None:
-            validar_edicion_transaccion(cursor, transaccion_id, fecha, monto, tipo)
-        return
-
-    # Si se edita una transacción existente, permitir la actualización para homologar con presupuesto
+    # Editar un movimiento existente se valida simulando la cronología completa sin él y con su versión nueva
     if transaccion_id is not None:
+        validar_edicion_transaccion(cursor, transaccion_id, fecha, monto, tipo)
+        return
+    if tipo == 'ingreso':
         return
 
     # Saldo acumulado en cuenta a la fecha solicitada (solo transacciones externas: apartado_id IS NULL)
@@ -662,9 +660,12 @@ def validar_edicion_transaccion(
     nuevo_tipo: str
 ) -> None:
     """
-    Protección Retroactiva de Ingresos:
+    Protección Retroactiva de Ingresos y de Saldo:
     Invariante: si se reduce el monto de un ingreso, se posterga su fecha o se cambia a gasto,
     simula la cronología resultante. Si genera déficit en cualquier fecha t, lanza ValueError.
+    Un gasto que sigue siendo gasto solo se simula cuando el cambio puede empeorar el saldo (sube el monto
+    o se adelanta la fecha): bajarlo, posponerlo o corregir su descripción no se bloquea aunque el saldo
+    ya viniera negativo de datos anteriores.
     """
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (transaccion_id,)).fetchone()
     if not trans:
@@ -676,7 +677,8 @@ def validar_edicion_transaccion(
     tipo_orig = trans["tipo"]
     fecha_orig = trans["fecha"]
 
-    if tipo_orig != 'ingreso' and nuevo_tipo != 'ingreso':
+    solo_gasto = tipo_orig != 'ingreso' and nuevo_tipo != 'ingreso'
+    if solo_gasto and not (float(nuevo_monto) > float(trans["monto"]) + 0.001 or nueva_fecha < fecha_orig):
         return
 
     total_apartados = obtener_total_apartados(cursor)
@@ -708,6 +710,11 @@ def validar_edicion_transaccion(
         saldo_corriente += deltas_por_fecha[f]
         if saldo_corriente < -0.001:
             deficit = abs(saldo_corriente)
+            if solo_gasto:
+                raise ValueError(
+                    f"Fondos insuficientes: este cambio dejaría tu saldo en -${deficit:,.2f} en fecha {f}. "
+                    f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo de periodos pasados."
+                )
             raise ValueError(
                 f"No es posible modificar este ingreso: dicho ingreso respalda gastos ya ejecutados. "
                 f"Provocaría un saldo negativo de -${deficit:,.2f} en fecha {f}."
@@ -737,12 +744,13 @@ def obtener_ventana_corte_fecha(
     cfg_dia = int(cfg["dia_pago"]) if cfg and "dia_pago" in cfg.keys() and cfg["dia_pago"] is not None else None
 
     if cfg_ingreso > 0:
+        # Solo la nómina que administra el presupuesto: un ingreso hecho a mano no se reescribe por su nombre
         cursor.execute("""
             UPDATE recurrentes
             SET monto = ?, frecuencia = ?
             WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
-            AND (presupuesto_tarjeta_id IS NOT NULL OR LOWER(descripcion) LIKE '%nomina%' OR LOWER(descripcion) LIKE '%nómina%' OR LOWER(descripcion) LIKE '%ingreso base%')
-        """, (cfg_ingreso, cfg_frecuencia))
+            AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
+        """, (cfg_ingreso, cfg_frecuencia, NOMINA_PRESUPUESTO))
 
     # Obtener ingresos fijos activos para deducir fechas de corte
     ingresos = cursor.execute("""
