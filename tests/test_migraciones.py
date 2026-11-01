@@ -4,6 +4,7 @@ No requiere fastapi. Usa directorios temporales: nunca toca 'data/' del proyecto
 """
 
 import os
+import re
 import sqlite3
 import sys
 import tempfile
@@ -231,6 +232,50 @@ def test_v18_agrega_version_a_los_movimientos_existentes():
         assert conn.execute("SELECT version FROM transacciones WHERE descripcion = 'previo'").fetchone()[0] == 1
         _migrar_hasta(conn, 18)  # idempotente
         assert _version(conn) == 18
+
+
+def test_v19_repara_fechas_imposibles_de_los_movimientos():
+    # Antes de validar la fecha real, un 2026-11-31 se guardaba y dejaba /api/resumen en 500
+    from datetime import date
+    from finanzas_core import calcular_periodos
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 18)
+        filas = [
+            ("2026-11-31", "Cena"),        # noviembre tiene 30 días
+            ("2026-02-30", None),          # sin descripción
+            ("2028-02-30", "Bisiesto"),    # febrero bisiesto
+            ("2026-13-05", "Mes 13"),
+            ("2026-10-00", "Día cero"),
+            ("2026-10-05", "Normal"),      # válida: no se toca
+            ("9999-01-01", "Año lejano"),  # fecha real aunque rara: no se toca
+        ]
+        for fecha, desc in filas:
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES (?, 100, 'gasto', ?, 1)", (fecha, desc))
+        conn.commit()
+        try:
+            calcular_periodos(conn, date(2026, 11, 10))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("el escenario debe reproducir el fallo antes de migrar")
+
+        _migrar_hasta(conn, 19)
+        assert _version(conn) == 19
+        sin_nota = lambda d: re.sub(r"\s*\(fecha original [^)]*\)", "", d or "")
+        obtenido = {sin_nota(r["descripcion"]): r["fecha"] for r in conn.execute("SELECT fecha, descripcion FROM transacciones")}
+        assert obtenido == {
+            "Cena": "2026-11-30", "": "2026-02-28", "Bisiesto": "2028-02-29", "Mes 13": "2026-12-05",
+            "Día cero": "2026-10-01", "Normal": "2026-10-05", "Año lejano": "9999-01-01",
+        }, obtenido
+        notas = {r["fecha"]: r["descripcion"] for r in conn.execute("SELECT fecha, descripcion FROM transacciones")}
+        assert notas["2026-11-30"] == "Cena (fecha original 2026-11-31)", notas
+        assert notas["2026-02-28"] == "(fecha original 2026-02-30)", notas
+        assert notas["2026-10-05"] == "Normal" and notas["9999-01-01"] == "Año lejano"
+        calcular_periodos(conn, date(2026, 11, 10))  # ya no falla
+
+        antes = [tuple(r) for r in conn.execute("SELECT id, fecha, descripcion FROM transacciones ORDER BY id")]
+        _migrar_hasta(conn, 19)  # idempotente: no repite la nota ni cambia nada
+        assert [tuple(r) for r in conn.execute("SELECT id, fecha, descripcion FROM transacciones ORDER BY id")] == antes
 
 
 if __name__ == "__main__":

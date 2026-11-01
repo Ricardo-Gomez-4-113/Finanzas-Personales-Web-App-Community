@@ -13,7 +13,9 @@ Este módulo implementa:
 5. Respaldos y exportaciones en caliente exclusivamente mediante VACUUM INTO o la API nativa de backup de SQLite.
 """
 
+import calendar
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime
@@ -28,7 +30,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 18
+CURRENT_TENANT_SCHEMA_VERSION = 19
 
 
 # =============================================================================
@@ -77,6 +79,20 @@ def configure_sqlite_pragmas(conn: sqlite3.Connection) -> None:
 # =============================================================================
 # 4. MIGRACIONES AUTOMÁTICAS BAJO DEMANDA (LAZY MIGRATIONS)
 # =============================================================================
+
+def _fecha_valida_mas_cercana(texto: str) -> Optional[str]:
+    """AAAA-MM-DD imposible -> la fecha válida más cercana (mes entre 1 y 12, día entre 1 y el último del mes).
+    None si ya es una fecha real o no tiene la forma AAAA-MM-DD. Solo para la migración 19."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", texto or "")
+    if not m:
+        return None
+    anio, mes, dia = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if anio < 1:
+        anio = 2000
+    mes = min(max(mes, 1), 12)
+    dia = min(max(dia, 1), calendar.monthrange(anio, mes)[1])
+    return f"{anio:04d}-{mes:02d}-{dia:02d}"
+
 
 def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     """
@@ -512,6 +528,25 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             cursor.execute("ALTER TABLE transacciones ADD COLUMN version INTEGER NOT NULL DEFAULT 1;")
         cursor.execute("PRAGMA user_version = 18;")
         current_version = 18
+
+    # Versión 19: repara fechas imposibles de los movimientos. Antes de validar la fecha real, la API aceptaba
+    # cualquier AAAA-MM-DD (2026-11-31, mes 13, día 00) y esa fila hacía fallar /api/resumen en cada carga.
+    # Se recorta a la fecha válida más cercana y se deja la original en la descripción. Las fechas reales
+    # (incluidas las muy lejanas) no se tocan. Idempotente: una fila reparada ya no se vuelve a seleccionar.
+    if current_version < 19 and CURRENT_TENANT_SCHEMA_VERSION >= 19:
+        sospechosas = cursor.execute(
+            "SELECT id, fecha, descripcion FROM transacciones "
+            "WHERE fecha GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND strftime('%Y-%m-%d', fecha) IS NOT fecha"
+        ).fetchall()
+        for fila in sospechosas:
+            reparada = _fecha_valida_mas_cercana(fila[1])
+            if reparada is None or reparada == fila[1]:
+                continue
+            nota = f"(fecha original {fila[1]})"
+            descripcion = f"{fila[2]} {nota}" if fila[2] else nota
+            cursor.execute("UPDATE transacciones SET fecha = ?, descripcion = ? WHERE id = ?", (reparada, descripcion, fila[0]))
+        cursor.execute("PRAGMA user_version = 19;")
+        current_version = 19
 
     conn.commit()
 

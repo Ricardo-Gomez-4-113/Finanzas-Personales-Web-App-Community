@@ -28,7 +28,7 @@ Convenciones:
 ## Estructura relevante
 
 - `main.py`: servidor FastAPI, middleware de seguridad y rutas SPA.
-- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 17 (`CURRENT_TENANT_SCHEMA_VERSION`).
+- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 19 (`CURRENT_TENANT_SCHEMA_VERSION`).
 - `finanzas_core.py`: cálculo financiero puro (conversiones, rendimientos, frecuencias, sub-periodos, reparto en centavos).
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.
 - `mercado.py`: tipos de cambio y precios, con caché y valores de respaldo.
