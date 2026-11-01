@@ -59,7 +59,8 @@ for p in "${PUERTOS[@]}"; do
   [[ "$c" == "401" ]] && ok "/api/resumen sin token -> 401" || falla "/api/resumen sin token -> $c (debe ser 401)"
 
   # 6. Cabeceras de seguridad
-  cab=$(curl -s -D - -o /dev/null -m 10 "$base/login")
+  # El túnel entrega la petición por HTTP con X-Forwarded-Proto: https; HSTS solo se envía sobre HTTPS
+  cab=$(curl -s -D - -o /dev/null -m 10 -H "X-Forwarded-Proto: https" "$base/login")
   for cabecera in "Content-Security-Policy" "Strict-Transport-Security" "X-Content-Type-Options"; do
     echo "$cab" | grep -qi "^$cabecera:" && ok "cabecera $cabecera" || falla "falta cabecera $cabecera"
   done
