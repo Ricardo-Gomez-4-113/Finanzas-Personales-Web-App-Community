@@ -81,18 +81,17 @@ Fases 1 a 6 cerradas.
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
-## Plan de auditoría de interfaz (en curso)
+## Plan de auditoría de interfaz (completado)
 
-Decisiones: el euro es moneda base seleccionable; todo se convierte a la moneda base elegida (nada de «pesos» fijo); los comentarios van solo a la base de datos, sin correo ni panel (se consultan con una consulta a la base maestra). Cada corrección lleva su prueba, que falla con el código anterior. Flujo: Community, luego `portar-a-saas.sh`.
+Estado de los seis puntos (cada uno con su prueba, publicado en Community y en el SaaS):
+1. **Sidebar colapsado:** no se reprodujo compresión del icono en ningún ancho ni estado. Sí se corrigió el desplazamiento del icono con el cursor encima (`d35807d`). Si el icono que se ve mal es otro, falta una captura.
+2. **Modo privacidad:** clase única `.dato-sensible` con `montoHTML()`. Las gráficas y los tooltips no siempre cubren todo: los `title` y las opciones de selector siguen en texto plano.
+3. **Euro como moneda base:** selectores, gastos por categoría (antes 500 con base EUR) y exportación a Excel.
+4. **Botón Cotizar:** altura del campo (26 px).
+5. **Formularios y relleno automático:** `color-scheme` por tema y regla `-webkit-autofill`. El relleno real del navegador no se puede disparar en automatización: se verificó la regla, no la pintura.
+6. **Comentarios:** tabla `comentarios` en la base maestra, `POST /api/comentarios`, 5 por hora, y `scripts/comentarios.py` para consultarlos.
 
-1. **Sidebar colapsado:** el icono se comprime. Medir en navegador y fijar tamaño y `flex-shrink` del icono. Hay media queries vacías en `vistas.css` (código muerto).
-2. **Modo privacidad:** hoy es una lista fija de selectores (`layout.css`); el presupuesto y otras pestañas quedan visibles. Pasar a una clase única `.dato-sensible` aplicada donde se pinta un monto (≈62 llamadas a `fmt(` en 9 archivos), con una sola regla de desenfoque.
-3. **Euro como moneda base:** `core.js` fuerza MXN o USD, y el selector de la barra y el de moneda del activo solo ofrecen MXN y USD. Revisar `/api/gastos-por-categoria` (recibe solo la tasa MXN) y los textos fijos como «se convierte a MXN» y la nota bajo Cotizar. Revisar todos los routers y la exportación a Excel.
-4. **Botón Cotizar muy grande:** el campo mide 26 px y el botón 36 px. Auditar alturas de controles (36, 38, 40, 44 y 48 px repartidas) y los grupos input más botón; unificar con un token.
-5. **Formularios completos:** 15 formularios y ≈88 campos. Recuadros blancos en el login (probable relleno automático: no hay reglas `:-webkit-autofill`). Revisar estados, temas y móvil en todos, y arreglar con reglas únicas.
-6. **Comentarios desde el menú de usuario:** modal con tipo y mensaje (máx. 1000), `POST /api/comentarios` con sesión, tabla `comentarios` en la base maestra (migración nueva), tope por usuario, sin contenido en el registro de fallos, se eliminan al borrar la cuenta. Va al final.
-
-Orden: diagnóstico con capturas de 1, 4 y 5; luego inventario de `fmt()` y del euro; correcciones 5, 1, 4, 2, 3 y 6.
+Prueba intermitente: `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` falló una vez esperando filas de movimientos y pasó en la siguiente corrida. No está corregida la causa.
 
 ## Seguridad (revisión del login C1 a C6 y pruebas de borde)
 
