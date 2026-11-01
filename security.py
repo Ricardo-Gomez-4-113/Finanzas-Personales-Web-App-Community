@@ -288,6 +288,15 @@ def reservar_intento_login(clave: str, limite: int = _MAX_INTENTOS_LOGIN) -> flo
         _intentos_fallidos_login[clave] = intentos
         return ahora
 
+def reservar_cupo_cuenta(accion: str, user_id: int) -> bool:
+    """Tope por cuenta para una acción de recuperación, sin importar la IP ni el identificador usado
+    (nombre de usuario o correo). Devuelve False si la cuenta agotó su cupo en la ventana."""
+    try:
+        reservar_intento_login(f"{accion}-cuenta:{user_id}")
+        return True
+    except HTTPException:
+        return False
+
 def devolver_intento_login(clave: str, marca: float) -> None:
     """Quita un intento reservado que terminó bien. Así solo cuentan los fallos para el tope."""
     with _candado_login:

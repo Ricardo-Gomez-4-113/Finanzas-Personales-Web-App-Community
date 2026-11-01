@@ -13,6 +13,7 @@ from security import (
     reservar_intento_login,
     reservar_intento_login_ip,
     devolver_intento_login_ip,
+    reservar_cupo_cuenta,
     limpiar_fallos_login,
     obtener_ip_cliente,
     hash_password,
@@ -222,7 +223,8 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
     reservar_intento_login(clave_tasa)
 
     user = master_db.get_user_by_identifier(req.identifier)
-    if user and user.get("email") and user.get("is_active"):
+    # El tope por cuenta no depende de la IP: sin cupo no se envía otro código, y la respuesta es la misma
+    if user and user.get("email") and user.get("is_active") and reservar_cupo_cuenta("solicitud", user["id"]):
         codigo = master_db.create_password_reset_code(user["id"])
         background_tasks.add_task(
             enviar_correo_codigo_recuperacion,
@@ -245,6 +247,11 @@ def reset_password(req: ResetPasswordRequest, request: Request):
     clave_tasa = f"reset:{client_ip}:{req.identifier.strip().lower()}"
     reservar_intento_login(clave_tasa)
 
+    cuenta = master_db.get_user_by_identifier(req.identifier)
+    if cuenta and not reservar_cupo_cuenta("recuperacion", cuenta["id"]):
+        # Mismo mensaje que un código incorrecto: no revela que la cuenta existe ni que tiene tope
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=master_db.MENSAJE_CODIGO_INVALIDO)
+
     user, error_msg = master_db.verify_reset_code(req.identifier, req.code)
     if not user:
         raise HTTPException(
@@ -255,6 +262,7 @@ def reset_password(req: ResetPasswordRequest, request: Request):
     # El hash costoso solo se calcula cuando el código ya es válido
     master_db.update_user_password(user["id"], hash_password(req.new_password))
     limpiar_fallos_login(clave_tasa)
+    limpiar_fallos_login(f"recuperacion-cuenta:{user['id']}")
     return {
         "mensaje": f"¡Contraseña actualizada exitosamente para '{user['username']}'! Ya puedes iniciar sesión con tu nueva contraseña."
     }

@@ -131,7 +131,7 @@ def test_registrar_ingreso_y_modal_accesible(navegador, base):
         _login(page, base)
         page.evaluate("document.querySelector('[data-tab=\"tab-movimientos\"]').click()")
         page.wait_for_selector("#tab-movimientos.active")
-        page.fill("#fecha", time.strftime("%Y-%m-%d"))
+        page.fill("#fecha", escenario.HOY)  # el servidor de pruebas tiene el reloj fijo: la fecha real caería fuera del periodo
         page.select_option("#tipo", "ingreso")
         page.fill("#monto", "1234.56")
         page.fill("#descripcion", "ingreso-desde-playwright")

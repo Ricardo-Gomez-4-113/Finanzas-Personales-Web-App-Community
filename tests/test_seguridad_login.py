@@ -197,6 +197,76 @@ def test_tope_de_una_ip_no_afecta_a_otra():
     _vaciar_contadores()
 
 
+def _id_de(usuario):
+    return master_db.get_user_by_username(usuario)["id"]
+
+
+def _codigos_activos(usuario):
+    conn = master_db.get_master_conn()
+    try:
+        return conn.execute("SELECT COUNT(*) FROM password_resets WHERE user_id = ?", (_id_de(usuario),)).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_codigo_de_recuperacion_no_se_adivina_desde_varias_ips():
+    """Varias IPs no multiplican los intentos contra una misma cuenta: el tope es por cuenta."""
+    _crear_usuario("seg_reset_ips")
+    _vaciar_contadores()
+    master_db.create_password_reset_code(_id_de("seg_reset_ips"))
+    verificaciones = []
+    original = master_db.verify_reset_code
+
+    def contar(identifier, code):
+        verificaciones.append(identifier)
+        return original(identifier, code)
+
+    cuerpo = {"identifier": "seg_reset_ips", "code": "000000", "new_password": "Nueva#Clave123"}
+    cliente = TestClient(app, client=("127.0.0.1", 50020))  # origen de proxy confiable: la IP viene de CF-Connecting-IP
+    with _parchar(master_db, verify_reset_code=contar):
+        respuestas = [cliente.post("/auth/reset-password", json=cuerpo, headers={"CF-Connecting-IP": f"198.51.100.{i}"}) for i in range(1, 13)]
+    assert len(verificaciones) <= LIMITE, f"{len(verificaciones)} verificaciones contra una cuenta desde 12 IPs"
+    assert all(r.status_code == 400 for r in respuestas), [r.status_code for r in respuestas]
+    assert {r.json()["detail"] for r in respuestas} == {master_db.MENSAJE_CODIGO_INVALIDO}, "la respuesta no debe revelar el tope"
+    _vaciar_contadores()
+
+
+def test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion():
+    """El correo y el nombre de usuario de una misma cuenta comparten el tope: no suman dos límites."""
+    _crear_usuario("seg_reset_alias")
+    _vaciar_contadores()
+    master_db.create_password_reset_code(_id_de("seg_reset_alias"))
+    verificaciones = []
+    original = master_db.verify_reset_code
+
+    def contar(identifier, code):
+        verificaciones.append(identifier)
+        return original(identifier, code)
+
+    cliente = TestClient(app, client=("127.0.0.1", 50010), headers={"CF-Connecting-IP": "198.51.100.90"})
+    with _parchar(master_db, verify_reset_code=contar):
+        for _ in range(LIMITE):
+            cliente.post("/auth/reset-password", json={"identifier": "seg_reset_alias", "code": "000000", "new_password": "Nueva#Clave123"})
+        cliente.post("/auth/reset-password", json={"identifier": "seg_reset_alias@test.local", "code": "000000", "new_password": "Nueva#Clave123"})
+    assert len(verificaciones) <= LIMITE, f"{len(verificaciones)} verificaciones con el alias"
+    _vaciar_contadores()
+
+
+def test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta():
+    """Desde muchas IPs no se emiten más códigos que el tope por cuenta; la respuesta no cambia."""
+    import email_service
+    _crear_usuario("seg_forgot_ips")
+    _vaciar_contadores()
+    cuerpo = {"identifier": "seg_forgot_ips"}
+    cliente = TestClient(app, client=("127.0.0.1", 50021))  # origen de proxy confiable
+    with _parchar(email_service, esta_configurado_servicio_correo=lambda: True, enviar_correo_codigo_recuperacion=lambda *a, **k: None):
+        respuestas = [cliente.post("/auth/forgot-password", json=cuerpo, headers={"CF-Connecting-IP": f"198.51.100.{100 + i}"}) for i in range(8)]
+    assert _codigos_activos("seg_forgot_ips") <= LIMITE, f"{_codigos_activos('seg_forgot_ips')} códigos emitidos desde 8 IPs"
+    assert all(r.status_code == 200 for r in respuestas), [r.status_code for r in respuestas]
+    assert len({r.json()["mensaje"] for r in respuestas}) == 1, "la respuesta no debe cambiar al alcanzar el tope"
+    _vaciar_contadores()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -208,6 +278,9 @@ if __name__ == "__main__":
         (test_spraying_desde_una_ip_se_frena_entre_cuentas, test_spraying_desde_una_ip_se_frena_entre_cuentas),
         (test_tope_de_una_ip_no_afecta_a_otra, test_tope_de_una_ip_no_afecta_a_otra),
         (test_aciertos_no_cuentan_para_el_tope_de_la_ip, test_aciertos_no_cuentan_para_el_tope_de_la_ip),
+        (test_codigo_de_recuperacion_no_se_adivina_desde_varias_ips, test_codigo_de_recuperacion_no_se_adivina_desde_varias_ips),
+        (test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion, test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion),
+        (test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta, test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")
