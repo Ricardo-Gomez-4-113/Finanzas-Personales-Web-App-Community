@@ -291,9 +291,9 @@
     margin: 0;
     background-color: var(--accent-color);
     color: var(--panel-bg);
-    height: 36px;
-    padding: 0 14px;
-    font-size: 0.82rem;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
     border-radius: 6px;
@@ -1112,8 +1112,9 @@
     }
 
     .btn-search-ticker {
-        padding: 8px 12px;
-        font-size: 0.82rem;
+        height: 26px;
+        padding: 0 10px;
+        font-size: 0.75rem;
         flex-shrink: 0;
         box-sizing: border-box;
     }

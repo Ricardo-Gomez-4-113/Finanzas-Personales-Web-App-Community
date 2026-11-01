@@ -1129,6 +1129,27 @@ def test_campos_y_selectores_nativos_siguen_el_tema(navegador, base):
         ctx.close()
 
 
+def test_boton_cotizar_no_sobresale_del_campo(navegador, base):
+    """El botón Cotizar cabe en la altura del campo del ticker y el bloque queda a la altura de los demás campos."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        page.evaluate("document.querySelector('[data-tab=\"tab-inversiones\"]').click()")
+        page.wait_for_selector("#tab-inversiones.active")
+        medidas = page.evaluate("""() => {
+            const alto = (el) => el.getBoundingClientRect().height;
+            const boton = document.querySelector('.btn-search-ticker');
+            const campo = document.getElementById('inv-ticker');
+            const moneda = document.getElementById('inv-moneda');
+            return {boton: alto(boton), campo: alto(campo), bloqueTicker: alto(campo.closest('.form-group')), bloqueMoneda: alto(moneda.closest('.form-group'))};
+        }""")
+        assert medidas["boton"] <= medidas["campo"] + 1, medidas
+        assert abs(medidas["bloqueTicker"] - medidas["bloqueMoneda"]) <= 2, medidas
+        assert not errores, "errores de JS:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1182,6 +1203,7 @@ if __name__ == "__main__":
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
+                (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
