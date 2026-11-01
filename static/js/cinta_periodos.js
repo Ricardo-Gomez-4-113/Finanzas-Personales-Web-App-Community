@@ -47,13 +47,14 @@ function celda(p, indice, seleccionado, onSeleccionar) {
     boton.setAttribute('aria-pressed', String(seleccionado));
     if (p.en_curso) boton.classList.add('cinta-periodo-actual');
     if (!p.en_curso) boton.classList.add('cinta-periodo-futuro');
-    if (t.saldo_al_cierre < 0) boton.classList.add('cinta-periodo-riesgo');
+    // Lo que queda en este periodo, sin arrastrar el efectivo ni los periodos anteriores: riesgo si gasta más de lo que ingresa
+    if (t.libre < 0) boton.classList.add('cinta-periodo-riesgo');
 
     boton.append(
         el('span', 'cinta-periodo-rango', `${fechaCorta(p.inicio)} – ${fechaCorta(p.fin)}`),
         el('span', 'cinta-periodo-estado', p.en_curso ? 'En curso' : 'Proyectado'),
-        Object.assign(el('strong', 'cinta-periodo-libre'), { innerHTML: montoMxnHTML(t.saldo_al_cierre) }),
-        el('span', 'cinta-periodo-etiqueta', 'Saldo al cierre'),
+        Object.assign(el('strong', 'cinta-periodo-libre'), { innerHTML: montoMxnHTML(t.libre) }),
+        el('span', 'cinta-periodo-etiqueta', 'Libre del periodo'),
     );
     if (t.ingresos > 0) {
         boton.append(barra(t));

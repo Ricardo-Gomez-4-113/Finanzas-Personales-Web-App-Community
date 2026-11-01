@@ -9,11 +9,11 @@ import { apiFetch, desdeMXN, escapeHTML, estado, fmt, leerJson, montoHTML, monto
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=76fabf03b3';
+import { cargarRecurrentes } from './recurrentes.js?v=e7c46cf97f';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=76fabf03b3';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=e7c46cf97f';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';

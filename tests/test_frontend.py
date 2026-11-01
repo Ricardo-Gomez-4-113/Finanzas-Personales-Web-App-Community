@@ -422,9 +422,9 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
             document.body.appendChild(raiz);
             const periodos = [
                 { inicio: '2026-10-15', fin: '2026-10-30', en_curso: true,
-                  totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 13201 } },
+                  totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 20000 } },
                 { inicio: '2026-10-31', fin: '2026-11-14', en_curso: false,
-                  totales: { ingresos: 0, fijos: 14000, msi: 0, libre: -14000, saldo_al_cierre: -799 } },
+                  totales: { ingresos: 0, fijos: 14000, msi: 0, libre: -14000, saldo_al_cierre: 5000 } },
             ];
             let elegido = -1;
             renderCintaPeriodos(raiz, periodos, { onSeleccionar: i => { elegido = i; } });
@@ -443,6 +443,7 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
         }""")
         assert resultado["n"] == 2, resultado
         assert resultado["actual"] and resultado["riesgo"] and resultado["sinIngreso"], resultado
+        # Cada periodo muestra lo suyo (libre), no el saldo acumulado; y es riesgo si el periodo gasta más de lo que ingresa
         assert resultado["libre"] == "$13,201.00", resultado
         assert resultado["elegido"] == 1, resultado          # el clic avisa el índice elegido
         assert resultado["dias"] == "16" and resultado["presionado"] == "true", resultado
@@ -451,7 +452,7 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
         ctx.close()
 
 
-def test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base):
+def test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         page.wait_for_selector("#cinta-periodos .cinta-periodo")
@@ -459,9 +460,13 @@ def test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base):
         assert celdas.count() == 4, celdas.count()
         actual = page.locator("#cinta-periodos .cinta-periodo-actual")
         assert actual.count() == 1 and "En curso" in actual.inner_text(), actual.inner_text()
-        # El periodo en curso se lee igual en el hero y en la cinta: un solo saldo, no dos
-        assert page.inner_text("#periodo-libre") == actual.locator(".cinta-periodo-libre").inner_text(), (
-            page.inner_text("#periodo-libre"), actual.inner_text())
+        # La cinta muestra lo que queda en cada periodo (ingresos - gastos - metas), sin arrastrar el efectivo ni los
+        # periodos anteriores. El hero, "Libre hasta el cobro", sí cuenta el efectivo disponible: es otra pregunta.
+        esperados = [f"${p['remanente']:,.2f}" for p in escenario.ESPERADO["periodos"]]
+        mostrados = page.locator("#cinta-periodos .cinta-periodo-libre").all_inner_texts()[:len(esperados)]
+        assert mostrados == esperados, (mostrados, esperados)
+        assert page.inner_text("#periodo-libre") == f"${escenario.ESPERADO['libre_hasta_cobro']:,.2f}"
+        assert "Libre del periodo" in actual.inner_text(), actual.inner_text()
         assert not errores, errores
     finally:
         ctx.close()
@@ -1281,7 +1286,7 @@ if __name__ == "__main__":
                 (test_selector_de_periodo_cambia_las_tarjetas, lambda: test_selector_de_periodo_cambia_las_tarjetas(navegador, base)),
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
-                (test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual, lambda: test_inicio_cinta_y_hero_muestran_el_mismo_periodo_actual(navegador, base)),
+                (test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo, lambda: test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(navegador, base)),
                 (test_fab_se_oculta_al_bajar_y_vuelve_al_subir, lambda: test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base)),
                 (test_admin_busca_filtra_y_pide_el_nombre_para_eliminar, lambda: test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
