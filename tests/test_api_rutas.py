@@ -350,6 +350,34 @@ def test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client):
     assert tras["version"] == mov["version"] + 1, tras
 
 
+def test_moneda_base_eur_convierte_gastos_y_excel(client):
+    """Con base EUR, los gastos por categoría y el Excel convierten con la tasa del euro (antes respondían 500 o cambiaban a MXN)."""
+    import io
+    from datetime import date
+    import openpyxl
+    import export_service
+    import routers.movimientos as rmovimientos
+
+    _crear_usuario("ruta_eur")
+    h = _login(client, "ruta_eur")
+    hoy = date.today().isoformat()
+    assert client.post("/api/transacciones", json={"fecha": hoy, "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base-eur"}, headers=h).status_code in (200, 201)
+    assert client.post("/api/transacciones", json={"fecha": hoy, "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "gasto-eur"}, headers=h).status_code in (200, 201)
+    tasas = {"MXN": 20.0, "EUR": 0.5}
+    with _parchar(rmovimientos, obtener_tasas_cambio=lambda: tasas):
+        mxn = client.get("/api/gastos-por-categoria?moneda_base=MXN", headers=h).json()
+        eur = client.get("/api/gastos-por-categoria?moneda_base=EUR", headers=h)
+    assert eur.status_code == 200, eur.text
+    assert eur.json()["moneda_base"] == "EUR", eur.text
+    assert abs(eur.json()["total"] - mxn["total"] * 0.5 / 20.0) < 0.01, (mxn, eur.json())
+
+    with _parchar(export_service, obtener_tasas_cambio=lambda: tasas):
+        r = client.get("/api/exportar-excel?moneda_base=EUR", headers=h)
+    assert r.status_code == 200, r.text[:200]
+    libro = openpyxl.load_workbook(io.BytesIO(r.content))
+    assert "Moneda Base: EUR" in libro[libro.sheetnames[0]]["A2"].value, libro.sheetnames
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -374,6 +402,7 @@ if __name__ == "__main__":
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
             (test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409, lambda: test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client)),
+            (test_moneda_base_eur_convierte_gastos_y_excel, lambda: test_moneda_base_eur_convierte_gastos_y_excel(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)

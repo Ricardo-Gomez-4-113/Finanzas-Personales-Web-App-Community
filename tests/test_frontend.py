@@ -1169,6 +1169,25 @@ def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
         ctx.close()
 
 
+def test_moneda_base_euro_se_aplica_y_persiste(navegador, base):
+    """Elegir EUR como moneda base cambia las cifras y los rótulos, y sobrevive a recargar la página."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        page.select_option("#select-moneda-global", "EUR")
+        _esperar(page, "[...document.querySelectorAll('.lbl-moneda-base')].length > 0 && [...document.querySelectorAll('.lbl-moneda-base')].every(el => el.textContent === 'EUR')")
+        _esperar(page, "document.getElementById('periodo-libre').textContent.includes('€')")  # las cifras llegan después de los rótulos
+        page.wait_for_load_state("networkidle")  # recargar con peticiones en vuelo las cancela y ensucia el registro de errores
+        errores.clear()
+        page.reload()
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        assert page.input_value("#select-moneda-global") == "EUR"
+        _esperar(page, "document.getElementById('periodo-libre').textContent.includes('€')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1224,6 +1243,7 @@ if __name__ == "__main__":
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
+                (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

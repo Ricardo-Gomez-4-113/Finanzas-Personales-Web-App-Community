@@ -9,11 +9,11 @@ import { apiFetch, escapeHTML, estado, fmt, leerJson, montoHTML, toast } from '.
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=292dcb49cb';
+import { cargarRecurrentes } from './recurrentes.js?v=d1a41c4c8b';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=292dcb49cb';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=d1a41c4c8b';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 import { inicializarDiagnostico } from './diagnostico.js';

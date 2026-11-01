@@ -7,7 +7,7 @@ El reporte consolida:
 2. Historial cronológico completo de Movimientos (Ingresos y Gastos).
 3. Portafolio de Inversiones valorado con cotizaciones en tiempo real.
 4. Gráfica nativa de Pastel (PieChart) de Asignación de Activos (Asset Allocation).
-5. Conversión multimoneda según la divisa base solicitada (MXN o USD).
+5. Conversión multimoneda según la divisa base solicitada (MXN, USD o EUR).
 """
 
 import io
@@ -28,7 +28,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     Parámetros:
     -----------
     moneda_base : str (opcional, default 'MXN')
-        Divisa base para consolidar todas las métricas patrimoniales ('MXN' o 'USD').
+        Divisa base para consolidar todas las métricas patrimoniales ('MXN', 'USD' o 'EUR').
     conn : sqlite3.Connection (opcional)
         Conexión inyectada hacia la base de datos del tenant autenticado.
     db_name : str (opcional)
@@ -41,9 +41,9 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     """
     from database import get_tenant_conn
 
-    # Normalizar la moneda base seleccionada (solo se aceptan MXN o USD)
+    # Normalizar la moneda base seleccionada (se aceptan MXN, USD y EUR)
     moneda_base = moneda_base.strip().upper()
-    if moneda_base not in ["MXN", "USD"]:
+    if moneda_base not in ["MXN", "USD", "EUR"]:
         moneda_base = "MXN"
 
     # =========================================================================
@@ -55,7 +55,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     tasa_usd_eur = tasas.get("EUR", TASA_EUR_RESPALDO)
     
     # Factor para convertir flujos originados en pesos mexicanos (MXN) a la divisa solicitada
-    factor_mxn_a_base = (1.0 / tasa_usd_mxn) if (moneda_base == "USD" and tasa_usd_mxn > 0) else 1.0
+    factor_mxn_a_base = convertir(1.0, "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur)
 
     # =========================================================================
     # PASO 2: CONEXIÓN A BD Y ACTUALIZACIÓN EN VIVO DE COTIZACIONES

@@ -17,7 +17,7 @@ export const estado = {
     debounceTimerBuscar: null,
     cache: { transacciones: {}, listaTransacciones: [], categorias: [], inversiones: {}, usuarios: {}, ventana: null }
 };
-if (!['MXN', 'USD'].includes(estado.monedaGlobal)) estado.monedaGlobal = 'MXN';
+if (!['MXN', 'USD', 'EUR'].includes(estado.monedaGlobal)) estado.monedaGlobal = 'MXN';
 
 
 

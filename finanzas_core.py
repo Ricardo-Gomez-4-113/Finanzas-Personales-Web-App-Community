@@ -1911,7 +1911,7 @@ def ventana_periodo_actual(conn: sqlite3.Connection, hoy: date) -> Dict[str, str
     return {"inicio": p["inicio"], "fin": p["fin"]}
 
 
-def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: str, moneda_base: str, tasa_usd_mxn: float) -> Dict[str, Any]:
+def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: str, moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Dict[str, Any]:
     """Gastos normales y fijos del rango agrupados por categoría (sin metas), en la moneda base."""
     filas = conn.execute(
         """
@@ -1925,7 +1925,7 @@ def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: st
         (desde, hasta),
     ).fetchall()
     categorias = [
-        {"categoria": f["categoria"], "total": round(convertir(float(f["total"] or 0), "MXN", moneda_base, tasa_usd_mxn), 2)}
+        {"categoria": f["categoria"], "total": round(convertir(float(f["total"] or 0), "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2)}
         for f in filas
     ]
     return {

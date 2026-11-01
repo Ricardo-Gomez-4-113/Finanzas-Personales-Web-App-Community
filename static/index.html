@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=292dcb49cb">
-    <link rel="stylesheet" href="/static/css/layout.css?v=292dcb49cb">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=292dcb49cb">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=292dcb49cb">
-    <link rel="stylesheet" href="/static/css/tema.css?v=292dcb49cb">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=d1a41c4c8b">
+    <link rel="stylesheet" href="/static/css/layout.css?v=d1a41c4c8b">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=d1a41c4c8b">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=d1a41c4c8b">
+    <link rel="stylesheet" href="/static/css/tema.css?v=d1a41c4c8b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -210,6 +210,7 @@
                         <select id="select-moneda-global" class="select-moneda-topbar" data-on-change='[["cambiarMonedaGlobal", "$value"]]' title="Cambiar moneda base de visualización">
                             <option value="MXN" selected>MXN</option>
                             <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
                         </select>
                         <span id="badge-tasa-global" class="badge-tasa-topbar">1 USD ≈ $18.40 MXN</span>
                     </div>
@@ -821,11 +822,12 @@
                             <div class="form-group">
                                 <label for="inv-moneda">Moneda del activo</label>
                                 <select id="inv-moneda">
-                                    <option value="USD">USD (dólares - se convierte a MXN)</option>
-                                    <option value="MXN">MXN (pesos mexicanos - sin multiplicar)</option>
+                                    <option value="USD">USD (dólares)</option>
+                                    <option value="MXN">MXN (pesos mexicanos)</option>
+                                    <option value="EUR">EUR (euros)</option>
                                 </select>
                             </div>
-                            <p class="modal-nota">Si compras en USD se multiplica por el tipo de cambio; si es en MXN se suma directo.</p>
+                            <p class="modal-nota">Cada compra se convierte a la moneda base de la barra superior con el tipo de cambio actual.</p>
 
                             <h4 class="form-seccion">Posición</h4>
                             <div class="form-row-2col">
@@ -1949,7 +1951,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=292dcb49cb"></script>
+    <script type="module" src="/static/js/main.js?v=d1a41c4c8b"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

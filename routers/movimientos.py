@@ -348,5 +348,8 @@ def gastos_por_categoria(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD
     hoy = ahora_local().date()
     materializar_recurrentes(conn, hoy)
     ventana = ventana_periodo_actual(conn, hoy)
-    tasa = obtener_tasas_cambio().get("MXN", TASA_MXN_RESPALDO)
-    return gastos_por_categoria_periodo(conn, ventana["inicio"], ventana["fin"], moneda_base.upper(), tasa)
+    tasas = obtener_tasas_cambio()
+    return gastos_por_categoria_periodo(
+        conn, ventana["inicio"], ventana["fin"], moneda_base.upper(),
+        tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO),
+    )
