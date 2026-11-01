@@ -81,7 +81,7 @@ Fases 1 a 6 cerradas.
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
-## Seguridad del login (revisión de C1 a C6 completa)
+## Seguridad (revisión del login C1 a C6 y pruebas de borde)
 
 Revisión enfocada del control de fuerza bruta, validada en un espacio de red sin salida (`unshare -rn`) con usuarios dummy.
 - **C1, carrera en el control de tasa (corregido):** antes, 40 peticiones simultáneas evaluaban 40 contraseñas. Ahora `reservar_intento_login` comprueba y anota en un solo paso, bajo candado, antes de verificar: 5 evaluadas. Prueba: `tests/test_seguridad_login.py`.
@@ -92,6 +92,8 @@ Revisión enfocada del control de fuerza bruta, validada en un espacio de red si
 - **C5, campos sin límite en el login (corregido):** un usuario de 5 MB se aceptaba y el contador guardaba una clave de 5 millones de caracteres, con 10 000 claves posibles. Ahora el login tiene los mismos límites del alta (usuario 50, contraseña 72). Además, el 422 ya no repite el valor enviado (manejador global en `main.py`): antes, un campo de 5 MB volvía en la respuesta. Una contraseña de 5 MB ya no era problema: bcrypt la rechaza y responde 401 en 0,12 s.
 - **C6, oráculo de tiempo en la solicitud de código (corregido):** con correo configurado, la ruta escribía el código antes de responder y la respuesta tardaba más para una cuenta real. Medido con muestras reales: diferencia de unos 2 ms en medianas, con distribuciones solapadas. Es una señal débil, pero el fix es barato: la escritura y el envío van en una tarea de fondo. Después de la corrección, la diferencia es de −0,8 ms (ruido). Prueba con uvicorn real y retardo inyectado de 0,3 s en la escritura.
 - Costo medido de un intento (bcrypt): unos 0,8 s en esta máquina; llenar 10 000 claves tarda del orden de minutos con concurrencia.
+- **C7, `/health` público exponía estado interno (corregido):** el endpoint público revelaba `"respaldo":"vencido"` y la antigüedad del último respaldo. Ahora `/health` solo devuelve `{"status":"ok"}` (503 si la base maestra no responde, para el healthcheck de Docker). El detalle está en `/api/salud/detalle`, solo para administradores. `scripts/smoke_produccion.sh` consulta el detalle si se pasa `SMOKE_ADMIN_TOKEN`.
+- **Pruebas de borde contra el dominio (sin volumen):** cabeceras y TLS correctos; rutas de desarrollo en 404; límite de login activo desde internet; `CF-Connecting-IP` y `X-Forwarded-For` falsas no cambian el contador. Pendiente de operación: el respaldo de producción estaba vencido.
 
 ## Criterio de hecho
 
