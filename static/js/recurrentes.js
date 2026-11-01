@@ -2,7 +2,7 @@
  * static/js/recurrentes.js - Pestaña "Fijos y MSI": nómina, gastos fijos y compras a meses.
  */
 
-import { apiFetch, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
 
@@ -90,9 +90,9 @@ function actualizarPreview() {
     }
     const cuota = Math.round((total / meses) * 100) / 100;
     const libre = margenPeriodos();
-    const baseTxt = `${meses} pagos de ${fmt(cuota)} al mes`;
+    const baseTxt = `${meses} pagos de ${montoHTML(cuota)} al mes`;
     if (libre !== null && cuota > libre) {
-        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${fmt(cuota)}) supera el libre de tu periodo más ajustado (${fmt(libre)}). Ese periodo quedaría en déficit.</span>`;
+        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${montoHTML(cuota)}) supera el libre de tu periodo más ajustado (${montoHTML(libre)}). Ese periodo quedaría en déficit.</span>`;
     } else {
         prev.textContent = baseTxt;
     }
@@ -209,7 +209,7 @@ function filaFijo(i) {
                 </div>
             </div>
             <div class="fijo-fila-monto">
-                <strong>${signo}${fmt(i.monto)}</strong>
+                <strong>${signo}${montoHTML(i.monto)}</strong>
                 <span>${i.estado === 'pausado' ? 'Próxima fecha ' : ''}${escapeHTML(i.fecha)}</span>
             </div>
             ${acciones ? `<div class="fijo-fila-acciones">${acciones}</div>` : ''}
@@ -241,7 +241,7 @@ function renderFijosPorPeriodo(data) {
                         <h3>${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}</h3>
                         ${p.en_curso ? '<span class="badge-tag badge-fijo">En curso</span>' : ''}
                     </header>
-                    <p class="fijos-periodo-totales">Ingresos ${fmt(t.ingresos)} · Gastos fijos ${fmt(t.fijos)} · Compras a meses ${fmt(t.msi)} · Por pagar ${fmt(t.por_pagar)}</p>
+                    <p class="fijos-periodo-totales">Ingresos ${montoHTML(t.ingresos)} · Gastos fijos ${montoHTML(t.fijos)} · Compras a meses ${montoHTML(t.msi)} · Por pagar ${montoHTML(t.por_pagar)}</p>
                     ${bloqueFijos('Ingresos y gastos fijos', [...ingresos, ...fijos])}
                     ${bloqueFijos('Compras a meses', msi)}
                     ${p.items.length === 0 ? '<p class="fijos-bloque-ayuda">Sin cargos en este periodo.</p>' : ''}
@@ -433,7 +433,7 @@ export function abrirModalEditarRecurrente(id) {
                             Tarjeta de Presupuesto: ${escapeHTML(item.tarjeta_nombre || 'Dividida')}
                         </span>
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
-                            Total: ${fmt(totalMostrar)}
+                            Total: ${montoHTML(totalMostrar)}
                         </span>
                     </div>
                     <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
@@ -446,7 +446,7 @@ export function abrirModalEditarRecurrente(id) {
                                     ${escapeHTML(h.descripcion)} ${h.id === item.id ? '← (editando)' : ''}
                                 </span>
                                 <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
-                                    ${fmt(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
+                                    ${montoHTML(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
                                 </span>
                             </div>
                         `).join('')}
@@ -575,13 +575,13 @@ function pintarCintaMovimientos(periodos) {
 function pintarKpisPeriodo() {
     const p = periodosKpi.find(x => x.inicio === inicioKpiSeleccionado);
     if (!p) return;
-    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = montoHTML(v); };
     setTxt('lbl-rec-ingreso', p.ingresos.total);
     setTxt('lbl-rec-gastos-normales', p.gastos.normales);
     setTxt('lbl-rec-fijos', p.gastos.fijos);
     setTxt('lbl-rec-msi', p.gastos.msi);
     const sub = document.getElementById('lbl-rec-ingreso-sub');
-    if (sub) sub.textContent = `Recibido ${fmt(p.ingresos.recibido)} · por recibir ${fmt(p.ingresos.por_recibir)}`;
+    if (sub) sub.innerHTML = `Recibido ${montoHTML(p.ingresos.recibido)} · por recibir ${montoHTML(p.ingresos.por_recibir)}`;
 }
 
 export async function cargarRecurrentes() {
@@ -606,7 +606,7 @@ export async function cargarRecurrentes() {
         periodosKpi = periodos;
         fijosPorPeriodo = porPeriodo;
         pintarCintaMovimientos(porPeriodo.periodos || []);
-        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = montoHTML(v); };
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
 
 

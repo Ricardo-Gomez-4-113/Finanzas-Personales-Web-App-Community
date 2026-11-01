@@ -2,7 +2,7 @@
  * static/js/dashboard.js - Gráfica mensual del dashboard.
  */
 
-import { colorVar, escapeHTML, estado, fmt } from './core.js';
+import { colorVar, escapeHTML, estado, fmt, montoHTML } from './core.js';
 
 
 // Colores y tipografía de las gráficas salen de tokens.css para seguir el tema activo.
@@ -144,11 +144,12 @@ export function renderPeriodo(p) {
     const raiz = document.getElementById('periodo-hero');
     if (!raiz || !p) return;
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
 
     set('periodo-titulo', p.cobro ? `Libre hasta tu cobro del ${fechaLarga(p.fin)}` : `Libre hasta el ${fechaLarga(p.fin)}`);
-    set('periodo-libre', fmt(p.libre));
-    set('periodo-disponible', fmt(p.disponible));
-    set('periodo-comprometido', fmt(p.comprometido));
+    setHTML('periodo-libre', montoHTML(p.libre));
+    setHTML('periodo-disponible', montoHTML(p.disponible));
+    setHTML('periodo-comprometido', montoHTML(p.comprometido));
     set('periodo-dias', p.dias_restantes === 0 ? 'Hoy' : p.dias_restantes === 1 ? '1 día' : `${p.dias_restantes} días`);
     set('periodo-inicio', fechaCorta(p.inicio));
     set('periodo-fin', fechaCorta(p.fin));
@@ -180,7 +181,7 @@ export function renderPeriodo(p) {
             lista.innerHTML = p.eventos.map(ev => `<li>
                 <span class="periodo-ev-fecha">${escapeHTML(fechaCorta(ev.fecha))}</span>
                 <span class="periodo-ev-desc">${escapeHTML(ev.descripcion)}${ev.es_msi ? ' <span class="badge-tag badge-msi">MSI</span>' : ''}</span>
-                <span class="periodo-ev-monto">−${fmt(ev.monto)}</span>
+                <span class="periodo-ev-monto">−${montoHTML(ev.monto)}</span>
             </li>`).join('');
         }
     }

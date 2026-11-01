@@ -474,29 +474,14 @@
     border-color: var(--gold-border);
 }
 
-/* Modo Privacidad / Blur Discreto con Peek-on-Hover */
-body.privacy-mode .hero-networth strong,
-body.privacy-mode #lbl-dash-patrimonio,
-body.privacy-mode .card p,
-body.privacy-mode .breakdown-info strong,
-body.privacy-mode #lbl-apartados-total-acum,
-body.privacy-mode .badge-peso,
-body.privacy-mode #tabla-movimientos td:nth-child(4),
-body.privacy-mode #tabla-inversiones td:nth-child(4),
-body.privacy-mode #tabla-inversiones td:nth-child(6),
-body.privacy-mode #tabla-inversiones td:nth-child(7) {
+/* Modo privacidad: toda cifra marcada con .dato-sensible se desenfoca; al pasar el cursor se revela una a una */
+body.privacy-mode .dato-sensible {
     filter: blur(8px);
     user-select: none;
     transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-body.privacy-mode .card:hover p,
-body.privacy-mode .hero-networth:hover strong,
-body.privacy-mode .breakdown-item:hover strong,
-body.privacy-mode #tabla-movimientos tr:hover td:nth-child(4),
-body.privacy-mode #tabla-inversiones tr:hover td:nth-child(4),
-body.privacy-mode #tabla-inversiones tr:hover td:nth-child(6),
-body.privacy-mode #tabla-inversiones tr:hover td:nth-child(7) {
+body.privacy-mode .dato-sensible:hover {
     filter: blur(0px);
 }
 

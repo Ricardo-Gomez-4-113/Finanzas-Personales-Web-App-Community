@@ -5,15 +5,15 @@
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
-import { apiFetch, escapeHTML, estado, fmt, leerJson, toast } from './core.js';
+import { apiFetch, escapeHTML, estado, fmt, leerJson, montoHTML, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=33a48f103d';
+import { cargarRecurrentes } from './recurrentes.js?v=292dcb49cb';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=33a48f103d';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=292dcb49cb';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import { activarAccionesDelegadas } from './acciones.js';
 import { inicializarDiagnostico } from './diagnostico.js';
@@ -48,12 +48,12 @@ export async function cargarDatos() {
         // 1. Resumen Consolidado del Tenant
         const resResumen = await apiFetch(`/api/resumen?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`);
         const dataResumen = await resResumen.json();
-        const setTxt = (id, texto) => { const el = document.getElementById(id); if (el) el.textContent = texto; };
+        const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
 
         if (document.getElementById('lbl-dash-patrimonio')) {
-            setTxt('lbl-dash-patrimonio', `${fmt(dataResumen.patrimonio_neto)} ${estado.monedaGlobal}`);
-            setTxt('lbl-dash-apartados', `${fmt(dataResumen.apartados)}`);
-            setTxt('lbl-dash-inversiones', `${fmt(dataResumen.inversiones)} ${estado.monedaGlobal}`);
+            setHTML('lbl-dash-patrimonio', `${montoHTML(dataResumen.patrimonio_neto)} ${estado.monedaGlobal}`);
+            setHTML('lbl-dash-apartados', montoHTML(dataResumen.apartados));
+            setHTML('lbl-dash-inversiones', `${montoHTML(dataResumen.inversiones)} ${estado.monedaGlobal}`);
 
             // Tira de Distribución de Patrimonio (Metas vs Inversiones)
             const vAp = Math.max(0, Number(dataResumen.apartados) || 0);
@@ -86,7 +86,7 @@ export async function cargarDatos() {
         renderTablaMovimientos();
 
         if (document.getElementById('lbl-apartados-total-acum')) {
-            document.getElementById('lbl-apartados-total-acum').textContent = `${fmt(dataResumen.apartados)}`;
+            document.getElementById('lbl-apartados-total-acum').innerHTML = `${montoHTML(dataResumen.apartados)}`;
         }
 
         // 2. Resumen Mensual Histórico
@@ -109,8 +109,8 @@ export async function cargarDatos() {
                     div.innerHTML = `
                         <div><strong>${escapeHTML(nombreMes)}</strong></div>
                         <div class="monthly-info">
-                            <span style="color: var(--success-text);">+${fmt(m.ingresos)}</span>
-                            <span style="color: var(--danger-text);">-${fmt(m.gastos)}</span>
+                            <span style="color: var(--success-text);">+${montoHTML(m.ingresos)}</span>
+                            <span style="color: var(--danger-text);">-${montoHTML(m.gastos)}</span>
                         </div>
                     `;
                     contenedorMensual.appendChild(div);

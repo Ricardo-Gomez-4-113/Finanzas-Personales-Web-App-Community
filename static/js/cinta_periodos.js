@@ -5,7 +5,7 @@
  * Solo pinta: el libre, el saldo y los fijos vienen del backend.
  */
 
-import { fmt } from './core.js';
+import { montoHTML } from './core.js';
 
 const el = (tag, clase, texto) => {
     const nodo = document.createElement(tag);
@@ -52,7 +52,7 @@ function celda(p, indice, seleccionado, onSeleccionar) {
     boton.append(
         el('span', 'cinta-periodo-rango', `${fechaCorta(p.inicio)} – ${fechaCorta(p.fin)}`),
         el('span', 'cinta-periodo-estado', p.en_curso ? 'En curso' : 'Proyectado'),
-        el('strong', 'cinta-periodo-libre', fmt(t.saldo_al_cierre)),
+        Object.assign(el('strong', 'cinta-periodo-libre'), { innerHTML: montoHTML(t.saldo_al_cierre) }),
         el('span', 'cinta-periodo-etiqueta', 'Saldo al cierre'),
     );
     if (t.ingresos > 0) {
@@ -60,7 +60,7 @@ function celda(p, indice, seleccionado, onSeleccionar) {
     } else {
         boton.append(el('span', 'cinta-periodo-sin-ingreso', 'Sin cobro en este periodo'));
     }
-    boton.append(el('span', 'cinta-periodo-ingreso', t.ingresos > 0 ? `Ingreso ${fmt(t.ingresos)}` : ''));
+    boton.append(Object.assign(el('span', 'cinta-periodo-ingreso'), { innerHTML: t.ingresos > 0 ? `Ingreso ${montoHTML(t.ingresos)}` : '' }));
 
     boton.addEventListener('click', () => onSeleccionar(indice));
     return boton;

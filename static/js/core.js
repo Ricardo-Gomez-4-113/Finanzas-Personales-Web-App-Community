@@ -115,6 +115,11 @@ export function fmt(valor, moneda = estado.monedaGlobal) {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: moneda, currencyDisplay: 'narrowSymbol' }).format(Number(valor) || 0);
 }
 
+// Cifra sensible: el modo privacidad la desenfoca (regla .dato-sensible). Solo para innerHTML con datos numéricos.
+export function montoHTML(valor, moneda = estado.monedaGlobal) {
+    return `<span class="dato-sensible">${fmt(valor, moneda)}</span>`;
+}
+
 export function toast(msg, tipo = 'ok') {
     const raiz = document.getElementById('toast-root') || document.body;
     const el = document.createElement('div');

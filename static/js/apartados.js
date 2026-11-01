@@ -2,7 +2,7 @@
  * static/js/apartados.js - Apartados y metas de ahorro.
  */
 
-import { apiFetch, escapeHTML, fmt, formatErrorDetail, leerJson, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, fmt, montoHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
 
 
 // =============================================================================
@@ -38,8 +38,8 @@ export async function cargarApartados() {
                 const porcentaje = Math.min(item.porcentaje || 0, 100);
                 contenidoMeta = `
                     <div class="apartado-meta">
-                        <span>${item.porcentaje}% de ${fmt(item.meta_monto)}</span>
-                        <span>Faltan ${fmt(Math.max(0, item.meta_monto - item.monto_actual))}</span>
+                        <span>${item.porcentaje}% de ${montoHTML(item.meta_monto)}</span>
+                        <span>Faltan ${montoHTML(Math.max(0, item.meta_monto - item.monto_actual))}</span>
                     </div>
                     <div class="progress-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${porcentaje}" aria-label="Avance de ${escapeHTML(item.nombre)}">
                         <div class="progress-bar-fill" style="width: ${porcentaje}%;"></div>
@@ -53,7 +53,7 @@ export async function cargarApartados() {
                     <h3 class="apartado-nombre">${escapeHTML(item.nombre)}</h3>
                     <span class="badge-tag ${item.tipo === 'meta' ? 'badge-fijo' : ''}">${item.tipo === 'meta' ? 'Meta' : 'Sobre libre'}</span>
                 </div>
-                <p class="apartado-saldo">${fmt(item.monto_actual)}</p>
+                <p class="apartado-saldo">${montoHTML(item.monto_actual)}</p>
                 ${contenidoMeta}
                 <div class="acciones-apartado">
                     <input type="number" id="monto-acc-${item.id}" step="0.01" min="0.01" placeholder="Monto">

@@ -1150,6 +1150,25 @@ def test_boton_cotizar_no_sobresale_del_campo(navegador, base):
         ctx.close()
 
 
+def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
+    """Con el modo privacidad activo, toda cifra visible (en cualquier pestaña) queda desenfocada."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        page.click("#btn-toggle-privacidad")
+        for tab in ["tab-dashboard", "tab-movimientos", "tab-apartados", "tab-inversiones", "tab-presupuesto"]:
+            _ir(page, tab)
+            resultado = page.evaluate("""() => {
+                const visibles = [...document.querySelectorAll('.dato-sensible')].filter(el => el.offsetParent !== null);
+                return {total: visibles.length, sinDesenfocar: visibles.filter(el => getComputedStyle(el).filter === 'none').map(el => el.textContent.slice(0, 30))};
+            }""")
+            assert resultado["total"] > 0, f"{tab}: no hay cifras marcadas como sensibles"
+            assert not resultado["sinDesenfocar"], f"{tab}: cifras sin desenfocar: {resultado['sinDesenfocar']}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1204,6 +1223,7 @@ if __name__ == "__main__":
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
+                (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

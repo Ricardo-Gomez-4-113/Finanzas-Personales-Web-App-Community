@@ -2,7 +2,7 @@
  * static/js/inversiones.js - Posiciones bursátiles, dona de asignación, buscador y sincronización.
  */
 
-import { actualizarIndicadorTasa, apiFetch, colorVar, escapeHTML, estado, fmt, formatErrorDetail, recargar, toast } from './core.js';
+import { actualizarIndicadorTasa, apiFetch, colorVar, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
 
 
 export async function cargarInversiones() {
@@ -19,21 +19,21 @@ export async function cargarInversiones() {
 
 
         // Tarjetas de Resumen
-        document.getElementById('lbl-inv-invertido').textContent = `${fmt(resumen.total_invertido)} ${estado.monedaGlobal}`;
-        document.getElementById('lbl-inv-valor').textContent = `${fmt(resumen.total_valor_actual)} ${estado.monedaGlobal}`;
+        document.getElementById('lbl-inv-invertido').innerHTML = `${montoHTML(resumen.total_invertido)} ${estado.monedaGlobal}`;
+        document.getElementById('lbl-inv-valor').innerHTML = `${montoHTML(resumen.total_valor_actual)} ${estado.monedaGlobal}`;
         
         const lblPnl = document.getElementById('lbl-inv-pnl');
         const signo = resumen.total_pnl >= 0 ? '+' : '';
         const signoMonto = resumen.total_pnl < 0 ? '-' : (resumen.total_pnl > 0 ? '+' : '');
 
         if (lblPnl) {
-            lblPnl.innerHTML = `${signoMonto}${fmt(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <span id="lbl-inv-pnl-pct" class="pnl-badge">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</span>`;
+            lblPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <span id="lbl-inv-pnl-pct" class="pnl-badge">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</span>`;
             lblPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 
         const lblDashPnl = document.getElementById('lbl-dash-pnl');
         if (lblDashPnl) {
-            lblDashPnl.innerHTML = `${signoMonto}${fmt(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <small style="font-size: 0.85rem;">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
+            lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <small style="font-size: 0.85rem;">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
             lblDashPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 
@@ -55,7 +55,7 @@ export async function cargarInversiones() {
                         : 'background: rgba(52, 152, 219, 0.15); color: var(--accent-color);';
 
                     const subOrig = (pos.moneda !== estado.monedaGlobal)
-                        ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;">(${fmt(pos.valor_actual_orig)} ${pos.moneda})</small>`
+                        ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;">(${montoHTML(pos.valor_actual_orig)} ${pos.moneda})</small>`
                         : '';
 
                     estado.cache.inversiones[pos.id] = pos;
@@ -63,10 +63,10 @@ export async function cargarInversiones() {
                         <td><strong>${escapeHTML(pos.ticker)}</strong></td>
                         <td><span class="badge-peso" style="${badgeMonedaColor}">${escapeHTML(pos.moneda)}</span></td>
                         <td>${escapeHTML(String(pos.cantidad))}</td>
-                        <td>${fmt(pos.precio_promedio)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
-                        <td>${fmt(pos.precio_actual)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
-                        <td><strong>${fmt(pos.valor_actual)}</strong> ${subOrig}</td>
-                        <td class="${clasePnl}">${signoPosMonto}${fmt(Math.abs(pos.pnl))} (${signoPos}${pos.pnl_porcentaje.toFixed(2)}%)</td>
+                        <td>${montoHTML(pos.precio_promedio)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
+                        <td>${montoHTML(pos.precio_actual)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
+                        <td><strong>${montoHTML(pos.valor_actual)}</strong> ${subOrig}</td>
+                        <td class="${clasePnl}">${signoPosMonto}${montoHTML(Math.abs(pos.pnl))} (${signoPos}${pos.pnl_porcentaje.toFixed(2)}%)</td>
                         <td><span class="badge-peso">${pos.peso_porcentaje.toFixed(1)}%</span></td>
                         <td class="col-acciones">
                             <button type="button" class="btn-accion btn-editar" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarInversionPorId", pos.id]]))}" title="Editar posición"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
