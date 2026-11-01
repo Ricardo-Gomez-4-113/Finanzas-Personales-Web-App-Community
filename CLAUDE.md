@@ -81,6 +81,19 @@ Fases 1 a 6 cerradas.
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
+## Plan de auditoría de interfaz (en curso)
+
+Decisiones: el euro es moneda base seleccionable; todo se convierte a la moneda base elegida (nada de «pesos» fijo); los comentarios van solo a la base de datos, sin correo ni panel (se consultan con una consulta a la base maestra). Cada corrección lleva su prueba, que falla con el código anterior. Flujo: Community, luego `portar-a-saas.sh`.
+
+1. **Sidebar colapsado:** el icono se comprime. Medir en navegador y fijar tamaño y `flex-shrink` del icono. Hay media queries vacías en `vistas.css` (código muerto).
+2. **Modo privacidad:** hoy es una lista fija de selectores (`layout.css`); el presupuesto y otras pestañas quedan visibles. Pasar a una clase única `.dato-sensible` aplicada donde se pinta un monto (≈62 llamadas a `fmt(` en 9 archivos), con una sola regla de desenfoque.
+3. **Euro como moneda base:** `core.js` fuerza MXN o USD, y el selector de la barra y el de moneda del activo solo ofrecen MXN y USD. Revisar `/api/gastos-por-categoria` (recibe solo la tasa MXN) y los textos fijos como «se convierte a MXN» y la nota bajo Cotizar. Revisar todos los routers y la exportación a Excel.
+4. **Botón Cotizar muy grande:** el campo mide 26 px y el botón 36 px. Auditar alturas de controles (36, 38, 40, 44 y 48 px repartidas) y los grupos input más botón; unificar con un token.
+5. **Formularios completos:** 15 formularios y ≈88 campos. Recuadros blancos en el login (probable relleno automático: no hay reglas `:-webkit-autofill`). Revisar estados, temas y móvil en todos, y arreglar con reglas únicas.
+6. **Comentarios desde el menú de usuario:** modal con tipo y mensaje (máx. 1000), `POST /api/comentarios` con sesión, tabla `comentarios` en la base maestra (migración nueva), tope por usuario, sin contenido en el registro de fallos, se eliminan al borrar la cuenta. Va al final.
+
+Orden: diagnóstico con capturas de 1, 4 y 5; luego inventario de `fmt()` y del euro; correcciones 5, 1, 4, 2, 3 y 6.
+
 ## Seguridad (revisión del login C1 a C6 y pruebas de borde)
 
 Revisión enfocada del control de fuerza bruta, validada en un espacio de red sin salida (`unshare -rn`) con usuarios dummy.
