@@ -233,12 +233,15 @@ def test_restore_solo_afecta_al_propio_tenant(client, ha, hb):
     assert client.post("/api/restore", files={"file": ("x.db", respaldo_b, "application/octet-stream")}).status_code == 401
 
 
-def test_health_publico_y_sin_datos_de_usuarios(client):
+def test_health_publico_solo_dice_si_responde(client):
+    """/health es público: solo informa si el servicio responde. El estado interno requiere administrador."""
     r = client.get("/health")
     assert r.status_code == 200, r.text
-    assert set(r.json()) == {"status", "base_maestra", "respaldo", "horas_desde_respaldo"}, r.json()
-    assert r.json()["base_maestra"] == "ok"
-    assert "usuario_a" not in r.text and "secreto" not in r.text
+    assert r.json() == {"status": "ok"}, r.json()
+    assert client.get("/api/salud/detalle").status_code == 401
+    assert client.get("/api/salud/detalle", headers=_login(client, "usuario_a")).status_code == 403
+    detalle = client.get("/api/salud/detalle", headers=_login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])).json()
+    assert set(detalle) == {"status", "base_maestra", "respaldo", "horas_desde_respaldo"}, detalle
 
 
 def test_login_bloquea_tras_5_fallos(client):
@@ -633,7 +636,7 @@ def test_health_responde_503_si_la_base_maestra_cae(client):
     with _parchar(rsalud, get_master_conn=caida):
         r = client.get("/health")
     assert r.status_code == 503, r.text
-    assert r.json()["status"] == "error" and r.json()["base_maestra"] == "error", r.json()
+    assert r.json() == {"status": "error"}, r.json()
 
 
 def test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin):
@@ -709,7 +712,7 @@ if __name__ == "__main__":
             (test_restore_rechaza_archivos_malos_sin_tocar_datos, lambda: test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)),
             (test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles, lambda: test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles(client, hb)),
             (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
-            (test_health_publico_y_sin_datos_de_usuarios, lambda: test_health_publico_y_sin_datos_de_usuarios(client)),
+            (test_health_publico_solo_dice_si_responde, lambda: test_health_publico_solo_dice_si_responde(client)),
             (test_borrar_retiro_de_meta_devuelve_el_dinero, lambda: test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)),
             (test_reset_no_revela_existencia_de_cuenta, lambda: test_reset_no_revela_existencia_de_cuenta(client)),
             (test_sincronizar_tiene_enfriamiento, lambda: test_sincronizar_tiene_enfriamiento(client, ha)),

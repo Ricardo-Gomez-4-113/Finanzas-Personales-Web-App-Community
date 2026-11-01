@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Verificación de solo lectura de los contenedores en ejecución (no crea usuarios ni toca datos).
 # Uso: ./scripts/smoke_produccion.sh            (SaaS 8001 y Community 8002)
+#      SMOKE_ADMIN_TOKEN=... ./scripts/smoke_produccion.sh   (además revisa el respaldo, solo para administradores)
 #      ./scripts/smoke_produccion.sh 8002       (solo el puerto indicado)
 # Sale con 1 si algo crítico falla. Las advertencias (por ejemplo, respaldo vencido) no fallan.
 set -u
@@ -19,14 +20,18 @@ for p in "${PUERTOS[@]}"; do
   base="http://127.0.0.1:$p"
   echo "== puerto $p"
 
-  # 1. Salud: la base maestra responde; "degradado" es aviso (p. ej. respaldo vencido)
+  # 1. Salud: /health público solo dice si responde. El detalle (base maestra, respaldo) requiere
+  #    administrador: se consulta solo si se pasa SMOKE_ADMIN_TOKEN (token de un administrador).
   salud=$(curl -s -m 10 "$base/health")
   case "$salud" in
-    *'"base_maestra":"ok"'*) ok "/health base maestra";;
+    *'"status":"ok"'*) ok "/health responde";;
     *) falla "/health no responde o la base maestra falla: ${salud:-sin respuesta}";;
   esac
-  if echo "$salud" | grep -q '"status":"degradado"'; then
-    aviso "/health degradado: $(echo "$salud" | grep -o '"respaldo":"[a-z]*"')"
+  if [[ -n "${SMOKE_ADMIN_TOKEN:-}" ]]; then
+    detalle=$(curl -s -m 10 -H "Authorization: Bearer $SMOKE_ADMIN_TOKEN" "$base/api/salud/detalle")
+    if echo "$detalle" | grep -q '"respaldo":"vencido"'; then
+      aviso "respaldo vencido: $(echo "$detalle" | grep -o '"horas_desde_respaldo":[0-9.a-z]*')"
+    fi
   fi
 
   # 2. Páginas principales

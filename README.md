@@ -97,7 +97,7 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 ### 10. 🩺 Respaldo Automático y Monitoreo
 * **Respaldo nocturno:** `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/`, verifica cada copia y conserva 14 días.
 * **Respaldo previo a migrar:** antes de actualizar el esquema de un tenant se guarda una copia en `data/backups_premigracion/`.
-* **`/health`:** estado de la base maestra y antigüedad del último respaldo; lo usa el `healthcheck` de Docker.
+* **`/health`:** público, solo dice si el servicio responde (`{"status":"ok"}`, o 503 si la base maestra no responde); lo usa el `healthcheck` de Docker. El detalle (base maestra y antigüedad del respaldo) está en `/api/salud/detalle`, solo para administradores.
 
 ---
 
@@ -194,7 +194,7 @@ Finanzas-Personales-Web-App-Community/
    ```cron
    0 3 * * * docker exec finanzas-community python3 scripts/respaldo_automatico.py
    ```
-   Mientras no exista un respaldo de las últimas 26 horas, `/health` reportará `"respaldo": "vencido"`.
+   Mientras no exista un respaldo de las últimas 26 horas, `/api/salud/detalle` reportará `"respaldo": "vencido"`.
 
 ### 🔑 Credenciales Iniciales por Defecto
 
@@ -305,7 +305,8 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 ### Monitoreo
 | Método | Endpoint | Seguridad | Descripción |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Público | Estado de la base maestra y del último respaldo (503 si la base no responde). No expone datos de usuarios |
+| `GET` | `/health` | Público | Solo indica si el servicio responde (503 si la base maestra no responde). No expone estado interno |
+| `GET` | `/api/salud/detalle` | Administrador | Estado de la base maestra y antigüedad del último respaldo |
 
 ---
 

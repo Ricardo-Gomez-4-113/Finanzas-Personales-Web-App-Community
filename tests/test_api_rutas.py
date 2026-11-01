@@ -245,11 +245,12 @@ def test_cuenta_propia_se_elimina_y_deja_de_entrar(client):
 
 
 def test_salud_degradada_si_el_respaldo_vence(client):
+    admin = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
     with _parchar(rsalud, _horas_desde_ultimo_respaldo=lambda: 30.0):
-        r = client.get("/health")
+        r = client.get("/api/salud/detalle", headers=admin)
     assert r.status_code == 200 and r.json()["status"] == "degradado" and r.json()["respaldo"] == "vencido", r.text
     with _parchar(rsalud, _horas_desde_ultimo_respaldo=lambda: None):
-        r = client.get("/health")
+        r = client.get("/api/salud/detalle", headers=admin)
     assert r.json()["respaldo"] == "vencido" and r.json()["horas_desde_respaldo"] is None, r.text
 
 
@@ -269,8 +270,9 @@ def test_apartado_solo_se_borra_sin_saldo(client):
 def test_salud_lee_la_antiguedad_del_ultimo_respaldo(client):
     carpeta = os.path.join(TMP, "respaldos_salud")
     os.makedirs(os.path.join(carpeta, datetime.now().strftime("%Y%m%d_%H%M%S")), exist_ok=True)
+    admin = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
     with _parchar(rsalud, RESPALDOS_DIR=carpeta):
-        r = client.get("/health")
+        r = client.get("/api/salud/detalle", headers=admin)
     assert r.json()["respaldo"] == "ok" and r.json()["horas_desde_respaldo"] < 1, r.text
     with _parchar(rsalud, RESPALDOS_DIR=os.path.join(carpeta, "no_existe")):
         assert rsalud._horas_desde_ultimo_respaldo() is None
