@@ -282,6 +282,65 @@ def test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada():
     _vaciar_contadores()
 
 
+def _servidor_real():
+    """uvicorn en un hilo, en loopback: los tiempos de respuesta reales incluyen las tareas de fondo."""
+    import socket
+    import urllib.request
+    import uvicorn
+    with socket.socket() as s_:
+        s_.bind(("127.0.0.1", 0))
+        puerto = s_.getsockname()[1]
+    srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=puerto, log_level="error"))
+    threading.Thread(target=srv.run, daemon=True).start()
+    for _ in range(100):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{puerto}/health", timeout=1)
+            return srv, puerto
+        except Exception:
+            time.sleep(0.1)
+    raise RuntimeError("el servidor de la prueba no arrancó")
+
+
+def test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta():
+    """Con una cuenta que tiene correo, la respuesta no tarda más que con una cuenta inexistente."""
+    import email_service
+    import json
+    import statistics
+    import urllib.request
+    _crear_usuario("seg_tiempo")
+    _vaciar_contadores()
+    original_crear = master_db.create_password_reset_code
+
+    def crear_lento(user_id):
+        time.sleep(0.3)  # coste de escritura: en la ruta síncrona se vería como diferencia de tiempo
+        return original_crear(user_id)
+
+    def pedir(identificador, ip, puerto):
+        body = json.dumps({"identifier": identificador}).encode()
+        req = urllib.request.Request(f"http://127.0.0.1:{puerto}/auth/forgot-password", data=body,
+                                     headers={"Content-Type": "application/json", "CF-Connecting-IP": ip})
+        inicio = time.perf_counter()
+        with urllib.request.urlopen(req, timeout=30) as r:
+            r.read()
+        return time.perf_counter() - inicio
+
+    srv, puerto = _servidor_real()
+    try:
+        with _parchar(email_service, esta_configurado_servicio_correo=lambda: True, enviar_correo_codigo_recuperacion=lambda *a, **k: None), \
+                _parchar(master_db, create_password_reset_code=crear_lento):
+            con, sin = [], []
+            for i in range(5):
+                _vaciar_contadores()
+                con.append(pedir("seg_tiempo", f"198.51.100.{i + 1}", puerto))
+                _vaciar_contadores()
+                sin.append(pedir(f"seg_nadie{i}", f"198.51.101.{i + 1}", puerto))
+    finally:
+        srv.should_exit = True
+    mediana_con, mediana_sin = statistics.median(con), statistics.median(sin)
+    assert abs(mediana_con - mediana_sin) < 0.1, f"con cuenta {mediana_con:.3f}s, sin cuenta {mediana_sin:.3f}s"
+    _vaciar_contadores()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -297,6 +356,7 @@ if __name__ == "__main__":
         (test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion, test_alias_de_la_cuenta_comparte_el_mismo_tope_de_recuperacion),
         (test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta, test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta),
         (test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada, test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada),
+        (test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta, test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")

@@ -201,6 +201,12 @@ def eliminar_mi_cuenta(current_user: Dict[str, Any] = Depends(verify_token)):
 # ENDPOINTS: RECUPERACIÓN DE CONTRASEÑA POR EMAIL
 # =============================================================================
 
+def _emitir_codigo_recuperacion(user_id: int, email: str, username: str) -> None:
+    """Trabajo de fondo de la solicitud de código: guarda el código y lo envía."""
+    from email_service import enviar_correo_codigo_recuperacion
+    codigo = master_db.create_password_reset_code(user_id)
+    enviar_correo_codigo_recuperacion(email, username, codigo)
+
 @router.post("/auth/forgot-password", summary="Solicitar código de restablecimiento de contraseña")
 def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks, request: Request):
     """
@@ -211,7 +217,7 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
     4. Si tiene email registrado, genera código y lo envía en segundo plano por correo/SMTP.
     5. Responde con un mensaje neutro para evitar enumeración de usuarios.
     """
-    from email_service import esta_configurado_servicio_correo, enviar_correo_codigo_recuperacion
+    from email_service import esta_configurado_servicio_correo
     if not esta_configurado_servicio_correo():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -226,13 +232,8 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
     user = master_db.get_user_by_identifier(req.identifier)
     # El tope por cuenta no depende de la IP: sin cupo no se envía otro código, y la respuesta es la misma
     if user and user.get("email") and user.get("is_active") and reservar_cupo_cuenta("solicitud", user["id"]):
-        codigo = master_db.create_password_reset_code(user["id"])
-        background_tasks.add_task(
-            enviar_correo_codigo_recuperacion,
-            user["email"],
-            user["username"],
-            codigo
-        )
+        # La escritura del código va en segundo plano: el tiempo de respuesta no debe revelar si la cuenta existe
+        background_tasks.add_task(_emitir_codigo_recuperacion, user["id"], user["email"], user["username"])
 
     return {
         "mensaje": "Si el usuario o correo electrónico existe y tiene una dirección registrada, hemos enviado un código de recuperación de 6 dígitos (válido por 15 minutos)."
