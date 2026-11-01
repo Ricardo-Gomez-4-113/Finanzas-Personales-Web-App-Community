@@ -241,7 +241,7 @@ def test_health_publico_solo_dice_si_responde(client):
     assert client.get("/api/salud/detalle").status_code == 401
     assert client.get("/api/salud/detalle", headers=_login(client, "usuario_a")).status_code == 403
     detalle = client.get("/api/salud/detalle", headers=_login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])).json()
-    assert set(detalle) == {"status", "base_maestra", "respaldo", "horas_desde_respaldo"}, detalle
+    assert set(detalle) == {"status", "base_maestra"}, detalle
 
 
 def test_login_bloquea_tras_5_fallos(client):

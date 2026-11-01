@@ -94,10 +94,9 @@ Diseñada desde cero para ser rápida, privada y correr de forma ultra eficiente
 * Compras a meses sin intereses dentro de un pago: una tarjeta MSI aporta su cuota mensual y, al exportar, se convierte en una compra a cuotas con el plazo indicado.
 * Exportación del presupuesto a gastos fijos con fecha de inicio configurable. Es un reemplazo total: borra todos los fijos, también las compras a meses que no estén en el presupuesto, y crea los del presupuesto. Cada tarjeta de un pago es un fijo mensual en el día de su pago.
 
-### 10. 🩺 Respaldo Automático y Monitoreo
-* **Respaldo nocturno:** `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/`, verifica cada copia y conserva 14 días.
+### 10. 🩺 Respaldo Previo y Monitoreo
 * **Respaldo previo a migrar:** antes de actualizar el esquema de un tenant se guarda una copia en `data/backups_premigracion/`.
-* **`/health`:** público, solo dice si el servicio responde (`{"status":"ok"}`, o 503 si la base maestra no responde); lo usa el `healthcheck` de Docker. El detalle (base maestra y antigüedad del respaldo) está en `/api/salud/detalle`, solo para administradores.
+* **`/health`:** público, solo dice si el servicio responde (`{"status":"ok"}`, o 503 si la base maestra no responde); lo usa el `healthcheck` de Docker. El detalle (base maestra) está en `/api/salud/detalle`, solo para administradores.
 
 ---
 
@@ -126,7 +125,7 @@ Finanzas-Personales-Web-App-Community/
 ├── email_service.py     # Correos transaccionales (API o SMTP)
 ├── test_finanzas.py     # Pruebas de la lógica financiera (sin dependencias)
 ├── tests/               # Pruebas en Docker: API, aislamiento, migraciones, respaldo y navegador (Playwright)
-├── scripts/             # respaldo_automatico, migrar_todos, cache_bust y verificar_reglas
+├── scripts/             # migrar_todos, cache_bust, verificar_reglas y smoke_produccion
 ├── docs/DESARROLLO.md   # Guía de desarrollo, pruebas y mantenimiento
 ├── requirements.txt     # Dependencias con versiones fijas (fastapi, uvicorn, pydantic, openpyxl, bcrypt, pyjwt)
 ├── Dockerfile           # Imagen Docker basada en python:3.11-slim (sin --reload)
@@ -137,7 +136,6 @@ Finanzas-Personales-Web-App-Community/
 ├── data/                # Almacenamiento local (ignorado en git)
 │   ├── auth_master.db   # Base maestra de usuarios
 │   ├── tenants/         # Una base SQLite por usuario (user_1.db, user_2.db...)
-│   └── backups/         # Respaldos automáticos con rotación
 └── static/
     ├── index.html       # SPA: login, pestañas y modales
     ├── css/             # tokens.css, componentes.css, layout.css, vistas.css
@@ -191,11 +189,6 @@ Finanzas-Personales-Web-App-Community/
    > ```
    > Tras cambiar código en Docker, vuelve a construir con `docker compose up -d --build`.
 
-5. **Programar el respaldo nocturno (recomendado):** agrega al crontab del host (`crontab -e`):
-   ```cron
-   0 3 * * * docker exec finanzas-community python3 scripts/respaldo_automatico.py
-   ```
-   Mientras no exista un respaldo de las últimas 26 horas, `/api/salud/detalle` reportará `"respaldo": "vencido"`.
 
 ### 🔑 Credenciales Iniciales por Defecto
 
@@ -307,7 +300,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | Método | Endpoint | Seguridad | Descripción |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | Público | Solo indica si el servicio responde (503 si la base maestra no responde). No expone estado interno |
-| `GET` | `/api/salud/detalle` | Administrador | Estado de la base maestra y antigüedad del último respaldo |
+| `GET` | `/api/salud/detalle` | Administrador | Estado de la base maestra |
 
 ---
 
@@ -331,7 +324,7 @@ uvicorn main:app --reload --port 8001
 
 ```bash
 python3 test_finanzas.py   # lógica financiera: rápido, sin Docker ni dependencias
-./tests/run_tests.sh       # todo en Docker: reglas, finanzas, migraciones, respaldo y API
+./tests/run_tests.sh       # todo en Docker: reglas, finanzas, migraciones, respaldo a mano y API
 ./tests/run_frontend.sh    # navegador real (Playwright): login, pestañas, desbordamiento y foco en modales
 ```
 

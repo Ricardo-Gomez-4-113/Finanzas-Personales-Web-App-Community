@@ -19,7 +19,7 @@ Guía práctica para trabajar en el código. La arquitectura (backend FastAPI, S
 Todo corre en contenedores efímeros: no toca el contenedor en producción ni `data/`.
 
 ```bash
-./tests/run_tests.sh       # reglas, lógica financiera, migraciones, respaldo, API (aislamiento, JWT, restore, /health)
+./tests/run_tests.sh       # reglas, lógica financiera, migraciones, respaldo a mano, API (aislamiento, JWT, restore, /health)
 ./tests/run_frontend.sh    # navegador real (Playwright): login, pestañas, desbordamiento 1366x768 y móvil, foco en modales
 python3 test_finanzas.py   # solo la lógica financiera, rápido y sin Docker
 ```
@@ -96,9 +96,8 @@ Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (l
 
 ## Respaldos
 
-- `scripts/respaldo_automatico.py` copia la base maestra y todos los tenants a `data/backups/AAAAmmdd_HHMMSS/`, verifica cada copia y borra las de más de 14 días.
-- Se programa con cron, por ejemplo: `0 3 * * * docker exec <contenedor> python3 scripts/respaldo_automatico.py`.
-- `/health` reporta `"respaldo": "vencido"` si el último tiene más de 26 horas, y responde 503 si la base maestra no responde. El `healthcheck` de `docker-compose.yml` usa ese endpoint.
+- El respaldo nocturno automático está fuera de Community: no hay script ni cron. Queda pendiente para el servidor de producción.
+- Los usuarios descargan y restauran su propia base desde la app (`/api/backup`, `/api/restore`).
 
 ## Sincronizar SaaS y Community (mantenedores)
 

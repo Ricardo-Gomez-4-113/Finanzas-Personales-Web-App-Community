@@ -23,7 +23,6 @@ docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINAN
   paso reglas               ./scripts/verificar_reglas.sh
   paso test_finanzas        python3 test_finanzas.py
   paso test_migraciones     python3 tests/test_migraciones.py
-  paso test_respaldo        python3 tests/test_respaldo_automatico.py
   paso test_mercado         python3 tests/test_mercado.py
   paso test_acciones        python3 tests/test_acciones.py
   paso test_api_aislamiento python3 tests/test_api_aislamiento.py

@@ -13,7 +13,6 @@ import sqlite3
 import sys
 import tempfile
 import time
-from datetime import date, datetime, timedelta
 
 try:
     import httpx  # noqa: F401
@@ -40,9 +39,6 @@ import master_db  # noqa: E402
 import security  # noqa: E402
 from main import app  # noqa: E402
 import routers.inversiones as rinversiones  # noqa: E402
-import routers.salud as rsalud  # noqa: E402
-from contextlib import contextmanager  # noqa: E402
-import routers.salud as rsalud  # noqa: E402
 from contextlib import contextmanager  # noqa: E402
 
 PASS = "Passw0rd#Test1"
@@ -244,14 +240,13 @@ def test_cuenta_propia_se_elimina_y_deja_de_entrar(client):
     assert client.post("/auth/login", json={"username": "ruta_borrar", "password": PASS}).status_code == 401
 
 
-def test_salud_degradada_si_el_respaldo_vence(client):
+def test_salud_detalle_es_solo_de_administradores(client):
+    _crear_usuario("ruta_salud_usuario")
+    h = _login(client, "ruta_salud_usuario")
+    assert client.get("/api/salud/detalle", headers=h).status_code in (401, 403)
     admin = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
-    with _parchar(rsalud, _horas_desde_ultimo_respaldo=lambda: 30.0):
-        r = client.get("/api/salud/detalle", headers=admin)
-    assert r.status_code == 200 and r.json()["status"] == "degradado" and r.json()["respaldo"] == "vencido", r.text
-    with _parchar(rsalud, _horas_desde_ultimo_respaldo=lambda: None):
-        r = client.get("/api/salud/detalle", headers=admin)
-    assert r.json()["respaldo"] == "vencido" and r.json()["horas_desde_respaldo"] is None, r.text
+    r = client.get("/api/salud/detalle", headers=admin)
+    assert r.status_code == 200 and r.json() == {"status": "ok", "base_maestra": "ok"}, r.text
 
 
 def test_apartado_solo_se_borra_sin_saldo(client):
@@ -265,17 +260,6 @@ def test_apartado_solo_se_borra_sin_saldo(client):
     assert client.post(f"/api/apartados/{apartado}/movimiento", json={"monto": 300, "accion": "retirar"}, headers=h).status_code in (200, 201)
     assert client.delete(f"/api/apartados/{apartado}", headers=h).status_code == 200
     assert client.delete(f"/api/apartados/{apartado}", headers=h).status_code == 404
-
-
-def test_salud_lee_la_antiguedad_del_ultimo_respaldo(client):
-    carpeta = os.path.join(TMP, "respaldos_salud")
-    os.makedirs(os.path.join(carpeta, datetime.now().strftime("%Y%m%d_%H%M%S")), exist_ok=True)
-    admin = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
-    with _parchar(rsalud, RESPALDOS_DIR=carpeta):
-        r = client.get("/api/salud/detalle", headers=admin)
-    assert r.json()["respaldo"] == "ok" and r.json()["horas_desde_respaldo"] < 1, r.text
-    with _parchar(rsalud, RESPALDOS_DIR=os.path.join(carpeta, "no_existe")):
-        assert rsalud._horas_desde_ultimo_respaldo() is None
 
 
 def test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client):
@@ -385,12 +369,11 @@ if __name__ == "__main__":
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),
             (test_recuperacion_no_revela_cuentas_y_valida_el_codigo, lambda: test_recuperacion_no_revela_cuentas_y_valida_el_codigo(client)),
             (test_cuenta_propia_se_elimina_y_deja_de_entrar, lambda: test_cuenta_propia_se_elimina_y_deja_de_entrar(client)),
-            (test_salud_degradada_si_el_respaldo_vence, lambda: test_salud_degradada_si_el_respaldo_vence(client)),
+            (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
             (test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409, lambda: test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client)),
-            (test_salud_lee_la_antiguedad_del_ultimo_respaldo, lambda: test_salud_lee_la_antiguedad_del_ultimo_respaldo(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
