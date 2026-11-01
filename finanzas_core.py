@@ -760,7 +760,7 @@ def obtener_ventana_corte_fecha(
 
     # Obtener ingresos fijos activos para deducir fechas de corte
     ingresos = cursor.execute("""
-        SELECT dia, monto, frecuencia FROM recurrentes
+        SELECT dia, monto, frecuencia, proxima_fecha FROM recurrentes
         WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
         ORDER BY dia ASC
     """).fetchall()
@@ -809,57 +809,65 @@ def obtener_ventana_corte_fecha(
             d_fin = date(f_target.year, f_target.month, max_d)
             ingreso_ventana = 0.0
     else:
-        dias_corte = set()
-        for ing in ingresos:
-            d = int(ing["dia"]) if ing["dia"] else 1
-            if ing["frecuencia"] == 'quincenal':
-                if d == 15 or d >= 28:
-                    dias_corte.add(15)
-                    dias_corte.add(30)
-                elif d == 1 or d == 16:
-                    dias_corte.add(1)
-                    dias_corte.add(16)
+        # Mismo corte que el tablero (calcular_periodos): el periodo de cobro del ingreso principal que contiene
+        # la fecha. El ingreso de la ventana son los cobros que caen dentro de ella.
+        principal = _ingreso_principal(_recurrentes_vigentes(cursor.connection))
+        if principal is not None:
+            d_inicio, d_fin = periodo_de_cobro_que_contiene(principal, f_target)
+            ingreso_ventana = sum(float(ing["monto"]) * _cobros_en_ventana(ing, d_inicio, d_fin) for ing in ingresos)
+        else:
+            # Sin un ingreso principal (por ejemplo, solo cobros anuales o ligados a metas) se conserva el corte por días
+            dias_corte = set()
+            for ing in ingresos:
+                d = int(ing["dia"]) if ing["dia"] else 1
+                if ing["frecuencia"] == 'quincenal':
+                    if d == 15 or d >= 28:
+                        dias_corte.add(15)
+                        dias_corte.add(30)
+                    elif d == 1 or d == 16:
+                        dias_corte.add(1)
+                        dias_corte.add(16)
+                    else:
+                        dias_corte.add(d)
+                        dias_corte.add(d + 15 if d <= 15 else d - 15)
                 else:
                     dias_corte.add(d)
-                    dias_corte.add(d + 15 if d <= 15 else d - 15)
-            else:
-                dias_corte.add(d)
 
-        dias_ordenados = sorted(list(dias_corte))
+            dias_ordenados = sorted(list(dias_corte))
 
-        # Encontrar corte correspondiente para f_target
-        cortes_previos = [d for d in dias_ordenados if _safe_date(f_target.year, f_target.month, d) <= f_target]
-        if cortes_previos:
-            d1_dia = cortes_previos[-1]
-            idx = dias_ordenados.index(d1_dia)
-            d_inicio = _safe_date(f_target.year, f_target.month, d1_dia)
-            if idx + 1 < len(dias_ordenados):
-                d2_dia = dias_ordenados[idx + 1]
-                d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+            # Encontrar corte correspondiente para f_target
+            cortes_previos = [d for d in dias_ordenados if _safe_date(f_target.year, f_target.month, d) <= f_target]
+            if cortes_previos:
+                d1_dia = cortes_previos[-1]
+                idx = dias_ordenados.index(d1_dia)
+                d_inicio = _safe_date(f_target.year, f_target.month, d1_dia)
+                if idx + 1 < len(dias_ordenados):
+                    d2_dia = dias_ordenados[idx + 1]
+                    d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+                else:
+                    d2_dia = dias_ordenados[0]
+                    m_next = 1 if f_target.month == 12 else f_target.month + 1
+                    y_next = f_target.year + 1 if f_target.month == 12 else f_target.year
+                    d_next = _safe_date(y_next, m_next, d2_dia)
+                d_fin = d_next - timedelta(days=1)
             else:
+                d1_dia = dias_ordenados[-1]
                 d2_dia = dias_ordenados[0]
-                m_next = 1 if f_target.month == 12 else f_target.month + 1
-                y_next = f_target.year + 1 if f_target.month == 12 else f_target.year
-                d_next = _safe_date(y_next, m_next, d2_dia)
-            d_fin = d_next - timedelta(days=1)
-        else:
-            d1_dia = dias_ordenados[-1]
-            d2_dia = dias_ordenados[0]
-            m_prev = 12 if f_target.month == 1 else f_target.month - 1
-            y_prev = f_target.year - 1 if f_target.month == 1 else f_target.year
-            d_inicio = _safe_date(y_prev, m_prev, d1_dia)
-            d_next = _safe_date(f_target.year, f_target.month, d2_dia)
-            d_fin = d_next - timedelta(days=1)
+                m_prev = 12 if f_target.month == 1 else f_target.month - 1
+                y_prev = f_target.year - 1 if f_target.month == 1 else f_target.year
+                d_inicio = _safe_date(y_prev, m_prev, d1_dia)
+                d_next = _safe_date(f_target.year, f_target.month, d2_dia)
+                d_fin = d_next - timedelta(days=1)
 
-        ingreso_ventana = 0.0
-        for ing in ingresos:
-            m = float(ing["monto"])
-            if ing["frecuencia"] == 'quincenal':
-                ingreso_ventana += m
-            elif ing["frecuencia"] == 'semanal':
-                ingreso_ventana += m * 2
-            else:
-                ingreso_ventana += m / max(1, len(dias_ordenados))
+            ingreso_ventana = 0.0
+            for ing in ingresos:
+                m = float(ing["monto"])
+                if ing["frecuencia"] == 'quincenal':
+                    ingreso_ventana += m
+                elif ing["frecuencia"] == 'semanal':
+                    ingreso_ventana += m * 2
+                else:
+                    ingreso_ventana += m / max(1, len(dias_ordenados))
 
     # Reconocer ingresos reales registrados en transacciones durante la ventana
     query_ingresos_reales = """
@@ -1647,6 +1655,37 @@ def _limites_periodos(principal, hoy: date, n: int) -> list:
         limites.append((inicio, cobro - timedelta(days=1), cobro))
         inicio, cobro = cobro, siguiente_fecha(cobro, frecuencia, dia)
     return limites
+
+
+def periodo_de_cobro_que_contiene(principal, fecha: date) -> tuple:
+    """(inicio, fin inclusive) del periodo de cobro del ingreso principal que contiene `fecha`, con el mismo
+    corte que el tablero (_limites_periodos), para cualquier fecha: pasada, actual o futura.
+    Antes del primer cobro conocido el periodo se calcula hacia atrás con la misma periodicidad."""
+    frecuencia, dia = principal["frecuencia"], principal["dia"]
+    cobro = date.fromisoformat(principal["proxima_fecha"])
+    while cobro <= fecha:
+        cobro = siguiente_fecha(cobro, frecuencia, dia)
+    inicio = _inicio_periodo(cobro, frecuencia, dia)
+    while inicio > fecha:
+        cobro, inicio = inicio, _inicio_periodo(inicio, frecuencia, dia)
+    return inicio, cobro - timedelta(days=1)
+
+
+def _cobros_en_ventana(ingreso, inicio: date, fin: date) -> int:
+    """Cuántas veces cae el cobro de un ingreso fijo dentro de [inicio, fin], registradas o aún por materializar."""
+    if not ingreso["proxima_fecha"]:
+        return 0
+    frecuencia, dia = ingreso["frecuencia"], ingreso["dia"]
+    fecha = date.fromisoformat(ingreso["proxima_fecha"])
+    while fecha > inicio and _inicio_periodo(fecha, frecuencia, dia) >= inicio:  # primer cobro dentro o después de inicio
+        fecha = _inicio_periodo(fecha, frecuencia, dia)
+    while fecha < inicio:
+        fecha = siguiente_fecha(fecha, frecuencia, dia)
+    cobros = 0
+    while fecha <= fin:
+        cobros += 1
+        fecha = siguiente_fecha(fecha, frecuencia, dia)
+    return cobros
 
 
 def _ocurrencias_programadas(vigentes: list, hasta: date):

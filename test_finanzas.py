@@ -1442,21 +1442,23 @@ def test_quincena_cortes_dias_estandar_15_y_fin_de_mes():
     """)
     conn.commit()
 
-    # Octubre 26 cae en la quincena 15 al 29
+    # Octubre 26 cae en la quincena del 15 al 30 (el corte de fin de mes es el 31, como en el tablero)
     v26 = obtener_ventana_corte_fecha(cur, '2026-10-26')
     assert v26["inicio"] == '2026-10-15'
-    assert v26["fin"] == '2026-10-29'
+    assert v26["fin"] == '2026-10-30'
     assert v26["ingreso_ventana"] == 18751.08
 
-    # Octubre 30 cae en la quincena 30 de oct al 14 de nov
+    # El 30 todavía es de esa quincena; la siguiente empieza el 31
     v30 = obtener_ventana_corte_fecha(cur, '2026-10-30')
-    assert v30["inicio"] == '2026-10-30'
-    assert v30["fin"] == '2026-11-14'
-    assert v30["ingreso_ventana"] == 18751.08
+    assert (v30["inicio"], v30["fin"]) == ('2026-10-15', '2026-10-30')
+    v31 = obtener_ventana_corte_fecha(cur, '2026-10-31')
+    assert v31["inicio"] == '2026-10-31'
+    assert v31["fin"] == '2026-11-14'
+    assert v31["ingreso_ventana"] == 18751.08
 
-    # Noviembre 5 cae en la misma quincena 30 de oct al 14 de nov
+    # Noviembre 5 cae en la misma quincena del 31 de oct al 14 de nov
     v5 = obtener_ventana_corte_fecha(cur, '2026-11-05')
-    assert v5["inicio"] == '2026-10-30'
+    assert v5["inicio"] == '2026-10-31'
     assert v5["fin"] == '2026-11-14'
     assert v5["ingreso_ventana"] == 18751.08
 
@@ -2649,6 +2651,57 @@ def test_factores_desde_mxn_son_lo_que_vale_un_peso_en_cada_moneda():
         pass
     else:
         raise AssertionError("sin tasa USD/EUR no se puede dar el factor en euros")
+
+
+def _ventanas_y_periodos(ingresos, hoy):
+    from finanzas_core import calcular_periodos
+    conn = nueva_bd()
+    for desc, monto, frec, dia, prox in ingresos:
+        insertar_recurrente(conn, desc, 'ingreso', monto, frec, dia, prox)
+    return conn, calcular_periodos(conn, hoy, 4)["periodos"]
+
+
+def test_ventana_de_validacion_usa_los_mismos_periodos_que_el_tablero():
+    # La validación del límite del periodo cortaba por su cuenta (día 30 fijo, mes completo para un sueldo
+    # semanal) y no coincidía con el periodo que ve el usuario en el tablero
+    hoy = date(2026, 11, 12)
+    casos = {
+        "quincenal": ([("Sueldo", 14000.0, 'quincenal', 15, date(2026, 11, 15))], 14000.0),
+        "mensual": ([("Sueldo", 30000.0, 'mensual', 5, date(2026, 12, 5))], 30000.0),
+        "semanal": ([("Sueldo", 3000.0, 'semanal', None, date(2026, 11, 16))], 3000.0),
+        # El principal marca los cortes; el otro ingreso cuenta en el periodo donde cae su cobro (5 de noviembre)
+        "quincenal y mensual": ([("Sueldo", 14000.0, 'quincenal', 15, date(2026, 11, 15)),
+                                 ("Renta cobrada", 6000.0, 'mensual', 5, date(2026, 12, 5))], 20000.0),
+    }
+    for nombre, (ingresos, ingreso_actual) in casos.items():
+        conn, periodos = _ventanas_y_periodos(ingresos, hoy)
+        for p in periodos:
+            inicio, fin = date.fromisoformat(p["inicio"]), date.fromisoformat(p["fin"])
+            for fecha in (inicio, inicio + (fin - inicio) / 2, fin):
+                v = obtener_ventana_corte_fecha(conn.cursor(), fecha.isoformat())
+                assert (v["inicio"], v["fin"]) == (p["inicio"], p["fin"]), (nombre, fecha, v, p["inicio"], p["fin"])
+        actual = obtener_ventana_corte_fecha(conn.cursor(), hoy.isoformat())
+        assert actual["ingreso_ventana"] == ingreso_actual, (nombre, actual)
+
+        # Fechas pasadas y futuras: ventanas contiguas que contienen la fecha, sin huecos ni traslapes
+        for fecha in (date(2026, 9, 3), date(2026, 10, 31), date(2027, 3, 14)):
+            v = obtener_ventana_corte_fecha(conn.cursor(), fecha.isoformat())
+            assert v["inicio"] <= fecha.isoformat() <= v["fin"], (nombre, fecha, v)
+            siguiente = obtener_ventana_corte_fecha(conn.cursor(), (date.fromisoformat(v["fin"]) + timedelta(days=1)).isoformat())
+            assert siguiente["inicio"] == (date.fromisoformat(v["fin"]) + timedelta(days=1)).isoformat(), (nombre, v, siguiente)
+
+
+def test_ventana_quincenal_corta_en_fin_de_mes_real_y_semanal_es_una_semana():
+    # Octubre tiene 31 días: el corte quincenal es el 31, no un día 30 fijo; y un sueldo semanal es una semana
+    conn, _ = _ventanas_y_periodos([("Sueldo", 14000.0, 'quincenal', 15, date(2026, 11, 15))], date(2026, 11, 12))
+    v = obtener_ventana_corte_fecha(conn.cursor(), "2026-10-30")
+    assert (v["inicio"], v["fin"]) == ("2026-10-15", "2026-10-30"), v
+    v = obtener_ventana_corte_fecha(conn.cursor(), "2026-10-31")
+    assert (v["inicio"], v["fin"]) == ("2026-10-31", "2026-11-14"), v
+
+    conn, _ = _ventanas_y_periodos([("Sueldo", 3000.0, 'semanal', None, date(2026, 11, 16))], date(2026, 11, 12))
+    v = obtener_ventana_corte_fecha(conn.cursor(), "2026-11-12")
+    assert (v["inicio"], v["fin"], v["ingreso_ventana"]) == ("2026-11-09", "2026-11-15", 3000.0), v
 
 
 if __name__ == '__main__':
