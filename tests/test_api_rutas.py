@@ -116,6 +116,9 @@ def test_tipo_de_cambio_privado_y_publico(client):
     with _parchar(rinversiones, obtener_tasas_cambio=lambda: tasas):
         r = client.get("/api/tipo-cambio", headers=h)
         assert r.status_code == 200, r.text
+        # Un peso en cada moneda, calculado en el servidor: 19.5 MXN y 0.92 EUR por USD
+        f = r.json()["factores_desde_mxn"]
+        assert f["MXN"] == 1.0 and abs(f["USD"] - 1 / 19.5) < 1e-9 and abs(f["EUR"] - 0.92 / 19.5) < 1e-9, f
         r = client.get("/api/public/tipo-cambio")
         assert r.status_code == 200, r.text
 

@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=450ec53c4e">
-    <link rel="stylesheet" href="/static/css/layout.css?v=450ec53c4e">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=450ec53c4e">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=450ec53c4e">
-    <link rel="stylesheet" href="/static/css/tema.css?v=450ec53c4e">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=76fabf03b3">
+    <link rel="stylesheet" href="/static/css/layout.css?v=76fabf03b3">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=76fabf03b3">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=76fabf03b3">
+    <link rel="stylesheet" href="/static/css/tema.css?v=76fabf03b3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -482,7 +482,7 @@
                             </div>
                             <div class="form-row-2col">
                                 <div class="form-group">
-                                    <label for="monto">Monto ($)</label>
+                                    <label for="monto">Monto (MXN)</label>
                                     <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
                                 </div>
                                 <div class="form-group">
@@ -586,7 +586,7 @@
                             <div id="rec-campos-fijo">
                                 <div class="form-row-2col">
                                     <div class="form-group">
-                                        <label for="rec-monto">Monto por pago ($)</label>
+                                        <label for="rec-monto">Monto por pago (MXN)</label>
                                         <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
                                     </div>
                                     <div class="form-group">
@@ -602,7 +602,7 @@
                             <div id="rec-campos-msi" class="hidden">
                                 <div class="form-row-2col">
                                     <div class="form-group">
-                                        <label for="rec-total">Monto total ($)</label>
+                                        <label for="rec-total">Monto total (MXN)</label>
                                         <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
                                     </div>
                                     <div class="form-group">
@@ -708,7 +708,7 @@
                     <form id="form-presupuesto-config">
                         <div class="pres-config-row">
                             <div class="form-group pres-fg-monto">
-                                <label for="pres-ingreso-base">Ingreso fijo base</label>
+                                <label for="pres-ingreso-base">Ingreso fijo base (MXN)</label>
                                 <div class="calc-input-adornment">
                                     <span class="calc-adornment-prefix">$</span>
                                     <input type="number" id="pres-ingreso-base" min="0" step="any" placeholder="0.00" class="input-calc calc-has-prefix calc-has-suffix" required>
@@ -1272,7 +1272,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="modal-edit-trans-monto">Monto ($)</label>
+                    <label for="modal-edit-trans-monto">Monto (MXN)</label>
                     <input type="number" step="0.01" min="0.01" id="modal-edit-trans-monto" placeholder="0.00" required>
                 </div>
 
@@ -1320,7 +1320,7 @@
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="modal-edit-rec-monto">Monto ($)</label>
+                        <label for="modal-edit-rec-monto">Monto (MXN)</label>
                         <input type="number" step="0.01" min="0.01" id="modal-edit-rec-monto" placeholder="0.00" required>
                         <small id="modal-edit-rec-monto-hint" class="hint-text hidden">En compras a meses la cuota mensual no se puede alterar.</small>
                     </div>
@@ -1503,7 +1503,7 @@
                 </div>
 
                 <div class="form-group hidden" id="group-meta-monto">
-                    <label for="meta-monto">Monto objetivo meta ($)</label>
+                    <label for="meta-monto">Monto objetivo meta (MXN)</label>
                     <input type="number" id="meta-monto" step="0.01" min="1" placeholder="Ej. 10000">
                 </div>
 
@@ -1538,7 +1538,7 @@
 
                 <div class="form-row-2col">
                     <div class="form-group">
-                        <label for="tarjeta-pres-monto">Monto asignado ($)</label>
+                        <label for="tarjeta-pres-monto">Monto asignado (MXN)</label>
                         <div class="calc-input-adornment">
                             <span class="calc-adornment-prefix">$</span>
                             <input type="number" id="tarjeta-pres-monto" step="0.01" min="0" placeholder="0.00" class="input-calc calc-has-prefix">
@@ -1995,7 +1995,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=450ec53c4e"></script>
+    <script type="module" src="/static/js/main.js?v=76fabf03b3"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

@@ -4,7 +4,7 @@
  * su distribución del ingreso y sus tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en su día.
  */
 
-import { apiFetch, escapeHTML, fmt, montoHTML, formatErrorDetail, toast } from './core.js';
+import { apiFetch, escapeHTML, fmtMXN, montoMxnHTML, formatErrorDetail, toast } from './core.js';
 
 let cachePresupuesto = null;
 // Pago al que pertenece la tarjeta del modal (null cuando se edita fuera de un pago)
@@ -60,7 +60,7 @@ function renderizarVistaPresupuesto(data) {
     const lblEq = document.getElementById('pres-ingreso-equivalentes');
     if (lblEq && cfg.equivalentes) {
         const eq = cfg.equivalentes;
-        lblEq.innerHTML = `Equivalente: ${montoHTML(eq.mensual)} mensual · ${montoHTML(eq.quincenal)} quincenal · ${montoHTML(eq.semanal)} semanal`;
+        lblEq.innerHTML = `Equivalente: ${montoMxnHTML(eq.mensual)} mensual · ${montoMxnHTML(eq.quincenal)} quincenal · ${montoMxnHTML(eq.semanal)} semanal`;
     }
 
     // Alerta contextual de datos detectados en Fijos y MSI
@@ -75,7 +75,7 @@ function renderizarVistaPresupuesto(data) {
         if (mostrar) {
             const lblTxt = document.getElementById('pres-fijos-alert-text');
             if (lblTxt) {
-                lblTxt.innerHTML = `Detectado en Fijos y MSI: Nómina de <strong>${montoHTML(fijos.ingreso_fijo_periodo)}</strong> y gastos/MSI de <strong>${montoHTML(fijos.gasto_fijo_periodo + fijos.cuota_msi_periodo)}</strong> (${cfg.frecuencia}).`;
+                lblTxt.innerHTML = `Detectado en Fijos y MSI: Nómina de <strong>${montoMxnHTML(fijos.ingreso_fijo_periodo)}</strong> y gastos/MSI de <strong>${montoMxnHTML(fijos.gasto_fijo_periodo + fijos.cuota_msi_periodo)}</strong> (${cfg.frecuencia}).`;
             }
         }
     }
@@ -89,7 +89,7 @@ function renderizarVistaPresupuesto(data) {
 function renderTotales(res) {
     const el = document.getElementById('lbl-pres-totales');
     if (!el) return;
-    el.innerHTML = `Ingreso ${montoHTML(res.ingreso_total)} · Asignado ${montoHTML(res.total_asignado_monto)} · Sin asignar ${montoHTML(res.disponible_monto)}`;
+    el.innerHTML = `Ingreso ${montoMxnHTML(res.ingreso_total)} · Asignado ${montoMxnHTML(res.total_asignado_monto)} · Sin asignar ${montoMxnHTML(res.disponible_monto)}`;
     el.classList.toggle('pres-totales-excedido', Boolean(res.excedido));
 }
 
@@ -112,11 +112,11 @@ function renderDistribucionPago(u) {
     const libreMonto = Math.max(0, u.ingreso - u.total_asignado);
 
     const slices = tramos.map(({ t, pct }) => `
-        <div class="pres-alloc-slice pres-color-${escapeHTML(t.color)}" style="width: ${(pct * escala).toFixed(2)}%" title="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}% (${fmt(t.monto)})"></div>`).join('');
+        <div class="pres-alloc-slice pres-color-${escapeHTML(t.color)}" style="width: ${(pct * escala).toFixed(2)}%" title="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}% (${fmtMXN(t.monto)})"></div>`).join('');
     const leyenda = tramos.map(({ t, pct }) => `
-        <span class="pres-legend-item"><span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${montoHTML(t.monto)})</span></span>`).join('');
-    const sliceLibre = librePct > 0 ? `<div class="pres-alloc-slice pres-slice-libre" style="width: ${librePct.toFixed(2)}%" title="Por asignar: ${librePct.toFixed(1)}% (${fmt(libreMonto)})"></div>` : '';
-    const legendLibre = librePct > 0 ? `<span class="pres-legend-item pres-legend-libre"><span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${montoHTML(libreMonto)})</span></span>` : '';
+        <span class="pres-legend-item"><span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${montoMxnHTML(t.monto)})</span></span>`).join('');
+    const sliceLibre = librePct > 0 ? `<div class="pres-alloc-slice pres-slice-libre" style="width: ${librePct.toFixed(2)}%" title="Por asignar: ${librePct.toFixed(1)}% (${fmtMXN(libreMonto)})"></div>` : '';
+    const legendLibre = librePct > 0 ? `<span class="pres-legend-item pres-legend-libre"><span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${montoMxnHTML(libreMonto)})</span></span>` : '';
 
     return `
         <div class="pres-pago-dist">
@@ -145,7 +145,7 @@ function renderPagos(data) {
             <div class="pres-pago-head">
                 <div class="pres-pago-titulo">
                     <h4>${escapeHTML(nombre)}</h4>
-                    <span>Ingreso de este pago: ${montoHTML(u.ingreso)}</span>
+                    <span>Ingreso de este pago: ${montoMxnHTML(u.ingreso)}</span>
                 </div>
                 <label class="pres-pago-dia-label">Día de cobro
                     <select class="select-calc pres-pago-dia" aria-label="Día de cobro de ${escapeHTML(nombre)}">${opcionesDia}</select>
@@ -153,8 +153,8 @@ function renderPagos(data) {
             </div>
             ${renderDistribucionPago(u)}
             <div class="pres-pago-stats">
-                <span>Asignado: <strong>${montoHTML(u.total_asignado)}</strong></span>
-                <span>Libre: <strong>${montoHTML(u.libre)}</strong></span>
+                <span>Asignado: <strong>${montoMxnHTML(u.total_asignado)}</strong></span>
+                <span>Libre: <strong>${montoMxnHTML(u.libre)}</strong></span>
             </div>
             <div class="grid-presupuesto pres-pago-grid"></div>
             <button type="button" class="btn-secondary pres-pago-add">Añadir tarjeta a ${escapeHTML(nombre)}</button>
@@ -210,7 +210,7 @@ function renderGridTarjetas(pago, grid) {
 
             <div class="pres-card-metric-block">
                 <div class="pres-card-pct-badge pres-badge-${escapeHTML(t.color)}">${pctPago.toFixed(1)}% de este pago</div>
-                <div class="pres-card-amount">${montoHTML(t.monto)}</div>
+                <div class="pres-card-amount">${montoMxnHTML(t.monto)}</div>
                 <div class="pres-card-freq-tag">${t.tipo === 'msi' ? `cuota mensual · ${t.msi_cuotas} meses` : 'en este pago'}</div>
             </div>
 
@@ -219,9 +219,9 @@ function renderGridTarjetas(pago, grid) {
             </div>
 
             <div class="pres-card-equivalences">
-                <span>Mensual: <strong>${montoHTML(eq.mensual)}</strong></span>
-                <span>Quincenal: <strong>${montoHTML(eq.quincenal)}</strong></span>
-                <span>Semanal: <strong>${montoHTML(eq.semanal)}</strong></span>
+                <span>Mensual: <strong>${montoMxnHTML(eq.mensual)}</strong></span>
+                <span>Quincenal: <strong>${montoMxnHTML(eq.quincenal)}</strong></span>
+                <span>Semanal: <strong>${montoMxnHTML(eq.semanal)}</strong></span>
             </div>
         `;
 
@@ -311,7 +311,7 @@ export function abrirModalExportarPresupuesto() {
     if (cfg.ingreso_base > 0) {
         if (boxIngreso) boxIngreso.classList.remove('hidden');
         if (chkIngreso) chkIngreso.checked = true;
-        if (txtIngreso) txtIngreso.innerHTML = `${montoHTML(cfg.ingreso_base)} (${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia})`;
+        if (txtIngreso) txtIngreso.innerHTML = `${montoMxnHTML(cfg.ingreso_base)} (${FRECUENCIA_LABEL[cfg.frecuencia] || cfg.frecuencia})`;
     } else {
         if (boxIngreso) boxIngreso.classList.add('hidden');
         if (chkIngreso) chkIngreso.checked = false;
@@ -341,7 +341,7 @@ export function abrirModalExportarPresupuesto() {
                             </div>
                         </label>
                         <div class="modal-fila-cifra">
-                            <div class="modal-fila-monto">${montoHTML(t.monto)}</div>
+                            <div class="modal-fila-monto">${montoMxnHTML(t.monto)}</div>
                             <div class="modal-fila-pct">${t.porcentaje.toFixed(1)}%</div>
                         </div>
                     </div>

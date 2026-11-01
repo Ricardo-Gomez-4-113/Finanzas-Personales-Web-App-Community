@@ -2,7 +2,7 @@
  * static/js/movimientos.js - Formulario, categorías, tabla con filtros y edición de movimientos de caja.
  */
 
-import { apiFetch, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 
 
 // Valor especial del select de categoría para crear una nueva
@@ -185,7 +185,7 @@ export function renderTablaMovimientos() {
             <td>${escapeHTML(t.descripcion || '-')} ${badgesMovimiento(t)}</td>
             <td>${escapeHTML(t.categoria || 'Sin categoría')}</td>
             <td class="td-tipo">${t.tipo === 'gasto' ? 'Gasto' : 'Ingreso'}</td>
-            <td class="td-monto ${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${t.tipo === 'gasto' ? '−' : '+'}${montoHTML(t.monto)}</td>
+            <td class="td-monto ${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${t.tipo === 'gasto' ? '−' : '+'}${montoMxnHTML(t.monto)}</td>
             <td class="col-acciones">
                 <button type="button" class="btn-accion btn-editar" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarTransaccionPorId", t.id]]))}" title="Editar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
                 <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarTransaccion", t.id]]))}" title="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -510,7 +510,7 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
                             Tarjeta de Presupuesto: ${escapeHTML(itemCompleto.tarjeta_nombre || 'Dividida')}
                         </span>
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
-                            Total mensual: ${montoHTML(totalMostrar)}
+                            Total mensual: ${montoMxnHTML(totalMostrar)}
                         </span>
                     </div>
                     <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
@@ -523,7 +523,7 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
                                     ${escapeHTML(h.descripcion || 'Movimiento')} ${h.id === itemCompleto.id ? '← (editando)' : ''}
                                 </span>
                                 <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
-                                    ${montoHTML(h.monto)} · ${escapeHTML(h.fecha)}
+                                    ${montoMxnHTML(h.monto)} · ${escapeHTML(h.fecha)}
                                 </span>
                             </div>
                         `).join('')}

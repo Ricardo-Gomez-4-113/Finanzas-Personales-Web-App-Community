@@ -13,6 +13,7 @@ export const estado = {
     usuarioActual: null,
     monedaGlobal: localStorage.getItem('moneda_global') || 'MXN',
     tasasCambio: { USD: 1.0, MXN: 18.40, EUR: 0.89 },
+    factoresMXN: null,   // lo que vale 1 MXN en cada moneda; lo calcula el servidor (/api/tipo-cambio)
     graficas: { barras: null, dona: null },
     debounceTimerBuscar: null,
     cache: { transacciones: {}, listaTransacciones: [], categorias: [], inversiones: {}, usuarios: {}, ventana: null }
@@ -120,6 +121,24 @@ export function montoHTML(valor, moneda = estado.monedaGlobal) {
     return `<span class="dato-sensible">${fmt(valor, moneda)}</span>`;
 }
 
+// Los movimientos, apartados, fijos y presupuesto se guardan en MXN. Para mostrarlos en la moneda base se
+// multiplican por el factor que calcula el servidor. Sin factor (aún no llegó o falló), se muestran como MXN
+// con su símbolo, nunca con el de otra moneda.
+function factorMXN() {
+    if (estado.monedaGlobal === 'MXN') return 1;
+    return (estado.factoresMXN && estado.factoresMXN[estado.monedaGlobal]) || null;
+}
+
+export const monedaDeMonto = () => (factorMXN() ? estado.monedaGlobal : 'MXN');
+
+export function desdeMXN(valor) {
+    return (Number(valor) || 0) * (factorMXN() || 1);
+}
+
+export const fmtMXN = (valor) => fmt(desdeMXN(valor), monedaDeMonto());
+
+export const montoMxnHTML = (valor) => montoHTML(desdeMXN(valor), monedaDeMonto());
+
 export function toast(msg, tipo = 'ok') {
     const raiz = document.getElementById('toast-root') || document.body;
     const el = document.createElement('div');
@@ -148,7 +167,11 @@ export async function cargarTiposCambio() {
         if (res.ok) {
             const data = await res.json();
             estado.tasasCambio = data.tasas || estado.tasasCambio;
+            const primeraVez = !estado.factoresMXN;
+            estado.factoresMXN = data.factores_desde_mxn || estado.factoresMXN;
             actualizarIndicadorTasa();
+            // Lo que se pintó antes de tener el factor salió en MXN: una vez, y solo si la base es otra moneda
+            if (primeraVez && estado.factoresMXN && estado.monedaGlobal !== 'MXN') recargar();
         }
     } catch (e) {
         console.warn("No se pudo obtener tipo de cambio:", e);
@@ -161,10 +184,10 @@ export function actualizarIndicadorTasa() {
     if (selectGlobal) selectGlobal.value = estado.monedaGlobal;
 
     const badgeGlobal = document.getElementById('badge-tasa-global');
-    if (badgeGlobal) badgeGlobal.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40)} MXN`;
+    if (badgeGlobal) badgeGlobal.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40, 'MXN')} MXN`;
 
     const badgeInv = document.getElementById('badge-tasa-inversiones');
-    if (badgeInv) badgeInv.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40)} MXN`;
+    if (badgeInv) badgeInv.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40, 'MXN')} MXN`;
 
     document.querySelectorAll('.lbl-moneda-base').forEach(el => {
         el.textContent = estado.monedaGlobal;

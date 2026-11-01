@@ -2,7 +2,7 @@
  * static/js/dashboard.js - Gráfica mensual del dashboard.
  */
 
-import { colorVar, escapeHTML, estado, fmt, montoHTML } from './core.js';
+import { colorVar, escapeHTML, estado, fmt, monedaDeMonto, montoHTML } from './core.js';
 
 
 // Colores y tipografía de las gráficas salen de tokens.css para seguir el tema activo.
@@ -67,13 +67,13 @@ export function actualizarGrafica(dataMensual) {
                 x: { ticks: { color: e.texto, font: e.fuente }, grid: { display: false }, border: { color: e.rejilla } },
                 y: {
                     beginAtZero: true,
-                    ticks: { color: e.texto, font: e.fuente, maxTicksLimit: 5, callback: v => fmt(v).replace(/\.00$/, '') },
+                    ticks: { color: e.texto, font: e.fuente, maxTicksLimit: 5, callback: v => fmt(v, monedaDeMonto()).replace(/\.00$/, '') },
                     grid: { color: e.rejilla }, border: { display: false },
                 },
             },
             plugins: {
                 legend: { align: 'end', labels: { color: e.texto, font: e.fuente, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 } },
-                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y, monedaDeMonto())}` } },
             },
         },
     });

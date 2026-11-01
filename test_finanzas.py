@@ -71,6 +71,7 @@ import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
 from finanzas_core import (
     convertir,
+    factores_desde_mxn,
     valorar_posiciones,
     fijos_por_periodo,
     calcular_resumen,
@@ -2634,6 +2635,20 @@ def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
         'Sueldo': (30000.0, 'mensual'),
         NOMINA_PRESUPUESTO: (9000.0, 'mensual'),
     }, estado()
+
+
+def test_factores_desde_mxn_son_lo_que_vale_un_peso_en_cada_moneda():
+    # El frontend solo multiplica por estos factores para mostrar montos guardados en MXN
+    f = factores_desde_mxn(20.0, 0.5)   # 20 MXN por USD y 0.5 EUR por USD
+    assert f == {"MXN": 1.0, "USD": 0.05, "EUR": 0.025}, f
+    assert round(40000 * f["USD"], 2) == convertir(40000, "MXN", "USD", 20.0, 0.5)
+    assert round(40000 * f["EUR"], 2) == convertir(40000, "MXN", "EUR", 20.0, 0.5)
+    try:
+        factores_desde_mxn(20.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("sin tasa USD/EUR no se puede dar el factor en euros")
 
 
 if __name__ == '__main__':

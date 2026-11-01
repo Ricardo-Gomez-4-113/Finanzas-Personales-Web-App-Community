@@ -2,7 +2,7 @@
  * static/js/recurrentes.js - Pestaña "Fijos y MSI": nómina, gastos fijos y compras a meses.
  */
 
-import { apiFetch, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { apiFetch, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
 
@@ -39,7 +39,7 @@ function llenarCategoriasRec() {
 function llenarApartadosRec() {
     const apartados = estado.cache.apartados || [];
     const opts = ['<option value="">-- Ninguno (gasto común) --</option>']
-        .concat(apartados.map(a => `<option value="${a.id}">${escapeHTML(a.nombre)} (${fmt(a.monto_actual)}${a.meta_monto ? ' / ' + fmt(a.meta_monto) : ''})</option>`))
+        .concat(apartados.map(a => `<option value="${a.id}">${escapeHTML(a.nombre)} (${fmtMXN(a.monto_actual)}${a.meta_monto ? ' / ' + fmtMXN(a.meta_monto) : ''})</option>`))
         .join('');
 
     const selForm = document.getElementById('rec-apartado-id');
@@ -90,9 +90,10 @@ function actualizarPreview() {
     }
     const cuota = Math.round((total / meses) * 100) / 100;
     const libre = margenPeriodos();
-    const baseTxt = `${meses} pagos de ${montoHTML(cuota)} al mes`;
-    if (libre !== null && cuota > libre) {
-        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${montoHTML(cuota)}) supera el libre de tu periodo más ajustado (${montoHTML(libre)}). Ese periodo quedaría en déficit.</span>`;
+    const baseTxt = `${meses} pagos de ${montoMxnHTML(cuota)} al mes`;
+    // La cuota sale del formulario (MXN); el libre del resumen ya viene en la moneda base
+    if (libre !== null && desdeMXN(cuota) > libre) {
+        prev.innerHTML = `${baseTxt}<br><span class="preview-warning"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Atención: la cuota (${montoMxnHTML(cuota)}) supera el libre de tu periodo más ajustado (${montoHTML(libre)}). Ese periodo quedaría en déficit.</span>`;
     } else {
         prev.textContent = baseTxt;
     }
@@ -116,8 +117,8 @@ async function guardarRecurrente(e) {
         if (!meses || meses < 2 || meses > 60) return toast('Los meses deben estar entre 2 y 60.', 'error');
         const cuota = Math.round((total / meses) * 100) / 100;
         const libre = margenPeriodos();
-        if (libre !== null && cuota > libre) {
-            const confirmar = confirm(`Esta compra a meses generará una cuota de ${fmt(cuota)} al mes, que supera el libre de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`);
+        if (libre !== null && desdeMXN(cuota) > libre) {
+            const confirmar = confirm(`Esta compra a meses generará una cuota de ${fmtMXN(cuota)} al mes, que supera el libre de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`);
             if (!confirmar) return;
         }
         body = { descripcion, monto_total: total, meses, fecha_inicio: fecha, categoria_id: categoriaId };
@@ -209,7 +210,7 @@ function filaFijo(i) {
                 </div>
             </div>
             <div class="fijo-fila-monto">
-                <strong>${signo}${montoHTML(i.monto)}</strong>
+                <strong>${signo}${montoMxnHTML(i.monto)}</strong>
                 <span>${i.estado === 'pausado' ? 'Próxima fecha ' : ''}${escapeHTML(i.fecha)}</span>
             </div>
             ${acciones ? `<div class="fijo-fila-acciones">${acciones}</div>` : ''}
@@ -241,7 +242,7 @@ function renderFijosPorPeriodo(data) {
                         <h3>${fechaPeriodo(p.inicio)} – ${fechaPeriodo(p.fin)}</h3>
                         ${p.en_curso ? '<span class="badge-tag badge-fijo">En curso</span>' : ''}
                     </header>
-                    <p class="fijos-periodo-totales">Ingresos ${montoHTML(t.ingresos)} · Gastos fijos ${montoHTML(t.fijos)} · Compras a meses ${montoHTML(t.msi)} · Por pagar ${montoHTML(t.por_pagar)}</p>
+                    <p class="fijos-periodo-totales">Ingresos ${montoMxnHTML(t.ingresos)} · Gastos fijos ${montoMxnHTML(t.fijos)} · Compras a meses ${montoMxnHTML(t.msi)} · Por pagar ${montoMxnHTML(t.por_pagar)}</p>
                     ${bloqueFijos('Ingresos y gastos fijos', [...ingresos, ...fijos])}
                     ${bloqueFijos('Compras a meses', msi)}
                     ${p.items.length === 0 ? '<p class="fijos-bloque-ayuda">Sin cargos en este periodo.</p>' : ''}
@@ -433,7 +434,7 @@ export function abrirModalEditarRecurrente(id) {
                             Tarjeta de Presupuesto: ${escapeHTML(item.tarjeta_nombre || 'Dividida')}
                         </span>
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
-                            Total: ${montoHTML(totalMostrar)}
+                            Total: ${montoMxnHTML(totalMostrar)}
                         </span>
                     </div>
                     <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
@@ -446,7 +447,7 @@ export function abrirModalEditarRecurrente(id) {
                                     ${escapeHTML(h.descripcion)} ${h.id === item.id ? '← (editando)' : ''}
                                 </span>
                                 <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
-                                    ${montoHTML(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
+                                    ${montoMxnHTML(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
                                 </span>
                             </div>
                         `).join('')}

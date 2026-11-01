@@ -60,6 +60,12 @@ def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: 
     return monto
 
 
+def factores_desde_mxn(tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Dict[str, float]:
+    """Lo que vale 1 MXN en cada moneda base. Los montos se guardan en MXN; para mostrarlos en otra moneda
+    el frontend solo multiplica por este factor, sin calcular tipos de cambio por su cuenta."""
+    return {moneda: convertir(1.0, "MXN", moneda, tasa_usd_mxn, tasa_usd_eur) for moneda in ("MXN", "USD", "EUR")}
+
+
 def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Dict[str, Any]:
     """Valúa las posiciones bursátiles en la moneda base y calcula el PnL del portafolio."""
     moneda_base_upper = moneda_base.upper()

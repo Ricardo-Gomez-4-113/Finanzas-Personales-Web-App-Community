@@ -1188,6 +1188,49 @@ def test_moneda_base_euro_se_aplica_y_persiste(navegador, base):
         ctx.close()
 
 
+def test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base):
+    """Movimientos, historial mensual y metas se guardan en MXN: con base EUR se muestran convertidos, no con otro símbolo."""
+    import re
+    ctx, page, errores = _flujo_escenario(navegador, base)
+
+    def cifra(texto):
+        return float(re.sub(r"[^\d.]", "", texto))
+
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        page.select_option("#select-moneda-global", "EUR")
+        _esperar(page, "document.getElementById('periodo-libre').textContent.includes('€')")
+        factor = page.evaluate(
+            "fetch('/api/tipo-cambio', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})"
+            ".then(r => r.json()).then(d => d.factores_desde_mxn.EUR)")
+        assert 0 < factor < 1, factor
+
+        # Historial mensual: octubre tuvo 14,000 de ingresos y 14,799 de gastos (MXN)
+        _esperar(page, "document.querySelector('#lista-resumen-mensual .monthly-card')?.textContent.includes('€')")
+        primera = page.locator("#lista-resumen-mensual .monthly-card").nth(0).inner_text()
+        ingresos, gastos = [cifra(t) for t in re.findall(r"[+-]€[\d,]+\.\d\d", primera)]
+        assert abs(ingresos - 14000 * factor) < 0.011 and abs(gastos - 14799 * factor) < 0.011, (primera, factor)
+
+        # Movimientos del periodo en curso: Netflix, 299 MXN
+        _ir(page, "tab-movimientos")
+        _esperar(page, "[...document.querySelectorAll('td.td-monto')].some(td => td.textContent.includes('€'))")
+        montos = [cifra(t) for t in page.locator("td.td-monto").all_inner_texts()]
+        assert any(abs(m - 299 * factor) < 0.011 for m in montos), (montos, factor)
+        assert 299.0 not in montos, "el monto guardado en MXN no debe mostrarse sin convertir"
+
+        # Metas: Viaje guarda 5,000 MXN
+        _ir(page, "tab-apartados")
+        _esperar(page, "[...document.querySelectorAll('.apartado-saldo')].some(p => p.textContent.includes('€'))")
+        saldos = [cifra(t) for t in page.locator(".apartado-saldo").all_inner_texts()]
+        assert any(abs(s - 5000 * factor) < 0.011 for s in saldos), (saldos, factor)
+
+        # Los formularios siguen en MXN y lo dicen
+        assert "MXN" in page.text_content("label[for=meta-monto]")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base):
     """Desde el menú de usuario se envía un comentario: se confirma, el modal se cierra y la fila queda en la base maestra."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1269,6 +1312,7 @@ if __name__ == "__main__":
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
+                (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),
                 (test_comentario_se_envia_desde_el_menu_y_queda_en_la_base, lambda: test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")

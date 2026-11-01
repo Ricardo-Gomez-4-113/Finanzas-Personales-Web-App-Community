@@ -5,15 +5,15 @@
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
-import { apiFetch, escapeHTML, estado, fmt, leerJson, montoHTML, toast } from './core.js';
+import { apiFetch, desdeMXN, escapeHTML, estado, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=450ec53c4e';
+import { cargarRecurrentes } from './recurrentes.js?v=76fabf03b3';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=450ec53c4e';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=76fabf03b3';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -110,8 +110,8 @@ export async function cargarDatos() {
                     div.innerHTML = `
                         <div><strong>${escapeHTML(nombreMes)}</strong></div>
                         <div class="monthly-info">
-                            <span style="color: var(--success-text);">+${montoHTML(m.ingresos)}</span>
-                            <span style="color: var(--danger-text);">-${montoHTML(m.gastos)}</span>
+                            <span style="color: var(--success-text);">+${montoMxnHTML(m.ingresos)}</span>
+                            <span style="color: var(--danger-text);">-${montoMxnHTML(m.gastos)}</span>
                         </div>
                     `;
                     contenedorMensual.appendChild(div);
@@ -119,7 +119,7 @@ export async function cargarDatos() {
             }
         }
 
-        actualizarGrafica(dataMensual.slice(0, 12).reverse());
+        actualizarGrafica(dataMensual.slice(0, 12).reverse().map(m => ({ ...m, ingresos: desdeMXN(m.ingresos), gastos: desdeMXN(m.gastos) })));
 
         // 3. Resto de datos en paralelo: movimientos, categorías, fijos y MSI, metas e inversiones
         await Promise.all([
