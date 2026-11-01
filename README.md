@@ -125,7 +125,7 @@ Finanzas-Personales-Web-App-Community/
 ├── email_service.py     # Correos transaccionales (API o SMTP)
 ├── test_finanzas.py     # Pruebas de la lógica financiera (sin dependencias)
 ├── tests/               # Pruebas en Docker: API, aislamiento, migraciones, respaldo y navegador (Playwright)
-├── scripts/             # migrar_todos, cache_bust, verificar_reglas y smoke_produccion
+├── scripts/             # migrar_todos, comentarios, cache_bust, verificar_reglas y smoke_produccion
 ├── docs/DESARROLLO.md   # Guía de desarrollo, pruebas y mantenimiento
 ├── requirements.txt     # Dependencias con versiones fijas (fastapi, uvicorn, pydantic, openpyxl, bcrypt, pyjwt)
 ├── Dockerfile           # Imagen Docker basada en python:3.11-slim (sin --reload)
@@ -289,6 +289,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
 | `PUT` | `/api/inversiones/{id}` | `verify_token` | Modificar títulos o precio promedio |
 | `DELETE` | `/api/inversiones/{id}` | `verify_token` | Eliminar posición bursátil |
 | `POST` | `/api/inversiones/sincronizar` | `verify_token` | Sincronizar cotizaciones en vivo en lote |
+| `POST` | `/api/comentarios` | `verify_token` | Enviar un comentario desde el menú de usuario (se guarda en la base maestra, tabla `comentarios`) |
 | `GET` | `/api/inversiones/cotizar/{ticker}` | `verify_token` | Consultar precio de mercado en tiempo real |
 | `GET` | `/api/inversiones/buscar` | `verify_token` | Autocompletado de tickers de Yahoo Finance |
 | `GET` | `/api/tipo-cambio` | `verify_token` | Tipos de cambio vigentes con caché |

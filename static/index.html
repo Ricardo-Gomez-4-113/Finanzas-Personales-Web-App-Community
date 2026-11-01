@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=d1a41c4c8b">
-    <link rel="stylesheet" href="/static/css/layout.css?v=d1a41c4c8b">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=d1a41c4c8b">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=d1a41c4c8b">
-    <link rel="stylesheet" href="/static/css/tema.css?v=d1a41c4c8b">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=450ec53c4e">
+    <link rel="stylesheet" href="/static/css/layout.css?v=450ec53c4e">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=450ec53c4e">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=450ec53c4e">
+    <link rel="stylesheet" href="/static/css/tema.css?v=450ec53c4e">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -285,6 +285,17 @@
                                     <span>Restaurar base de datos</span>
                                 </button>
                                 <input type="file" id="input-restore-db" accept=".db,.sqlite,.sqlite3" data-on-change='[["procesarArchivoBackup", "$event"]]' class="hidden">
+                            </div>
+
+                            <div class="dropdown-section-divider"></div>
+
+                            <div class="dropdown-action-list">
+                                <button type="button" class="dropdown-action-btn btn-comentarios" data-on-click='[["abrirModalComentarios"], ["cerrarUserDropdown"]]' title="Enviar una sugerencia o reportar un problema">
+                                    <span class="action-icon">
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    </span>
+                                    <span>Enviar comentarios</span>
+                                </button>
                             </div>
 
                             <div class="dropdown-section-divider"></div>
@@ -1730,6 +1741,39 @@
     <!-- ============================================== -->
     <!-- MODAL 6: RECUPERAR CONTRASEÑA POR EMAIL        -->
     <!-- ============================================== -->
+    <div id="modal-comentarios" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-comentarios-titulo" data-on-click='[["cerrarModalComentarios"]]' data-solo-fondo>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-comentarios-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                    <span>Enviar comentarios</span>
+                </h3>
+                <button type="button" class="btn-modal-close" data-on-click='[["cerrarModalComentarios"]]'>&times;</button>
+            </div>
+            <form id="form-comentarios" data-on-submit='[["enviarComentario", "$event"]]'>
+                <div class="modal-body">
+                    <p class="modal-nota">Tu comentario llega al equipo que administra la aplicación. Sirve para sugerencias y para reportar problemas.</p>
+                    <div class="form-group">
+                        <label for="comentario-tipo">Tipo</label>
+                        <select id="comentario-tipo">
+                            <option value="sugerencia">Sugerencia</option>
+                            <option value="error">Algo no funciona</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comentario-mensaje">Mensaje</label>
+                        <textarea id="comentario-mensaje" rows="5" maxlength="1000" required placeholder="Cuéntanos qué te gustaría mejorar o qué pasó" data-on-input='[["actualizarContadorComentario"]]'></textarea>
+                        <p class="modal-nota s-text-align-right" id="comentario-contador">0/1000</p>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-on-click='[["cerrarModalComentarios"]]'>Cancelar</button>
+                    <button type="submit" class="btn-primary" id="btn-enviar-comentario">Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="modal-recuperar-password" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-recuperar-password-titulo" data-on-click='[["cerrarModalRecuperarPassword"]]' data-solo-fondo>
         <div class="modal-card">
             <div class="modal-header">
@@ -1951,7 +1995,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=d1a41c4c8b"></script>
+    <script type="module" src="/static/js/main.js?v=450ec53c4e"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

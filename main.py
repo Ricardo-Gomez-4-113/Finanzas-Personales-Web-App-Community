@@ -27,7 +27,7 @@ import observabilidad
 from security import (
     hash_password
 )
-from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico
+from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico, comentarios
 from limite_cuerpo import LimiteTamanoCuerpo
 
 @asynccontextmanager
@@ -95,6 +95,7 @@ app.include_router(recurrentes.router)
 app.include_router(presupuesto.router)
 app.include_router(salud.router)
 app.include_router(diagnostico.router)
+app.include_router(comentarios.router)
 
 @app.exception_handler(RequestValidationError)
 async def errores_de_validacion(request: Request, exc: RequestValidationError):

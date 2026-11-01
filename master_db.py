@@ -152,6 +152,20 @@ def init_master_db() -> None:
         except sqlite3.OperationalError:
             pass
 
+        # Comentarios que los usuarios envían desde su menú. user_id queda NULL si la cuenta se elimina.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS comentarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                tipo TEXT NOT NULL,
+                mensaje TEXT NOT NULL,
+                contexto TEXT,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                leido INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
         # Índices optimizados
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -454,6 +468,34 @@ def update_user(
     finally:
         conn.close()
 
+def guardar_comentario(user_id: int, tipo: str, mensaje: str, contexto: Optional[str]) -> int:
+    """Guarda un comentario del usuario en la base maestra y devuelve su id."""
+    conn = get_master_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO comentarios (user_id, tipo, mensaje, contexto) VALUES (?, ?, ?, ?)",
+            (user_id, tipo, mensaje, contexto),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def contar_comentarios_recientes(user_id: int, horas: int = 1) -> int:
+    """Cuántos comentarios envió el usuario en las últimas `horas` horas (para el límite de envíos)."""
+    conn = get_master_conn()
+    try:
+        fila = conn.execute(
+            "SELECT COUNT(*) FROM comentarios WHERE user_id = ? AND creado_en >= datetime('now', ?)",
+            (user_id, f"-{int(horas)} hours"),
+        ).fetchone()
+        return int(fila[0])
+    finally:
+        conn.close()
+
+
 def delete_user_and_tenant(user_id: int) -> bool:
     """
     Elimina permanentemente a un usuario de 'auth_master.db' y borra
@@ -479,6 +521,7 @@ def delete_user_and_tenant(user_id: int) -> bool:
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+        cursor.execute("UPDATE comentarios SET user_id = NULL WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
     

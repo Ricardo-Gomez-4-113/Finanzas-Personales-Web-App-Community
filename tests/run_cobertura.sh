@@ -14,7 +14,7 @@ docker run --rm -v "$PWD":/src:ro -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" 
   cp -r /src /tmp/app && cd /tmp/app
   printf "[run]\nsource =\n    /tmp/app\n    /tmp/app_run\n[paths]\ncodigo =\n    /tmp/app/\n    /tmp/app_run/\n" > .coveragerc
   for suite in test_finanzas.py tests/test_migraciones.py tests/test_mercado.py \
-               tests/test_acciones.py tests/test_api_aislamiento.py tests/test_escenario_api.py tests/test_durabilidad.py tests/test_api_rutas.py tests/test_observabilidad.py tests/test_seguridad_login.py tests/test_limite_cuerpo.py; do
+               tests/test_acciones.py tests/test_api_aislamiento.py tests/test_escenario_api.py tests/test_durabilidad.py tests/test_api_rutas.py tests/test_observabilidad.py tests/test_seguridad_login.py tests/test_limite_cuerpo.py tests/test_comentarios.py; do
     if ! coverage run -a --rcfile=.coveragerc tests/cov_run.py "$suite" >/tmp/suite.log 2>&1; then
       echo "FALLO: $suite"; tail -5 /tmp/suite.log; exit 1
     fi

@@ -94,6 +94,13 @@ Pone en cada `?v=` un hash del contenido. `auth.js` y la landing no entran en el
 
 Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (las 3 últimas por usuario). Para migrar todos de una vez, por ejemplo tras un despliegue: `python3 scripts/migrar_todos.py`.
 
+## Comentarios de usuarios
+
+- Los comentarios del menú de usuario se guardan en la tabla `comentarios` de la base maestra (`data/auth_master.db`). La app no los muestra.
+- Límite: 5 comentarios por usuario por hora (`routers/comentarios.py`). El texto no se escribe en el registro de fallos.
+- Al eliminar una cuenta, sus comentarios se conservan con `user_id` vacío.
+- Consulta: `docker exec finanzas-community python3 scripts/comentarios.py` (o `--nuevos` para los no leídos, `--marcar-leidos` para marcarlos).
+
 ## Respaldos
 
 - El respaldo nocturno automático está fuera de Community: no hay script ni cron. Queda pendiente para el servidor de producción.

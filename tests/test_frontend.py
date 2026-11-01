@@ -1188,6 +1188,31 @@ def test_moneda_base_euro_se_aplica_y_persiste(navegador, base):
         ctx.close()
 
 
+def test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base):
+    """Desde el menú de usuario se envía un comentario: se confirma, el modal se cierra y la fila queda en la base maestra."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        page.click("#btn-user-menu-trigger")
+        page.click(".btn-comentarios")
+        page.wait_for_selector("#modal-comentarios:not(.hidden)")
+        page.select_option("#comentario-tipo", "error")
+        texto = "e2e-comentario-no-guarda-el-cambio"
+        page.fill("#comentario-mensaje", texto)
+        page.click("#btn-enviar-comentario")
+        page.wait_for_selector("#modal-comentarios.hidden", state="attached")
+        page.wait_for_selector("text=Gracias. Recibimos tu comentario.")
+        conn = master_db.get_master_conn()
+        try:
+            fila = conn.execute("SELECT tipo, contexto FROM comentarios WHERE mensaje = ?", (texto,)).fetchone()
+        finally:
+            conn.close()
+        assert fila is not None and fila[0] == "error" and fila[1] == "tab-dashboard", fila
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1244,6 +1269,7 @@ if __name__ == "__main__":
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
+                (test_comentario_se_envia_desde_el_menu_y_queda_en_la_base, lambda: test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()
