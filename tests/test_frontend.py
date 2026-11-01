@@ -1179,7 +1179,7 @@ def test_moneda_base_euro_se_aplica_y_persiste(navegador, base):
         _esperar(page, "document.getElementById('periodo-libre').textContent.includes('€')")  # las cifras llegan después de los rótulos
         page.wait_for_load_state("networkidle")  # recargar con peticiones en vuelo las cancela y ensucia el registro de errores
         errores.clear()
-        page.reload()
+        page.goto(base + "/app")  # recargar /login muestra el login en el SaaS aunque haya sesión: se entra a la app por su ruta
         page.wait_for_selector("#periodo-libre:not(:empty)")
         assert page.input_value("#select-moneda-global") == "EUR"
         _esperar(page, "document.getElementById('periodo-libre').textContent.includes('€')")
