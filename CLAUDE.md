@@ -81,7 +81,7 @@ Fases 1 a 6 cerradas.
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
   - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
-## Seguridad del login (en curso)
+## Seguridad del login (revisión de C1 a C6 completa)
 
 Revisión enfocada del control de fuerza bruta, validada en un espacio de red sin salida (`unshare -rn`) con usuarios dummy.
 - **C1, carrera en el control de tasa (corregido):** antes, 40 peticiones simultáneas evaluaban 40 contraseñas. Ahora `reservar_intento_login` comprueba y anota en un solo paso, bajo candado, antes de verificar: 5 evaluadas. Prueba: `tests/test_seguridad_login.py`.
@@ -90,7 +90,7 @@ Revisión enfocada del control de fuerza bruta, validada en un espacio de red si
 - **C4, adivinar el código de recuperación desde varias IPs (corregido):** el tope era por IP e identificador. 30 IPs hacían 150 verificaciones contra una cuenta en una ventana, y el nombre y el correo sumaban dos topes. Ahora cada cuenta tiene su propio cupo de 5 verificaciones y 5 solicitudes de código por ventana de 5 min, sin importar la IP ni el identificador (`reservar_cupo_cuenta`). Al agotarse, la respuesta es la misma que la de un código incorrecto o una solicitud normal, para no revelar la cuenta. Estimación: con el cupo por cuenta, adivinar el código toma en promedio unos 300 días por cuenta.
 - **Prueba corregida en la misma ronda:** `test_registrar_ingreso_y_modal_accesible` usaba la fecha real del contenedor; el servidor de pruebas tiene el reloj fijo al 20 de octubre y el movimiento caía fuera del periodo. Ahora usa `escenario.HOY`.
 - **C5, campos sin límite en el login (corregido):** un usuario de 5 MB se aceptaba y el contador guardaba una clave de 5 millones de caracteres, con 10 000 claves posibles. Ahora el login tiene los mismos límites del alta (usuario 50, contraseña 72). Además, el 422 ya no repite el valor enviado (manejador global en `main.py`): antes, un campo de 5 MB volvía en la respuesta. Una contraseña de 5 MB ya no era problema: bcrypt la rechaza y responde 401 en 0,12 s.
-- **Pendiente de la revisión:** C6 (oráculo de tiempo en la solicitud de código). Pasa por validación local antes de corregirse.
+- **C6, oráculo de tiempo en la solicitud de código (corregido):** con correo configurado, la ruta escribía el código antes de responder y la respuesta tardaba más para una cuenta real. Medido con muestras reales: diferencia de unos 2 ms en medianas, con distribuciones solapadas. Es una señal débil, pero el fix es barato: la escritura y el envío van en una tarea de fondo. Después de la corrección, la diferencia es de −0,8 ms (ruido). Prueba con uvicorn real y retardo inyectado de 0,3 s en la escritura.
 - Costo medido de un intento (bcrypt): unos 0,8 s en esta máquina; llenar 10 000 claves tarda del orden de minutos con concurrencia.
 
 ## Criterio de hecho
