@@ -1097,6 +1097,38 @@ def test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base):
         ctx.close()
 
 
+def test_campos_y_selectores_nativos_siguen_el_tema(navegador, base):
+    """El esquema de color sigue al tema (calendarios y listas), hay regla de relleno automático y ningún campo visible queda blanco en oscuro."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        for tema in ["dark", "light"]:
+            page.evaluate(f"document.documentElement.setAttribute('data-theme', '{tema}')")
+            esquema = page.evaluate("getComputedStyle(document.documentElement).colorScheme")
+            assert esquema == tema, f"color-scheme en {tema}: {esquema}"
+        reglas = page.evaluate("""() => {
+            const encontradas = [];
+            for (const hoja of document.styleSheets) {
+                let reglas;
+                try { reglas = hoja.cssRules; } catch (e) { continue; }
+                for (const r of reglas) {
+                    if (r.selectorText && r.selectorText.includes('-webkit-autofill')) encontradas.push(r.selectorText);
+                }
+            }
+            return encontradas;
+        }""")
+        assert reglas, "falta la regla de relleno automático de los campos"
+        page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
+        blancos = page.evaluate("""() => [...document.querySelectorAll('input, select, textarea')]
+            .filter(el => el.offsetParent !== null && !['hidden', 'checkbox', 'radio', 'file'].includes(el.type))
+            .map(el => ({id: el.id, fondo: getComputedStyle(el).backgroundColor}))
+            .filter(c => /^rgb\((2[0-5]\d), (2[0-5]\d), (2[0-5]\d)\)$/.test(c.fondo))""")
+        assert not blancos, f"campos con fondo blanco en modo oscuro: {blancos}"
+        assert not errores, "errores de JS:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1149,6 +1181,7 @@ if __name__ == "__main__":
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
+                (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

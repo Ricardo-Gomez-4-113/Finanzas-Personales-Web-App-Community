@@ -938,6 +938,25 @@
     :root .form-group textarea { font-size: 1rem; }
 }
 
+/* Calendarios, listas desplegables y selectores nativos siguen el modo activo (si no, salen en blanco en oscuro) */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Relleno automático del navegador: el campo conserva el fondo del tema en vez de pintarse de blanco o azul */
+:root { --autofill-fondo: var(--panel-bg); }
+.modal-overlay { --autofill-fondo: var(--surface-modal); }
+:root input:-webkit-autofill,
+:root input:-webkit-autofill:hover,
+:root input:-webkit-autofill:focus,
+:root select:-webkit-autofill,
+:root textarea:-webkit-autofill {
+    -webkit-text-fill-color: var(--text-color);
+    -webkit-box-shadow: 0 0 0 1000px var(--autofill-fondo) inset;
+    box-shadow: 0 0 0 1000px var(--autofill-fondo) inset;
+    caret-color: var(--text-color);
+    transition: background-color 9999s ease-out 0s;
+}
+
 /* ---------- Modales: bloques, opciones y notas (sin estilos en línea) ---------- */
 :root .modal-bloque {
     padding: 10px 12px;
