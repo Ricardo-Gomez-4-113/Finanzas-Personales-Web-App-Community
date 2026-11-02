@@ -1845,7 +1845,12 @@ def test_convertir_y_rendimiento_casos_borde():
     # EUR pasa por USD: 100 EUR = 111.11 USD = 2000 MXN con 0.9 EUR por USD y 18 MXN por USD
     assert round(convertir(100, 'EUR', 'MXN', 18, 0.9), 2) == 2000.0
     assert round(convertir(2000, 'MXN', 'EUR', 18, 0.9), 2) == 100.0
-    assert convertir(100, 'MXN', 'USD', 0) == 100
+    try:
+        convertir(100, 'MXN', 'USD', 0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("un monto en pesos sin tasa válida no debe convertirse en silencio")
     try:
         convertir(100, 'EUR', 'MXN', 18)
     except ValueError:
@@ -2744,6 +2749,61 @@ def test_deposito_a_meta_consume_la_capacidad_del_periodo_igual_que_el_saldo():
     for monto, cabe in ((7000.0, True), (8000.0, True), (9000.0, False)):   # quedan 8,000 libres
         assert acepta(validar_limite_cargos_ventana, '2026-11-20', monto) is cabe, ("periodo", monto)
         assert acepta(validar_saldo_disponible_fecha, '2026-11-20', monto, 'gasto') is cabe, ("saldo", monto)
+
+
+def test_conversion_y_frecuencias_no_fallan_en_silencio():
+    from finanzas_core import convertir, convertir_de_mensual, calcular_distribucion_tarjeta_asimetrica
+    # Sin tasa USD/MXN válida, un monto en pesos no se devuelve sin convertir ni se multiplica por cero
+    for tasa in (0, -1.0):
+        for origen, base in (("MXN", "USD"), ("USD", "MXN"), ("MXN", "EUR")):
+            try:
+                convertir(100.0, origen, base, tasa, 0.9)
+            except ValueError:
+                continue
+            raise AssertionError(("convertir aceptó una tasa MXN inválida", tasa, origen, base))
+    assert convertir(100.0, "USD", "EUR", 0, 0.9) == 90.0   # sin pesos de por medio, la tasa MXN no importa
+    # Una frecuencia desconocida ya no se trata como semanal
+    try:
+        convertir_de_mensual(1000.0, "bimestral")
+        raise AssertionError("convertir_de_mensual aceptó una frecuencia desconocida")
+    except ValueError:
+        pass
+    assert convertir_de_mensual(5200.0, "semanal") == 1200.0
+    # Una distribución guardada ilegible cae al reparto por defecto, sin lanzar
+    cfg = [{"id": "a", "nombre": "Primera", "porcentaje": 50.0}, {"id": "b", "nombre": "Segunda", "porcentaje": 50.0}]
+    for roto in ("{no es json", '[{"monto": "abc"}]', '[1, 2]'):
+        reparto = calcular_distribucion_tarjeta_asimetrica(1000.0, cfg, roto)
+        assert round(sum(sp["monto"] for sp in reparto), 2) == 1000.0, (roto, reparto)
+
+
+def test_sugerir_icono_compara_palabras_completas():
+    from finanzas_core import sugerir_icono_color
+    por_defecto = ("wallet", "blue")
+    # Una clave corta no se activa dentro de otra palabra: «nu», «cet» y «gas»
+    for texto in ("Menu del dia", "Pago anual", "Gastos varios", "Receta", "Continuo"):
+        assert sugerir_icono_color(texto) == por_defecto, texto
+    # Las palabras completas, con acentos, mayúsculas y plural, siguen funcionando
+    esperado = {
+        "Nu": "shield", "Gas natural": "home", "CETES": "trending-up", "Inversión mensual": "trending-up",
+        "Seguros del auto": "heart", "Supermercado": "shopping-bag", "Renta": "home", "Cines": "smile",
+    }
+    for texto, icono in esperado.items():
+        assert sugerir_icono_color(texto)[0] == icono, (texto, sugerir_icono_color(texto))
+    assert sugerir_icono_color("", "Salud")[0] == "heart"   # también lee la categoría
+    assert sugerir_icono_color(None, None) == por_defecto
+
+
+def test_balance_disponible_a_fecha_ignora_lo_programado_hacia_adelante():
+    from finanzas_core import balance_disponible_a_fecha
+    conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-01', 1000, 'ingreso', 'Cobro', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-02', 300, 'gasto', 'Super', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-20', 5000, 'ingreso', 'Cobro futuro', 1)")
+    conn.commit()
+    cur = conn.cursor()
+    assert balance_disponible_a_fecha(cur, '2026-11-10') == 700.0      # el cobro del 20 aún no llega
+    assert balance_disponible_a_fecha(cur, '2026-11-20') == 5700.0
+    assert balance_disponible_a_fecha(cur, '2026-10-01') == 0.0
 
 
 if __name__ == '__main__':

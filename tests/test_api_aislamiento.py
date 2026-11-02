@@ -264,6 +264,18 @@ def test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha):
     assert saldo == 1000.0, saldo
 
 
+def test_deposito_a_meta_no_cuenta_ingresos_programados_a_futuro(client):
+    _crear_usuario("meta_futura")
+    h = _login(client, "meta_futura")
+    futuro = (date.today() + timedelta(days=30)).isoformat()
+    assert client.post("/api/transacciones", json=dict(MOV, tipo="ingreso", monto=5000.0, fecha=futuro, descripcion="cobro-futuro"), headers=h).status_code in (200, 201)
+    client.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 18000}, headers=h)
+    aid = next(a["id"] for a in client.get("/api/apartados", headers=h).json() if a["nombre"] == "Viaje")
+    # El cobro del mes que viene todavía no es dinero que se pueda guardar hoy
+    r = client.post(f"/api/apartados/{aid}/movimiento", json={"monto": 1000, "accion": "depositar"}, headers=h)
+    assert r.status_code == 400 and "MXN" in r.json()["detail"], r.text
+
+
 def test_token_deja_de_valer_tras_cambiar_contrasena(client, ua):
     h = _login(client, "usuario_a")
     assert client.get("/api/resumen", headers=h).status_code == 200
@@ -714,6 +726,7 @@ if __name__ == "__main__":
             (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
             (test_health_publico_solo_dice_si_responde, lambda: test_health_publico_solo_dice_si_responde(client)),
             (test_borrar_retiro_de_meta_devuelve_el_dinero, lambda: test_borrar_retiro_de_meta_devuelve_el_dinero(client, ua, ha)),
+            (test_deposito_a_meta_no_cuenta_ingresos_programados_a_futuro, lambda: test_deposito_a_meta_no_cuenta_ingresos_programados_a_futuro(client)),
             (test_reset_no_revela_existencia_de_cuenta, lambda: test_reset_no_revela_existencia_de_cuenta(client)),
             (test_sincronizar_tiene_enfriamiento, lambda: test_sincronizar_tiene_enfriamiento(client, ha)),
             (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),

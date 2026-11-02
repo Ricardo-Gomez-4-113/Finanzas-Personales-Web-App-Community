@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import sqlite3
 
-from finanzas_core import ahora_local, clase_movimiento
+from finanzas_core import ahora_local, balance_disponible_a_fecha, clase_movimiento
 from security import (
     get_tenant_db
 )
@@ -76,7 +76,7 @@ def eliminar_apartado(apartado_id: int, conn: sqlite3.Connection = Depends(get_t
     if saldo_actual > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No puedes eliminar un apartado con saldo disponible (${saldo_actual:.2f}). Retira los fondos al balance disponible primero."
+            detail=f"No puedes eliminar un apartado con saldo disponible (${saldo_actual:.2f} MXN). Retira los fondos al balance disponible primero."
         )
         
     cursor.execute('DELETE FROM apartados WHERE id = ?', (apartado_id,))
@@ -98,18 +98,13 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
         fecha_hoy = ahora_local().strftime('%Y-%m-%d')
         
         if mov.accion == 'depositar':
-            ingresos_row = cursor.execute("SELECT SUM(monto) as total FROM transacciones WHERE tipo='ingreso'").fetchone()
-            gastos_row = cursor.execute("SELECT SUM(monto) as total FROM transacciones WHERE tipo='gasto'").fetchone()
-            
-            total_ingresos = float(ingresos_row['total']) if (ingresos_row and ingresos_row['total']) else 0.0
-            total_gastos = float(gastos_row['total']) if (gastos_row and gastos_row['total']) else 0.0
-            balance_disponible = round(total_ingresos - total_gastos, 2)
-            
+            balance_disponible = balance_disponible_a_fecha(cursor, fecha_hoy)
+
             if round(mov.monto, 2) > balance_disponible:
                 conn.rollback()
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"No puedes guardar dinero que no tienes. Tu balance disponible es de ${balance_disponible:.2f}"
+                    detail=f"No puedes guardar dinero que no tienes. Tu balance disponible es de ${balance_disponible:.2f} MXN"
                 )
                 
             nuevo_saldo = round(monto_actual + mov.monto, 2)

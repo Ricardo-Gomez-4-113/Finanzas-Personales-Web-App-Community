@@ -14,6 +14,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import json
 import re
 import sqlite3
+import unicodedata
 from typing import Any, Dict, Iterable, Optional, Union
 
 
@@ -43,10 +44,12 @@ def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: 
         return monto
     if "EUR" in (origen, base) and not tasa_usd_eur:
         raise ValueError("Falta el tipo de cambio USD/EUR para convertir montos en EUR.")
+    if "MXN" in (origen, base) and not tasa_usd_mxn > 0:
+        raise ValueError("Falta el tipo de cambio USD/MXN para convertir montos en MXN.")
     if origen == "USD":
         usd = monto
     elif origen == "MXN":
-        usd = monto / tasa_usd_mxn if tasa_usd_mxn > 0 else monto
+        usd = monto / tasa_usd_mxn
     elif origen == "EUR":
         usd = monto / tasa_usd_eur
     else:
@@ -366,7 +369,9 @@ def convertir_de_mensual(monto_mensual: float, frecuencia_destino: str) -> float
         return round(m, 2)
     if frecuencia_destino == 'quincenal':
         return round(m / 2, 2)
-    return round(m * 12 / 52, 2)
+    if frecuencia_destino == 'semanal':
+        return round(m * 12 / 52, 2)
+    raise ValueError(f"Frecuencia desconocida: {frecuencia_destino}")
 
 
 def generar_subperiodos_default(frecuencia: str, subdivision_tipo: str) -> list:
@@ -459,8 +464,8 @@ def calcular_distribucion_tarjeta_asimetrica(
                     if float(sp.get("monto", 0.0) or 0.0) <= 0:
                         sp["dia"] = None
                 return custom
-        except Exception:
-            pass
+        except (ValueError, TypeError, KeyError, AttributeError):
+            pass   # distribución guardada ilegible: se usa el reparto por defecto
     return calcular_distribucion_subperiodos(monto_total, subperiodos_config)
 
 
@@ -529,6 +534,16 @@ def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
         return 0.0
 
 
+def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
+    """Dinero disponible a una fecha: ingresos menos gastos con fecha igual o anterior. Lo programado hacia
+    adelante no cuenta, porque todavía no se ha recibido ni gastado."""
+    fila = cursor.execute("""
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        FROM transacciones WHERE fecha <= ?
+    """, (fecha,)).fetchone()
+    return round(float(fila[0]), 2)
+
+
 def validar_saldo_disponible_fecha(
     cursor: sqlite3.Cursor,
     fecha: str,
@@ -567,14 +582,14 @@ def validar_saldo_disponible_fecha(
         deficit = abs(saldo_operativo - monto)
         if total_apartados > 0 and (saldo_en_cuenta - monto >= -0.001):
             raise ValueError(
-                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} con fecha {fecha}. "
-                f"El saldo disponible operativo es de ${saldo_operativo:,.2f} (saldo en cuenta ${saldo_en_cuenta:,.2f} "
-                f"menos ${total_apartados:,.2f} retenidos en apartados). Este gasto comprometería fondos guardados en apartados."
+                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} MXN con fecha {fecha}. "
+                f"El saldo disponible operativo es de ${saldo_operativo:,.2f} MXN (saldo en cuenta ${saldo_en_cuenta:,.2f} MXN "
+                f"menos ${total_apartados:,.2f} MXN retenidos en apartados). Este gasto comprometería fondos guardados en apartados."
             )
         else:
             raise ValueError(
-                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} con fecha {fecha}. "
-                f"El saldo disponible a esa fecha sería de -${deficit:,.2f}. "
+                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} MXN con fecha {fecha}. "
+                f"El saldo disponible a esa fecha sería de -${deficit:,.2f} MXN. "
                 f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo transferido de periodos pasados."
             )
 
@@ -598,12 +613,12 @@ def validar_saldo_disponible_fecha(
             deficit_post = abs(saldo_corriente)
             if total_apartados > 0:
                 raise ValueError(
-                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} "
+                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} MXN "
                     f"en fecha posterior ({fp['fecha']}) comprometiendo fondos retenidos en apartados."
                 )
             else:
                 raise ValueError(
-                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} en fecha posterior ({fp['fecha']})."
+                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} MXN en fecha posterior ({fp['fecha']})."
                 )
 
 
@@ -652,8 +667,8 @@ def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int)
         if saldo_corriente < -0.001:
             deficit = abs(saldo_corriente)
             raise ValueError(
-                f"No es posible eliminar este ingreso de ${monto_ingreso:,.2f} con fecha {t_ingreso}: "
-                f"dicho ingreso respalda gastos ya ejecutados. Provocaría un saldo negativo de -${deficit:,.2f} "
+                f"No es posible eliminar este ingreso de ${monto_ingreso:,.2f} MXN con fecha {t_ingreso}: "
+                f"dicho ingreso respalda gastos ya ejecutados. Provocaría un saldo negativo de -${deficit:,.2f} MXN "
                 f"en fecha {f}."
             )
 
@@ -718,12 +733,12 @@ def validar_edicion_transaccion(
             deficit = abs(saldo_corriente)
             if solo_gasto:
                 raise ValueError(
-                    f"Fondos insuficientes: este cambio dejaría tu saldo en -${deficit:,.2f} en fecha {f}. "
+                    f"Fondos insuficientes: este cambio dejaría tu saldo en -${deficit:,.2f} MXN en fecha {f}. "
                     f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo de periodos pasados."
                 )
             raise ValueError(
                 f"No es posible modificar este ingreso: dicho ingreso respalda gastos ya ejecutados. "
-                f"Provocaría un saldo negativo de -${deficit:,.2f} en fecha {f}."
+                f"Provocaría un saldo negativo de -${deficit:,.2f} MXN en fecha {f}."
             )
 
 
@@ -931,32 +946,46 @@ def validar_limite_cargos_ventana(
             total_proyectado = v["cargos_actuales"] + monto
             raise ValueError(
                 f"El presupuesto del período ({v['inicio']} al {v['fin']}) ha sido superado. "
-                f"La capacidad total asignada es de ${v['capacidad_total']:,.2f} y los compromisos acumulados alcanzarían ${total_proyectado:,.2f}."
+                f"La capacidad total asignada es de ${v['capacidad_total']:,.2f} MXN y los compromisos acumulados alcanzarían ${total_proyectado:,.2f} MXN."
             )
+
+
+def _menciona(texto: str, claves: list) -> bool:
+    """Si el texto nombra alguna clave como palabra: «nu» no está en «menú» ni «gas» en «gastos».
+    Las claves de 5 letras o más también valen como inicio de palabra («invers» en «inversión»).
+    Ignora mayúsculas, acentos y la «s» final del plural."""
+    sin_acentos = unicodedata.normalize("NFD", texto.lower())
+    palabras = re.findall(r"[a-z0-9ñ]+", "".join(c for c in sin_acentos if unicodedata.category(c) != "Mn"))
+    for palabra in palabras:
+        variantes = {palabra, palabra.rstrip("s")}
+        for clave in claves:
+            if clave in variantes or (len(clave) >= 5 and palabra.startswith(clave)):
+                return True
+    return False
 
 
 def sugerir_icono_color(descripcion: str, categoria: str = "") -> tuple:
     """Sugiere icono SVG y token de color según nombre del concepto y categoría."""
-    txt = f"{descripcion or ''} {categoria or ''}".lower()
-    if any(k in txt for k in ["etf", "cet", "cetes", "bolsa", "invers", "rendimiento", "gbm", "fondo"]):
+    txt = f"{descripcion or ''} {categoria or ''}"
+    if _menciona(txt, ["etf", "cet", "cetes", "bolsa", "invers", "rendimiento", "gbm", "fondo"]):
         return "trending-up", "emerald"
-    if any(k in txt for k in ["nu", "ahorro", "apartado", "meta", "reserva", "emergencia"]):
+    if _menciona(txt, ["nu", "ahorro", "apartado", "meta", "reserva", "emergencia"]):
         return "shield", "purple"
-    if any(k in txt for k in ["dentista", "doctor", "salud", "medico", "farmacia", "seguro", "mama", "madre"]):
+    if _menciona(txt, ["dentista", "doctor", "salud", "medico", "farmacia", "seguro", "mama", "madre"]):
         return "heart", "rose"
-    if any(k in txt for k in ["comida", "despensa", "super", "restaurante", "alimento"]):
+    if _menciona(txt, ["comida", "despensa", "super", "restaurante", "alimento"]):
         return "shopping-bag", "amber"
-    if any(k in txt for k in ["gasolina", "transporte", "auto", "uber", "coche", "camion"]):
+    if _menciona(txt, ["gasolina", "transporte", "auto", "uber", "coche", "camion"]):
         return "wallet", "cyan"
-    if any(k in txt for k in ["renta", "vivienda", "casa", "depa", "hipoteca"]):
+    if _menciona(txt, ["renta", "vivienda", "casa", "depa", "hipoteca"]):
         return "home", "blue"
-    if any(k in txt for k in ["streaming", "netflix", "spotify", "ocio", "juego", "cine"]):
+    if _menciona(txt, ["streaming", "netflix", "spotify", "ocio", "juego", "cine"]):
         return "smile", "purple"
-    if any(k in txt for k in ["msi", "meses", "tarjeta", "credito"]):
+    if _menciona(txt, ["msi", "meses", "tarjeta", "credito"]):
         return "credit-card", "amber"
-    if any(k in txt for k in ["luz", "agua", "internet", "cfe", "gas", "servicio", "telefono"]):
+    if _menciona(txt, ["luz", "agua", "internet", "cfe", "gas", "servicio", "telefono"]):
         return "home", "blue"
-    if any(k in txt for k in ["curso", "escuela", "educacion", "libro", "colegiatura"]):
+    if _menciona(txt, ["curso", "escuela", "educacion", "libro", "colegiatura"]):
         return "book", "cyan"
     return "wallet", "blue"
 
@@ -1307,7 +1336,7 @@ def exportar_presupuesto_a_fijos_core(
     try:
         if cfg and "dia_pago" in cfg.keys() and cfg["dia_pago"] is not None:
             dia_pago_ingreso = int(cfg["dia_pago"])
-    except Exception:
+    except (TypeError, ValueError):
         pass
 
     unidades = cursor.execute("SELECT orden, dia_pago FROM presupuesto_unidades ORDER BY orden").fetchall()
@@ -1407,7 +1436,7 @@ def exportar_presupuesto_a_fijos_core(
                 raw = json.loads(t["distribucion_subperiodos"]) if isinstance(t["distribucion_subperiodos"], str) else t["distribucion_subperiodos"]
                 if isinstance(raw, list):
                     sub_list = raw
-            except Exception:
+            except (ValueError, TypeError):
                 sub_list = None
         sub_positivos = [sp for sp in (sub_list or []) if float(sp.get("monto", 0.0) or 0.0) > 0]
 

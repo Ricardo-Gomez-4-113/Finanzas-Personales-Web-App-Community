@@ -202,7 +202,7 @@ def eliminar_transacciones_lote(
                 status_code=422,
                 detail=(
                     f"No es posible eliminar los movimientos seleccionados: provocaría un saldo negativo de "
-                    f"-${deficit_encontrado:,.2f} en fecha {fecha_deficit}. Puedes forzar la eliminación si deseas continuar."
+                    f"-${deficit_encontrado:,.2f} MXN en fecha {fecha_deficit}. Puedes forzar la eliminación si deseas continuar."
                 )
             )
 
