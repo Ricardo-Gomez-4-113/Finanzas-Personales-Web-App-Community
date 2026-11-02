@@ -1840,6 +1840,16 @@ def test_frecuencias_ida_y_vuelta():
             assert abs(vuelta - monto) <= 0.01, (frec, monto, vuelta)
 
 
+def test_convertir_rechaza_monedas_no_soportadas():
+    for origen, base in (("GBP", "MXN"), ("USD", "CAD")):
+        try:
+            convertir(100, origen, base, 18, 0.9)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("una moneda sin tipo de cambio no debe valuarse en nominal")
+
+
 def test_convertir_y_rendimiento_casos_borde():
     assert convertir(100, 'usd', 'mxn', 18) == 1800
     # EUR pasa por USD: 100 EUR = 111.11 USD = 2000 MXN con 0.9 EUR por USD y 18 MXN por USD

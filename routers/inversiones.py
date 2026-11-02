@@ -9,7 +9,7 @@ import sqlite3
 
 from datetime import date
 
-from finanzas_core import ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
+from finanzas_core import MONEDAS_SOPORTADAS, ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
 from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
     verify_token,
@@ -42,7 +42,15 @@ def listar_inversiones(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|E
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
     tasas = obtener_tasas_cambio()
-    return valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
+    try:
+        return valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+def _exigir_moneda_soportada(ticker: str, moneda: str) -> str:
+    if moneda not in MONEDAS_SOPORTADAS:
+        raise HTTPException(status_code=422, detail=f"{ticker} cotiza en {moneda}, una moneda no soportada. Solo se admiten {', '.join(MONEDAS_SOPORTADAS)}.")
+    return moneda
 
 @router.post("/api/inversiones", status_code=status.HTTP_201_CREATED, summary="Registrar posición bursátil")
 def crear_inversion(item: InversionCreate, conn: sqlite3.Connection = Depends(get_tenant_db)):
@@ -53,8 +61,10 @@ def crear_inversion(item: InversionCreate, conn: sqlite3.Connection = Depends(ge
     if precio_actual is None or precio_actual <= 0:
         precio_mercado, moneda_mercado = consultar_precio_y_moneda_mercado(ticker)
         precio_actual = precio_mercado if precio_mercado else item.precio_promedio
-        if not item.moneda:
-            moneda = moneda_mercado
+        if precio_mercado:
+            _exigir_moneda_soportada(ticker, moneda_mercado)
+            if not item.moneda:
+                moneda = moneda_mercado
 
     cursor = conn.cursor()
     try:
@@ -128,6 +138,8 @@ def sincronizar_precios(
     for fila in filas:
         t = fila["ticker"]
         precio, moneda = cotizaciones[t]
+        if precio is not None and moneda not in MONEDAS_SOPORTADAS:
+            precio = None
         if precio is not None:
             moneda_actualizada = moneda or ("MXN" if t.endswith(".MX") else "USD")
             pendientes.append((precio, moneda_actualizada, fila["id"]))
@@ -156,6 +168,7 @@ def cotizar_ticker(ticker: str, _user: Dict[str, Any] = Depends(verify_token)):
     precio, moneda = consultar_precio_y_moneda_mercado(ticker)
     if precio is None:
         raise HTTPException(status_code=404, detail=f"No se pudo consultar la cotización para {ticker.upper()}")
+    moneda = _exigir_moneda_soportada(ticker.upper(), moneda)
     return {"ticker": ticker.upper(), "precio": precio, "moneda": moneda}
 
 @router.get("/api/inversiones/buscar", summary="Buscador predictivo de tickers")

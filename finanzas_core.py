@@ -35,11 +35,17 @@ def ahora_local() -> datetime:
     return datetime.now(zona) if zona else datetime.now()
 
 
+MONEDAS_SOPORTADAS = ("USD", "MXN", "EUR")
+
+
 def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> float:
     """Convierte un monto entre USD, MXN y EUR pasando por USD. Las tasas son unidades de moneda por USD.
     Un monto en EUR sin tasa_usd_eur es un error: sin ella el valor sería nominal y el total saldría mal."""
     origen = moneda_origen.upper()
     base = moneda_base.upper()
+    for moneda in (origen, base):
+        if moneda not in MONEDAS_SOPORTADAS:
+            raise ValueError(f"Moneda no soportada: {moneda}. Solo se admiten {', '.join(MONEDAS_SOPORTADAS)}.")
     if origen == base:
         return monto
     if "EUR" in (origen, base) and not tasa_usd_eur:
@@ -50,17 +56,13 @@ def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: 
         usd = monto
     elif origen == "MXN":
         usd = monto / tasa_usd_mxn
-    elif origen == "EUR":
-        usd = monto / tasa_usd_eur
     else:
-        return monto
+        usd = monto / tasa_usd_eur
     if base == "USD":
         return usd
     if base == "MXN":
         return usd * tasa_usd_mxn
-    if base == "EUR":
-        return usd * tasa_usd_eur
-    return monto
+    return usd * tasa_usd_eur
 
 
 def factores_desde_mxn(tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Dict[str, float]:
@@ -87,6 +89,8 @@ def valorar_posiciones(filas: Iterable[Any], moneda_base: str, tasa_usd_mxn: flo
         cap_invertido_orig = round(cant * costo_prom, 2)
         val_act_orig = round(cant * precio_act, 2)
 
+        if moneda_activo not in MONEDAS_SOPORTADAS:
+            raise ValueError(f"{item['ticker']} está en {moneda_activo}, una moneda no soportada. Elimina la posición o regístrala en USD, MXN o EUR.")
         cap_invertido_base = round(convertir(cap_invertido_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur), 2)
         val_act_base = round(convertir(val_act_orig, moneda_activo, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur), 2)
         pnl_base = round(val_act_base - cap_invertido_base, 2)

@@ -109,6 +109,28 @@ def test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client):
         assert client.post("/api/inversiones/sincronizar", headers=h).status_code == 422
 
 
+def test_monedas_no_soportadas_del_mercado_se_rechazan(client):
+    _crear_usuario("ruta_gbp")
+    h = _login(client, "ruta_gbp")
+    client.post("/api/inversiones", json={"ticker": "MSFT", "cantidad": 3, "precio_promedio": 300, "precio_actual": 300, "moneda": "USD"}, headers=h)
+    en_libras = {
+        "consultar_precio_y_moneda_mercado": lambda t: (55.0, "GBP"),
+        "cotizar_varios": lambda ts: {t: (55.0, "GBP") for t in ts},
+    }
+    with _parchar(rinversiones, **en_libras):
+        # Registrar sin precio propio, o con moneda explícita pero cotización en libras, se rechaza
+        r = client.post("/api/inversiones", json={"ticker": "SHEL.L", "cantidad": 1, "precio_promedio": 50}, headers=h)
+        assert r.status_code == 422 and "GBP" in r.json()["detail"], r.text
+        r = client.post("/api/inversiones", json={"ticker": "SHEL.L", "cantidad": 1, "precio_promedio": 50, "moneda": "USD"}, headers=h)
+        assert r.status_code == 422, r.text
+        assert client.get("/api/inversiones/cotizar/shel.l", headers=h).status_code == 422
+        # La sincronización no pisa la posición con una cotización en otra moneda
+        r = client.post("/api/inversiones/sincronizar", headers=h)
+        assert r.json()["actualizados"] == [] and r.json()["no_actualizados"] == ["MSFT"], r.text
+    posiciones = client.get("/api/inversiones", headers=h).json()["posiciones"]
+    assert [(p["ticker"], p["moneda"], p["precio_actual"]) for p in posiciones] == [("MSFT", "USD", 300.0)]
+
+
 def test_tipo_de_cambio_privado_y_publico(client):
     _crear_usuario("ruta_fx")
     h = _login(client, "ruta_fx")
@@ -456,6 +478,7 @@ if __name__ == "__main__":
         registradas = [
             (test_inversiones_crud_y_validaciones, lambda: test_inversiones_crud_y_validaciones(client)),
             (test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar, lambda: test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client)),
+            (test_monedas_no_soportadas_del_mercado_se_rechazan, lambda: test_monedas_no_soportadas_del_mercado_se_rechazan(client)),
             (test_tipo_de_cambio_privado_y_publico, lambda: test_tipo_de_cambio_privado_y_publico(client)),
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),
             (test_presupuesto_config_unidades_y_tarjetas, lambda: test_presupuesto_config_unidades_y_tarjetas(client)),
