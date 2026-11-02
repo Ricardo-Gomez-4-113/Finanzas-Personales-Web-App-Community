@@ -119,6 +119,7 @@ def test_tipo_de_cambio_privado_y_publico(client):
         # Un peso en cada moneda, calculado en el servidor: 19.5 MXN y 0.92 EUR por USD
         f = r.json()["factores_desde_mxn"]
         assert f["MXN"] == 1.0 and abs(f["USD"] - 1 / 19.5) < 1e-9 and abs(f["EUR"] - 0.92 / 19.5) < 1e-9, f
+        assert isinstance(r.json()["en_respaldo"], list), r.json()   # qué tasas son de respaldo y no cotizadas
         r = client.get("/api/public/tipo-cambio")
         assert r.status_code == 200, r.text
 

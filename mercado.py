@@ -81,7 +81,8 @@ def buscar_tickers_mercado(query: str):
 
 _CACHE_TASAS = {
     "datos": None,
-    "expira_en": 0.0
+    "expira_en": 0.0,
+    "respaldo": ["MXN", "EUR"],  # monedas cuya tasa es la fija de respaldo y no una cotización
 }
 
 _LOCK_TASAS = threading.Lock()
@@ -89,6 +90,10 @@ _LOCK_TASAS = threading.Lock()
 # Tipos de cambio de respaldo cuando no hay cotización en vivo ni caché (unidades por USD)
 TASA_MXN_RESPALDO = 18.40
 TASA_EUR_RESPALDO = 0.89
+
+def tasas_en_respaldo():
+    """Monedas cuya tasa vigente es el valor fijo de respaldo y no una cotización real."""
+    return list(_CACHE_TASAS["respaldo"])
 
 def obtener_tasas_cambio():
     ahora = time.time()
@@ -104,11 +109,14 @@ def obtener_tasas_cambio():
 def _refrescar_tasas_cambio():
     ahora = time.time()
 
+    # Lo que no se logre cotizar conserva su último valor bueno; solo sin historia cae al respaldo
+    previas = _CACHE_TASAS["datos"]
     tasas = {
         "USD": 1.0,
-        "MXN": TASA_MXN_RESPALDO,
-        "EUR": TASA_EUR_RESPALDO
+        "MXN": previas["MXN"] if previas else TASA_MXN_RESPALDO,
+        "EUR": previas["EUR"] if previas else TASA_EUR_RESPALDO
     }
+    respaldo = [m for m in _CACHE_TASAS["respaldo"] if m in ("MXN", "EUR")] if previas else ["MXN", "EUR"]
     try:
         precio_mxn = consultar_precio_mercado("USDMXN=X")
         precio_eur = consultar_precio_mercado("EURUSD=X")
@@ -119,8 +127,10 @@ def _refrescar_tasas_cambio():
     obtuvo_eur = bool(precio_eur and precio_eur > 0)
     if obtuvo_mxn:
         tasas["MXN"] = round(precio_mxn, 4)
+        respaldo = [m for m in respaldo if m != "MXN"]
     if obtuvo_eur:
         tasas["EUR"] = round(1.0 / precio_eur, 4)
+        respaldo = [m for m in respaldo if m != "EUR"]
 
     # Sin ninguna cotización nueva, se conserva lo último bueno y se reintenta pronto.
     # Solo se cachean 300 s cuando llegaron las dos tasas; los valores por defecto caducan en 60 s.
@@ -130,6 +140,7 @@ def _refrescar_tasas_cambio():
 
     completas = obtuvo_mxn and obtuvo_eur
     _CACHE_TASAS["datos"] = tasas
+    _CACHE_TASAS["respaldo"] = respaldo
     _CACHE_TASAS["expira_en"] = ahora + (300 if completas else 60)
     return _CACHE_TASAS["datos"]
 

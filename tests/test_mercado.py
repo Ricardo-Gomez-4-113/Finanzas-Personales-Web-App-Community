@@ -13,6 +13,7 @@ import mercado  # noqa: E402
 def _vaciar_cache():
     mercado._CACHE_TASAS["datos"] = None
     mercado._CACHE_TASAS["expira_en"] = 0
+    mercado._CACHE_TASAS["respaldo"] = ["MXN", "EUR"]
 
 
 def _cotizaciones(mxn, eur):
@@ -44,6 +45,39 @@ def test_tasas_sin_cotizacion_conservan_la_ultima_buena():
     with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(None, None)):
         tasas = mercado._refrescar_tasas_cambio()
     assert tasas["MXN"] == 20.0 and tasas["EUR"] == 0.8
+
+
+def test_si_solo_llega_el_peso_el_euro_conserva_su_ultimo_valor_bueno():
+    # Antes el euro volvía al valor fijo de respaldo aunque ya se hubiera cotizado bien
+    _vaciar_cache()
+    with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(20.0, 1.25)):
+        mercado._refrescar_tasas_cambio()
+    assert mercado.tasas_en_respaldo() == []
+    mercado._CACHE_TASAS["expira_en"] = 0
+    with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(25.0, None)):
+        tasas = mercado._refrescar_tasas_cambio()
+    assert tasas["MXN"] == 25.0 and tasas["EUR"] == 0.8, tasas
+    assert mercado.tasas_en_respaldo() == []
+    assert mercado._CACHE_TASAS["expira_en"] - time.time() <= 61  # al faltar una, se reintenta pronto
+
+
+def test_tasas_en_respaldo_se_distinguen_de_las_cotizadas():
+    _vaciar_cache()
+    with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(None, None)):
+        tasas = mercado._refrescar_tasas_cambio()
+    assert tasas["MXN"] == mercado.TASA_MXN_RESPALDO and tasas["EUR"] == mercado.TASA_EUR_RESPALDO
+    assert mercado.tasas_en_respaldo() == ["MXN", "EUR"]
+
+    _vaciar_cache()
+    with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(20.0, None)):
+        tasas = mercado._refrescar_tasas_cambio()
+    assert tasas["MXN"] == 20.0 and tasas["EUR"] == mercado.TASA_EUR_RESPALDO
+    assert mercado.tasas_en_respaldo() == ["EUR"]
+
+    mercado._CACHE_TASAS["expira_en"] = 0
+    with mock.patch.object(mercado, "consultar_precio_mercado", _cotizaciones(20.0, 1.25)):
+        mercado._refrescar_tasas_cambio()
+    assert mercado.tasas_en_respaldo() == []
 
 
 def test_ticker_se_codifica_en_la_ruta_de_yahoo():

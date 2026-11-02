@@ -10,7 +10,7 @@ import sqlite3
 from datetime import date
 
 from finanzas_core import ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
-from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
+from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
     verify_token,
     get_tenant_db
@@ -175,6 +175,7 @@ def get_tipo_cambio(_user: Dict[str, Any] = Depends(verify_token)):
         "base": "USD",
         "tasas": tasas,
         "factores_desde_mxn": factores_desde_mxn(tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO)),
+        "en_respaldo": tasas_en_respaldo(),
         "actualizado_en": ahora_local().strftime("%Y-%m-%d %H:%M:%S")
     }
 
