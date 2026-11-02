@@ -12,7 +12,8 @@ import { reportarFallo } from './diagnostico.js';
 export const estado = {
     usuarioActual: null,
     monedaGlobal: localStorage.getItem('moneda_global') || 'MXN',
-    tasasCambio: { USD: 1.0, MXN: 18.40, EUR: 0.89 },
+    tasasCambio: { USD: 1.0 },   // las cotiza el servidor (/api/tipo-cambio); sin ellas no se inventa un valor
+    tasasEnRespaldo: [],         // monedas cuya tasa no es una cotización real
     factoresMXN: null,   // lo que vale 1 MXN en cada moneda; lo calcula el servidor (/api/tipo-cambio)
     graficas: { barras: null, dona: null },
     debounceTimerBuscar: null,
@@ -167,6 +168,7 @@ export async function cargarTiposCambio() {
         if (res.ok) {
             const data = await res.json();
             estado.tasasCambio = data.tasas || estado.tasasCambio;
+            estado.tasasEnRespaldo = data.en_respaldo || [];
             const primeraVez = !estado.factoresMXN;
             estado.factoresMXN = data.factores_desde_mxn || estado.factoresMXN;
             actualizarIndicadorTasa();
@@ -183,11 +185,18 @@ export function actualizarIndicadorTasa() {
     const selectGlobal = document.getElementById('select-moneda-global');
     if (selectGlobal) selectGlobal.value = estado.monedaGlobal;
 
-    const badgeGlobal = document.getElementById('badge-tasa-global');
-    if (badgeGlobal) badgeGlobal.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40, 'MXN')} MXN`;
-
-    const badgeInv = document.getElementById('badge-tasa-inversiones');
-    if (badgeInv) badgeInv.textContent = `1 USD ≈ ${fmt(estado.tasasCambio.MXN || 18.40, 'MXN')} MXN`;
+    // Se avisa si la tasa mostrada o la de la moneda base no es una cotización real
+    const aprox = estado.tasasEnRespaldo.includes('MXN') || estado.tasasEnRespaldo.includes(estado.monedaGlobal);
+    const texto = estado.tasasCambio.MXN
+        ? `1 USD ≈ ${fmt(estado.tasasCambio.MXN, 'MXN')} MXN${aprox ? ' (aprox.)' : ''}`
+        : '1 USD ≈ — MXN';
+    const aviso = aprox ? 'No se pudo cotizar el tipo de cambio: se usa un valor aproximado de respaldo' : '';
+    for (const id of ['badge-tasa-global', 'badge-tasa-inversiones']) {
+        const badge = document.getElementById(id);
+        if (!badge) continue;
+        badge.textContent = texto;
+        badge.title = aviso;
+    }
 
     document.querySelectorAll('.lbl-moneda-base').forEach(el => {
         el.textContent = estado.monedaGlobal;

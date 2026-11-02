@@ -1155,6 +1155,31 @@ def test_boton_cotizar_no_sobresale_del_campo(navegador, base):
         ctx.close()
 
 
+def test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base):
+    """La etiqueta «1 USD ≈ …» marca como aproximada la tasa que no es una cotización real, y no inventa una sin datos."""
+    def etiqueta(en_respaldo):
+        ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+        try:
+            def servir(route):
+                resp = route.fetch()
+                datos = resp.json()
+                datos["tasas"]["MXN"] = 19.5
+                datos["en_respaldo"] = en_respaldo
+                route.fulfill(response=resp, json=datos)
+            page.route("**/api/tipo-cambio", servir)
+            _login(page, base)
+            _esperar(page, "document.getElementById('badge-tasa-global').textContent.includes('19.50')")
+            assert not errores, "errores de JS:\n" + "\n".join(errores)
+            return page.inner_text("#badge-tasa-global"), page.get_attribute("#badge-tasa-global", "title")
+        finally:
+            ctx.close()
+
+    texto, aviso = etiqueta(["MXN"])
+    assert "(aprox.)" in texto and aviso, (texto, aviso)
+    texto, aviso = etiqueta([])
+    assert "(aprox.)" not in texto and not aviso, (texto, aviso)
+
+
 def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
     """Con el modo privacidad activo, toda cifra visible (en cualquier pestaña) queda desenfocada."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1315,6 +1340,7 @@ if __name__ == "__main__":
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
+                (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),
