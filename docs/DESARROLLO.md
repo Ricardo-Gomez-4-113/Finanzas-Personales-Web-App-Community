@@ -60,12 +60,13 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Ingreso del periodo | Resumen, Movimientos | Ingresos con fecha dentro del periodo: recibidos más los fijos aún por recibir. |
 | Gastos del periodo | Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |
 | A metas | Movimientos | Depósitos menos retiros de metas del periodo, incluidos los aportes recurrentes programados. |
+| Libre del periodo | Cinta de periodos (Inicio) | Ingresos menos gastos y metas de **ese** periodo (`totales.libre`). No arrastra el efectivo ni los periodos anteriores: cada tarjeta responde cuánto deja ese periodo. Es riesgo si gasta más de lo que ingresa. |
 | Libre hasta el cobro | Resumen (periodo) | Disponible menos los cargos que faltan en el periodo más los ingresos que aún llegan en él: el saldo al cierre del periodo en curso. |
 | Fijos por periodo | Fijos y MSI | `fijos_por_periodo` (finanzas_core): cada cargo cae en el periodo de cobro de su fecha; `aplicado` si ya está en Movimientos, `programado` si no. Pausados aparte. Los saltos no dejan registro, así que no se muestran en periodos pasados. |
 | Deuda MSI | Fijos y MSI | Monto pendiente de cada compra a meses, también si está pausada (la deuda sigue). |
 | Rubro del movimiento | Resumen, Movimientos | Se guarda en la propia transacción (`transacciones.rubro`: fijos, msi, normales, ingreso o metas). No depende del enlace a `recurrentes`, que al borrar un fijo pasa a NULL. |
 | Pagos del presupuesto | Presupuesto | La frecuencia activa 4 (semanal), 2 (quincenal) o 1 (mensual) pagos. Cada pago tiene su día de cobro y sus tarjetas (`presupuesto_tarjetas.unidad_orden`). Un pago con tarjetas exige fecha, y las fechas van en orden creciente. Las tarjetas siempre pertenecen a un pago: desde la versión 15 no hay tablero general, y las tarjetas sueltas pasaron al pago 1. Ninguno puede asignar más que su ingreso. |
-| Exportación del presupuesto | Fijos y Movimientos | Reemplazo total: se borran todos los fijos, incluidas las compras a meses que no estén en el presupuesto (también los hechos a mano y los aportes a metas) y se crean los del presupuesto. Un fijo del presupuesto que sigue vigente se actualiza en su lugar, así renombrar una tarjeta no duplica el cargo del mes. Cada tarjeta de un pago es un fijo mensual en su día. |
+| Exportación del presupuesto | Fijos y Movimientos | Antes de aplicar, `POST /api/presupuesto/exportar-a-fijos/vista-previa` simula la exportación y la revierte, y el modal muestra qué se crea, actualiza y elimina (con su origen). Reemplazo total: se borran todos los fijos, incluidas las compras a meses que no estén en el presupuesto (también los hechos a mano y los aportes a metas) y se crean los del presupuesto. Un fijo del presupuesto que sigue vigente se actualiza en su lugar, así renombrar una tarjeta no duplica el cargo del mes. Cada tarjeta de un pago es un fijo mensual en su día. Una tarjeta aporta a una meta solo si la eligió (`presupuesto_tarjetas.apartado_id`); el nombre ya no decide. El primer cargo salta las fechas que ya tienen movimiento de ese fijo, aunque se haya renombrado. |
 
 Reglas que las pruebas vigilan: los periodos son contiguos y no se solapan, cada movimiento cae en un solo periodo, el inicio de un periodo mensual usa el día de cobro como ancla, la exportación quincenal cuadra con el presupuesto, el historial mensual y el Resumen usan la misma regla de movimientos de apartados; el `monto_actual` de cada apartado coincide con sus movimientos; el saldo al cierre de un periodo es el saldo inicial del siguiente, y lo libre hasta el cobro es el saldo al cierre del periodo en curso.
 
@@ -75,6 +76,17 @@ Reglas que las pruebas vigilan: los periodos son contiguos y no se solapan, cada
 - `static/css/tema.css`: capa de componentes que se carga al final; sus reglas llevan prefijo `:root` para ganar a las anteriores sin `!important`.
 - Las gráficas leen sus colores de los tokens (`colorVar`) y se redibujan al cambiar de tema.
 - Textos en tipo oración; cifras en Fraunces con `tabular-nums`; íconos SVG con `stroke-width` 1.8.
+
+## Moneda base y tipos de cambio
+
+- Todo se guarda en MXN. Con USD o EUR como moneda base, el servidor da `factores_desde_mxn` en `/api/tipo-cambio` (`finanzas_core.factores_desde_mxn`) y el frontend solo multiplica; no calcula tipos de cambio.
+- `convertir` lanza `ValueError` sin tasa USD/MXN válida (o USD/EUR para montos en EUR). Una moneda desconocida se deja a valor nominal: Yahoo puede devolver otras monedas para una acción.
+- `mercado.py` conserva el último valor bueno de cada moneda; solo sin historia usa `TASA_MXN_RESPALDO` y `TASA_EUR_RESPALDO`. `/api/tipo-cambio` informa `en_respaldo` y la etiqueta «1 USD ≈ …» marca «(aprox.)».
+- Los mensajes de error del backend rotulan sus importes como MXN.
+
+## Confirmaciones
+
+`static/js/confirmar.js` exporta `confirmar({ titulo, mensaje, detalle, aceptar, cancelar, peligro })`, que devuelve una promesa con `true` o `false`. Usa el modal `#modal-confirmar`, que va al final de `index.html` para quedar encima de otros modales. Escape y el clic afuera cancelan, y Escape no cierra el modal de abajo. `detalle` recibe nodos del DOM ya construidos (sin HTML en bruto). No se usa `confirm()` ni `alert()` nativos.
 
 ## Cache-busting
 
@@ -108,11 +120,10 @@ Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (l
 
 ## Sincronizar SaaS y Community (mantenedores)
 
-La edición Community comparte el núcleo con una edición privada. Los cambios comunes se hacen en la privada y se propagan con `scripts/sync.sh`, que solo existe ahí:
+La edición Community comparte el núcleo con una edición privada (SaaS). El flujo es:
 
-```bash
-./scripts/sync.sh            # simula y lista qué copiaría
-./scripts/sync.sh --aplicar  # copia y corre verificar_reglas.sh en Community
-```
+1. Implementar y probar en Community; commit y push a `main`.
+2. Pasar el mismo commit al SaaS con `~/bin/portar-a-saas.sh <commit> --probar`: aplica el resto de archivos con `git apply`, mezcla `static/index.html` a tres bandas (conserva la landing) y corre las suites del SaaS. Si hay conflicto no toca nada.
+3. Revisar y hacer el commit y el push del SaaS.
 
-Nunca se copian la landing, `main.py`, `auth.js`, `docker-compose.yml`, `Dockerfile`, README, LICENSE ni `.env`.
+Nunca se copian la landing, `main.py`, `auth.js`, `docker-compose.yml`, `Dockerfile`, README, LICENSE ni `.env`: difieren a propósito. El script y `scripts/sync.sh` no se versionan.
