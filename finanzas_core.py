@@ -155,11 +155,6 @@ def siguiente_fecha(fecha: date, frecuencia: str, dia: Optional[int]) -> date:
         # Fin de mes -> 15 del mes siguiente
         anio, mes = (fecha.year + 1, 1) if fecha.month == 12 else (fecha.year, fecha.month + 1)
         return date(anio, mes, 15)
-    if frecuencia == 'anual':
-        # Mismo mes y día ancla, un año después (29 de febrero se limita al 28 en años no bisiestos)
-        anio = fecha.year + 1
-        ancla = dia if dia else fecha.day
-        return date(anio, fecha.month, min(ancla, ultimo_dia_mes(anio, fecha.month)))
     # mensual: mes siguiente, día ancla limitado al último día del mes
     anio, mes = (fecha.year + 1, 1) if fecha.month == 12 else (fecha.year, fecha.month + 1)
     ancla = dia if dia else fecha.day
@@ -344,8 +339,6 @@ def mensualizar(monto: float, frecuencia: str) -> float:
         return float(monto) * 2
     if frecuencia == 'semanal':
         return round(float(monto) * 52 / 12, 2)
-    if frecuencia == 'anual':
-        return round(float(monto) / 12, 2)
     if frecuencia == 'mensual':
         return float(monto)
     # La base solo admite semanal, quincenal y mensual (CHECK); cualquier otro valor es un error de código
@@ -831,7 +824,7 @@ def obtener_ventana_corte_fecha(
             d_inicio, d_fin = periodo_de_cobro_que_contiene(principal, f_target)
             ingreso_ventana = sum(float(ing["monto"]) * _cobros_en_ventana(ing, d_inicio, d_fin) for ing in ingresos)
         else:
-            # Sin un ingreso principal (por ejemplo, solo cobros anuales o ligados a metas) se conserva el corte por días
+            # Sin un ingreso principal (por ejemplo, solo cobros ligados a metas) se conserva el corte por días
             dias_corte = set()
             for ing in ingresos:
                 d = int(ing["dia"]) if ing["dia"] else 1
@@ -1685,8 +1678,7 @@ def _recurrentes_vigentes(conn: sqlite3.Connection) -> list:
 
 def _ingreso_principal(vigentes: list):
     """Ingreso fijo que marca la periodicidad: el de mayor equivalente mensual; si empatan, el de cobro más próximo."""
-    ingresos = [r for r in vigentes if r["tipo"] == 'ingreso' and r["proxima_fecha"] and r["apartado_id"] is None
-                and r["frecuencia"] != 'anual']  # un cobro anual no fija la quincena ni el mes de los periodos
+    ingresos = [r for r in vigentes if r["tipo"] == 'ingreso' and r["proxima_fecha"] and r["apartado_id"] is None]
     if not ingresos:
         return None
     return min(ingresos, key=lambda r: (-mensualizar(float(r["monto"]), r["frecuencia"]), r["proxima_fecha"]))

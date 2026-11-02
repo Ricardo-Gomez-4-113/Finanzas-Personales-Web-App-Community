@@ -52,7 +52,7 @@ class RecurrenteCreate(BaseModel):
 class RecurrenteUpdate(BaseModel):
     descripcion: Optional[str] = Field(None, min_length=1, max_length=100)
     monto: Optional[float] = Field(None, gt=0, le=1e12)
-    frecuencia: Optional[str] = None
+    frecuencia: Optional[Literal['semanal', 'quincenal', 'mensual']] = None
     proxima_fecha: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     apartado_id: Optional[int] = None
 

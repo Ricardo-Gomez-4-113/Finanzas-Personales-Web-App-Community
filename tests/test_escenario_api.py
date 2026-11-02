@@ -234,11 +234,11 @@ def test_flujo_fijo_pausado_y_reanudado_no_cobra_atrasado():
 
 
 def test_flujo_frecuencia_anual_se_rechaza_sin_romper_el_fijo():
-    # 'anual' no está en el CHECK de la tabla: no se guarda (antes respondía 500). Requiere migración v18.
+    # No existe la frecuencia anual: la API la rechaza al validar (422) y el fijo queda como estaba.
     h = _usuario_flujos()
     rid = _fijo(h, descripcion="Seguro de auto", tipo="gasto", frecuencia="mensual", monto=1200, fecha_inicio="2026-08-01")
     r = CLIENT.patch(f"/api/recurrentes/{rid}", json={"frecuencia": "anual"}, headers=h)
-    assert r.status_code == 400, (r.status_code, r.text)
+    assert r.status_code == 422, (r.status_code, r.text)
     assert _fila(h, rid)["frecuencia"] == "mensual", _fila(h, rid)
 
 

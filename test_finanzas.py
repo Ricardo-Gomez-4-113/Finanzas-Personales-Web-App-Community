@@ -2473,26 +2473,15 @@ def test_msi_cuotas_suman_el_total_sin_importar_cuando_se_materialice():
         assert conn.execute("SELECT activo FROM recurrentes WHERE id = 1").fetchone()["activo"] == 0, seed
 
 
-def test_anual_avanza_un_ano_y_no_un_mes():
-    from finanzas_core import siguiente_fecha, mensualizar, _ingreso_principal
-    # Un cargo anual cae cada año, en el mismo mes y día ancla; nunca un mes después
-    assert siguiente_fecha(date(2026, 3, 15), 'anual', 15) == date(2027, 3, 15)
-    # Un 29 de febrero se limita al 28 en años no bisiestos y vuelve al 29 cuando puede
-    assert siguiente_fecha(date(2028, 2, 29), 'anual', 29) == date(2029, 2, 28)
-    assert siguiente_fecha(date(2029, 2, 28), 'anual', 29) == date(2030, 2, 28)
-    assert siguiente_fecha(date(2031, 2, 28), 'anual', 29) == date(2032, 2, 29)
-    # El equivalente mensual de un anual es una doceava parte
-    assert mensualizar(1200, 'anual') == 100.0
-    try:
-        mensualizar(100, 'diaria')  # una frecuencia fuera del CHECK de la base no debe pasar en silencio
-        assert False, "mensualizar debió rechazar una frecuencia desconocida"
-    except ValueError:
-        pass
-    # Un anual nunca marca la periodicidad de la quincena o del mes: no es el ingreso principal
-    anual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-01", "monto": 50000.0, "frecuencia": "anual"}
-    mensual = {"tipo": "ingreso", "apartado_id": None, "proxima_fecha": "2026-11-15", "monto": 3000.0, "frecuencia": "mensual"}
-    assert _ingreso_principal([anual, mensual]) is mensual
-    assert _ingreso_principal([anual]) is None
+def test_no_existe_la_frecuencia_anual():
+    # La app solo maneja semanal, quincenal y mensual (así lo exige el CHECK de la base): una anual no pasa en silencio
+    from finanzas_core import mensualizar
+    for frecuencia in ('anual', 'diaria'):
+        try:
+            mensualizar(1200, frecuencia)
+            assert False, f"mensualizar debió rechazar {frecuencia}"
+        except ValueError:
+            pass
 
 
 def test_editar_proximo_cargo_no_cambia_el_dia_ancla_si_cae_a_fin_de_mes():
