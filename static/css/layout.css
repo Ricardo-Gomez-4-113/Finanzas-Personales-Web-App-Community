@@ -13,6 +13,7 @@
     background-color: var(--bg-color);
 }
 
+/* !important: el JS oculta la app con un estilo en línea y esto debe ganarle al display del layout */
 #vista-app.app-layout[style*="display: none"] {
     display: none !important;
 }
@@ -47,7 +48,7 @@
     flex-direction: column;
     z-index: 100;
     transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 1px 0 3px rgba(0,0,0,0.02);
+    box-shadow: 1px 0 3px rgb(var(--sombra-rgb) / 0.02);
 }
 
 .sidebar-header {
@@ -205,7 +206,7 @@
     color: var(--text-color);
     border: 1px solid var(--border-color);
     border-left: 3.5px solid var(--gold-color);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 3px 0 8px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 16px rgb(var(--sombra-rgb) / 0.5), inset 3px 0 8px rgb(var(--luz-rgb) / 0.05);
 }
 
 .sidebar-nav .tab-btn .nav-icon {
@@ -325,7 +326,7 @@
     justify-content: space-between;
     padding: 0 24px;
     backdrop-filter: blur(8px);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgb(var(--sombra-rgb) / 0.02);
 }
 
 .topbar-left {
@@ -397,9 +398,6 @@
 }
 
 .select-moneda-topbar {
-    width: auto !important;
-    height: 32px !important;
-    padding: 0 26px 0 10px !important;
     border-radius: 6px;
     font-size: 0.8rem;
     font-weight: 600;
@@ -418,6 +416,11 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 8px center;
+}
+:root .select-moneda-topbar {
+    width: auto;
+    height: 32px;
+    padding: 0 26px 0 10px;
 }
 
 .select-moneda-topbar:hover, .select-moneda-topbar:focus {
@@ -438,11 +441,13 @@
     background-color: var(--bg-color);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    white-space: nowrap !important;
     flex-shrink: 0;
     box-sizing: border-box;
     user-select: none;
     line-height: 1;
+}
+:root .badge-tasa-topbar {
+    white-space: nowrap;
 }
 
 /* --- BOTÓN MODO PRIVACIDAD TOPBAR (ESTILO COPILOT / MONARCH) --- */
@@ -501,7 +506,7 @@ body.privacy-mode .dato-sensible:hover {
     cursor: pointer;
     color: var(--text-color);
     transition: all 0.15s ease-in-out;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.03);
 }
 
 .btn-user-trigger:hover {
@@ -550,7 +555,7 @@ body.privacy-mode .dato-sensible:hover {
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 10px 25px rgb(var(--sombra-rgb) / 0.15);
     z-index: 1100;
     overflow: hidden;
     opacity: 0;
@@ -759,7 +764,7 @@ body.privacy-mode .dato-sensible:hover {
     padding: 35px 30px;
     width: 100%;
     max-width: 420px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    box-shadow: 0 10px 30px rgb(var(--sombra-rgb) / 0.12);
     animation: fadeIn 0.25s ease-out;
 }
 

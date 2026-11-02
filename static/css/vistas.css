@@ -122,7 +122,7 @@
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.06);
   transition: all 0.15s ease;
 }
 
@@ -190,7 +190,7 @@
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.05);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -221,11 +221,11 @@
 
 .cards-inversiones .inv-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 14px rgb(var(--sombra-rgb) / 0.08);
 }
 
 [data-theme="dark"] .cards-inversiones .inv-card:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 6px 18px rgb(var(--sombra-rgb) / 0.4);
 }
 
 .pnl-badge {
@@ -283,7 +283,10 @@
 .input-group-search input {
     flex: 1 1 0%;
     min-width: 0;
-    width: auto !important;
+}
+:root .input-group-search input,
+:root .form-group .input-group-search input {
+    width: auto;
 }
 
 .btn-search-ticker {
@@ -303,7 +306,7 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgb(var(--sombra-rgb) / 0.08);
     transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
@@ -344,10 +347,13 @@
 }
 
 .chart-container-dona canvas {
+    /* !important: Chart.js fija el tamaño del canvas en línea y esto lo acota */
     max-width: 100% !important;
     max-height: 280px !important;
 }
 
+/* Colores de estado (ganancia, pérdida, sin cambio): el !important es deliberado. Deben ganar a los colores
+   que cada contexto (hero, tarjeta, tabla) fija a sus textos con selectores más específicos. */
 .pnl-positivo {
     color: var(--success-text) !important;
     font-weight: bold;
@@ -443,14 +449,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(0, 0, 0, 0.02);
+    background: rgb(var(--sombra-rgb) / 0.02);
     border: 1px solid var(--border-color);
     padding: 6px 12px;
     border-radius: 8px;
 }
 
 [data-theme="dark"] .breakdown-item {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgb(var(--luz-rgb) / 0.03);
 }
 
 .breakdown-dot {
@@ -484,16 +490,16 @@
 .networth-alloc-track {
     width: 100%;
     height: 5px;
-    background: rgba(0, 0, 0, 0.06);
+    background: rgb(var(--sombra-rgb) / 0.06);
     border-radius: 10px;
     display: flex;
     overflow: hidden;
     margin-top: 10px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+    box-shadow: inset 0 1px 2px rgb(var(--sombra-rgb) / 0.08);
 }
 
 [data-theme="dark"] .networth-alloc-track {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgb(var(--luz-rgb) / 0.08);
 }
 
 .alloc-bar {
@@ -535,7 +541,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.18s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgb(var(--sombra-rgb) / 0.05);
 }
 
 .gbm-action-btn:hover {
@@ -556,7 +562,7 @@
     background: var(--border-color);
     border-color: var(--border-focus);
     color: var(--text-color);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 14px rgb(var(--sombra-rgb) / 0.5);
 }
 
 /* Cabecera de Apartados */
@@ -640,7 +646,9 @@
     font-size: 0.76rem;
     color: var(--text-muted);
     font-weight: 600;
-    white-space: nowrap !important;
+}
+:root .badge-tasa {
+    white-space: nowrap;
 }
 
 #badge-tasa-inversiones {
@@ -657,11 +665,13 @@
     border: 1px solid var(--border-color);
     border-radius: 6px;
     color: var(--text-muted);
-    white-space: nowrap !important;
     flex-shrink: 0;
     box-sizing: border-box;
     user-select: none;
     line-height: 1;
+}
+:root #badge-tasa-inversiones {
+    white-space: nowrap;
 }
 
 /* --- AUTOCOMPLETADO DE TICKERS --- */
@@ -680,7 +690,7 @@
     border-radius: 8px;
     max-height: 240px;
     overflow-y: auto;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 25px rgb(var(--sombra-rgb) / 0.2);
     z-index: 1000;
 }
 
@@ -815,11 +825,11 @@
 
 .card-kpi:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 14px rgb(var(--sombra-rgb) / 0.08);
 }
 
 [data-theme="dark"] .card-kpi:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 6px 18px rgb(var(--sombra-rgb) / 0.4);
 }
 
 .card-kpi h3 {
@@ -863,7 +873,7 @@
         transform: translateX(-100%);
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 1000;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.25);
+        box-shadow: 4px 0 20px rgb(var(--sombra-rgb) / 0.25);
     }
 
     .app-sidebar.sidebar-open {
@@ -922,7 +932,7 @@
         margin-right: -12px;
         gap: 5px;
         border-bottom: 1px solid var(--border-color);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.04);
     }
 
     .tab-btn {
@@ -963,12 +973,12 @@
         gap: 10px;
         padding: 7px 10px;
         border-radius: 8px;
-        background: rgba(0, 0, 0, 0.02);
+        background: rgb(var(--sombra-rgb) / 0.02);
         border: 1px solid var(--border-color);
     }
 
     [data-theme="dark"] .breakdown-item {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgb(var(--luz-rgb) / 0.03);
     }
 
     .breakdown-info {
@@ -1007,8 +1017,8 @@
         grid-column: auto;
     }
 
-    .cards.cards-4 > .card {
-        grid-column: span 1 !important;
+    :root .cards.cards-4 > .card {
+        grid-column: span 1;
     }
 
     .card {
@@ -1107,8 +1117,11 @@
     .input-group-search input {
         flex: 1 1 0%;
         min-width: 0;
-        width: auto !important;
         box-sizing: border-box;
+    }
+    :root .input-group-search input,
+    :root .form-group .input-group-search input {
+        width: auto;
     }
 
     .btn-search-ticker {
@@ -1214,8 +1227,10 @@
         padding: 0 12px;
         font-size: 0.8rem;
         border-radius: 6px;
-        white-space: nowrap !important;
         box-sizing: border-box;
+    }
+    :root #badge-tasa-inversiones {
+        white-space: nowrap;
     }
 
     .btn-sync {
@@ -1227,8 +1242,10 @@
         padding: 0 12px;
         font-size: 0.8rem;
         border-radius: 6px;
-        white-space: nowrap !important;
         box-sizing: border-box;
+    }
+    :root .btn-sync {
+        white-space: nowrap;
     }
 
     /* Cabecera de Apartados Móvil */
@@ -1254,7 +1271,7 @@
         -webkit-overflow-scrolling: touch;
         border-radius: 8px;
         border: 1px solid var(--border-color);
-        box-shadow: inset -8px 0 8px -8px rgba(0, 0, 0, 0.15);
+        box-shadow: inset -8px 0 8px -8px rgb(var(--sombra-rgb) / 0.15);
     }
 
     #tabla-inversiones th:first-child,
@@ -1266,7 +1283,7 @@
         background-color: var(--panel-bg);
         z-index: 3;
         border-right: 2px solid var(--border-color);
-        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.06);
+        box-shadow: 2px 0 5px rgb(var(--sombra-rgb) / 0.06);
     }
 
     #tabla-inversiones th:first-child,
@@ -1282,11 +1299,11 @@
     }
 
     tbody tr:nth-child(even) {
-        background-color: rgba(0, 0, 0, 0.015);
+        background-color: rgb(var(--sombra-rgb) / 0.015);
     }
 
     [data-theme="dark"] tbody tr:nth-child(even) {
-        background-color: rgba(255, 255, 255, 0.02);
+        background-color: rgb(var(--luz-rgb) / 0.02);
     }
 
     /* Autocompletado de Tickers */
@@ -1317,9 +1334,11 @@
 
 @media (max-width: 480px) {
     .select-moneda-topbar {
-        padding: 0 22px 0 8px !important;
         font-size: 0.76rem;
-        height: 30px !important;
+    }
+    :root .select-moneda-topbar {
+        padding: 0 22px 0 8px;
+        height: 30px;
     }
 
     .modal-card {
@@ -1446,7 +1465,7 @@
 
 .btn-legal-tab:hover {
     color: var(--text-color);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(var(--luz-rgb) / 0.04);
 }
 
 .btn-legal-tab.active {
@@ -1535,7 +1554,7 @@
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px rgb(var(--sombra-rgb) / 0.08);
     animation: fadeInLote 0.2s ease-out;
 }
 @keyframes fadeInLote {
@@ -1573,13 +1592,16 @@
     transform: translateY(-1px);
 }
 .chk-mov-item, #chk-mov-todos {
-    width: 16px !important;
-    height: 16px !important;
-    padding: 0 !important;
     margin: 0 auto;
     display: block;
     cursor: pointer;
     accent-color: var(--primary-color);
+}
+:root .chk-mov-item,
+:root #chk-mov-todos {
+    width: 16px;
+    height: 16px;
+    padding: 0;
 }
 .rec-item {
     border: 1px solid var(--border-color);
@@ -1605,7 +1627,7 @@
    ========================================================================== */
 .networth-dual { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-end; }
 .networth-sub { display: block; color: var(--text-muted); font-size: 0.75rem; }
-.networth-sin { color: var(--text-muted) !important; font-size: 1.25rem; }
+.networth-sin { color: var(--text-muted) !important; font-size: 1.25rem; }   /* estado: gana al color del hero */
 .dot-rendimiento { background-color: var(--gold-color); }
 .dot-deuda { background-color: var(--danger-color); }
 .breakdown-debt strong { color: var(--danger-text); }
@@ -1757,16 +1779,16 @@
     border: 1px solid var(--border-color);
 }
 
-.input-calc.calc-has-prefix {
-    padding-left: 32px !important;
+:root .input-calc.calc-has-prefix {
+    padding-left: 32px;
 }
 
-.input-calc.calc-has-prefix-dia {
-    padding-left: 48px !important;
+:root .input-calc.calc-has-prefix-dia {
+    padding-left: 48px;
 }
 
-.input-calc.calc-has-suffix {
-    padding-right: 60px !important;
+:root .input-calc.calc-has-suffix {
+    padding-right: 60px;
 }
 
 /* Evitar empalmes y ocultar flechas nativas (spin buttons) en inputs numéricos */
@@ -1904,7 +1926,7 @@ input[type="number"].subperiodo-editor-input-pct {
 .card-calc:hover {
     transform: translateY(-2px);
     border-color: color-mix(in srgb, var(--gold-color) 45%, transparent);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 24px rgb(var(--sombra-rgb) / 0.12);
 }
 
 .card-calc-top {
@@ -2249,7 +2271,7 @@ input[type="number"].subperiodo-editor-input-pct {
     height: 38px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(var(--luz-rgb) / 0.04);
     color: var(--gold-color);
     display: inline-flex;
     align-items: center;
@@ -2359,7 +2381,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-slice-empty {
-    background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 10px, transparent 10px, transparent 20px);
+    background: repeating-linear-gradient(45deg, rgb(var(--luz-rgb) / 0.05), rgb(var(--luz-rgb) / 0.05) 10px, transparent 10px, transparent 20px);
 }
 
 .pres-slice-libre {
@@ -2389,14 +2411,30 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 /* Colores de Presupuesto */
-.pres-color-gold { background: var(--gold-color) !important; }
-.pres-color-blue { background: var(--cyan-color) !important; }
-.pres-color-emerald { background: var(--success-color) !important; }
-.pres-color-purple { background: var(--gold-color) !important; }
-.pres-color-amber { background: var(--warning-color) !important; }
-.pres-color-cyan { background: var(--cyan-color) !important; }
-.pres-color-rose { background: var(--danger-color) !important; }
-.pres-color-libre { background: color-mix(in srgb, var(--success-color) 50%, transparent) !important; }
+:root .pres-color-gold {
+    background: var(--gold-color);
+}
+:root .pres-color-blue {
+    background: var(--cyan-color);
+}
+:root .pres-color-emerald {
+    background: var(--success-color);
+}
+:root .pres-color-purple {
+    background: var(--gold-color);
+}
+:root .pres-color-amber {
+    background: var(--warning-color);
+}
+:root .pres-color-cyan {
+    background: var(--cyan-color);
+}
+:root .pres-color-rose {
+    background: var(--danger-color);
+}
+:root .pres-color-libre {
+    background: color-mix(in srgb, var(--success-color) 50%, transparent);
+}
 
 .pres-icon-gold { background: color-mix(in srgb, var(--gold-color) 15%, transparent); color: var(--gold-color); border: 1px solid color-mix(in srgb, var(--gold-color) 30%, transparent); }
 .pres-icon-blue { background: color-mix(in srgb, var(--cyan-color) 15%, transparent); color: var(--cyan-color); border: 1px solid color-mix(in srgb, var(--cyan-color) 30%, transparent); }
@@ -2483,7 +2521,7 @@ input[type="number"].subperiodo-editor-input-pct {
 
 .pres-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 24px rgb(var(--sombra-rgb) / 0.12);
 }
 
 .pres-card-accent-gold {
@@ -2755,7 +2793,7 @@ input[type="number"].subperiodo-editor-input-pct {
     font-weight: 600;
     border-radius: 20px;
     border: 1px solid var(--border-color);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(var(--luz-rgb) / 0.04);
     color: var(--text-color);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -2765,7 +2803,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-subperiodo-pill:hover {
-    background: rgba(255, 255, 255, 0.09);
+    background: rgb(var(--luz-rgb) / 0.09);
     border-color: color-mix(in srgb, var(--gold-color) 40%, transparent);
     color: var(--gold-color);
 }
@@ -2801,7 +2839,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-card-sub-pill {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(var(--luz-rgb) / 0.04);
     border: 1px solid var(--border-color);
     padding: 2px 7px;
     border-radius: 5px;
@@ -2868,7 +2906,6 @@ input[type="number"].subperiodo-editor-input-pct {
 .subperiodo-editor-input-pct {
     width: 100%;
     height: 38px;
-    padding: 8px 36px 8px 10px !important;
     border-radius: 8px;
     background: var(--input-bg, var(--surface-level2));
     border: 1px solid var(--border-color, var(--border-color));
@@ -2877,6 +2914,9 @@ input[type="number"].subperiodo-editor-input-pct {
     text-align: right;
     font-variant-numeric: tabular-nums;
     box-sizing: border-box;
+}
+:root .subperiodo-editor-input-pct {
+    padding: 8px 36px 8px 10px;
 }
 
 .btn-remove-subperiodo {

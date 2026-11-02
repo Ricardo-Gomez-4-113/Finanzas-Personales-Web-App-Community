@@ -33,6 +33,9 @@
     /* ---- Modo claro: porcelana y tinta ---- */
     --bg-color: #EEF0F3;
     --overlay-scrim: #080A0D;
+    /* Canales de las sombras y de los brillos neutros: rgb(var(--sombra-rgb) / .12). El alfa se queda en cada regla. */
+    --sombra-rgb: 0 0 0;
+    --luz-rgb: 255 255 255;
     /* Texto sobre las porciones de las gráficas: claro en ambos temas, porque las porciones son tonos medios y oscuros */
     --chart-label: #F6F2EA;
     --panel-bg: #FFFFFF;

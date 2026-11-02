@@ -55,6 +55,7 @@ html, body {
     outline-offset: 2px;
 }
 
+/* El !important es deliberado: quien pide menos movimiento gana sobre cualquier animación o transición */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -113,11 +114,11 @@ body {
 
 .card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 24px rgb(var(--sombra-rgb) / 0.12);
 }
 
 [data-theme="dark"] .card:hover {
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 10px 28px rgb(var(--sombra-rgb) / 0.55);
 }
 
 .card h3 {
@@ -168,6 +169,7 @@ body {
     border-color: color-mix(in srgb, var(--danger-color) 45%, transparent);
     background: color-mix(in srgb, var(--danger-color) 4%, transparent);
 }
+/* Estado de déficit: el !important es deliberado, gana al color que cada tarjeta fija a sus textos */
 .card.card-deficit p {
     color: var(--danger-text) !important;
 }
@@ -268,7 +270,7 @@ button {
     line-height: 1;
     margin: 0;
     box-sizing: border-box;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.05);
     transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
@@ -297,7 +299,7 @@ button:active {
     gap: 6px;
     width: auto;
     margin: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.15);
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
@@ -305,7 +307,7 @@ button:active {
     background: var(--primary-hover);
     border-color: var(--primary-hover);
     color: var(--primary-text, var(--panel-bg));
-    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 14px rgb(var(--luz-rgb) / 0.2);
 }
 
 .btn-primary:active {
@@ -317,14 +319,14 @@ button:active {
     color: var(--primary-text);
     border: 1px solid var(--gold-color);
     font-weight: 700;
-    box-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 10px rgb(var(--luz-rgb) / 0.15);
 }
 
 [data-theme="dark"] .btn-primary:hover {
     background: var(--primary-hover);
     border-color: var(--border-color);
     color: var(--primary-text);
-    box-shadow: 0 4px 16px rgba(255, 255, 255, 0.25);
+    box-shadow: 0 4px 16px rgb(var(--luz-rgb) / 0.25);
 }
 
 .btn-secondary {
@@ -373,7 +375,7 @@ form > button[type="submit"],
     gap: 6px;
     width: auto;
     margin-top: 14px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.15);
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
@@ -383,7 +385,7 @@ form > button[type="submit"]:hover,
     background: var(--primary-hover);
     border-color: var(--primary-hover);
     color: var(--primary-text, var(--panel-bg));
-    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 14px rgb(var(--luz-rgb) / 0.2);
 }
 
 form > button[type="submit"]:active,
@@ -399,7 +401,7 @@ form > button[type="submit"]:active,
     color: var(--primary-text);
     border: 1px solid var(--gold-color);
     font-weight: 700;
-    box-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 10px rgb(var(--luz-rgb) / 0.15);
 }
 
 [data-theme="dark"] form > button[type="submit"]:hover,
@@ -408,7 +410,7 @@ form > button[type="submit"]:active,
     background: var(--primary-hover);
     border-color: var(--border-color);
     color: var(--primary-text);
-    box-shadow: 0 4px 16px rgba(255, 255, 255, 0.25);
+    box-shadow: 0 4px 16px rgb(var(--luz-rgb) / 0.25);
 }
 
 .form-actions {
@@ -682,13 +684,13 @@ tbody tr:hover {
     max-height: calc(100dvh - 32px);
     overflow-y: auto;
     padding: 22px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 15px 35px rgb(var(--sombra-rgb) / 0.4);
     box-sizing: border-box;
     animation: slideUp 0.18s ease-out;
 }
 
 [data-theme="dark"] .modal-card {
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.85);
+    box-shadow: 0 15px 35px rgb(var(--sombra-rgb) / 0.85);
 }
 
 @keyframes slideUp {
@@ -788,6 +790,7 @@ tbody tr:hover {
 /* ==========================================================================
    Utilidades y componentes de la Fase 5 (fijos, MSI, filtros y etiquetas)
    ========================================================================== */
+/* Utilidad de ocultar: debe ganar a cualquier display del componente */
 .hidden { display: none !important; }
 .hint-text { font-size: 0.85rem; color: var(--text-muted); margin: 6px 0 10px; }
 .link-btn {
@@ -978,14 +981,14 @@ tbody tr:hover {
 
 .subtab-btn:hover {
     color: var(--text-color);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgb(var(--luz-rgb) / 0.04);
 }
 
 .subtab-btn.active {
     background: var(--panel-bg);
     color: var(--accent-color);
     border-color: var(--border-color);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.2);
 }
 
 .subtab-content {

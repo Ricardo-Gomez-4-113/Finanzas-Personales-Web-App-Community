@@ -134,7 +134,13 @@ Tanda visual (`2857cfd`):
 - Los `title` con importes (donut de patrimonio, marcas del periodo, barras del presupuesto) usan `conTituloPrivado`: guardan `data-titulo` y `data-titulo-monto` y siguen el modo privacidad, también al repintarse con `innerHTML` (un `MutationObserver` en `core.js`).
 - Estilos en línea movidos a clases; el bloque de tarjeta dividida de movimientos y fijos es `bloqueTarjetaPartes` (`static/js/tarjeta_partes.js`) y usa `color-mix` con tokens. Los velos de modales usan `--overlay-scrim`.
 
-Visual abierto: 31 `!important` en `vistas.css`; unas 50 sombras y tintes neutros con `rgba` literal (se dejaron para no cambiar el aspecto sin capturas por componente); consolidar las 5 hojas (180 KB); los estilos en línea que quedan son anchos dinámicos por dato (barras de progreso y rebanadas).
+`!important` y sombras (resuelto):
+- De 44 declaraciones `!important` quedan 15, cada una con su motivo escrito junto a la regla: el bloque de reducir movimiento, `.hidden`, el tamaño del canvas de Chart.js (que fija estilos en línea), el `display` que el JS pone en línea a la app, y los colores de estado (`.pnl-*`, `.networth-sin`, `.card-deficit`), que deben ganar a los colores que cada contexto fija. El resto se resolvió con una regla `:root` aparte para esas declaraciones, y bajando la especificidad de la regla de campos de `tema.css` con `:where()`.
+- Las 57 sombras y tintes neutros con `rgba` literal usan `rgb(var(--sombra-rgb) / alfa)` y `rgb(var(--luz-rgb) / alfa)` (definidos en `tokens.css`); el valor calculado es idéntico.
+- Prueba: se volcaron los estilos calculados de 200 640 elementos en 110 pantallas (login, siete pestañas, tres modales; claro y oscuro; cinco anchos de 390 a 1500 px) antes y después. Sin diferencias reales; las únicas, de menos de 3 px en títulos, aparecen también entre dos corridas de la versión anterior (carga de tipografía). El volcado no cubre hover, foco ni estados que dependen de datos (déficit).
+- `scripts/verificar_reglas.sh` falla si reaparece un `rgba` neutro literal fuera de `tokens.css` o si hay más de 15 declaraciones `!important` (la landing, solo del SaaS, queda fuera).
+
+Visual abierto: consolidar las 5 hojas (180 KB) y los `rgba` de colores de marca de la landing (SaaS); los estilos en línea que quedan son anchos dinámicos por dato. En `tema.css` queda un `#000` en una máscara de degradado, donde solo cuenta la transparencia.
 
 Abierto:
 - **Decisión pendiente:** frecuencia anual (el código la contempla y el `CHECK` de la base no); las dos nociones de «mes» del tablero (calendario y periodo de cobro); moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).

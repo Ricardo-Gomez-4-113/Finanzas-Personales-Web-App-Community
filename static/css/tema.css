@@ -699,7 +699,7 @@
     padding: 0 18px;
     font-size: var(--fs-sm);
     font-weight: 600;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 6px 16px -8px var(--primary-glow);
+    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 6px 16px -8px var(--primary-glow);
 }
 
 :root .btn-primary:hover,
@@ -709,7 +709,7 @@
     background: var(--primary-hover);
     border-color: var(--primary-hover);
     color: var(--primary-text);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 8px 20px -8px var(--primary-glow);
+    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 8px 20px -8px var(--primary-glow);
 }
 
 :root .btn-secondary {
@@ -879,7 +879,7 @@
     color: var(--text-muted);
 }
 
-:root .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+:root .form-group input:where(:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])),
 :root .form-group select,
 :root .form-group textarea {
     width: 100%;
@@ -933,7 +933,7 @@
 
 /* En móvil el texto de los campos va a 16 px: iOS no hace zoom al enfocar */
 @media (max-width: 720px) {
-    :root .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    :root .form-group input:where(:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])),
     :root .form-group select,
     :root .form-group textarea { font-size: 1rem; }
 }

@@ -27,5 +27,20 @@ if [[ "$(basename "$PWD")" == *Community* ]]; then
   done
 fi
 
+# 4. Sin sombras ni brillos neutros con color literal fuera de tokens.css: se usa rgb(var(--sombra-rgb) / alfa)
+#    o rgb(var(--luz-rgb) / alfa). La paleta vive en tokens.css; la landing (solo SaaS) tiene su propia hoja.
+CSS_APP=$(ls static/css/*.css | grep -v -e landing -e tokens)
+if grep -nE "rgba\(\s*(0\s*,\s*0\s*,\s*0|255\s*,\s*255\s*,\s*255)\s*," $CSS_APP; then
+  echo "FALLO: rgba neutro literal en static/css (usar --sombra-rgb o --luz-rgb)"; fallos=1
+fi
+
+# 5. Los !important (declaraciones, no comentarios) tienen tope. Cada uno de los actuales lleva su motivo escrito
+#    junto a la regla. Para uno nuevo: selector más específico con :root; si de verdad hace falta, justificarlo y subir el tope.
+MAX_IMPORTANT=15
+n_important=$(grep -hE "![i]mportant\s*[;}]" $CSS_APP | wc -l)
+if (( n_important > MAX_IMPORTANT )); then
+  echo "FALLO: hay $n_important declaraciones !important en static/css (tope $MAX_IMPORTANT)"; fallos=1
+fi
+
 [[ $fallos -eq 0 ]] && echo "Reglas OK"
 exit $fallos
