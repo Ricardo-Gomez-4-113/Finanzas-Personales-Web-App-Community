@@ -508,7 +508,7 @@ export async function ejecutarExportarPresupuesto() {
         const habraBajas = previa.eliminados > 0;
         const aceptado = await confirmar({
             titulo: 'Esto es lo que cambiará',
-            mensaje: 'Al exportar se reemplazan tus fijos por los del presupuesto. Los movimientos ya registrados no se tocan.',
+            mensaje: 'Revisa lo que cambia. Los movimientos que ya registraste no se tocan.',
             detalle: detalleVistaPreviaExportar(previa),
             aceptar: habraBajas ? 'Reemplazar fijos' : 'Exportar',
             peligro: habraBajas,
@@ -558,6 +558,23 @@ function ajustarModalParaPago(esPago) {
     if (campoDia) campoDia.classList.toggle('hidden', esPago);
 }
 
+/** Llena el selector de metas. Hasta que cargue no se envía el campo, para no desvincular por accidente. */
+async function llenarMetasDeTarjeta(seleccionada = null) {
+    const sel = document.getElementById('tarjeta-pres-apartado');
+    if (!sel) return;
+    delete sel.dataset.listo;
+    sel.replaceChildren(new Option('Ninguna: es un gasto', ''));
+    try {
+        const res = await apiFetch('/api/apartados');
+        if (!res.ok) return;
+        for (const a of await res.json()) sel.append(new Option(a.nombre, a.id));
+        sel.value = seleccionada === null || seleccionada === undefined ? '' : String(seleccionada);
+        sel.dataset.listo = '1';
+    } catch (e) {
+        console.warn('No se pudieron cargar las metas:', e);
+    }
+}
+
 export function abrirModalCrearTarjeta(pago = null) {
     idTarjetaEditando = null;
     pagoTarjetaEditando = Number.isInteger(pago) ? pago : null;
@@ -572,6 +589,7 @@ export function abrirModalCrearTarjeta(pago = null) {
     document.getElementById('tarjeta-pres-msi').checked = false;
     document.getElementById('tarjeta-pres-msi-cuotas').value = '';
     sincronizarCamposMsi();
+    llenarMetasDeTarjeta(null);
     const inpDia = document.getElementById('tarjeta-pres-dia');
     if (inpDia) inpDia.value = '';
     if (titulo) {
@@ -604,6 +622,7 @@ export function abrirModalEditarTarjeta(t) {
     document.getElementById('tarjeta-pres-msi').checked = t.tipo === 'msi';
     document.getElementById('tarjeta-pres-msi-cuotas').value = t.msi_cuotas ?? '';
     sincronizarCamposMsi();
+    llenarMetasDeTarjeta(t.apartado_id);
 
     if (titulo) titulo.textContent = 'Editar tarjeta de presupuesto';
     ajustarModalParaPago(pagoTarjetaEditando !== null);
@@ -681,6 +700,8 @@ export async function guardarTarjetaPresupuesto(e) {
     const esMsi = document.getElementById('tarjeta-pres-msi').checked;
     const msiCuotas = parseInt(document.getElementById('tarjeta-pres-msi-cuotas').value, 10) || null;
     const body = { nombre, monto, porcentaje, icono, color, notas, dia_pago, tipo: esMsi ? 'msi' : 'normal', msi_cuotas: esMsi ? msiCuotas : null };
+    const selMeta = document.getElementById('tarjeta-pres-apartado');
+    if (selMeta && selMeta.dataset.listo) body.apartado_id = selMeta.value ? Number(selMeta.value) : null;
     if (!idEditar && pagoCrear !== null) body.unidad_orden = pagoCrear;
 
     guardandoTarjeta = true;

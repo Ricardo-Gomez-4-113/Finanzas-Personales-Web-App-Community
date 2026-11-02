@@ -30,7 +30,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 19
+CURRENT_TENANT_SCHEMA_VERSION = 20
 
 
 # =============================================================================
@@ -547,6 +547,26 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
             cursor.execute("UPDATE transacciones SET fecha = ?, descripcion = ? WHERE id = ?", (reparada, descripcion, fila[0]))
         cursor.execute("PRAGMA user_version = 19;")
         current_version = 19
+
+    # Versión 20: la tarjeta del presupuesto se vincula a su meta por id y no por nombre. Al exportar, el
+    # nombre exacto unía una tarjeta con una meta sin que nadie lo decidiera, y renombrar cualquiera de las
+    # dos rompía el aporte. Las tarjetas que hoy coinciden por nombre conservan su meta.
+    if current_version < 20 and CURRENT_TENANT_SCHEMA_VERSION >= 20:
+        try:
+            cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL;")
+        except sqlite3.OperationalError:
+            pass
+        cursor.execute("""
+            UPDATE presupuesto_tarjetas
+            SET apartado_id = (
+                SELECT a.id FROM apartados a
+                WHERE LOWER(TRIM(a.nombre)) = LOWER(TRIM(presupuesto_tarjetas.nombre))
+                ORDER BY a.id LIMIT 1
+            )
+            WHERE apartado_id IS NULL
+        """)
+        cursor.execute("PRAGMA user_version = 20;")
+        current_version = 20
 
     conn.commit()
 

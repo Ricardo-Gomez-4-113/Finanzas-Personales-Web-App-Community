@@ -213,6 +213,35 @@ def test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real(cl
     assert [(d["descripcion"], d["accion"]) for d in real.json()["detalles"]] == [(d["descripcion"], d["accion"]) for d in previa["detalles"]]
 
 
+def test_tarjeta_del_presupuesto_se_vincula_a_su_meta_por_id(client):
+    _crear_usuario("ruta_tarjeta_meta")
+    h = _login(client, "ruta_tarjeta_meta")
+    assert client.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}, headers=h).status_code == 200
+    assert client.put("/api/presupuesto/unidades/1", json={"dia_pago": 5}, headers=h).status_code == 200
+    client.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 9000}, headers=h)
+    meta = next(a["id"] for a in client.get("/api/apartados", headers=h).json() if a["nombre"] == "Viaje")
+    # Una meta que no existe se rechaza
+    r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Ahorro", "monto": 1000, "unidad_orden": 1, "apartado_id": 999999}, headers=h)
+    assert r.status_code == 422, r.text
+    # El nombre ya no decide: «Viaje» sin vínculo es un gasto, «Ahorro» vinculada abona a la meta
+    assert client.post("/api/presupuesto/tarjetas", json={"nombre": "Viaje", "monto": 500, "unidad_orden": 1}, headers=h).status_code == 201
+    r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Ahorro", "monto": 1000, "unidad_orden": 1, "apartado_id": meta}, headers=h)
+    assert r.status_code == 201 and r.json()["apartado_id"] == meta, r.text
+    ahorro = r.json()["id"]
+    assert client.post("/api/presupuesto/exportar-a-fijos", json={}, headers=h).status_code == 200
+    destino = {f["descripcion"]: f["apartado_id"] for f in client.get("/api/recurrentes", headers=h).json()}
+    assert destino["Viaje"] is None and destino["Ahorro"] == meta, destino
+    # Desvincularla (null explícito) y volver a exportar
+    r = client.patch(f"/api/presupuesto/tarjetas/{ahorro}", json={"apartado_id": None}, headers=h)
+    assert r.status_code == 200 and r.json()["apartado_id"] is None, r.text
+    assert client.post("/api/presupuesto/exportar-a-fijos", json={}, headers=h).status_code == 200
+    assert {f["descripcion"]: f["apartado_id"] for f in client.get("/api/recurrentes", headers=h).json()}["Ahorro"] is None
+    # Editar otra cosa no toca el vínculo
+    client.patch(f"/api/presupuesto/tarjetas/{ahorro}", json={"apartado_id": meta}, headers=h)
+    r = client.patch(f"/api/presupuesto/tarjetas/{ahorro}", json={"notas": "mensual"}, headers=h)
+    assert r.json()["apartado_id"] == meta, r.text
+
+
 def test_recurrentes_listar_editar_saltar_y_borrar(client):
     _crear_usuario("ruta_rec")
     h = _login(client, "ruta_rec")
@@ -431,6 +460,7 @@ if __name__ == "__main__":
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),
             (test_presupuesto_config_unidades_y_tarjetas, lambda: test_presupuesto_config_unidades_y_tarjetas(client)),
             (test_presupuesto_exporta_fijos, lambda: test_presupuesto_exporta_fijos(client)),
+            (test_tarjeta_del_presupuesto_se_vincula_a_su_meta_por_id, lambda: test_tarjeta_del_presupuesto_se_vincula_a_su_meta_por_id(client)),
             (test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real, lambda: test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real(client)),
             (test_recurrentes_listar_editar_saltar_y_borrar, lambda: test_recurrentes_listar_editar_saltar_y_borrar(client)),
             (test_admin_lista_edita_suspende_y_elimina, lambda: test_admin_lista_edita_suspende_y_elimina(client, hadmin)),

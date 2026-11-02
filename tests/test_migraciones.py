@@ -278,6 +278,24 @@ def test_v19_repara_fechas_imposibles_de_los_movimientos():
         assert [tuple(r) for r in conn.execute("SELECT id, fecha, descripcion FROM transacciones ORDER BY id")] == antes
 
 
+def test_v20_vincula_por_id_las_tarjetas_que_coinciden_con_una_meta_por_nombre():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 19)
+        conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 0), (2, 'Fondo', 'libre', 0)")
+        for nombre in ("  viaje ", "Despensa", "FONDO"):   # coincide sin distinguir mayúsculas ni espacios, o no coincide
+            conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES (?, 'wallet', 'gold', 10, 1000, '', 1)", (nombre,))
+        conn.commit()
+        _migrar_hasta(conn, 20)
+        assert _version(conn) == 20
+        vinculos = {r["nombre"].strip().lower(): r["apartado_id"] for r in conn.execute("SELECT nombre, apartado_id FROM presupuesto_tarjetas")}
+        assert vinculos == {"viaje": 1, "despensa": None, "fondo": 2}, vinculos
+        # Desvincular y re-migrar no vuelve a unirlas por nombre
+        conn.execute("UPDATE presupuesto_tarjetas SET apartado_id = NULL")
+        conn.commit()
+        _migrar_hasta(conn, 20)
+        assert conn.execute("SELECT COUNT(*) FROM presupuesto_tarjetas WHERE apartado_id IS NOT NULL").fetchone()[0] == 0
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

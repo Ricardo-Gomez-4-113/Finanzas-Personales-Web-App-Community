@@ -2806,6 +2806,40 @@ def test_balance_disponible_a_fecha_ignora_lo_programado_hacia_adelante():
     assert balance_disponible_a_fecha(cur, '2026-10-01') == 0.0
 
 
+def test_exportar_vincula_la_meta_por_id_y_no_por_nombre():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = nueva_bd()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_unidades SET dia_pago = 5 WHERE orden = 1")
+    conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 0)")
+    # «Viaje» coincide por nombre pero no está vinculada; «Ahorro» sí lo está, con otro nombre
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES ('Viaje', 'wallet', 'gold', 10, 1000, '', 1, 1)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden, apartado_id) VALUES ('Ahorro', 'wallet', 'gold', 5, 500, '', 2, 1, 1)")
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
+    destino = {r["descripcion"]: r["apartado_id"] for r in conn.execute("SELECT descripcion, apartado_id FROM recurrentes")}
+    assert destino["Viaje"] is None and destino["Ahorro"] == 1, destino
+
+
+def test_renombrar_una_tarjeta_no_duplica_el_cargo_ya_registrado():
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    conn = nueva_bd()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_unidades SET dia_pago = 5 WHERE orden = 1")
+    conn.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES (1, 'Despensa', 'wallet', 'gold', 10, 1000, '', 1, 1)")
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
+    fijo = conn.execute("SELECT * FROM recurrentes WHERE presupuesto_tarjeta_id = 1").fetchone()
+    # El fijo ya cobró este mes: su movimiento lleva el nombre anterior
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, recurrente_id) VALUES (?, 1000, 'gasto', 'Despensa', 1, ?)", (fijo["proxima_fecha"], fijo["id"]))
+    conn.execute("UPDATE presupuesto_tarjetas SET nombre = 'Super y despensa' WHERE id = 1")
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
+    nuevo = conn.execute("SELECT * FROM recurrentes WHERE presupuesto_tarjeta_id = 1").fetchone()
+    assert nuevo["descripcion"] == "Super y despensa"
+    assert nuevo["proxima_fecha"] > fijo["proxima_fecha"], (fijo["proxima_fecha"], nuevo["proxima_fecha"])   # el cargo de esa fecha ya existe
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

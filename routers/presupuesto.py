@@ -67,6 +67,7 @@ class TarjetaPresupuestoCreate(BaseModel):
     unidad_orden: int = Field(..., ge=1, le=4, description="Pago al que pertenece la tarjeta (1 a 4)")
     tipo: Literal['normal', 'msi'] = 'normal'
     msi_cuotas: Optional[int] = Field(None, ge=2, le=60, description="Plazo de la compra a meses (solo tipo msi)")
+    apartado_id: Optional[int] = Field(None, description="Meta a la que aporta al exportar a Fijos")
 
 
 class UnidadPagoUpdate(BaseModel):
@@ -85,6 +86,7 @@ class TarjetaPresupuestoUpdate(BaseModel):
     distribucion_subperiodos: Optional[List[DistribucionSubperiodo]] = None
     tipo: Optional[Literal['normal', 'msi']] = None
     msi_cuotas: Optional[int] = Field(None, ge=2, le=60)
+    apartado_id: Optional[int] = Field(None, description="Meta a la que aporta al exportar a Fijos; null la desvincula")
 
 
 class ExportarFijosRequest(BaseModel):
@@ -416,6 +418,12 @@ def exportar_presupuesto_a_fijos(
     return res
 
 
+def _validar_apartado(cursor: sqlite3.Cursor, apartado_id: Optional[int]) -> Optional[int]:
+    if apartado_id is not None and not cursor.execute("SELECT 1 FROM apartados WHERE id = ?", (apartado_id,)).fetchone():
+        raise HTTPException(status_code=422, detail="La meta seleccionada no existe.")
+    return apartado_id
+
+
 def _validar_tipo_msi(tipo: str, msi_cuotas: Optional[int]) -> Optional[int]:
     """Una compra a meses necesita su plazo; una tarjeta normal no lo guarda."""
     if tipo == 'msi':
@@ -445,6 +453,7 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
 
     monto, porcentaje = _resolver_montos(req.monto, req.porcentaje, ingreso)
     msi_cuotas = _validar_tipo_msi(req.tipo, req.msi_cuotas)
+    apartado_id = _validar_apartado(cursor, req.apartado_id)
 
     if req.unidad_orden is not None:
         if req.unidad_orden > unidades_activas(cfg["frecuencia"]):
@@ -473,9 +482,9 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
         "SELECT COALESCE(MAX(orden), 0) FROM presupuesto_tarjetas WHERE unidad_orden IS ?", (req.unidad_orden,)
     ).fetchone()[0]
     cursor.execute("""
-        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden, tipo, msi_cuotas)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden, req.tipo, msi_cuotas))
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden, tipo, msi_cuotas, apartado_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden, req.tipo, msi_cuotas, apartado_id))
 
     tarjeta_id = cursor.lastrowid
     conn.commit()
@@ -508,6 +517,8 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         campos.append("notas = ?"); valores.append(req.notas)
     if req.orden is not None:
         campos.append("orden = ?"); valores.append(req.orden)
+    if "apartado_id" in req.model_fields_set:
+        campos.append("apartado_id = ?"); valores.append(_validar_apartado(cursor, req.apartado_id))
     if req.tipo is not None or req.msi_cuotas is not None:
         tipo_nuevo = req.tipo if req.tipo is not None else fila["tipo"]
         cuotas_nuevas = req.msi_cuotas if req.msi_cuotas is not None else fila["msi_cuotas"]

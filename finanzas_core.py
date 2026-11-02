@@ -1320,12 +1320,13 @@ def _nota_de_fijo(fila) -> Optional[str]:
     return f"{pagadas} de {total} cuotas ya generadas" if pagadas < total else "ya liquidada"
 
 
-def _sin_cargo_previo(cursor: sqlite3.Cursor, item: dict) -> date:
-    """Primera fecha >= la propuesta sin un movimiento ya registrado con el mismo nombre."""
+def _sin_cargo_previo(cursor: sqlite3.Cursor, item: dict, recurrente_id: Optional[int] = None) -> date:
+    """Primera fecha >= la propuesta sin un movimiento ya registrado de este cargo: el que generó el propio
+    fijo (aunque se haya renombrado) o uno con el mismo nombre."""
     prox = item["proxima"]
     while cursor.execute(
-        "SELECT 1 FROM transacciones WHERE descripcion = ? AND fecha = ? AND tipo = ? LIMIT 1",
-        (item["descripcion"], prox.isoformat(), item["tipo"]),
+        "SELECT 1 FROM transacciones WHERE fecha = ? AND tipo = ? AND (descripcion = ? OR recurrente_id = ?) LIMIT 1",
+        (prox.isoformat(), item["tipo"], item["descripcion"], recurrente_id),
     ).fetchone():
         prox = siguiente_fecha(prox, item["frecuencia"], item["dia"])
     return prox
@@ -1433,8 +1434,10 @@ def exportar_presupuesto_a_fijos_core(
         tarjeta_id = t["id"]
 
         cat_id = resolver_categoria_por_nombre(cursor, f"{nombre} {t['notas'] or ''}", tipo="gasto")
-        ap = cursor.execute("SELECT id FROM apartados WHERE LOWER(TRIM(nombre)) = LOWER(?) LIMIT 1", (nombre,)).fetchone()
-        apartado_id = ap["id"] if ap else None
+        apartado_id = None
+        if "apartado_id" in t.keys() and t["apartado_id"] is not None:
+            ap = cursor.execute("SELECT id FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
+            apartado_id = ap["id"] if ap else None
 
         # Tarjeta de una unidad de pago: un fijo mensual en la fecha de su pago, sin subdivisiones
         if t["unidad_orden"] is not None:
@@ -1535,7 +1538,7 @@ def exportar_presupuesto_a_fijos_core(
 
     creados = actualizados = eliminados = 0
     for item, fila in emparejados:
-        item["proxima"] = _sin_cargo_previo(cursor, item)
+        item["proxima"] = _sin_cargo_previo(cursor, item, fila["id"] if fila is not None else None)
         valores = (item["descripcion"], item["tipo"], item["monto"], item["frecuencia"], item["dia"],
                    item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"],
                    item.get("total_cuotas"))

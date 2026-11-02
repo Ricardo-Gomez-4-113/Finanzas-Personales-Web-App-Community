@@ -1256,6 +1256,37 @@ def test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, 
         ctx.close()
 
 
+def test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base):
+    usuario, clave = _usuario_nuevo("tarjmeta")
+    api = _api(base, usuario, clave)
+    assert api.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}).status_code == 200
+    assert api.put("/api/presupuesto/unidades/1", json={"dia_pago": 5}).status_code == 200
+    api.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 9000})
+    meta = next(a["id"] for a in api.get("/api/apartados").json() if a["nombre"] == "Viaje")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-presupuesto")
+        page.evaluate("document.querySelector('.pres-pago-add').click()")   # una tarjeta siempre pertenece a un pago
+        page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
+        page.fill("#tarjeta-pres-nombre", "Ahorro mensual")
+        page.fill("#tarjeta-pres-monto", "1000")
+        _esperar(page, "document.getElementById('tarjeta-pres-apartado').dataset.listo === '1'")
+        assert [o.inner_text() for o in page.locator("#tarjeta-pres-apartado option").all()] == ["Ninguna: es un gasto", "Viaje"]
+        page.select_option("#tarjeta-pres-apartado", str(meta))
+        page.click("#form-tarjeta-presupuesto [type=submit]")
+        page.wait_for_selector("#modal-tarjeta-presupuesto.hidden", state="attached")
+        tarjetas = lambda: [t for u in api.get("/api/presupuesto").json()["unidades"] for t in u["tarjetas"] if t["nombre"] == "Ahorro mensual"]
+        for _ in range(50):
+            if tarjetas():
+                break
+            page.wait_for_timeout(100)
+        assert tarjetas()[0]["apartado_id"] == meta, tarjetas()
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
     """Con el modo privacidad activo, toda cifra visible (en cualquier pestaña) queda desenfocada."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1418,6 +1449,7 @@ if __name__ == "__main__":
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
                 (test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar, lambda: test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base)),
+                (test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva, lambda: test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),
