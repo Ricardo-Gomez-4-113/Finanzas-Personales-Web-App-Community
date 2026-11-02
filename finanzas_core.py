@@ -1299,6 +1299,27 @@ def _es_del_presupuesto(fila) -> bool:
     return fila["presupuesto_tarjeta_id"] is not None or fila["descripcion"] == NOMINA_PRESUPUESTO
 
 
+def _origen_de_fijo(fila) -> str:
+    """Qué es un fijo para quien lo ve borrarse: de una tarjeta del presupuesto, aporte a una meta,
+    compra a meses o un fijo hecho a mano."""
+    if _es_del_presupuesto(fila):
+        return "presupuesto"
+    if fila["apartado_id"] is not None:
+        return "meta"
+    if fila["total_cuotas"] is not None:
+        return "msi"
+    return "manual"
+
+
+def _nota_de_fijo(fila) -> Optional[str]:
+    """Dato que decide si borrarlo importa: una compra a meses con cuotas por pagar sigue siendo deuda."""
+    if fila["total_cuotas"] is None:
+        return None
+    pagadas = int(fila["cuotas_generadas"] or 0)
+    total = int(fila["total_cuotas"])
+    return f"{pagadas} de {total} cuotas ya generadas" if pagadas < total else "ya liquidada"
+
+
 def _sin_cargo_previo(cursor: sqlite3.Cursor, item: dict) -> date:
     """Primera fecha >= la propuesta sin un movimiento ya registrado con el mismo nombre."""
     prox = item["proxima"]
@@ -1535,13 +1556,15 @@ def exportar_presupuesto_a_fijos_core(
             """, valores)
             creados += 1
             accion = "creado"
-        detalles.append({"descripcion": item["descripcion"], "monto": item["monto"], "frecuencia": item["frecuencia"], "accion": accion})
+        detalles.append({"descripcion": item["descripcion"], "tipo": item["tipo"], "monto": item["monto"],
+                         "frecuencia": item["frecuencia"], "accion": accion, "origen": "presupuesto"})
 
     for sobrante in libres:
         cursor.execute("DELETE FROM recurrentes WHERE id = ?", (sobrante["id"],))
         eliminados += 1
-        detalles.append({"descripcion": sobrante["descripcion"], "monto": float(sobrante["monto"]),
-                         "frecuencia": sobrante["frecuencia"], "accion": "eliminado"})
+        detalles.append({"descripcion": sobrante["descripcion"], "tipo": sobrante["tipo"], "monto": float(sobrante["monto"]),
+                         "frecuencia": sobrante["frecuencia"], "accion": "eliminado",
+                         "origen": _origen_de_fijo(sobrante), "nota": _nota_de_fijo(sobrante)})
 
     return {
         "frecuencia": frecuencia,

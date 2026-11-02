@@ -356,18 +356,9 @@ def actualizar_unidad_pago(orden: int, req: UnidadPagoUpdate, conn: sqlite3.Conn
     return get_presupuesto(conn)
 
 
-@router.post("/api/presupuesto/exportar-a-fijos", summary="Exportar tarjetas de presupuesto a Movimientos y Fijos con la misma periodicidad")
-def exportar_presupuesto_a_fijos(
-    req: Optional[ExportarFijosRequest] = None,
-    conn: sqlite3.Connection = Depends(get_tenant_db)
-):
-    if isinstance(req, sqlite3.Connection):
-        conn = req
-        req = None
-    if req is None:
-        req = ExportarFijosRequest()
-    cursor = conn.cursor()
-    hoy_local = ahora_local().date()
+def _simular_o_exportar(req: ExportarFijosRequest, conn: sqlite3.Connection, hoy_local: date) -> tuple:
+    """Ejecuta el reemplazo del presupuesto sobre los fijos. No confirma: quien llama decide entre
+    commit (exportar) y rollback (vista previa). Devuelve el resultado y la fecha de inicio de cargos."""
     fecha_base_custom = None
     if req.fecha_base:
         try:
@@ -383,7 +374,7 @@ def exportar_presupuesto_a_fijos(
 
     try:
         res = exportar_presupuesto_a_fijos_core(
-            cursor=cursor,
+            cursor=conn.cursor(),
             tarjetas_ids=req.tarjetas_ids,
             incluir_ingreso=req.incluir_ingreso,
             fecha_base=fecha_inicio_efectiva
@@ -391,11 +382,37 @@ def exportar_presupuesto_a_fijos(
     except ValueError as e:
         conn.rollback()
         raise HTTPException(status_code=422, detail=str(e))
-    materializadas = materializar_recurrentes(conn, hoy_local)
-    conn.commit()
-    res["transacciones_materializadas"] = materializadas
     res["fecha_inicio_cargos"] = fecha_inicio_efectiva.isoformat()
     res["inicio_cargos_modo"] = req.inicio_cargos or 'natural'
+    return res
+
+
+@router.post("/api/presupuesto/exportar-a-fijos/vista-previa", summary="Mostrar qué crearía, actualizaría y eliminaría la exportación, sin aplicarla")
+def vista_previa_exportar_presupuesto(
+    req: Optional[ExportarFijosRequest] = None,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    """Corre la exportación completa y la revierte: lo que se muestra es lo que haría la real, con las mismas validaciones."""
+    try:
+        res = _simular_o_exportar(req or ExportarFijosRequest(), conn, ahora_local().date())
+    finally:
+        conn.rollback()
+    res["vista_previa"] = True
+    return res
+
+
+@router.post("/api/presupuesto/exportar-a-fijos", summary="Exportar tarjetas de presupuesto a Movimientos y Fijos con la misma periodicidad")
+def exportar_presupuesto_a_fijos(
+    req: Optional[ExportarFijosRequest] = None,
+    conn: sqlite3.Connection = Depends(get_tenant_db)
+):
+    if isinstance(req, sqlite3.Connection):
+        conn = req
+        req = None
+    hoy_local = ahora_local().date()
+    res = _simular_o_exportar(req or ExportarFijosRequest(), conn, hoy_local)
+    res["transacciones_materializadas"] = materializar_recurrentes(conn, hoy_local)
+    conn.commit()
     return res
 
 

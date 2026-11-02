@@ -178,6 +178,41 @@ def test_presupuesto_exporta_fijos(client):
     assert r.status_code == 200, r.text
 
 
+def test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real(client):
+    _crear_usuario("ruta_vista_previa")
+    h = _login(client, "ruta_vista_previa")
+    assert client.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}, headers=h).status_code == 200
+    r = client.post("/api/presupuesto/tarjetas", json={"nombre": "Hogar", "porcentaje": 30, "notas": "", "unidad_orden": 1}, headers=h)
+    assert r.status_code in (200, 201), r.text
+    assert client.put("/api/presupuesto/unidades/1", json={"dia_pago": 5}, headers=h).status_code == 200
+    # Fijos que el reemplazo borraría: un sueldo y un gasto a mano, una compra a meses y un aporte a una meta
+    sueldo = dict(descripcion="Sueldo", tipo="ingreso", frecuencia="mensual", monto=20000, fecha_inicio="2026-12-01", categoria_id=12)
+    assert client.post("/api/recurrentes", json=sueldo, headers=h).status_code == 201
+    client.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 9000}, headers=h)
+    meta = next(a["id"] for a in client.get("/api/apartados", headers=h).json() if a["nombre"] == "Viaje")
+    manual = dict(descripcion="Gimnasio", tipo="gasto", frecuencia="mensual", monto=500, fecha_inicio="2026-12-01", categoria_id=7)
+    meses = dict(descripcion="Tablet", tipo="gasto", frecuencia="mensual", monto_total=1200, meses=12, fecha_inicio="2026-12-01")
+    aporte = dict(descripcion="Ahorro viaje", tipo="gasto", frecuencia="mensual", monto=300, fecha_inicio="2026-12-01", apartado_id=meta)
+    for cuerpo in (manual, meses, aporte):
+        r = client.post("/api/recurrentes", json=cuerpo, headers=h)
+        assert r.status_code == 201, (cuerpo["descripcion"], r.text)
+
+    antes = client.get("/api/recurrentes", headers=h).json()
+    vista = client.post("/api/presupuesto/exportar-a-fijos/vista-previa", json={}, headers=h)
+    assert vista.status_code == 200, vista.text
+    previa = vista.json()
+    origen = {d["descripcion"]: d["origen"] for d in previa["detalles"] if d["accion"] == "eliminado"}
+    assert origen == {"Sueldo": "manual", "Gimnasio": "manual", "Tablet": "msi", "Ahorro viaje": "meta"}, previa["detalles"]
+    assert next(d for d in previa["detalles"] if d["descripcion"] == "Tablet")["nota"], previa["detalles"]
+    assert previa["vista_previa"] is True and previa["eliminados"] == 4 and previa["creados"] >= 1
+    # Verla no toca nada: ni los fijos ni lo que genera la exportación
+    assert client.get("/api/recurrentes", headers=h).json() == antes
+
+    real = client.post("/api/presupuesto/exportar-a-fijos", json={}, headers=h)
+    assert real.status_code == 200, real.text
+    assert [(d["descripcion"], d["accion"]) for d in real.json()["detalles"]] == [(d["descripcion"], d["accion"]) for d in previa["detalles"]]
+
+
 def test_recurrentes_listar_editar_saltar_y_borrar(client):
     _crear_usuario("ruta_rec")
     h = _login(client, "ruta_rec")
@@ -396,6 +431,7 @@ if __name__ == "__main__":
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),
             (test_presupuesto_config_unidades_y_tarjetas, lambda: test_presupuesto_config_unidades_y_tarjetas(client)),
             (test_presupuesto_exporta_fijos, lambda: test_presupuesto_exporta_fijos(client)),
+            (test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real, lambda: test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real(client)),
             (test_recurrentes_listar_editar_saltar_y_borrar, lambda: test_recurrentes_listar_editar_saltar_y_borrar(client)),
             (test_admin_lista_edita_suspende_y_elimina, lambda: test_admin_lista_edita_suspende_y_elimina(client, hadmin)),
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),
