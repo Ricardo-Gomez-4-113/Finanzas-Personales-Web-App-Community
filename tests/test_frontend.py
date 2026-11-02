@@ -50,10 +50,22 @@ def _puerto_libre():
         return s.getsockname()[1]
 
 
+# El servidor de las pruebas no sale a internet: sin cotizaciones fijas, cada consulta a Yahoo
+# desde un contenedor sin red consume los 5 s de espera y las pruebas dependen de la latencia.
+LANZADOR = """
+import sys
+import mercado
+COTIZACIONES = {"USDMXN=X": 19.5, "EURUSD=X": 1.08}
+mercado.consultar_precio_y_moneda_mercado = lambda t: (COTIZACIONES.get(t.strip().upper()), "USD")
+import uvicorn
+uvicorn.run("main:app", host="127.0.0.1", port=int(sys.argv[1]))
+"""
+
+
 def _arrancar_servidor():
     puerto = _puerto_libre()
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(puerto)],
+        [sys.executable, "-c", LANZADOR, str(puerto)],
         cwd=TMP, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
         env={**os.environ, "FINANZAS_LOG_DIR": LOGS},
     )

@@ -5,6 +5,7 @@
 - Sale con código 1 si alguna falló, para que run_tests.sh y cualquier CI lo detecten.
 """
 
+import os
 import sys
 import time
 import traceback
@@ -17,6 +18,9 @@ def descubrir(modulo):
 
 def ejecutar(pruebas, titulo):
     """Corre cada prueba. `pruebas` es una lista de (nombre, llamable sin argumentos)."""
+    solo = [t for t in os.environ.get("SOLO", "").split(",") if t]
+    if solo:  # SOLO=texto1,texto2 corre únicamente las pruebas cuyo nombre contiene alguno
+        pruebas = [(n, p) for n, p in pruebas if any(t in n for t in solo)]
     fallos = []
     inicio_total = time.perf_counter()
     for nombre, prueba in pruebas:
