@@ -5,6 +5,7 @@
 import { apiFetch, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
+import { bloqueTarjetaPartes } from './tarjeta_partes.js';
 import { confirmar } from './confirmar.js';
 
 
@@ -431,34 +432,14 @@ export function abrirModalEditarRecurrente(id) {
             const totalHermanos = hermanos.reduce((acc, h) => acc + (parseFloat(h.monto) || 0), 0);
             const totalMostrar = item.tarjeta_monto_total ? item.tarjeta_monto_total : totalHermanos;
 
-            subInfoEl.innerHTML = `
-                <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--cyan-color); display: inline-flex; align-items: center; gap: 5px;">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                            Tarjeta de Presupuesto: ${escapeHTML(item.tarjeta_nombre || 'Dividida')}
-                        </span>
-                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
-                            Total: ${montoMxnHTML(totalMostrar)}
-                        </span>
-                    </div>
-                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
-                        Esta tarjeta se compone de cargos independientes. Puedes ver las partes juntas, aunque cada una se procesa por separado:
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        ${hermanos.map(h => `
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 4px; font-size: 0.78rem; background: ${h.id === item.id ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.03)'}; border: ${h.id === item.id ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid transparent'};">
-                                <span style="font-weight: ${h.id === item.id ? '600' : '400'}; color: ${h.id === item.id ? 'var(--cyan-color)' : 'var(--text-main)'};">
-                                    ${escapeHTML(h.descripcion)} ${h.id === item.id ? '← (editando)' : ''}
-                                </span>
-                                <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
-                                    ${montoMxnHTML(h.monto)} · Día ${h.dia || '--'} (${escapeHTML(h.proxima_fecha)})
-                                </span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
+            subInfoEl.innerHTML = bloqueTarjetaPartes({
+                nombre: item.tarjeta_nombre || 'Dividida',
+                total: totalMostrar,
+                etiquetaTotal: 'Total',
+                aviso: 'Esta tarjeta se compone de cargos independientes. Puedes ver las partes juntas, aunque cada una se procesa por separado:',
+                partes: hermanos.map(h => ({ id: h.id, descripcion: h.descripcion, monto: h.monto, detalle: `Día ${h.dia || '--'} (${h.proxima_fecha})` })),
+                actualId: item.id,
+            });
             subInfoEl.classList.remove('hidden');
         } else {
             subInfoEl.innerHTML = '';

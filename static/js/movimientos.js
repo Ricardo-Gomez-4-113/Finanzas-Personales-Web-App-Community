@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { bloqueTarjetaPartes } from './tarjeta_partes.js';
 import { confirmar } from './confirmar.js';
 
 
@@ -179,7 +180,7 @@ export function renderTablaMovimientos() {
     lista.forEach(t => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td style="text-align: center;">
+            <td class="celda-centro">
                 <input type="checkbox" class="chk-mov-item" value="${t.id}" data-id="${t.id}" aria-label="Seleccionar movimiento">
             </td>
             <td class="td-fecha" title="${escapeHTML(t.fecha)}">${escapeHTML(fechaTabla(t.fecha))}</td>
@@ -218,7 +219,7 @@ if (formTrans) {
         const montoVal = parseFloat(document.getElementById('monto').value);
         if (isNaN(montoVal) || montoVal <= 0) {
             if (mensajeDiv) {
-                mensajeDiv.style.color = 'var(--danger-text)';
+                mensajeDiv.className = 'msg-error';
                 mensajeDiv.textContent = 'Ingresa un monto válido mayor a 0.';
             }
             return;
@@ -247,7 +248,7 @@ if (formTrans) {
 
             if (response.ok) {
                 if (mensajeDiv) {
-                    mensajeDiv.style.color = 'var(--success-text)';
+                    mensajeDiv.className = 'msg-ok';
                     mensajeDiv.textContent = '¡Movimiento guardado!';
                 }
                 formTrans.reset();
@@ -261,13 +262,13 @@ if (formTrans) {
                     errText = formatErrorDetail(err.detail, errText);
                 } catch (_) {}
                 if (mensajeDiv) {
-                    mensajeDiv.style.color = 'var(--danger-text)';
+                    mensajeDiv.className = 'msg-error';
                     mensajeDiv.textContent = errText;
                 }
             }
         } catch (error) {
             if (mensajeDiv) {
-                mensajeDiv.style.color = 'var(--danger-text)';
+                mensajeDiv.className = 'msg-error';
                 mensajeDiv.textContent = 'Error de conexión.';
             }
         } finally {
@@ -293,7 +294,7 @@ export function actualizarSeleccionMovimientos() {
     }
 
     if (barra) {
-        barra.style.display = seleccionados.length > 0 ? 'flex' : 'none';
+        barra.classList.toggle('hidden', seleccionados.length === 0);
     }
 
     if (chkTodos) {
@@ -503,34 +504,14 @@ export function abrirModalEditarTransaccion(id, fecha, monto, tipo, descripcion,
             const hermanos = (estado.cache?.listaTransacciones || []).filter(h => h.presupuesto_tarjeta_id === itemCompleto.presupuesto_tarjeta_id);
             const totalMostrar = itemCompleto.tarjeta_monto_total || hermanos.reduce((acc, h) => acc + (parseFloat(h.monto) || 0), 0);
 
-            subInfoEl.innerHTML = `
-                <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--cyan-color); display: inline-flex; align-items: center; gap: 5px;">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                            Tarjeta de Presupuesto: ${escapeHTML(itemCompleto.tarjeta_nombre || 'Dividida')}
-                        </span>
-                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums;">
-                            Total mensual: ${montoMxnHTML(totalMostrar)}
-                        </span>
-                    </div>
-                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">
-                        Esta tarjeta se compone de cargos independientes por sub-período. Puedes ver las partes juntas, aunque cada una se procesa por separado:
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        ${hermanos.map(h => `
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 4px; font-size: 0.78rem; background: ${h.id === itemCompleto.id ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.03)'}; border: ${h.id === itemCompleto.id ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid transparent'};">
-                                <span style="font-weight: ${h.id === itemCompleto.id ? '600' : '400'}; color: ${h.id === itemCompleto.id ? 'var(--cyan-color)' : 'var(--text-main)'};">
-                                    ${escapeHTML(h.descripcion || 'Movimiento')} ${h.id === itemCompleto.id ? '← (editando)' : ''}
-                                </span>
-                                <span style="font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-main);">
-                                    ${montoMxnHTML(h.monto)} · ${escapeHTML(h.fecha)}
-                                </span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
+            subInfoEl.innerHTML = bloqueTarjetaPartes({
+                nombre: itemCompleto.tarjeta_nombre || 'Dividida',
+                total: totalMostrar,
+                etiquetaTotal: 'Total mensual',
+                aviso: 'Esta tarjeta se compone de cargos independientes por sub-período. Puedes ver las partes juntas, aunque cada una se procesa por separado:',
+                partes: hermanos.map(h => ({ id: h.id, descripcion: h.descripcion || 'Movimiento', monto: h.monto, detalle: h.fecha })),
+                actualId: itemCompleto.id,
+            });
             subInfoEl.classList.remove('hidden');
         } else {
             subInfoEl.innerHTML = '';

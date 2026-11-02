@@ -5,15 +5,15 @@
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
-import { apiFetch, desdeMXN, escapeHTML, estado, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
+import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaMes, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=ed76bc965f';
+import { cargarRecurrentes } from './recurrentes.js?v=5fe05d02d4';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=ed76bc965f';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=5fe05d02d4';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -69,7 +69,7 @@ export async function cargarDatos() {
                 if (!bar) return;
                 const pct = totalPat > 0 ? ((valor / totalPat) * 100).toFixed(1) : '0.0';
                 bar.style.width = `${pct}%`;
-                bar.title = `${nombre}: ${pct}% (${fmt(valor)})`;
+                conTituloPrivado(bar, `${nombre}: ${pct}%`, `${nombre}: ${pct}% (${fmt(valor)})`);
             });
         }
 
@@ -98,20 +98,16 @@ export async function cargarDatos() {
         if (contenedorMensual) {
             contenedorMensual.innerHTML = '';
             if (dataMensual.length === 0) {
-                contenedorMensual.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Sin registros mensuales aún.</p>';
+                contenedorMensual.innerHTML = '<p class="monthly-vacio">Sin registros mensuales aún.</p>';
             } else {
                 dataMensual.forEach(m => {
                     const div = document.createElement('div');
                     div.className = 'monthly-card';
-                    const [anio, numMes] = String(m.mes).split('-').map(Number);
-                    const nombreMes = anio && numMes
-                        ? new Intl.DateTimeFormat('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(anio, numMes - 1, 1))).replace('.', '')
-                        : m.mes;
                     div.innerHTML = `
-                        <div><strong>${escapeHTML(nombreMes)}</strong></div>
+                        <div><strong>${escapeHTML(etiquetaMes(m.mes))}</strong></div>
                         <div class="monthly-info">
-                            <span style="color: var(--success-text);">+${montoMxnHTML(m.ingresos)}</span>
-                            <span style="color: var(--danger-text);">-${montoMxnHTML(m.gastos)}</span>
+                            <span class="monthly-ingreso">+${montoMxnHTML(m.ingresos)}</span>
+                            <span class="monthly-gasto">-${montoMxnHTML(m.gastos)}</span>
                         </div>
                     `;
                     contenedorMensual.appendChild(div);

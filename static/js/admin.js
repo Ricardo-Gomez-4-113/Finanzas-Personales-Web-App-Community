@@ -14,7 +14,7 @@ import { renderMenuUsuario } from './menu_usuario.js';
  * Convierte una fecha/hora (string) a formato relativo legible en español ("hace X tiempo").
  */
 export function formatoTiempoRelativo(fechaStr) {
-    if (!fechaStr) return '<span style="color: var(--text-muted);">Nunca</span>';
+    if (!fechaStr) return '<span class="texto-tenue">Nunca</span>';
     
     // Normalizar formato fecha si viene de SQLite (ej. YYYY-MM-DD HH:MM:SS)
     const fecha = new Date(fechaStr.replace(' ', 'T'));

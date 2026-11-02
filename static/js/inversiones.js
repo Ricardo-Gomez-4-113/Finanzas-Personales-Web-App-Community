@@ -34,7 +34,7 @@ export async function cargarInversiones() {
 
         const lblDashPnl = document.getElementById('lbl-dash-pnl');
         if (lblDashPnl) {
-            lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <small style="font-size: 0.85rem;">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
+            lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <small class="texto-sm">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
             lblDashPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 
@@ -51,21 +51,19 @@ export async function cargarInversiones() {
                     const clasePnl = pos.pnl > 0 ? 'pnl-positivo' : (pos.pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
                     const signoPosMonto = pos.pnl < 0 ? '-' : (pos.pnl > 0 ? '+' : '');
 
-                    const badgeMonedaColor = pos.moneda === 'USD' 
-                        ? 'background: rgba(46, 204, 113, 0.15); color: var(--success-color);' 
-                        : 'background: rgba(52, 152, 219, 0.15); color: var(--accent-color);';
+                    const claseBadgeMoneda = pos.moneda === 'USD' ? 'badge-peso--usd' : 'badge-peso--otra';
 
                     const subOrig = (pos.moneda !== estado.monedaGlobal)
-                        ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;">(${montoHTML(pos.valor_actual_orig)} ${pos.moneda})</small>`
+                        ? `<br><small class="texto-tenue texto-xs">(${montoHTML(pos.valor_actual_orig)} ${pos.moneda})</small>`
                         : '';
 
                     estado.cache.inversiones[pos.id] = pos;
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(pos.ticker)}</strong></td>
-                        <td><span class="badge-peso" style="${badgeMonedaColor}">${escapeHTML(pos.moneda)}</span></td>
+                        <td><span class="badge-peso ${claseBadgeMoneda}">${escapeHTML(pos.moneda)}</span></td>
                         <td>${escapeHTML(String(pos.cantidad))}</td>
-                        <td>${montoHTML(pos.precio_promedio)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
-                        <td>${montoHTML(pos.precio_actual)} <small style="color: var(--text-muted);">${escapeHTML(pos.moneda)}</small></td>
+                        <td>${montoHTML(pos.precio_promedio)} <small class="texto-tenue">${escapeHTML(pos.moneda)}</small></td>
+                        <td>${montoHTML(pos.precio_actual)} <small class="texto-tenue">${escapeHTML(pos.moneda)}</small></td>
                         <td><strong>${montoHTML(pos.valor_actual)}</strong> ${subOrig}</td>
                         <td class="${clasePnl}">${signoPosMonto}${montoHTML(Math.abs(pos.pnl))} (${signoPos}${pos.pnl_porcentaje.toFixed(2)}%)</td>
                         <td><span class="badge-peso">${pos.peso_porcentaje.toFixed(1)}%</span></td>

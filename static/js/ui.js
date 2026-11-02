@@ -3,7 +3,7 @@
  */
 
 import { cargarDatosAdmin } from './admin.js';
-import { estado } from './core.js';
+import { estado, sincronizarTitulosPrivados } from './core.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { cargarInversiones } from './inversiones.js';
 import { repintarGraficas } from './dashboard.js';
@@ -72,6 +72,7 @@ if (window.Chart) {
 
 export function toggleModoPrivacidad() {
     const activo = document.body.classList.toggle('privacy-mode');
+    sincronizarTitulosPrivados();
     localStorage.setItem('finanzas_cloud_privacy_mode', activo ? '1' : '0');
     localStorage.removeItem('finora_privacy_mode');
     actualizarIconoPrivacidad(activo);

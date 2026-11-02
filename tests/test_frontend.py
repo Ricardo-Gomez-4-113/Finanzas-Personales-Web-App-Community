@@ -7,6 +7,7 @@ Requiere playwright (se ejecuta en Docker, ver tests/run_frontend.sh). Nunca toc
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -1287,6 +1288,73 @@ def test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base):
         ctx.close()
 
 
+def test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        etiquetas = page.evaluate("import('/static/js/core.js').then(m => m.estado.graficas.barras.data.labels)")
+        assert etiquetas and all(re.fullmatch(r"[a-záéíóú]{3,4} \d{4}", e) for e in etiquetas), etiquetas   # «oct 2026», no «2026-10»
+        # Un mes sin movimientos entre dos con movimientos aparece en cero
+        resultado = page.evaluate("""async () => {
+            const { actualizarGrafica } = await import('/static/js/dashboard.js');
+            const { estado } = await import('/static/js/core.js');
+            actualizarGrafica([{ mes: '2026-11', ingresos: 100, gastos: 50 }, { mes: '2027-02', ingresos: 300, gastos: 10 }]);
+            const d = estado.graficas.barras.data;
+            return { etiquetas: d.labels, ingresos: d.datasets[0].data, gastos: d.datasets[1].data };
+        }""")
+        assert resultado["etiquetas"] == ["nov 2026", "dic 2026", "ene 2027", "feb 2027"], resultado
+        assert resultado["ingresos"] == [100, 0, 0, 300] and resultado["gastos"] == [50, 0, 0, 10], resultado
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#periodo-libre:not(:empty)")
+        simbolos = page.evaluate("""async () => {
+            const { fmt, conTituloPrivado, sincronizarTitulosPrivados } = await import('/static/js/core.js');
+            const pie = document.createElement('div');
+            document.body.appendChild(pie);
+            conTituloPrivado(pie, 'Hogar: 30%', 'Hogar: 30% ($6,000.00)');
+            const normal = pie.title;
+            document.body.classList.add('privacy-mode');
+            sincronizarTitulosPrivados();
+            const privado = pie.title;
+            // Un elemento que aparece después (pintado con innerHTML) toma el modo vigente
+            const caja = document.createElement('div');
+            caja.innerHTML = '<span data-titulo="Sin importe" data-titulo-monto="Con importe $1.00"></span>';
+            document.body.appendChild(caja);
+            await new Promise(r => setTimeout(r, 50));
+            const nuevo = caja.firstChild.title;
+            document.body.classList.remove('privacy-mode');
+            return { mxn: fmt(5, 'MXN'), usd: fmt(5, 'USD'), eur: fmt(5, 'EUR'), negativo: fmt(-5, 'USD'), normal, privado, nuevo };
+        }""")
+        assert simbolos["mxn"] == "$5.00" and simbolos["usd"] == "US$5.00" and simbolos["eur"] == "€5.00" and simbolos["negativo"] == "-US$5.00", simbolos
+        assert simbolos["normal"] == "Hogar: 30% ($6,000.00)" and simbolos["privado"] == "Hogar: 30%", simbolos
+        assert simbolos["nuevo"] == "Sin importe", simbolos
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_barra_de_seleccion_multiple_aparece_al_marcar_un_movimiento(navegador, base):
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#tabla-movimientos .chk-mov-item")
+        assert page.locator("#barra-lote-movimientos.hidden").count() == 1
+        page.evaluate("document.querySelector('#tabla-movimientos .chk-mov-item').click()")
+        _esperar(page, "!document.getElementById('barra-lote-movimientos').classList.contains('hidden')")
+        assert page.evaluate("getComputedStyle(document.getElementById('barra-lote-movimientos')).display") == "flex"
+        page.evaluate("document.querySelector('#tabla-movimientos .chk-mov-item').click()")
+        _esperar(page, "document.getElementById('barra-lote-movimientos').classList.contains('hidden')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
     """Con el modo privacidad activo, toda cifra visible (en cualquier pestaña) queda desenfocada."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1450,6 +1518,9 @@ if __name__ == "__main__":
                 (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
                 (test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar, lambda: test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base)),
                 (test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva, lambda: test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base)),
+                (test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios, lambda: test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios(navegador, base)),
+                (test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad, lambda: test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad(navegador, base)),
+                (test_barra_de_seleccion_multiple_aparece_al_marcar_un_movimiento, lambda: test_barra_de_seleccion_multiple_aparece_al_marcar_un_movimiento(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),

@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=ed76bc965f">
-    <link rel="stylesheet" href="/static/css/layout.css?v=ed76bc965f">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=ed76bc965f">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=ed76bc965f">
-    <link rel="stylesheet" href="/static/css/tema.css?v=ed76bc965f">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=5fe05d02d4">
+    <link rel="stylesheet" href="/static/css/layout.css?v=5fe05d02d4">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=5fe05d02d4">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=5fe05d02d4">
+    <link rel="stylesheet" href="/static/css/tema.css?v=5fe05d02d4">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -69,21 +69,21 @@
                     <label for="login-password">Contraseña</label>
                     <input type="password" id="login-password" placeholder="Tu contraseña" required autocomplete="current-password">
                 </div>
-                <div class="login-options-row" style="display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 14px;">
-                    <a href="#" data-prevent data-on-click='[["abrirModalRecuperarPassword"]]' class="link-forgot-password" style="font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500;">¿Olvidaste tu contraseña?</a>
+                <div class="login-options-row">
+                    <a href="#" data-prevent data-on-click='[["abrirModalRecuperarPassword"]]' class="link-forgot-password">¿Olvidaste tu contraseña?</a>
                 </div>
                 <button type="submit" id="btn-login-submit" class="btn-primary btn-block">Ingresar a la plataforma</button>
                 <div id="login-error" class="login-error-msg hidden"></div>
             </form>
-            <div style="text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color);">
-                <a href="/" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease;">
+            <div class="login-pie">
+                <a href="/" class="login-volver">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     <span>Volver a la página principal</span>
                 </a>
-                <p style="font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0 0; line-height: 1.4;">
+                <p class="login-legal">
                     Al ingresar aceptas nuestros 
-                    <a href="#" data-prevent data-on-click='[["abrirModalLegal", "terminos"]]' style="color: var(--gold-color); text-decoration: underline;">Términos</a> y el 
-                    <a href="#" data-prevent data-on-click='[["abrirModalLegal", "privacidad"]]' style="color: var(--gold-color); text-decoration: underline;">Aviso de Privacidad</a>.
+                    <a href="#" data-prevent data-on-click='[["abrirModalLegal", "terminos"]]'>Términos</a> y el 
+                    <a href="#" data-prevent data-on-click='[["abrirModalLegal", "privacidad"]]'>Aviso de Privacidad</a>.
                 </p>
             </div>
         </div>
@@ -527,7 +527,7 @@
                             <input type="search" id="filtro-buscar" placeholder="Buscar descripción..." aria-label="Buscar descripción">
                         </div>
                         <p class="card-subtext" id="lbl-ventana-movimientos"></p>
-                        <div id="barra-lote-movimientos" class="barra-lote" style="display: none;">
+                        <div id="barra-lote-movimientos" class="barra-lote hidden">
                             <div class="barra-lote-info">
                                 <span id="lbl-mov-seleccionados">0 seleccionados</span>
                             </div>
@@ -546,7 +546,7 @@
                             <table>
                                 <thead>
                                     <tr>
-                                        <th style="width: 44px; text-align: center;">
+                                        <th class="col-chk">
                                             <input type="checkbox" id="chk-mov-todos" aria-label="Seleccionar todos los movimientos">
                                         </th>
                                         <th>Fecha</th>
@@ -2017,7 +2017,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=ed76bc965f"></script>
+    <script type="module" src="/static/js/main.js?v=5fe05d02d4"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

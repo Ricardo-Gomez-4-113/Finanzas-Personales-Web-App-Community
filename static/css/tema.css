@@ -1741,3 +1741,59 @@
 :root .confirmar-fila-nombre { min-width: 0; overflow-wrap: anywhere; }
 :root .confirmar-fila-nota { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
 :root .confirmar-fila-monto { flex: none; font-variant-numeric: tabular-nums; }
+
+/* Tarjeta de presupuesto dividida, en los modales de edición (js/tarjeta_partes.js) */
+:root .tarjeta-partes {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--cyan-color) 25%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--cyan-color) 8%, transparent);
+}
+:root .tarjeta-partes-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+:root .tarjeta-partes-titulo { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; color: var(--cyan-color); }
+:root .tarjeta-partes-total { font-size: 0.8rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums; }
+:root .tarjeta-partes-aviso { margin-bottom: 6px; font-size: 0.76rem; color: var(--text-muted); }
+:root .tarjeta-partes-lista { display: flex; flex-direction: column; gap: 4px; }
+:root .tarjeta-parte {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, var(--text-main) 4%, transparent);
+}
+:root .tarjeta-parte-nombre { color: var(--text-main); }
+:root .tarjeta-parte-monto { font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums; }
+:root .tarjeta-parte--actual {
+    border-color: color-mix(in srgb, var(--cyan-color) 40%, transparent);
+    background: color-mix(in srgb, var(--cyan-color) 15%, transparent);
+}
+:root .tarjeta-parte--actual .tarjeta-parte-nombre { font-weight: 600; color: var(--cyan-color); }
+
+/* Historial mensual */
+:root .monthly-vacio { text-align: center; color: var(--text-muted); }
+:root .monthly-ingreso { color: var(--success-text); }
+:root .monthly-gasto { color: var(--danger-text); }
+
+/* Login y utilidades que sustituyen estilos en línea */
+:root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }
+:root .link-forgot-password { font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500; }
+:root .login-pie { text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+:root .login-volver { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease; }
+:root .login-legal { font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0; line-height: 1.4; }
+:root .login-legal a { color: var(--gold-color); text-decoration: underline; }
+:root .col-chk { width: 44px; text-align: center; }
+:root .celda-centro { text-align: center; }
+:root .msg-ok { color: var(--success-text); }
+:root .msg-error { color: var(--danger-text); }
+:root .texto-tenue { color: var(--text-muted); }
+:root .texto-xs { font-size: 0.75rem; }
+:root .texto-sm { font-size: 0.85rem; }
+
+/* Badge de moneda en el portafolio */
+:root .badge-peso--usd { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
+:root .badge-peso--otra { background: color-mix(in srgb, var(--accent-color) 15%, transparent); color: var(--accent-color); }

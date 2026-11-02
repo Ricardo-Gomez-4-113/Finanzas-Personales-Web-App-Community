@@ -543,7 +543,7 @@
     border-color: var(--primary-color);
     color: var(--primary-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 104, 71, 0.15);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--success-color) 15%, transparent);
 }
 
 [data-theme="dark"] .gbm-action-btn {

@@ -2,7 +2,7 @@
  * static/js/dashboard.js - Gráfica mensual del dashboard.
  */
 
-import { colorVar, escapeHTML, estado, fmt, monedaDeMonto, montoHTML } from './core.js';
+import { colorVar, conTituloPrivado, escapeHTML, estado, etiquetaMes, fmt, monedaDeMonto, montoHTML } from './core.js';
 
 
 // Colores y tipografía de las gráficas salen de tokens.css para seguir el tema activo.
@@ -30,14 +30,31 @@ export function repintarGraficas() {
     if (ultimasCategorias) actualizarGraficaCategorias(ultimasCategorias);
 }
 
+/** Los meses sin movimientos no vienen del servidor: se rellenan en cero para que la gráfica no salte de un mes a otro. */
+function conMesesSinMovimientos(datos) {
+    if (datos.length < 2) return datos;
+    const porMes = new Map(datos.map(m => [m.mes, m]));
+    const meses = datos.map(m => m.mes).sort();
+    const completa = [];
+    let [anio, mes] = meses[0].split('-').map(Number);
+    const [anioFin, mesFin] = meses[meses.length - 1].split('-').map(Number);
+    while (anio < anioFin || (anio === anioFin && mes <= mesFin)) {
+        const clave = `${anio}-${String(mes).padStart(2, '0')}`;
+        completa.push(porMes.get(clave) || { mes: clave, ingresos: 0, gastos: 0 });
+        if (++mes > 12) { mes = 1; anio++; }
+    }
+    return completa;
+}
+
 export function actualizarGrafica(dataMensual) {
     ultimoMensual = dataMensual;
     const canvas = document.getElementById('graficaFinanzas');
     if (!canvas) return;
     const e = estiloGraficas();
-    const meses = dataMensual.map(m => m.mes);
-    const ingresos = dataMensual.map(m => m.ingresos);
-    const gastos = dataMensual.map(m => m.gastos);
+    const serieMensual = conMesesSinMovimientos(dataMensual);
+    const meses = serieMensual.map(m => etiquetaMes(m.mes));
+    const ingresos = serieMensual.map(m => m.ingresos);
+    const gastos = serieMensual.map(m => m.gastos);
 
     if (estado.graficas.barras) {
         estado.graficas.barras.data.labels = meses;
@@ -168,7 +185,8 @@ export function renderPeriodo(p) {
             const m = document.createElement('span');
             m.className = 'periodo-marca';
             m.style.left = `${pos(fecha)}%`;
-            m.title = `${fechaCorta(fecha)}: ` + evs.map(ev => `${ev.descripcion} ${fmt(ev.monto)}`).join(', ');
+            conTituloPrivado(m, `${fechaCorta(fecha)}: ` + evs.map(ev => ev.descripcion).join(', '),
+                `${fechaCorta(fecha)}: ` + evs.map(ev => `${ev.descripcion} ${fmt(ev.monto)}`).join(', '));
             pista.appendChild(m);
         });
     }

@@ -113,10 +113,10 @@ function renderDistribucionPago(u) {
     const libreMonto = Math.max(0, u.ingreso - u.total_asignado);
 
     const slices = tramos.map(({ t, pct }) => `
-        <div class="pres-alloc-slice pres-color-${escapeHTML(t.color)}" style="width: ${(pct * escala).toFixed(2)}%" title="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}% (${fmtMXN(t.monto)})"></div>`).join('');
+        <div class="pres-alloc-slice pres-color-${escapeHTML(t.color)}" style="width: ${(pct * escala).toFixed(2)}%" data-titulo="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}%" data-titulo-monto="${escapeHTML(t.nombre)}: ${pct.toFixed(1)}% (${fmtMXN(t.monto)})"></div>`).join('');
     const leyenda = tramos.map(({ t, pct }) => `
         <span class="pres-legend-item"><span class="pres-legend-dot pres-color-${escapeHTML(t.color)}"></span><span>${escapeHTML(t.nombre)}: <strong>${pct.toFixed(1)}%</strong> (${montoMxnHTML(t.monto)})</span></span>`).join('');
-    const sliceLibre = librePct > 0 ? `<div class="pres-alloc-slice pres-slice-libre" style="width: ${librePct.toFixed(2)}%" title="Por asignar: ${librePct.toFixed(1)}% (${fmtMXN(libreMonto)})"></div>` : '';
+    const sliceLibre = librePct > 0 ? `<div class="pres-alloc-slice pres-slice-libre" style="width: ${librePct.toFixed(2)}%" data-titulo="Por asignar: ${librePct.toFixed(1)}%" data-titulo-monto="Por asignar: ${librePct.toFixed(1)}% (${fmtMXN(libreMonto)})"></div>` : '';
     const legendLibre = librePct > 0 ? `<span class="pres-legend-item pres-legend-libre"><span class="pres-legend-dot pres-color-libre"></span><span>Por asignar: <strong>${librePct.toFixed(1)}%</strong> (${montoMxnHTML(libreMonto)})</span></span>` : '';
 
     return `

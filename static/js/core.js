@@ -114,8 +114,45 @@ async function cuentaInactiva(response) {
 // =============================================================================
 
 export function fmt(valor, moneda = estado.monedaGlobal) {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: moneda, currencyDisplay: 'narrowSymbol' }).format(Number(valor) || 0);
+    const texto = new Intl.NumberFormat('es-MX', { style: 'currency', currency: moneda, currencyDisplay: 'narrowSymbol' }).format(Number(valor) || 0);
+    // El peso y el dólar comparten «$»: los dólares se rotulan US$ para no confundirlos con pesos
+    return moneda === 'USD' ? texto.replace('$', 'US$') : texto;
 }
+
+/** «2026-10» como «oct 2026». Si no es un mes válido, devuelve el texto tal cual. */
+export function etiquetaMes(mes) {
+    const [anio, numMes] = String(mes).split('-').map(Number);
+    if (!anio || !numMes) return String(mes);
+    return new Intl.DateTimeFormat('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+        .format(new Date(Date.UTC(anio, numMes - 1, 1))).replace('.', '');
+}
+
+// Un `title` con importes revela lo que el modo privacidad oculta. Cada elemento guarda su texto sin importes
+// (data-titulo) y con ellos (data-titulo-monto), y el `title` sigue al modo vigente.
+function aplicarTituloPrivado(el) {
+    el.title = document.body.classList.contains('privacy-mode') ? el.dataset.titulo : el.dataset.tituloMonto;
+}
+
+export function conTituloPrivado(el, sinMonto, conMonto) {
+    el.dataset.titulo = sinMonto;
+    el.dataset.tituloMonto = conMonto;
+    aplicarTituloPrivado(el);
+}
+
+export function sincronizarTitulosPrivados() {
+    document.querySelectorAll('[data-titulo-monto]').forEach(aplicarTituloPrivado);
+}
+
+// Los elementos que se pintan con innerHTML traen sus data-*: aquí se les pone el `title` al aparecer
+new MutationObserver(cambios => {
+    for (const { addedNodes } of cambios) {
+        for (const nodo of addedNodes) {
+            if (nodo.nodeType !== 1) continue;
+            if (nodo.dataset?.tituloMonto !== undefined) aplicarTituloPrivado(nodo);
+            nodo.querySelectorAll?.('[data-titulo-monto]').forEach(aplicarTituloPrivado);
+        }
+    }
+}).observe(document.body, { childList: true, subtree: true });
 
 // Cifra sensible: el modo privacidad la desenfoca (regla .dato-sensible). Solo para innerHTML con datos numéricos.
 export function montoHTML(valor, moneda = estado.monedaGlobal) {
