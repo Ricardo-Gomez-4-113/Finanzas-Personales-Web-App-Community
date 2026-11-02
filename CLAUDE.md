@@ -128,6 +128,14 @@ Decisiones del usuario que no se vuelven a proponer:
 - Las inversiones y cuentas con rendimiento son una calculadora: no generan movimientos de caja.
 - No se puede tener un gasto fijo sin un ingreso fijo activo: el bloqueo es deliberado, no una advertencia.
 
+Tanda visual (`2857cfd`):
+- La gráfica mensual rotula «oct 2026» con `etiquetaMes` (la misma del historial) y rellena en cero los meses sin movimientos.
+- Los dólares se rotulan `US$` en `fmt`; el peso y el euro no cambian.
+- Los `title` con importes (donut de patrimonio, marcas del periodo, barras del presupuesto) usan `conTituloPrivado`: guardan `data-titulo` y `data-titulo-monto` y siguen el modo privacidad, también al repintarse con `innerHTML` (un `MutationObserver` en `core.js`).
+- Estilos en línea movidos a clases; el bloque de tarjeta dividida de movimientos y fijos es `bloqueTarjetaPartes` (`static/js/tarjeta_partes.js`) y usa `color-mix` con tokens. Los velos de modales usan `--overlay-scrim`.
+
+Visual abierto: 31 `!important` en `vistas.css`; unas 50 sombras y tintes neutros con `rgba` literal (se dejaron para no cambiar el aspecto sin capturas por componente); consolidar las 5 hojas (180 KB); los estilos en línea que quedan son anchos dinámicos por dato (barras de progreso y rebanadas).
+
 Abierto:
 - **Decisión pendiente:** frecuencia anual (el código la contempla y el `CHECK` de la base no); las dos nociones de «mes» del tablero (calendario y periodo de cobro); moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).
 - `detectar_fijos_recurrentes_core` empareja tarjetas por subcadena (`LIKE '%nombre%'`): «Gas» podría fusionarse con «Gasolina».
