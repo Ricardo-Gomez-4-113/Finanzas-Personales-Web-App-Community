@@ -116,8 +116,9 @@ Finanzas-Personales-Web-App-Community/
 │   ├── respaldo.py      # Respaldo, restauración y exportación a Excel
 │   └── salud.py         # Endpoint /health para Docker y monitoreo
 ├── finanzas_core.py     # Lógica financiera pura: conversión, resumen, recurrentes, MSI y rendimiento
+├── dinero.py            # El dinero se guarda en centavos enteros: conversión y lectura en pesos
 ├── mercado.py           # Cotizaciones de Yahoo Finance y tipos de cambio (en paralelo, con caché)
-├── database.py          # Esquema por tenant, migraciones versionadas (v1–v20) y conexión por petición
+├── database.py          # Esquema por tenant, migraciones versionadas (v1–v21) y conexión por petición
 ├── master_db.py         # Base maestra (usuarios, OTP y estadísticas admin)
 ├── security.py          # bcrypt, JWT, dependencias verify_token/verify_admin y freno anti fuerza bruta
 ├── limite_cuerpo.py     # Tope del tamaño del cuerpo por petición (256 KB; 50 MB en /api/restore)

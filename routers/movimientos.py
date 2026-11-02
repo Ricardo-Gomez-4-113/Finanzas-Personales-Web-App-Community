@@ -11,6 +11,7 @@ from typing import Literal, Optional, List
 import re
 import sqlite3
 
+from dinero import a_centavos
 from finanzas_core import (
     ahora_local,
     clase_movimiento,
@@ -109,7 +110,7 @@ def crear_transaccion(t: Transaccion, conn: sqlite3.Connection = Depends(get_ten
         INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, rubro)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (t.fecha, t.monto, t.tipo, t.categoria_id, t.descripcion, clase_movimiento(t.tipo, None, None, False))
+        (t.fecha, a_centavos(t.monto), t.tipo, t.categoria_id, t.descripcion, clase_movimiento(t.tipo, None, None, False))
     )
     conn.commit()
     return {"mensaje": "Transacción guardada con éxito"}
@@ -288,7 +289,7 @@ def actualizar_transaccion(id_transaccion: int, t: TransaccionUpdate, conn: sqli
         SET fecha = ?, monto = ?, tipo = ?, categoria_id = ?, descripcion = ?, rubro = ?, version = version + 1
         WHERE id = ? AND version = ?
         """,
-        (nueva_fecha, nuevo_monto, nuevo_tipo, nueva_cat, nueva_desc, nuevo_rubro, id_transaccion, trans["version"])
+        (nueva_fecha, a_centavos(nuevo_monto), nuevo_tipo, nueva_cat, nueva_desc, nuevo_rubro, id_transaccion, trans["version"])
     )
     if cursor.rowcount == 0:
         conn.rollback()
@@ -317,7 +318,7 @@ def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):
         """
         SELECT t.id, t.version, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id,
                c.nombre AS categoria, t.recurrente_id, t.apartado_id,
-               r.presupuesto_tarjeta_id, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+               r.presupuesto_tarjeta_id, pt.nombre AS tarjeta_nombre, pt.monto / 100.0 AS tarjeta_monto_total
         FROM transacciones t
         LEFT JOIN categorias c ON c.id = t.categoria_id
         LEFT JOIN recurrentes r ON r.id = t.recurrente_id

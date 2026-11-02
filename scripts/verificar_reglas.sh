@@ -42,5 +42,12 @@ if (( n_important > MAX_IMPORTANT )); then
   echo "FALLO: hay $n_important declaraciones !important en static/css (tope $MAX_IMPORTANT)"; fallos=1
 fi
 
+# 6. El dinero vive en centavos enteros (dinero.py). Un total calculado en SQL sobre una columna de dinero
+#    sale en centavos: se divide entre 100.0 en la propia consulta. Excepción: HAVING compara contra centavos.
+CODIGO_SQL="finanzas_core.py routers/*.py"
+if grep -nE "SUM\((CASE|[a-z]\.)?[^)]*(monto|monto_actual|capital|ingreso_base)" $CODIGO_SQL | grep -v "100" | grep -v "HAVING"; then
+  echo "FALLO: SUM sobre una columna de dinero sin dividir entre 100.0 (los montos se guardan en centavos)"; fallos=1
+fi
+
 [[ $fallos -eq 0 ]] && echo "Reglas OK"
 exit $fallos

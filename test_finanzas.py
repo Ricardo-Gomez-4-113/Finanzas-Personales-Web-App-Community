@@ -69,6 +69,7 @@ if 'pydantic' not in sys.modules:
 
 import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
+from dinero import a_centavos, fabrica_filas
 from finanzas_core import (
     obtener_total_apartados,
     convertir,
@@ -103,7 +104,7 @@ from finanzas_core import (
 
 def nueva_bd():
     conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = fabrica_filas
     configure_sqlite_pragmas(conn)
     apply_lazy_migrations(conn)
     return conn
@@ -116,7 +117,7 @@ def insertar_recurrente(conn, descripcion, tipo, monto, frecuencia, dia, proxima
                                  total_cuotas, cuotas_generadas, monto_total, categoria_id, activo)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 1, 1)
         """,
-        (descripcion, tipo, monto, frecuencia, dia, proxima.isoformat(), total, monto_total),
+        (descripcion, tipo, a_centavos(monto), frecuencia, dia, proxima.isoformat(), total, a_centavos(monto_total)),
     )
     conn.commit()
     return conn.execute("SELECT * FROM recurrentes ORDER BY id DESC LIMIT 1").fetchone()
@@ -130,9 +131,9 @@ def test_convertir():
 
 def test_calcular_resumen():
     conn = nueva_bd()
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-01-05', 1000, 'ingreso')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-01-06', 300, 'gasto')")
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 200)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-01-05', 100000, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-01-06', 30000, 'gasto')")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 20000)")
     conn.commit()
     r = calcular_resumen(conn, 'MXN', 18, date(2026, 1, 31))
     assert r['balance'] == 700, r
@@ -178,7 +179,7 @@ def test_msi_completo_suma_exacta_y_termina():
     insertar_recurrente(conn, "Celular", 'gasto', 2583.33, 'mensual', 10, date(2026, 1, 10), total=12, monto_total=31000)
     n = materializar_recurrentes(conn, date(2030, 1, 1))
     assert n == 12, n
-    suma = conn.execute("SELECT ROUND(SUM(monto), 2) AS s FROM transacciones WHERE recurrente_id IS NOT NULL").fetchone()["s"]
+    suma = conn.execute("SELECT ROUND(SUM(monto) / 100.0, 2) AS s FROM transacciones WHERE recurrente_id IS NOT NULL").fetchone()["s"]
     assert suma == 31000.00, suma
     fila = conn.execute("SELECT activo FROM recurrentes").fetchone()
     assert fila["activo"] == 0
@@ -191,7 +192,7 @@ def test_valor_rendimiento_un_anio():
 
 def test_migracion_v4_enlaza_apartados():
     conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = fabrica_filas
     configure_sqlite_pragmas(conn)
     original = database.CURRENT_TENANT_SCHEMA_VERSION
     try:
@@ -215,7 +216,7 @@ def test_migracion_v4_enlaza_apartados():
 
 def test_migracion_v5_presupuesto():
     conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = fabrica_filas
     configure_sqlite_pragmas(conn)
     apply_lazy_migrations(conn)
     assert conn.execute("PRAGMA user_version").fetchone()[0] >= 5
@@ -227,7 +228,7 @@ def test_migracion_v5_presupuesto():
 
     conn.execute(
         "INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden) VALUES (?, ?, ?, ?, ?, ?)",
-        ("Gastos Fijos", "building-columns", "gold", 50.0, 5000.0, 0)
+        ("Gastos Fijos", "building-columns", "gold", 50.0, 500000, 0)
     )
     conn.commit()
     t = conn.execute("SELECT nombre, porcentaje, monto FROM presupuesto_tarjetas WHERE nombre='Gastos Fijos'").fetchone()
@@ -281,12 +282,12 @@ def test_migracion_v7_apartado_recurrente():
 
 def test_recurrente_aporta_a_meta():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Fondo Emergencia', 'meta', 1000.0, 5000.0)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Fondo Emergencia', 'meta', 100000, 500000)")
     apa_id = conn.execute("SELECT id FROM apartados WHERE nombre='Fondo Emergencia'").fetchone()["id"]
     conn.execute(
         """
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo)
-        VALUES ('Ahorro mensual', 'gasto', 500.0, 'mensual', 1, '2026-01-01', 1, ?, 1)
+        VALUES ('Ahorro mensual', 'gasto', 50000, 'mensual', 1, '2026-01-01', 1, ?, 1)
         """,
         (apa_id,)
     )
@@ -307,17 +308,17 @@ def test_recurrente_aporta_a_meta():
 def test_importar_fijos_individual_y_limpieza():
     from finanzas_core import sincronizar_fijos_presupuesto_core
     conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = fabrica_filas
     configure_sqlite_pragmas(conn)
     apply_lazy_migrations(conn)
 
     conn.execute("INSERT OR IGNORE INTO categorias (id, nombre, tipo) VALUES (1, 'General', 'gasto'), (12, 'Nómina', 'ingreso')")
-    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Nómina', 'ingreso', 10000.0, 'mensual', 1, '2026-11-01', 1, 12)")
-    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Internet', 'gasto', 500.0, 'mensual', 5, '2026-11-05', 1, 1)")
-    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Supermercado', 'gasto', 2000.0, 'mensual', 10, '2026-11-10', 1, 1)")
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Nómina', 'ingreso', 1000000, 'mensual', 1, '2026-11-01', 1, 12)")
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Internet', 'gasto', 50000, 'mensual', 5, '2026-11-05', 1, 1)")
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo, categoria_id) VALUES ('Supermercado', 'gasto', 200000, 'mensual', 10, '2026-11-10', 1, 1)")
     
     # Tarjeta vieja residual
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Gastos Fijos', 'home', 'blue', 25.0, 2500.0, 'Importado de Fijos y MSI', 10)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Gastos Fijos', 'home', 'blue', 25.0, 250000, 'Importado de Fijos y MSI', 10)")
     conn.commit()
 
     cursor = conn.cursor()
@@ -340,8 +341,8 @@ def test_importar_fijos_no_funde_tarjetas_de_nombre_parecido():
     conn = nueva_bd()
     insertar_recurrente(conn, "Nómina", "ingreso", 20000.0, "mensual", 1, date(2026, 11, 1))
     insertar_recurrente(conn, "Luz", "gasto", 400.0, "mensual", 8, date(2026, 11, 8))
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Gasolina y luz del carro', 'car', 'blue', 5.0, 1000.0, 'mío', 10)")
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('luz', 'zap', 'amber', 1.0, 100.0, '', 20)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Gasolina y luz del carro', 'car', 'blue', 5.0, 100000, 'mío', 10)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('luz', 'zap', 'amber', 1.0, 10000, '', 20)")
     conn.commit()
     sincronizar_fijos_presupuesto_core(conn.cursor(), modo='individual', actualizar_ingreso=False, reemplazar=False)
     filas = {f["nombre"]: f["monto"] for f in conn.execute("SELECT nombre, monto FROM presupuesto_tarjetas")}
@@ -351,7 +352,7 @@ def test_importar_fijos_no_funde_tarjetas_de_nombre_parecido():
 
     # Unificado: una tarjeta cuyo nombre solo contiene «MSI» no es la de compras a meses
     conn.execute("DELETE FROM presupuesto_tarjetas")
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Seguro dental MSI', 'heart', 'red', 2.0, 500.0, '', 10)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Seguro dental MSI', 'heart', 'red', 2.0, 50000, '', 10)")
     conn.commit()
     insertar_recurrente(conn, "Laptop", "gasto", 1500.0, "mensual", 3, date(2026, 11, 3), total=12, monto_total=18000.0)
     sincronizar_fijos_presupuesto_core(conn.cursor(), modo='unificado', actualizar_ingreso=False, reemplazar=False)
@@ -362,7 +363,7 @@ def test_importar_fijos_no_funde_tarjetas_de_nombre_parecido():
 def test_total_de_apartados_no_oculta_errores():
     assert obtener_total_apartados(nueva_bd().cursor()) == 0.0
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 250)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 25000)")
     assert obtener_total_apartados(conn.cursor()) == 250.0
     conn.execute("DROP TABLE apartados")
     try:
@@ -371,6 +372,37 @@ def test_total_de_apartados_no_oculta_errores():
         pass
     else:
         raise AssertionError("un fallo de la consulta no debe pasar por saldo de cero")
+
+
+def test_dinero_en_centavos_conversion_y_filas():
+    from dinero import de_centavos
+    # Pesos a centavos: la media fracción sube y los decimales binarios no estorban
+    assert [a_centavos(x) for x in (0, 0.1, 0.3, 19.99, 1234.56, 0.1 + 0.2, 0.005, 2.675, "12.34", 7, None)] == [0, 10, 30, 1999, 123456, 30, 1, 268, 1234, 700, None]
+    assert a_centavos(-5.555) == -556
+    assert de_centavos(123456) == 1234.56 and de_centavos(None) is None
+    try:
+        a_centavos(float("nan"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("un monto que no es número no debe convertirse")
+
+    conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-01-01', 123456, 'gasto', 'x')")
+    fila = conn.execute("SELECT id, monto, descripcion FROM transacciones").fetchone()
+    # Por nombre o posición, en pesos; el resto de columnas queda tal cual
+    assert fila["monto"] == 1234.56 and fila[1] == 1234.56 and fila["MONTO"] == 1234.56 and fila["descripcion"] == "x"
+    assert dict(fila) == {"id": 1, "monto": 1234.56, "descripcion": "x"} and fila.keys() == ["id", "monto", "descripcion"]
+    # Un total calculado en SQL no pasa por la fábrica: se divide en la consulta
+    assert conn.execute("SELECT SUM(monto) / 100.0 FROM transacciones").fetchone()[0] == 1234.56
+    # Una columna de dinero con decimales es una escritura que no pasó por a_centavos: falla a la vista
+    conn.execute("UPDATE transacciones SET monto = 12.34")
+    try:
+        conn.execute("SELECT monto FROM transacciones").fetchone()
+    except TypeError as e:
+        assert "centavos enteros" in str(e), e
+    else:
+        raise AssertionError("un decimal en una columna de centavos debía fallar al leerse")
 
 
 def test_migracion_v8_indice_unico():
@@ -416,7 +448,7 @@ def test_migracion_v12_presupuesto_tarjeta_id():
 def test_exportar_presupuesto_con_dia_pago_configurado():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = nueva_bd()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'mensual', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 2500000, frecuencia = 'mensual', dia_pago = 15 WHERE id = 1")
     conn.commit()
 
     res = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
@@ -448,12 +480,12 @@ def test_distribucion_tarjeta_asimetrica():
 
 def test_materializar_ingreso_no_afecta_apartado():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Ahorro', 'libre', 1000.0)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Ahorro', 'libre', 100000)")
     # Forzamos en BD un ingreso con apartado_id
     conn.execute(
         """
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo)
-        VALUES ('Sueldo', 'ingreso', 5000.0, 'mensual', 1, '2026-10-01', 1, 1, 1)
+        VALUES ('Sueldo', 'ingreso', 500000, 'mensual', 1, '2026-10-01', 1, 1, 1)
         """
     )
     conn.commit()
@@ -538,7 +570,7 @@ def test_resumen_fijos_msi_compromiso_mensual():
     conn.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
                                  total_cuotas, cuotas_generadas, monto_total, categoria_id, activo)
-        VALUES ('Laptop MSI', 'gasto', 1074.92, 'mensual', 15, '2026-10-15', 12, 0, 12899.0, 1, 1)
+        VALUES ('Laptop MSI', 'gasto', 107492, 'mensual', 15, '2026-10-15', 12, 0, 1289900, 1, 1)
     """)
     conn.commit()
 
@@ -558,7 +590,7 @@ def test_deuda_msi_incluye_compras_pausadas():
     conn.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
                                  total_cuotas, cuotas_generadas, monto_total, categoria_id, activo)
-        VALUES ('Celular en pausa', 'gasto', 500, 'mensual', 5, '2026-10-05', 6, 2, 3000.0, 1, 0)
+        VALUES ('Celular en pausa', 'gasto', 50000, 'mensual', 5, '2026-10-05', 6, 2, 300000, 1, 0)
     """)
     conn.commit()
     r = calcular_resumen(conn, 'MXN', 18.0, date(2026, 10, 20))
@@ -572,7 +604,7 @@ def test_resumen_gastos_normales_mes():
     insertar_recurrente(conn, "Renta", "gasto", 3000.0, "mensual", 1, date(2026, 10, 1))
     conn.execute("""
         INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id)
-        VALUES ('2026-10-10', 1500.0, 'gasto', 1, 'Supermercado', NULL, NULL)
+        VALUES ('2026-10-10', 150000, 'gasto', 1, 'Supermercado', NULL, NULL)
     """)
     conn.commit()
 
@@ -586,14 +618,14 @@ def test_exportar_presupuesto_a_fijos_misma_periodicidad():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = nueva_bd()
     # Presupuesto configurado con periodicidad quincenal
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 9375.54, frecuencia = 'quincenal' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 937554, frecuencia = 'quincenal' WHERE id = 1")
     conn.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-        VALUES ('Transporte y Gasolina', 'shopping-bag', 'amber', 21.33, 2000.0, 'Transporte', 1)
+        VALUES ('Transporte y Gasolina', 'shopping-bag', 'amber', 21.33, 200000, 'Transporte', 1)
     """)
     conn.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-        VALUES ('Dentista', 'wallet', 'blue', 5.33, 500.0, 'Salud', 2)
+        VALUES ('Dentista', 'wallet', 'blue', 5.33, 50000, 'Salud', 2)
     """)
     conn.commit()
 
@@ -608,7 +640,7 @@ def test_exportar_presupuesto_a_fijos_misma_periodicidad():
         assert r['frecuencia'] == 'quincenal', r
 
     # Si se actualiza el monto en el presupuesto y se reexporta, actualiza el recurrente sin duplicar
-    conn.execute("UPDATE presupuesto_tarjetas SET monto = 2200.0 WHERE nombre = 'Transporte y Gasolina'")
+    conn.execute("UPDATE presupuesto_tarjetas SET monto = 220000 WHERE nombre = 'Transporte y Gasolina'")
     conn.commit()
 
     res2 = exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
@@ -627,7 +659,7 @@ def test_editar_recurrente_frecuencia_y_campos():
     # Simular la actualización de campos: descripcion, monto, frecuencia
     conn.execute(
         "UPDATE recurrentes SET descripcion = ?, monto = ?, frecuencia = ? WHERE id = ?",
-        ("Gimnasio Premium", 850.0, "quincenal", rec_id)
+        ("Gimnasio Premium", 85000, "quincenal", rec_id)
     )
     conn.commit()
 
@@ -661,7 +693,7 @@ def test_crear_gasto_fijo_sin_ingreso_fijo_falla():
     # 2. Con ingreso fijo pero inactivo (activo = 0) debe seguir fallando
     cursor.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Sueldo Inactivo', 'ingreso', 20000.0, 'mensual', 1, '2026-01-01', 0)
+        VALUES ('Sueldo Inactivo', 'ingreso', 2000000, 'mensual', 1, '2026-01-01', 0)
     """)
     conn.commit()
     try:
@@ -673,7 +705,7 @@ def test_crear_gasto_fijo_sin_ingreso_fijo_falla():
     # 3. Con ingreso fijo activo, la validación tiene éxito si el monto es cubierto
     cursor.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Sueldo Activo', 'ingreso', 20000.0, 'mensual', 1, '2026-01-01', 1)
+        VALUES ('Sueldo Activo', 'ingreso', 2000000, 'mensual', 1, '2026-01-01', 1)
     """)
     conn.commit()
     validar_sustentabilidad_gasto_fijo(cursor, tipo='gasto', monto=1500.0, frecuencia='mensual')
@@ -683,17 +715,17 @@ def test_gasto_fijo_rechazado_por_depender_de_remanente():
     conn = nueva_bd()
     cursor = conn.cursor()
     # Saldo histórico masivo en transacciones de periodos pasados (remanente)
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 500000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 50000000, 'ingreso')")
 
     # Ingreso fijo activo de 10,000 mensual
     cursor.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Nómina', 'ingreso', 10000.0, 'mensual', 1, '2026-11-01', 1)
+        VALUES ('Nómina', 'ingreso', 1000000, 'mensual', 1, '2026-11-01', 1)
     """)
     # Gasto fijo previo de 7,000 mensual -> Capacidad fija restante: 3,000 mensual
     cursor.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Renta', 'gasto', 7000.0, 'mensual', 1, '2026-11-01', 1)
+        VALUES ('Renta', 'gasto', 700000, 'mensual', 1, '2026-11-01', 1)
     """)
     conn.commit()
 
@@ -714,7 +746,7 @@ def test_gasto_previo_a_fecha_de_cobro_sin_remanente_falla():
     conn = nueva_bd()
     cursor = conn.cursor()
     # Nómina programada para el día 15
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 12000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 1200000, 'ingreso')")
     conn.commit()
 
     # Intentar gastar el día 10 sin saldo previo acumulado debe fallar (saldo sería negativo)
@@ -730,9 +762,9 @@ def test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso():
     conn = nueva_bd()
     cursor = conn.cursor()
     # Remanente disponible de periodo anterior
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 5000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 500000, 'ingreso')")
     # Próxima nómina el día 15
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 12000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-15', 1200000, 'ingreso')")
     conn.commit()
 
     # Gasto de 3,000 el día 10 debe permitirse porque el remanente previo (5,000) lo respalda
@@ -752,10 +784,10 @@ def test_cargos_quincena_no_superan_presupuesto_de_quincena():
     # Ingreso fijo recurrente de 8,000 quincenal (días 15 y 30)
     cursor.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Nómina Quincenal', 'ingreso', 8000.0, 'quincenal', 15, '2026-11-15', 1)
+        VALUES ('Nómina Quincenal', 'ingreso', 800000, 'quincenal', 15, '2026-11-15', 1)
     """)
     # Registrar cargos existentes de 6,500 en la quincena (15 al 29 nov)
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-16', 6500.0, 'gasto')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-16', 650000, 'gasto')")
     tx_id = cursor.lastrowid
     conn.commit()
 
@@ -786,7 +818,7 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
     cursor = conn.cursor()
 
     # 1. En métricas patrimoniales (calcular_resumen) y en el historial: los gastos excluyen transacciones eliminadas
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 1500.0, 'gasto')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 150000, 'gasto')")
     tx_id = cursor.lastrowid
     conn.commit()
 
@@ -802,10 +834,10 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
     assert historial_por_periodos(conn, date(2026, 11, 20))['periodos'] == []
 
     # 2. En tarjetas KPI del presupuesto (get_presupuesto): resumen asignado y disponible excluyen tarjetas eliminadas
-    cursor.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0 WHERE id = 1")
+    cursor.execute("UPDATE presupuesto_config SET ingreso_base = 1000000 WHERE id = 1")
     cursor.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, orden, unidad_orden)
-        VALUES ('Suscripciones', 'film', 'purple', 10.0, 1000.0, 1, 1)
+        VALUES ('Suscripciones', 'film', 'purple', 10.0, 100000, 1, 1)
     """)
     t_id = cursor.lastrowid
     conn.commit()
@@ -829,10 +861,10 @@ def test_importacion_presupuesto_a_fijos_estricta():
     conn = nueva_bd()
 
     # Flujo permitido y estricto de Presupuesto -> Fijos
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 15000.0, frecuencia = 'quincenal' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 1500000, frecuencia = 'quincenal' WHERE id = 1")
     conn.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
-        VALUES ('Ahorro Emergencia', 'shield', 'purple', 20.0, 3000.0, 'Reserva de liquidez', 1)
+        VALUES ('Ahorro Emergencia', 'shield', 'purple', 20.0, 300000, 'Reserva de liquidez', 1)
     """)
     conn.commit()
 
@@ -855,9 +887,9 @@ def test_gasto_respeta_saldo_retenido_en_apartados():
     conn = nueva_bd()
     cursor = conn.cursor()
     # Ingreso de 10,000 en la cuenta
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 10000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 1000000, 'ingreso')")
     # Apartado con 4,000 retenidos
-    cursor.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Fondo Emergencia', 'libre', 4000.0)")
+    cursor.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Fondo Emergencia', 'libre', 400000)")
     conn.commit()
 
     # Saldo en cuenta = 10,000, Apartados = 4,000 -> Saldo Operativo = 6,000
@@ -873,7 +905,7 @@ def test_gasto_respeta_saldo_retenido_en_apartados():
         assert "apartados" in str(e).lower()
 
     # Si se registra el gasto de 5,000 en BD
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 5000.0, 'gasto')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 500000, 'gasto')")
     conn.commit()
 
     # Ahora el saldo operativo disponible es 1,000.
@@ -898,10 +930,10 @@ def test_edicion_ingreso_retroactivo_no_genera_saldo_negativo_futuro():
     conn = nueva_bd()
     cursor = conn.cursor()
     # Ingreso de 10,000 el 2026-11-01
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 10000.0, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 1000000, 'ingreso')")
     id_ingreso = cursor.lastrowid
     # Gasto de 8,000 el 2026-11-05 respaldado por dicho ingreso
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 8000.0, 'gasto')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 800000, 'gasto')")
     id_gasto = cursor.lastrowid
     conn.commit()
 
@@ -956,8 +988,8 @@ def test_edicion_ingreso_retroactivo_no_genera_saldo_negativo_futuro():
     assert float(cursor.execute("SELECT monto FROM transacciones WHERE id = ?", (id_ingreso,)).fetchone()[0]) == 9000.0
 
     # 8. Blindaje de movimientos vinculados a apartados
-    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo Emergencia', 'libre', 500.0)")
-    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 500.0, 'gasto', 1)")
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo Emergencia', 'libre', 50000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 50000, 'gasto', 1)")
     id_ap_mov = cursor.lastrowid
     conn.commit()
 
@@ -1030,7 +1062,7 @@ def test_presupuesto_tarjeta_dia_pago_y_subperiodos():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
-        VALUES ('Dentista', 'wallet', 'blue', 5.0, 500.0, 5, ?)
+        VALUES ('Dentista', 'wallet', 'blue', 5.0, 50000, 5, ?)
     """, (json.dumps(sub_dist),))
     conn.commit()
 
@@ -1046,7 +1078,7 @@ def test_gastos_por_categoria_solo_cuenta_el_periodo_de_cobro():
     conn = nueva_bd()
     insertar_recurrente(conn, "Nómina", 'ingreso', 14000, 'mensual', 15, date(2026, 10, 15))
     for fecha, monto in [("2026-10-14", 100), ("2026-10-16", 300), ("2026-11-14", 50), ("2026-11-15", 999)]:
-        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, monto))
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, a_centavos(monto)))
     conn.commit()
     ventana = ventana_periodo_actual(conn, date(2026, 10, 20))
     assert ventana["inicio"] <= "2026-10-20" <= ventana["fin"], ventana
@@ -1061,12 +1093,12 @@ def test_exportar_borra_msi_que_no_estan_en_el_presupuesto():
     # Compra a meses suelta (no está en el presupuesto): la exportación la borra
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
-        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+        VALUES ('Pixel 10', 'gasto', 107492, 'mensual', 14, '2026-11-14', 10, 1, 1)
     """)
     # Tarjeta del presupuesto con el mismo nombre (legacy, sin pago): se exporta como fijo normal
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
-        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 1074.92, 14)
+        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 107492, 14)
     """)
     conn.commit()
 
@@ -1080,11 +1112,11 @@ def test_exportar_borra_msi_que_no_estan_en_el_presupuesto():
 def test_exportar_msi_del_presupuesto_crea_compra_a_cuotas():
     conn = nueva_bd()
     cur = conn.cursor()
-    cur.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    cur.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'mensual' WHERE id = 1")
     cur.execute("INSERT INTO presupuesto_unidades (orden, dia_pago) VALUES (1, 10) ON CONFLICT(orden) DO UPDATE SET dia_pago = 10")
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, unidad_orden, tipo, msi_cuotas)
-        VALUES ('Celular', 'credit-card', 'amber', 10.0, 1000.0, 1, 'msi', 12)
+        VALUES ('Celular', 'credit-card', 'amber', 10.0, 100000, 1, 'msi', 12)
     """)
     conn.commit()
 
@@ -1107,12 +1139,12 @@ def test_exportar_presupuesto_respeta_dias():
     # 1. Crear recurrente MSI Pixel 10
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
-        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+        VALUES ('Pixel 10', 'gasto', 107492, 'mensual', 14, '2026-11-14', 10, 1, 1)
     """)
     # 2. Crear tarjeta en presupuesto nombrada 'Pixel 10 (MSI)' con dia_pago=14
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
-        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 1074.92, 14)
+        VALUES ('Pixel 10 (MSI)', 'credit-card', 'amber', 5.73, 107492, 14)
     """)
     # 3. Crear tarjeta normal 'Sueldo madre' con subperiodo dia 30
     sub_madre = [
@@ -1121,7 +1153,7 @@ def test_exportar_presupuesto_respeta_dias():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
-        VALUES ('Sueldo madre', 'heart', 'rose', 10.67, 2000.0, 30, ?)
+        VALUES ('Sueldo madre', 'heart', 'rose', 10.67, 200000, 30, ?)
     """, (json.dumps(sub_madre),))
     conn.commit()
 
@@ -1166,7 +1198,7 @@ def test_exportar_presupuesto_dia_segundo_subperiodo():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
-        VALUES ('Tarjeta NU Especial', 'credit-card', 'purple', 26.67, 5000.0, NULL, ?)
+        VALUES ('Tarjeta NU Especial', 'credit-card', 'purple', 26.67, 500000, NULL, ?)
     """, (json.dumps(sub_nu),))
     conn.commit()
 
@@ -1181,7 +1213,7 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     conn = nueva_bd()
     cur = conn.cursor()
     # Ingreso quincenal de 10000; la tarjeta es 4000 POR QUINCENA (la interfaz muestra 8000 al mes)
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
     # Tarjeta dividida Transporte: 2000 en Dia 1 y 2000 en Dia 16 de cada quincena
     sub_transporte = [
         {"id": "q1", "nombre": "Quincena 1", "monto": 2000.0, "porcentaje": 50.0, "dia": 1},
@@ -1189,7 +1221,7 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
-        VALUES ('Transporte', 'wallet', 'cyan', 40.0, 4000.0, NULL, ?)
+        VALUES ('Transporte', 'wallet', 'cyan', 40.0, 400000, NULL, ?)
     """, (json.dumps(sub_transporte),))
     t_id = cur.lastrowid
     conn.commit()
@@ -1205,7 +1237,7 @@ def test_exportar_tarjeta_dividida_en_subperiodos():
     assert round(sum(r["monto"] for r in recs), 2) == 8000.0
 
     # Re-exportar con actualización: no debe duplicar
-    cur.execute("UPDATE presupuesto_tarjetas SET monto = 4200.0 WHERE id = ?", (t_id,))
+    cur.execute("UPDATE presupuesto_tarjetas SET monto = 420000 WHERE id = ?", (t_id,))
     sub_transporte_act = [
         {"id": "q1", "nombre": "Quincena 1", "monto": 2100.0, "porcentaje": 50.0, "dia": 1},
         {"id": "q2", "nombre": "Quincena 2", "monto": 2100.0, "porcentaje": 50.0, "dia": 16}
@@ -1224,7 +1256,7 @@ def test_exportar_tarjeta_subperiodo_dia_futuro_no_materializa_antes_de_tiempo()
     from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes
     conn = nueva_bd()
     cur = conn.cursor()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 20000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 2000000, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
     # Tarjeta NU con 5000 el día 30
     sub_nu = [
         {"id": "q1", "nombre": "Q1", "monto": 0.0, "porcentaje": 0.0, "dia": None},
@@ -1232,7 +1264,7 @@ def test_exportar_tarjeta_subperiodo_dia_futuro_no_materializa_antes_de_tiempo()
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago, distribucion_subperiodos)
-        VALUES ('Tarjeta NU', 'credit-card', 'purple', 25.0, 5000.0, 30, ?)
+        VALUES ('Tarjeta NU', 'credit-card', 'purple', 25.0, 500000, 30, ?)
     """, (json.dumps(sub_nu),))
     conn.commit()
 
@@ -1262,11 +1294,11 @@ def test_edicion_transaccion_no_aumenta_gasto_permite_guardar_aunque_periodo_sup
     conn = nueva_bd()
     cur = conn.cursor()
     # Ingreso quincenal de 5000 el día 15
-    cur.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo) VALUES ('Nómina', 'ingreso', 5000.0, 'quincenal', 15, '2026-11-15', 1)")
+    cur.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo) VALUES ('Nómina', 'ingreso', 500000, 'quincenal', 15, '2026-11-15', 1)")
     # Gastos en la misma quincena que superan la capacidad (ej. 6000 total)
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-16', 4000.0, 'gasto', 'Renta', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-16', 400000, 'gasto', 'Renta', 1)")
     id_t1 = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-18', 2000.0, 'gasto', 'Servicios', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-18', 200000, 'gasto', 'Servicios', 1)")
     id_t2 = cur.lastrowid
     conn.commit()
 
@@ -1309,8 +1341,8 @@ def test_eliminacion_transacciones_individual_y_lote():
     cur = conn.cursor()
 
     # 1. Movimiento ligado a meta / apartado (ahorro / gasto)
-    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 1000.0)")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 300.0, 'gasto', 1)")
+    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 100000)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 30000, 'gasto', 1)")
     id_t1 = cur.lastrowid
     conn.commit()
 
@@ -1319,7 +1351,7 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_t1,)).fetchone()[0] == 0
 
     # 2. Movimiento ligado a meta / apartado (retiro / ingreso): al borrar el retiro, el dinero vuelve a la meta
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 200.0, 'ingreso', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-02', 20000, 'ingreso', 1)")
     id_t2 = cur.lastrowid
     conn.commit()
 
@@ -1331,9 +1363,9 @@ def test_eliminacion_transacciones_individual_y_lote():
     # 3. Movimiento ligado a recurrente / MSI terminado
     cur.execute("""
         INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
-        VALUES (1, 'Compra TV', 'gasto', 1000.0, 'mensual', 15, '2026-11-15', 3, 3, 0)
+        VALUES (1, 'Compra TV', 'gasto', 100000, 'mensual', 15, '2026-11-15', 3, 3, 0)
     """)
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-03', 1000.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-03', 100000, 'gasto', 1)")
     id_t3 = cur.lastrowid
     conn.commit()
 
@@ -1343,9 +1375,9 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert rec["activo"] == 1, "Debió reactivarse el recurrente al decrementar sus cuotas"
 
     # 4. Parámetro forzar=True en ingreso con gastos posteriores
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-04', 5000.0, 'ingreso')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-04', 500000, 'ingreso')")
     id_ingreso = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 4000.0, 'gasto')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 400000, 'gasto')")
     id_gasto = cur.lastrowid
     conn.commit()
 
@@ -1362,9 +1394,9 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_ingreso,)).fetchone()[0] == 0
 
     # 5. Eliminación por lote (POST /api/transacciones/eliminar-lote)
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-06', 100.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-06', 10000, 'gasto', 1)")
     id_batch_1 = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-07', 500.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-07', 50000, 'gasto', 1)")
     id_batch_2 = cur.lastrowid
     conn.commit()
 
@@ -1377,9 +1409,9 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT cuotas_generadas FROM recurrentes WHERE id = 1").fetchone()[0] == 1
 
     # 6. Validación de déficit en lote (forzar=False vs forzar=True)
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-10', 3000.0, 'ingreso')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-10', 300000, 'ingreso')")
     id_ing2 = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-11', 2500.0, 'gasto')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-11', 250000, 'gasto')")
     id_gas2 = cur.lastrowid
     conn.commit()
 
@@ -1398,10 +1430,10 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
 
     # 8. Comprobar que eliminar en lote no genere falso 422 en fechas históricas anteriores a los ingresos eliminados
-    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (2, 'Auto', 'meta', 200.0)")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 50.0, 'gasto')")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-02', 10000.0, 'ingreso')")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-06-01', 1000.0, 'ingreso')")
+    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (2, 'Auto', 'meta', 20000)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-01', 5000, 'gasto')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-01-02', 1000000, 'ingreso')")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2025-06-01', 100000, 'ingreso')")
     id_hist_del = cur.lastrowid
     conn.commit()
 
@@ -1411,15 +1443,15 @@ def test_eliminacion_transacciones_individual_y_lote():
     assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_hist_del,)).fetchone()[0] == 0
 
     # 9. Eliminación múltiple ligada al mismo apartado y mismo recurrente
-    cur.execute("UPDATE apartados SET monto_actual = 500.0 WHERE id = 1")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-20', 100.0, 'gasto', 1)")
+    cur.execute("UPDATE apartados SET monto_actual = 50000 WHERE id = 1")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-20', 10000, 'gasto', 1)")
     id_ap_m1 = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-21', 150.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-21', 15000, 'gasto', 1)")
     id_ap_m2 = cur.lastrowid
     cur.execute("UPDATE recurrentes SET cuotas_generadas = 2 WHERE id = 1")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-22', 500.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-22', 50000, 'gasto', 1)")
     id_rec_m1 = cur.lastrowid
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-23', 500.0, 'gasto', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-23', 50000, 'gasto', 1)")
     id_rec_m2 = cur.lastrowid
     conn.commit()
 
@@ -1435,12 +1467,12 @@ def test_listar_transacciones_incluye_metadata_presupuesto():
     from routers.movimientos import listar_transacciones
     conn = nueva_bd()
     cur = conn.cursor()
-    cur.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto) VALUES (5, 'Transporte', 'car', 'blue', 10.0, 4000.0)")
+    cur.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto) VALUES (5, 'Transporte', 'car', 'blue', 10.0, 400000)")
     cur.execute("""
         INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, presupuesto_tarjeta_id, activo)
-        VALUES (10, 'Transporte (Quincena 1)', 'gasto', 2000.0, 'mensual', 1, '2026-11-01', 5, 1)
+        VALUES (10, 'Transporte (Quincena 1)', 'gasto', 200000, 'mensual', 1, '2026-11-01', 5, 1)
     """)
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, recurrente_id) VALUES ('2026-11-01', 2000.0, 'gasto', 'Transporte (Quincena 1)', 10)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, recurrente_id) VALUES ('2026-11-01', 200000, 'gasto', 'Transporte (Quincena 1)', 10)")
     conn.commit()
 
     txs = listar_transacciones(conn)
@@ -1457,7 +1489,7 @@ def test_sincronizacion_config_presupuesto_con_recurrentes():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES (1, 'Nómina Fija (Presupuesto)', 'ingreso', 10000.0, 'mensual', 15, '2026-11-15', 1)
+        VALUES (1, 'Nómina Fija (Presupuesto)', 'ingreso', 1000000, 'mensual', 15, '2026-11-15', 1)
     """)
     conn.commit()
 
@@ -1478,7 +1510,7 @@ def test_quincena_cortes_dias_estandar_15_y_fin_de_mes():
     # Nómina quincenal con día 15
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Nómina', 'ingreso', 18751.08, 'quincenal', 15, '2026-10-15', 1)
+        VALUES ('Nómina', 'ingreso', 1875108, 'quincenal', 15, '2026-10-15', 1)
     """)
     conn.commit()
 
@@ -1525,7 +1557,7 @@ def test_saltar_recurrente_gasto_fijo():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Internet Casa', 'gasto', 650.0, 'quincenal', 15, '2026-10-15', 1)
+        VALUES ('Internet Casa', 'gasto', 65000, 'quincenal', 15, '2026-10-15', 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1553,7 +1585,7 @@ def test_saltar_recurrente_msi_contabilizar_cuota():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
-        VALUES ('Laptop MSI', 'gasto', 1000.0, 'mensual', 15, '2026-10-15', 3, 0, 3000.0, 1)
+        VALUES ('Laptop MSI', 'gasto', 100000, 'mensual', 15, '2026-10-15', 3, 0, 300000, 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1599,7 +1631,7 @@ def test_saltar_recurrente_msi_solo_aplazar():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
-        VALUES ('Celular MSI', 'gasto', 800.0, 'mensual', 20, '2026-10-20', 6, 1, 4800.0, 1)
+        VALUES ('Celular MSI', 'gasto', 80000, 'mensual', 20, '2026-10-20', 6, 1, 480000, 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1623,7 +1655,7 @@ def test_saltar_recurrente_inactivo_falla():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Gasto Pausado', 'gasto', 300.0, 'mensual', 5, '2026-11-05', 0)
+        VALUES ('Gasto Pausado', 'gasto', 30000, 'mensual', 5, '2026-11-05', 0)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1639,10 +1671,10 @@ def test_exportar_presupuesto_con_inicio_proximo_mes_evita_materializacion():
     from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes, calcular_fecha_inicio_exportacion
     conn = nueva_bd()
     cur = conn.cursor()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 2500000, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
-        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 5000.0, 15)
+        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 500000, 15)
     """)
     conn.commit()
 
@@ -1670,7 +1702,7 @@ def test_exportar_presupuesto_con_inicio_siguiente_quincena():
     from finanzas_core import exportar_presupuesto_a_fijos_core, materializar_recurrentes, calcular_fecha_inicio_exportacion
     conn = nueva_bd()
     cur = conn.cursor()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 30000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 3000000, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
     # Tarjeta dividida: Q1 día 1 ($2,000) y Q2 día 16 ($2,000)
     sub = [
         {"id": "q1", "nombre": "Q1", "monto": 2000.0, "porcentaje": 50.0, "dia": 1},
@@ -1678,7 +1710,7 @@ def test_exportar_presupuesto_con_inicio_siguiente_quincena():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, distribucion_subperiodos)
-        VALUES ('Gastos Servicios', 'zap', 'amber', 13.33, 4000.0, ?)
+        VALUES ('Gastos Servicios', 'zap', 'amber', 13.33, 400000, ?)
     """, (json.dumps(sub),))
     conn.commit()
 
@@ -1713,7 +1745,7 @@ def test_endpoint_saltar_recurrente():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, monto_total, activo)
-        VALUES ('Laptop MSI', 'gasto', 1000.0, 'mensual', 15, '2026-10-15', 3, 0, 3000.0, 1)
+        VALUES ('Laptop MSI', 'gasto', 100000, 'mensual', 15, '2026-10-15', 3, 0, 300000, 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1730,10 +1762,10 @@ def test_endpoint_exportar_presupuesto_diferido():
     from routers.presupuesto import exportar_presupuesto_a_fijos, ExportarFijosRequest
     conn = nueva_bd()
     cur = conn.cursor()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 25000.0, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 2500000, frecuencia = 'quincenal', dia_pago = 15 WHERE id = 1")
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, dia_pago)
-        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 5000.0, 15)
+        VALUES ('Supermercado', 'shopping-cart', 'emerald', 20.0, 500000, 15)
     """)
     conn.commit()
 
@@ -1750,7 +1782,7 @@ def test_endpoint_saltar_recurrente_sin_body_y_con_conexion_directa():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Luz CFE', 'gasto', 400.0, 'mensual', 15, '2026-10-15', 1)
+        VALUES ('Luz CFE', 'gasto', 40000, 'mensual', 15, '2026-10-15', 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1777,7 +1809,7 @@ def test_saltar_recurrente_ingreso_fijo():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
-        VALUES ('Nómina Quincenal', 'ingreso', 12000.0, 'quincenal', 15, '2026-10-15', 1)
+        VALUES ('Nómina Quincenal', 'ingreso', 1200000, 'quincenal', 15, '2026-10-15', 1)
     """)
     rec_id = cur.lastrowid
     conn.commit()
@@ -1794,7 +1826,7 @@ def test_exportar_presupuesto_subperiodos_asimetricos_febrero():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = nueva_bd()
     cur = conn.cursor()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 30000.0, frecuencia = 'mensual' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 3000000, frecuencia = 'mensual' WHERE id = 1")
     sub = [
         {"id": "sp1", "nombre": "Semana 1", "monto": 1000.0, "porcentaje": 25.0, "dia": 1},
         {"id": "sp2", "nombre": "Semana 2", "monto": 1000.0, "porcentaje": 25.0, "dia": 15},
@@ -1802,7 +1834,7 @@ def test_exportar_presupuesto_subperiodos_asimetricos_febrero():
     ]
     cur.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, distribucion_subperiodos)
-        VALUES ('Super Asimétrico', 'shopping-cart', 'emerald', 10.0, 3000.0, ?)
+        VALUES ('Super Asimétrico', 'shopping-cart', 'emerald', 10.0, 300000, ?)
     """, (json.dumps(sub),))
     conn.commit()
 
@@ -1997,13 +2029,13 @@ def test_fijos_por_periodo_marca_aplicados_y_no_cuenta_dos_veces():
 def _con_pagos(frecuencia, dias, tarjetas):
     """Presupuesto con pagos: dias por orden ({orden: día}) y tarjetas [(orden, nombre, monto)]."""
     conn = nueva_bd()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 5000, frecuencia = ? WHERE id = 1", (frecuencia,))
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 500000, frecuencia = ? WHERE id = 1", (frecuencia,))
     for orden, dia in dias.items():
         conn.execute("UPDATE presupuesto_unidades SET dia_pago = ? WHERE orden = ?", (dia, orden))
     for orden, nombre, monto in tarjetas:
         conn.execute(
             "INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) "
-            "VALUES (?, 'x', 'amber', 0, ?, '', 1, ?)", (nombre, monto, orden))
+            "VALUES (?, 'x', 'amber', 0, ?, '', 1, ?)", (nombre, a_centavos(monto), orden))
     conn.commit()
     return conn
 
@@ -2067,9 +2099,9 @@ def test_pago_inactivo_no_se_exporta_pero_conserva_la_tarjeta():
 
 def _presupuesto_para_export():
     conn = nueva_bd()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 9000, frecuencia = 'quincenal' WHERE id = 1")
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Transporte', 'x', 'amber', 20, 2000, 'Transporte', 1)")
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Dentista', 'x', 'blue', 5, 500, 'Salud', 2)")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 900000, frecuencia = 'quincenal' WHERE id = 1")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Transporte', 'x', 'amber', 20, 200000, 'Transporte', 1)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Dentista', 'x', 'blue', 5, 50000, 'Salud', 2)")
     conn.commit()
     return conn
 
@@ -2084,7 +2116,7 @@ def test_export_sobrescribe_todo_y_borra_lo_que_sobra():
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
     conn.commit()
     # Se cambia el monto y se desmarca Dentista: el fijo de Dentista debe desactivarse
-    conn.execute("UPDATE presupuesto_tarjetas SET monto = 2200 WHERE nombre = 'Transporte'")
+    conn.execute("UPDATE presupuesto_tarjetas SET monto = 220000 WHERE nombre = 'Transporte'")
     conn.commit()
     res = exportar_presupuesto_a_fijos_core(conn.cursor(), tarjetas_ids=[1], fecha_base=date(2026, 10, 20))
     conn.commit()
@@ -2100,7 +2132,7 @@ def test_export_borra_tambien_los_fijos_a_mano_y_los_msi():
     insertar_recurrente(conn, "Netflix", 'gasto', 299, 'mensual', 15, date(2026, 10, 25))
     conn.execute("""
         INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
-        VALUES ('Pixel 10', 'gasto', 1074.92, 'mensual', 14, '2026-11-14', 10, 1, 1)
+        VALUES ('Pixel 10', 'gasto', 107492, 'mensual', 14, '2026-11-14', 10, 1, 1)
     """)
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 20))
@@ -2158,12 +2190,12 @@ def test_export_no_duplica_cargo_ya_registrado():
 
 def test_resumen_mensual_excluye_movimientos_de_apartados():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 28500, 'ingreso')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 1500, 'gasto')")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 1800000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 2850000, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 150000, 'gasto')")
     # Depósito a meta (gasto ligado a apartado) y retiro (ingreso ligado): no son gasto ni ingreso del mes
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 4500, 'gasto', 1)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-07', 500, 'ingreso', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 450000, 'gasto', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-07', 50000, 'ingreso', 1)")
     conn.commit()
     h = historial_por_periodos(conn, date(2026, 10, 31))
     assert h["granularidad"] == "mes"   # sin ingreso fijo, meses calendario
@@ -2179,14 +2211,14 @@ def test_historial_quincenal_sigue_los_cortes_de_la_nomina():
     # Mismo escenario de referencia de tests/escenario.py, a mano: nómina quincenal que cobra el 15 y a fin de mes
     conn = nueva_bd()
     insertar_recurrente(conn, "Nómina", 'ingreso', 14000.0, 'quincenal', 15, date(2026, 10, 31))
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 1800000)")
     movs = [("2026-08-15", 299, 'gasto'), ("2026-09-01", 9500, 'gasto'), ("2026-09-10", 2000, 'gasto'),
             ("2026-09-15", 14000, 'ingreso'), ("2026-09-15", 299, 'gasto'), ("2026-09-30", 14000, 'ingreso'),
             ("2026-10-01", 9500, 'gasto'), ("2026-10-05", 3000, 'gasto'), ("2026-10-10", 2000, 'gasto'),
             ("2026-10-15", 14000, 'ingreso'), ("2026-10-15", 299, 'gasto')]
     for fecha, monto, tipo in movs:
-        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-20', 6000, 'gasto', 1)")   # depósito a meta: no cuenta
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, a_centavos(monto), tipo))
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-20', 600000, 'gasto', 1)")   # depósito a meta: no cuenta
     conn.commit()
     granularidad, periodos = _historial(conn, date(2026, 10, 20))
     assert granularidad == "quincena"
@@ -2205,7 +2237,7 @@ def test_historial_mensual_corta_en_el_dia_de_cobro():
     insertar_recurrente(conn, "Sueldo", 'ingreso', 5000.0, 'mensual', 15, date(2026, 11, 15))
     for fecha, monto, tipo in (("2026-08-20", 30, 'gasto'), ("2026-09-20", 100, 'gasto'), ("2026-10-14", 50, 'gasto'),
                                ("2026-10-15", 5000, 'ingreso'), ("2026-11-03", 10, 'gasto')):
-        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, a_centavos(monto), tipo))
     conn.commit()
     granularidad, periodos = _historial(conn, date(2026, 11, 5))
     assert granularidad == "mes"
@@ -2220,7 +2252,7 @@ def test_historial_semanal_rellena_las_semanas_sin_movimientos():
     conn = nueva_bd()
     insertar_recurrente(conn, "Pago semanal", 'ingreso', 1000.0, 'semanal', 9, date(2026, 11, 9))
     for fecha, monto in (("2026-10-20", 10), ("2026-11-06", 20)):
-        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, monto))
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, a_centavos(monto)))
     conn.commit()
     granularidad, periodos = _historial(conn, date(2026, 11, 8))
     assert granularidad == "semana"
@@ -2234,7 +2266,7 @@ def test_historial_semanal_rellena_las_semanas_sin_movimientos():
 def test_historial_sin_ingreso_fijo_usa_meses_y_respeta_el_tope():
     conn = nueva_bd()
     for fecha, monto, tipo in (("2026-08-10", 5, 'gasto'), ("2026-10-05", 100, 'ingreso')):
-        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, a_centavos(monto), tipo))
     conn.commit()
     granularidad, periodos = _historial(conn, date(2026, 10, 31))
     assert granularidad == "mes"
@@ -2247,8 +2279,8 @@ def test_historial_sin_ingreso_fijo_usa_meses_y_respeta_el_tope():
 
 def test_historial_incluye_el_periodo_de_un_movimiento_futuro():
     conn = nueva_bd()
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-12-20', 80, 'gasto')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 10, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-12-20', 8000, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 1000, 'gasto')")
     conn.commit()
     _, periodos = _historial(conn, date(2026, 10, 31))
     assert [p[0] for p in periodos] == ["2026-12-01", "2026-11-01", "2026-10-01"] and periodos[0][3] == 80.0 and not periodos[0][4], periodos
@@ -2266,11 +2298,11 @@ def test_saldo_de_apartados_coincide_con_sus_movimientos():
         monto = round(rnd.uniform(1, 300), 2)
         guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
         if rnd.random() < 0.6 or guardado < monto:
-            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'gasto', 1, 'dep', ?)", (monto, aid))
-            conn.execute("UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?", (monto, aid))
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'gasto', 1, 'dep', ?)", (a_centavos(monto), aid))
+            conn.execute("UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?", (a_centavos(monto), aid))
         elif rnd.random() < 0.5 and guardado >= monto:
-            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'ingreso', 1, 'ret', ?)", (monto, aid))
-            conn.execute("UPDATE apartados SET monto_actual = monto_actual - ? WHERE id = ?", (monto, aid))
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id) VALUES ('2026-01-06', ?, 'ingreso', 1, 'ret', ?)", (a_centavos(monto), aid))
+            conn.execute("UPDATE apartados SET monto_actual = monto_actual - ? WHERE id = ?", (a_centavos(monto), aid))
         else:
             # Borrar un movimiento de la meta (depósito o retiro) al azar: el saldo debe seguir cuadrando
             mov = conn.execute("SELECT id, tipo, monto FROM transacciones WHERE apartado_id = ? ORDER BY RANDOM() LIMIT 1", (aid,)).fetchone()
@@ -2284,7 +2316,7 @@ def test_saldo_de_apartados_coincide_con_sus_movimientos():
         conn.commit()
     for aid in (1, 2):
         guardado = conn.execute("SELECT monto_actual FROM apartados WHERE id = ?", (aid,)).fetchone()[0]
-        movimientos = conn.execute("SELECT COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE -monto END), 0) FROM transacciones WHERE apartado_id = ?", (aid,)).fetchone()[0]
+        movimientos = conn.execute("SELECT COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE -monto END), 0) / 100.0 FROM transacciones WHERE apartado_id = ?", (aid,)).fetchone()[0]
         assert abs(guardado - movimientos) < 0.01, (aid, guardado, movimientos)
 
 
@@ -2295,10 +2327,10 @@ def test_msi_saldo_y_prorrateo_se_mantienen():
     fila = conn.execute("SELECT * FROM recurrentes").fetchone()
     assert fila["cuotas_generadas"] == 3 and deuda_pendiente(fila) == 18000.0
     # Cambiar el total re-prorratea y la última cuota absorbe el redondeo
-    conn.execute("UPDATE recurrentes SET monto_total = 25000 WHERE id = 1")
+    conn.execute("UPDATE recurrentes SET monto_total = 2500000 WHERE id = 1")
     conn.commit()
     materializar_recurrentes(conn, date(2026, 12, 31))
-    assert round(conn.execute("SELECT SUM(monto) FROM transacciones").fetchone()[0], 2) == 25000.0
+    assert round(conn.execute("SELECT SUM(monto) / 100.0 FROM transacciones").fetchone()[0], 2) == 25000.0
 
 
 def test_quincenal_cae_en_15_y_fin_de_mes():
@@ -2311,11 +2343,11 @@ def test_quincenal_cae_en_15_y_fin_de_mes():
 
 def test_conciliacion_resumen_historial_y_periodo():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 28500, 'ingreso')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 1500, 'gasto')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 4500, 'gasto', 1)")
-    conn.execute("UPDATE apartados SET monto_actual = 4500 WHERE id = 1")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 1800000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 2850000, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 150000, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 450000, 'gasto', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 450000 WHERE id = 1")
     conn.commit()
     hoy = date(2026, 10, 20)
     r = calcular_resumen(conn, 'MXN', 18, hoy)
@@ -2333,11 +2365,11 @@ def test_conciliacion_resumen_historial_y_periodo():
 
 def test_no_se_borra_deposito_si_ya_se_retiro_parte():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 100)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 100, 'gasto', 1)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 10000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 10000, 'gasto', 1)")
     dep = conn.execute("SELECT id FROM transacciones").fetchone()["id"]
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 50, 'ingreso', 1)")
-    conn.execute("UPDATE apartados SET monto_actual = 50 WHERE id = 1")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 5000, 'ingreso', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 5000 WHERE id = 1")
     conn.commit()
     try:
         revertir_movimiento_apartado(conn.cursor(), 1, 'gasto', 100)
@@ -2351,10 +2383,10 @@ def test_no_se_borra_deposito_si_ya_se_retiro_parte():
 
 def test_borrar_retiro_luego_deposito_queda_cuadrado():
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 100)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 100, 'gasto', 1)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 50, 'ingreso', 1)")
-    conn.execute("UPDATE apartados SET monto_actual = 50 WHERE id = 1")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 10000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 10000, 'gasto', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-02', 5000, 'ingreso', 1)")
+    conn.execute("UPDATE apartados SET monto_actual = 5000 WHERE id = 1")
     ret = conn.execute("SELECT id FROM transacciones WHERE tipo = 'ingreso'").fetchone()["id"]
     conn.commit()
     # Primero se borra el retiro (el dinero vuelve a la meta) y después el depósito
@@ -2378,7 +2410,7 @@ def _escenario_periodos():
     insertar_recurrente(conn, "Clases", 'gasto', 200, 'semanal', None, date(2026, 10, 21))
     tablet = insertar_recurrente(conn, "Tablet", 'gasto', 333.33, 'mensual', 10, date(2026, 11, 10), total=3, monto_total=1000)
     conn.execute("UPDATE recurrentes SET cuotas_generadas = 1 WHERE id = ?", (tablet["id"],))
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 800)")
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'meta', 80000)")
     aporte = insertar_recurrente(conn, "Aporte viaje", 'gasto', 500, 'mensual', 16, date(2026, 11, 16))
     conn.execute("UPDATE recurrentes SET apartado_id = 1 WHERE id = ?", (aporte["id"],))
     for fecha, monto, tipo, rec, ap in [
@@ -2392,7 +2424,7 @@ def _escenario_periodos():
         ("2026-10-20", 200, 'ingreso', None, 1),  # retiro de la meta
     ]:
         conn.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id, apartado_id) VALUES (?, ?, ?, ?, ?)",
-                     (fecha, monto, tipo, rec, ap))
+                     (fecha, a_centavos(monto), tipo, rec, ap))
     conn.commit()
     return conn, date(2026, 10, 20)
 
@@ -2465,7 +2497,7 @@ def test_periodos_siguen_la_quincena_y_comparan_ingreso_con_gastos():
 def test_periodo_actual_libre_es_el_saldo_al_cierre_del_periodo():
     from finanzas_core import calcular_periodos
     conn, hoy = _escenario_periodos()
-    balance = float(conn.execute("SELECT SUM(CASE WHEN tipo='ingreso' THEN monto ELSE -monto END) FROM transacciones").fetchone()[0])
+    balance = float(conn.execute("SELECT SUM(CASE WHEN tipo='ingreso' THEN monto ELSE -monto END) / 100.0 FROM transacciones").fetchone()[0])
     p = calcular_periodo_actual(conn, hoy, balance)
     assert (p["inicio"], p["fin"]) == ("2026-10-15", "2026-10-31"), p
     assert [e["fecha"] for e in p["eventos"]] == ["2026-10-21", "2026-10-28"], p["eventos"]
@@ -2475,8 +2507,8 @@ def test_periodo_actual_libre_es_el_saldo_al_cierre_del_periodo():
 def test_periodos_sin_ingreso_fijo_son_meses_calendario():
     from finanzas_core import calcular_periodos
     conn = nueva_bd()
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-01', 1000, 'ingreso')")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-03', 100, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-01', 100000, 'ingreso')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2028-02-03', 10000, 'gasto')")
     datos = calcular_periodos(conn, date(2028, 2, 10), 2)
     ps = datos["periodos"]
     assert datos["ingreso_principal"] is None
@@ -2512,8 +2544,8 @@ def test_periodo_mensual_dia_31_empieza_en_el_cobro_real():
     from finanzas_core import calcular_periodos
     conn = nueva_bd()
     insertar_recurrente(conn, "Principal", 'ingreso', 5000, 'mensual', 31, date(2027, 4, 30))
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-30', 1000, 'gasto')")  # antes del cobro del 31 de marzo
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-31', 200, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-30', 100000, 'gasto')")  # antes del cobro del 31 de marzo
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2027-03-31', 20000, 'gasto')")
     conn.commit()
     p = calcular_periodos(conn, date(2027, 4, 10), 1)["periodos"][0]
     assert p["inicio"] == "2027-03-31", p
@@ -2533,15 +2565,15 @@ def test_exportar_quincenal_cuadra_con_el_presupuesto():
     for frecuencia, dia_pago, subs, esperado in casos:
         conn = nueva_bd()
         cur = conn.cursor()
-        cur.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = ?, subdivision_tipo = 'ninguna' WHERE id = 1", (frecuencia,))
+        cur.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = ?, subdivision_tipo = 'ninguna' WHERE id = 1", (frecuencia,))
         cur.execute("""INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos)
-                       VALUES ('Renta', 'x', 'blue', 10, 1000, 'Vivienda', 1, ?, ?)""", (dia_pago, json.dumps(subs) if subs else None))
+                       VALUES ('Renta', 'x', 'blue', 10, 100000, 'Vivienda', 1, ?, ?)""", (dia_pago, json.dumps(subs) if subs else None))
         conn.commit()
         exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 1))
         conn.commit()
         for dia in range(1, 31):
             materializar_recurrentes(conn, date(2026, 11, dia))
-        real = cur.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE descripcion LIKE 'Renta%' AND fecha BETWEEN '2026-11-01' AND '2026-11-30'").fetchone()[0]
+        real = cur.execute("SELECT COALESCE(SUM(monto), 0) / 100.0 FROM transacciones WHERE descripcion LIKE 'Renta%' AND fecha BETWEEN '2026-11-01' AND '2026-11-30'").fetchone()[0]
         assert abs(real - esperado) < 0.01, (frecuencia, dia_pago, subs, real, esperado)
 
 
@@ -2566,7 +2598,7 @@ def test_periodos_invariantes_con_escenarios_aleatorios():
         materializar_recurrentes(conn, hoy)
         for i in range(rng.randint(0, 5)):
             cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)",
-                        ((hoy - timedelta(days=rng.randint(0, 90))).isoformat(), round(rng.uniform(10, 4000), 2), rng.choice(["ingreso", "gasto"])))
+                        ((hoy - timedelta(days=rng.randint(0, 90))).isoformat(), a_centavos(round(rng.uniform(10, 4000), 2)), rng.choice(["ingreso", "gasto"])))
         conn.commit()
         ps = calcular_periodos(conn, hoy, 6)["periodos"]
         for a, b in zip(ps, ps[1:]):
@@ -2574,8 +2606,8 @@ def test_periodos_invariantes_con_escenarios_aleatorios():
             assert abs(a["saldo_final"] - b["saldo_inicial"]) < 0.02, (seed, a, b)
         assert date.fromisoformat(ps[0]["inicio"]) <= hoy <= date.fromisoformat(ps[0]["fin"]), (seed, hoy, ps[0])
         desde, hasta = ps[0]["inicio"], ps[-1]["fin"]
-        ing_db = cur.execute("SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='ingreso' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
-        gas_db = cur.execute("SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='gasto' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
+        ing_db = cur.execute("SELECT COALESCE(SUM(monto),0) / 100.0 FROM transacciones WHERE tipo='ingreso' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
+        gas_db = cur.execute("SELECT COALESCE(SUM(monto),0) / 100.0 FROM transacciones WHERE tipo='gasto' AND substr(fecha,1,10) BETWEEN ? AND ?", (desde, hasta)).fetchone()[0]
         assert abs(sum(p["ingresos"]["recibido"] for p in ps) - ing_db) < 0.02, seed
         assert abs(sum(p["gastos"]["pagado"] for p in ps) - gas_db) < 0.02, seed
 
@@ -2685,8 +2717,8 @@ def test_editar_gasto_no_puede_sobregirar_el_saldo():
     from routers.movimientos import actualizar_transaccion, TransaccionUpdate
     conn = nueva_bd()
     cur = conn.cursor()
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-05', 1000.0, 'ingreso', 'Sueldo', 1)")
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-10', 100.0, 'gasto', 'Súper', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-05', 100000, 'ingreso', 'Sueldo', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-10', 10000, 'gasto', 'Súper', 1)")
     id_g = cur.lastrowid
     conn.commit()
 
@@ -2718,7 +2750,7 @@ def test_editar_gasto_no_puede_sobregirar_el_saldo():
     assert (fila()["monto"], fila()["fecha"], fila()["descripcion"]) == (400.0, "2026-10-06", "Súper de la semana")
 
     # Con un saldo ya negativo (datos anteriores) una edición inocua no se bloquea, pero subir el gasto sí
-    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-07', 5000.0, 'gasto', 'Antiguo', 1)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-10-07', 500000, 'gasto', 'Antiguo', 1)")
     id_g = cur.lastrowid
     conn.commit()
     actualizar_transaccion(id_g, TransaccionUpdate(descripcion="Antiguo corregido"), conn=conn)
@@ -2739,7 +2771,7 @@ def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
     ):
         cur.execute(
             "INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo) VALUES (?, 'ingreso', ?, ?, ?, ?, 1)",
-            (desc, monto, frec, dia, prox),
+            (desc, a_centavos(monto), frec, dia, prox),
         )
     conn.commit()
 
@@ -2754,7 +2786,7 @@ def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
     }, estado()
 
     # Registrar un gasto consulta la ventana de cobro: tampoco puede reescribir ingresos hechos a mano
-    cur.execute("UPDATE presupuesto_config SET ingreso_base = 9000.0, frecuencia = 'mensual' WHERE id = 1")
+    cur.execute("UPDATE presupuesto_config SET ingreso_base = 900000, frecuencia = 'mensual' WHERE id = 1")
     conn.commit()
     obtener_ventana_corte_fecha(cur, '2026-11-20')
     conn.commit()
@@ -2836,10 +2868,10 @@ def test_exportar_tarjeta_antigua_dividida_sin_dia_no_falla():
     import json as _json
     for subdivision, dias_esperados in (('quincenas', [1, 16]), ('ninguna', [1, 2])):
         conn = nueva_bd()
-        conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual', subdivision_tipo = ? WHERE id = 1", (subdivision,))
+        conn.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'mensual', subdivision_tipo = ? WHERE id = 1", (subdivision,))
         conn.execute("""
             INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, distribucion_subperiodos)
-            VALUES ('Despensa', 'shopping-bag', 'amber', 40.0, 4000.0, 'Comida', 1, ?)
+            VALUES ('Despensa', 'shopping-bag', 'amber', 40.0, 400000, 'Comida', 1, ?)
         """, (_json.dumps([{"id": "a", "nombre": "Primera", "monto": 2500.0, "dia": None},
                            {"id": "b", "nombre": "Segunda", "monto": 1500.0, "dia": None}]),))
         conn.commit()
@@ -2854,9 +2886,9 @@ def test_deposito_a_meta_consume_la_capacidad_del_periodo_igual_que_el_saldo():
     from finanzas_core import validar_limite_cargos_ventana, validar_saldo_disponible_fecha
     conn = nueva_bd()
     insertar_recurrente(conn, "Sueldo", 'ingreso', 14000.0, 'quincenal', 15, date(2026, 11, 30))
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-15', 14000, 'ingreso', 'Sueldo', 1)")
-    conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 6000)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, apartado_id) VALUES ('2026-11-16', 6000, 'gasto', 'Ahorro destinado a: Viaje', 1, 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-15', 1400000, 'ingreso', 'Sueldo', 1)")
+    conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 600000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, apartado_id) VALUES ('2026-11-16', 600000, 'gasto', 'Ahorro destinado a: Viaje', 1, 1)")
     conn.commit()
     cur = conn.cursor()
 
@@ -2917,9 +2949,9 @@ def test_sugerir_icono_compara_palabras_completas():
 def test_balance_disponible_a_fecha_ignora_lo_programado_hacia_adelante():
     from finanzas_core import balance_disponible_a_fecha
     conn = nueva_bd()
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-01', 1000, 'ingreso', 'Cobro', 1)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-02', 300, 'gasto', 'Super', 1)")
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-20', 5000, 'ingreso', 'Cobro futuro', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-01', 100000, 'ingreso', 'Cobro', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-02', 30000, 'gasto', 'Super', 1)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-20', 500000, 'ingreso', 'Cobro futuro', 1)")
     conn.commit()
     cur = conn.cursor()
     assert balance_disponible_a_fecha(cur, '2026-11-10') == 700.0      # el cobro del 20 aún no llega
@@ -2930,12 +2962,12 @@ def test_balance_disponible_a_fecha_ignora_lo_programado_hacia_adelante():
 def test_exportar_vincula_la_meta_por_id_y_no_por_nombre():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = nueva_bd()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'mensual' WHERE id = 1")
     conn.execute("UPDATE presupuesto_unidades SET dia_pago = 5 WHERE orden = 1")
     conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 0)")
     # «Viaje» coincide por nombre pero no está vinculada; «Ahorro» sí lo está, con otro nombre
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES ('Viaje', 'wallet', 'gold', 10, 1000, '', 1, 1)")
-    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden, apartado_id) VALUES ('Ahorro', 'wallet', 'gold', 5, 500, '', 2, 1, 1)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES ('Viaje', 'wallet', 'gold', 10, 100000, '', 1, 1)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden, apartado_id) VALUES ('Ahorro', 'wallet', 'gold', 5, 50000, '', 2, 1, 1)")
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
     destino = {r["descripcion"]: r["apartado_id"] for r in conn.execute("SELECT descripcion, apartado_id FROM recurrentes")}
@@ -2945,14 +2977,14 @@ def test_exportar_vincula_la_meta_por_id_y_no_por_nombre():
 def test_renombrar_una_tarjeta_no_duplica_el_cargo_ya_registrado():
     from finanzas_core import exportar_presupuesto_a_fijos_core
     conn = nueva_bd()
-    conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual' WHERE id = 1")
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'mensual' WHERE id = 1")
     conn.execute("UPDATE presupuesto_unidades SET dia_pago = 5 WHERE orden = 1")
-    conn.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES (1, 'Despensa', 'wallet', 'gold', 10, 1000, '', 1, 1)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (id, nombre, icono, color, porcentaje, monto, notas, orden, unidad_orden) VALUES (1, 'Despensa', 'wallet', 'gold', 10, 100000, '', 1, 1)")
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
     fijo = conn.execute("SELECT * FROM recurrentes WHERE presupuesto_tarjeta_id = 1").fetchone()
     # El fijo ya cobró este mes: su movimiento lleva el nombre anterior
-    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, recurrente_id) VALUES (?, 1000, 'gasto', 'Despensa', 1, ?)", (fijo["proxima_fecha"], fijo["id"]))
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, recurrente_id) VALUES (?, 100000, 'gasto', 'Despensa', 1, ?)", (fijo["proxima_fecha"], fijo["id"]))
     conn.execute("UPDATE presupuesto_tarjetas SET nombre = 'Super y despensa' WHERE id = 1")
     conn.commit()
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))

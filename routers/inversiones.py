@@ -9,6 +9,7 @@ import sqlite3
 
 from datetime import date
 
+from dinero import a_centavos
 from finanzas_core import MONEDAS_SOPORTADAS, ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
 from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
@@ -255,7 +256,7 @@ def _capitalizar(cursor, fila, hoy: date) -> float:
     valor = valor_rendimiento(float(fila["capital"]), float(fila["tasa_anual"]),
                               date.fromisoformat(fila["fecha_base"]), hoy)
     cursor.execute("UPDATE cuentas_rendimiento SET capital = ?, fecha_base = ? WHERE id = ?",
-                   (valor, hoy.isoformat(), fila["id"]))
+                   (a_centavos(valor), hoy.isoformat(), fila["id"]))
     return valor
 
 
@@ -295,7 +296,7 @@ def crear_rendimiento(req: RendimientoCreate, conn: sqlite3.Connection = Depends
         raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese nombre.")
     cursor.execute(
         "INSERT INTO cuentas_rendimiento (nombre, capital, tasa_anual, fecha_base) VALUES (?, ?, ?, ?)",
-        (nombre, req.capital, req.tasa_anual, req.fecha_inicio)
+        (nombre, a_centavos(req.capital), req.tasa_anual, req.fecha_inicio)
     )
     conn.commit()
     return {"id": cursor.lastrowid, "mensaje": "Cuenta creada."}
@@ -315,7 +316,7 @@ def movimiento_rendimiento(cuenta_id: int, mov: RendimientoMovimiento, conn: sql
     else:
         nuevo_capital = valor + mov.monto
     cursor.execute("UPDATE cuentas_rendimiento SET capital = ?, fecha_base = ? WHERE id = ?",
-                   (round(nuevo_capital, 2), hoy.isoformat(), cuenta_id))
+                   (a_centavos(nuevo_capital), hoy.isoformat(), cuenta_id))
     conn.commit()
     return {"mensaje": "Movimiento registrado.", "valor_actual": round(nuevo_capital, 2)}
 

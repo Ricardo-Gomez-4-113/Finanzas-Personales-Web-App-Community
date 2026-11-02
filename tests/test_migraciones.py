@@ -296,6 +296,56 @@ def test_v20_vincula_por_id_las_tarjetas_que_coinciden_con_una_meta_por_nombre()
         assert conn.execute("SELECT COUNT(*) FROM presupuesto_tarjetas WHERE apartado_id IS NOT NULL").fetchone()[0] == 0
 
 
+def test_v21_pasa_el_dinero_a_centavos_sin_perder_nada():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 20)
+        for i in range(10):
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-10-01', 0.1, 'gasto', ?)", (f"diez centavos {i}",))
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-10-02', 1234.56, 'ingreso', 'sueldo')")
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-10-03', 19.99, 'gasto', 'cuenta')")
+        conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual, meta_monto) VALUES (1, 'Viaje', 'meta', 333.33, 5000.5), (2, 'Libre', 'libre', 0, NULL)")
+        conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, monto_total) VALUES ('Curso', 'gasto', 333.34, 'mensual', 5, '2026-11-05', 3, 1000.01)")
+        conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha) VALUES ('Nómina', 'ingreso', 14000, 'quincenal', 15, '2026-11-15')")
+        conn.execute("UPDATE presupuesto_config SET ingreso_base = 28000.5")
+        conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Ocio', 'x', 'gold', 5, 1500.75, '', 1)")
+        conn.execute("INSERT INTO cuentas_rendimiento (nombre, capital, tasa_anual, fecha_base) VALUES ('Cetes', 12345.67, 7.5, '2026-09-01')")
+        conn.commit()
+        conteos = _conteos(conn)
+        otros = [tuple(r) for r in conn.execute("SELECT descripcion, fecha, categoria_id FROM transacciones ORDER BY id")]
+
+        _migrar_hasta(conn, 21)
+        assert _version(conn) == 21
+        assert _conteos(conn) == conteos
+        assert [tuple(r) for r in conn.execute("SELECT descripcion, fecha, categoria_id FROM transacciones ORDER BY id")] == otros
+
+        def valores(tabla, columna, orden="id"):
+            return [r[0] for r in conn.execute(f"SELECT {columna} FROM {tabla} ORDER BY {orden}")]
+
+        # Cada columna de dinero queda declarada INTEGER y guarda centavos enteros
+        for tabla, columna in (("transacciones", "monto"), ("apartados", "monto_actual"), ("apartados", "meta_monto"), ("recurrentes", "monto"),
+                               ("recurrentes", "monto_total"), ("presupuesto_config", "ingreso_base"), ("presupuesto_tarjetas", "monto"),
+                               ("cuentas_rendimiento", "capital"), ("cuentas", "saldo_inicial")):
+            tipo = next(r[2] for r in conn.execute(f"PRAGMA table_info({tabla})") if r[1] == columna)
+            assert tipo == "INTEGER", (tabla, columna, tipo)
+            assert conn.execute(f"SELECT COUNT(*) FROM {tabla} WHERE typeof({columna}) NOT IN ('integer', 'null')").fetchone()[0] == 0, (tabla, columna)
+        assert valores("transacciones", "monto") == [10] * 10 + [123456, 1999]
+        assert conn.execute("SELECT SUM(monto) FROM transacciones WHERE descripcion LIKE 'diez%'").fetchone()[0] == 100   # diez veces 0.10 suman exactamente 1.00
+        assert valores("apartados", "monto_actual") == [33333, 0] and valores("apartados", "meta_monto") == [500050, None]
+        assert valores("recurrentes", "monto") == [33334, 1400000] and valores("recurrentes", "monto_total") == [100001, None]
+        assert valores("presupuesto_config", "ingreso_base") == [2800050]
+        assert valores("presupuesto_tarjetas", "monto") == [150075]
+        assert valores("cuentas_rendimiento", "capital") == [1234567]
+
+        # Repetir la conversión no toca nada, y la base conserva su integridad
+        database._pasar_dinero_a_centavos(conn.cursor())
+        assert valores("transacciones", "monto") == [10] * 10 + [123456, 1999]
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        # Los índices de las tablas reconstruidas siguen en pie
+        indices = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+        assert {"idx_transacciones_fecha", "uq_transacciones_rec_fecha", "idx_recurrentes_tarjeta"} <= indices, indices
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

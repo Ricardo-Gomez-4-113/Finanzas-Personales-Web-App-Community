@@ -28,7 +28,8 @@ Convenciones:
 ## Estructura relevante
 
 - `main.py`: servidor FastAPI, middleware de seguridad y rutas SPA.
-- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 20 (`CURRENT_TENANT_SCHEMA_VERSION`).
+- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 21 (`CURRENT_TENANT_SCHEMA_VERSION`).
+- `dinero.py`: el dinero se guarda en centavos enteros. `a_centavos` convierte al escribir y `fabrica_filas` (el `row_factory` de los tenants) devuelve pesos al leer las columnas de dinero. Un total en SQL (`SUM`, `CASE`) se divide entre `100.0` en la consulta; `verificar_reglas.sh` lo vigila.
 - `finanzas_core.py`: cálculo financiero puro (conversiones, rendimientos, frecuencias, sub-periodos, reparto en centavos).
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.
 - `mercado.py`: tipos de cambio y precios, con caché y valores de respaldo.
@@ -145,12 +146,11 @@ Tanda visual (`2857cfd`):
 Visual abierto: consolidar las 5 hojas (180 KB) y los `rgba` de colores de marca de la landing (SaaS); los estilos en línea que quedan son anchos dinámicos por dato. En `tema.css` queda un `#000` en una máscara de degradado, donde solo cuenta la transparencia.
 
 Abierto:
-- **Decisión pendiente:** moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).
-- `detectar_fijos_recurrentes_core` empareja tarjetas por subcadena (`LIKE '%nombre%'`): «Gas» podría fusionarse con «Gasolina».
-- `obtener_total_apartados` devuelve 0.0 ante cualquier error, lo que oculta fallos de la base.
+- Monedas del portafolio (cerrado): solo USD, MXN y EUR. Una cotización en otra moneda se rechaza al registrar o cotizar (422), la sincronización la deja sin actualizar y `convertir` no valúa a valor nominal.
+- Dinero en centavos (cerrado, migración v21): columnas `INTEGER` en `transacciones.monto`, `apartados.monto_actual/meta_monto`, `recurrentes.monto/monto_total`, `cuentas_rendimiento.capital`, `presupuesto_config.ingreso_base`, `presupuesto_tarjetas.monto` y `cuentas.saldo_inicial`. Cantidades y precios de la bolsa siguen en `REAL`. Una escritura sin `a_centavos` con decimales falla al leerse (`TypeError`); una con monto entero queda 100 veces mal, así que toda escritura de dinero pasa por `a_centavos`. Se comprobó comparando todos los GET y las escrituras sobre una misma base antes y después de migrar: cero diferencias.
+- La importación de fijos al presupuesto solo reutiliza una tarjeta con el mismo nombre (sin distinguir mayúsculas); antes la emparejaba por subcadena.
 - La cuota MSI se calcula también en `recurrentes.js` para la vista previa; el valor guardado sale de `cuota_msi`.
-- Dinero en `REAL`: no se cambia sin una razón concreta.
-- Pruebas de navegador intermitentes: `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` y `test_moneda_base_euro_se_aplica_y_persiste` (cada una falló una vez y pasó en la siguiente corrida).
+- Pruebas de navegador intermitentes: el servidor de pruebas salía a Yahoo y dependían de la latencia; ahora arranca con cotizaciones fijas (`LANZADOR` en `test_frontend.py`). `SOLO=texto ./tests/run_frontend.sh` repite pruebas sueltas. Si `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` vuelve a fallar, investigar aparte: no se probó que su causa fuera la red.
 
 ## Seguridad (revisión del login C1 a C6 y pruebas de borde)
 

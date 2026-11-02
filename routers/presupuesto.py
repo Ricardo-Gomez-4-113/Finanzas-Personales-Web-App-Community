@@ -23,6 +23,7 @@ from finanzas_core import (
     unidades_activas,
     validar_dias_unidades,
 )
+from dinero import a_centavos
 from security import get_tenant_db
 
 router = APIRouter()
@@ -108,7 +109,7 @@ def obtener_config_presupuesto(cursor: sqlite3.Cursor) -> dict:
     if not row:
         cursor.execute("""
             INSERT OR IGNORE INTO presupuesto_config (id, ingreso_base, frecuencia, dia_pago, subdivision_tipo, subdivision_config)
-            VALUES (1, 0.0, 'mensual', NULL, 'ninguna', '[]')
+            VALUES (1, 0, 'mensual', NULL, 'ninguna', '[]')
         """)
         return {
             "ingreso_base": 0.0,
@@ -202,7 +203,7 @@ def _validar_capacidad_unidad(cursor: sqlite3.Cursor, cfg: dict, orden: int, mon
     """Las tarjetas de un pago no pueden sumar más que el ingreso de ese pago."""
     ingreso = float(cfg["ingreso_base"])
     total = cursor.execute(
-        "SELECT COALESCE(SUM(monto), 0) FROM presupuesto_tarjetas WHERE unidad_orden = ? AND id IS NOT ?",
+        "SELECT COALESCE(SUM(monto), 0) / 100.0 FROM presupuesto_tarjetas WHERE unidad_orden = ? AND id IS NOT ?",
         (orden, excluir_id),
     ).fetchone()[0]
     if float(total) + monto_nuevo > ingreso + 0.005:
@@ -302,7 +303,7 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         UPDATE presupuesto_config
         SET ingreso_base = ?, frecuencia = ?, dia_pago = ?, subdivision_tipo = ?, subdivision_config = ?, actualizado_en = CURRENT_TIMESTAMP
         WHERE id = 1
-    """, (ingreso_nuevo, frecuencia_nueva, dia_pago, sub_tipo, json.dumps(config_list)))
+    """, (a_centavos(ingreso_nuevo), frecuencia_nueva, dia_pago, sub_tipo, json.dumps(config_list)))
 
     # Preservar el monto exacto de cada tarjeta y actualizar su porcentaje respecto al nuevo ingreso_base
     filas = cursor.execute("SELECT id, porcentaje, monto FROM presupuesto_tarjetas").fetchall()
@@ -315,7 +316,7 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
             cursor.execute("UPDATE presupuesto_tarjetas SET porcentaje = ? WHERE id = ?", (pct_recalc, t_id))
         else:
             monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
-            cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (monto_recalc, t_id))
+            cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (a_centavos(monto_recalc), t_id))
 
     # Sincronizar la nómina del presupuesto, si existe. Un ingreso hecho a mano no se toca aunque diga "nómina"
     rec_nomina = cursor.execute("""
@@ -329,7 +330,7 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
             UPDATE recurrentes
             SET monto = ?, frecuencia = ?, dia = COALESCE(?, dia)
             WHERE id = ?
-        """, (ingreso_nuevo, frecuencia_nueva, dia_fijo, rec_nomina["id"]))
+        """, (a_centavos(ingreso_nuevo), frecuencia_nueva, dia_fijo, rec_nomina["id"]))
 
     conn.commit()
     return get_presupuesto(conn)
@@ -484,7 +485,7 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     cursor.execute("""
         INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, dia_pago, distribucion_subperiodos, unidad_orden, tipo, msi_cuotas, apartado_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), round(monto, 2), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden, req.tipo, msi_cuotas, apartado_id))
+    """, (req.nombre.strip(), req.icono, req.color, round(porcentaje, 2), a_centavos(monto), req.notas or "", max_orden + 1, req.dia_pago, dist_json, req.unidad_orden, req.tipo, msi_cuotas, apartado_id))
 
     tarjeta_id = cursor.lastrowid
     conn.commit()
@@ -562,7 +563,7 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         if es_pago:
             _validar_capacidad_unidad(cursor, cfg, fila["unidad_orden"], monto, excluir_id=tarjeta_id)
         campos.extend(["monto = ?", "porcentaje = ?"])
-        valores.extend([monto, pct])
+        valores.extend([a_centavos(monto), pct])
 
     if campos:
         valores.append(tarjeta_id)

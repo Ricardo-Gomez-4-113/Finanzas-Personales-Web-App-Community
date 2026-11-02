@@ -17,6 +17,8 @@ import sqlite3
 import unicodedata
 from typing import Any, Dict, Iterable, Optional, Union
 
+from dinero import a_centavos, fabrica_filas
+
 
 def ahora_local() -> datetime:
     """Retorna la fecha y hora actual en la zona horaria de México (CST / UTC-6).
@@ -237,13 +239,13 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
                     INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id, rubro)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (prox.isoformat(), monto_cuota, fila["tipo"], fila["categoria_id"], descripcion, fila["id"], apartado_id,
+                    (prox.isoformat(), a_centavos(monto_cuota), fila["tipo"], fila["categoria_id"], descripcion, fila["id"], apartado_id,
                      clase_movimiento(fila["tipo"], apartado_id, fila["id"], total is not None))
                 )
                 if apartado_id and fila["tipo"] == 'gasto':
                     cursor.execute(
                         "UPDATE apartados SET monto_actual = monto_actual + ? WHERE id = ?",
-                        (monto_cuota, apartado_id)
+                        (a_centavos(monto_cuota), apartado_id)
                     )
                 generadas += 1
                 insertadas += 1
@@ -524,7 +526,7 @@ def validar_sustentabilidad_gasto_fijo(
 
 def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
     """Calcula la suma de fondos retenidos en apartados activos (monto_actual)."""
-    row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0.0) FROM apartados").fetchone()
+    row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0) / 100.0 FROM apartados").fetchone()
     return float(row[0]) if row and row[0] is not None else 0.0
 
 
@@ -532,7 +534,7 @@ def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
     """Dinero disponible a una fecha: ingresos menos gastos con fecha igual o anterior. Lo programado hacia
     adelante no cuenta, porque todavía no se ha recibido ni gastado."""
     fila = cursor.execute("""
-        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones WHERE fecha <= ?
     """, (fecha,)).fetchone()
     return round(float(fila[0]), 2)
@@ -559,7 +561,7 @@ def validar_saldo_disponible_fecha(
 
     # Saldo acumulado en cuenta a la fecha solicitada (solo transacciones externas: apartado_id IS NULL)
     query_base = """
-        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0) AS saldo
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0) AS saldo
         FROM transacciones
         WHERE fecha <= ? AND apartado_id IS NULL
     """
@@ -589,7 +591,7 @@ def validar_saldo_disponible_fecha(
 
     # Verificar fechas posteriores para asegurar que no se produzca sobregiro acumulativo
     query_post = """
-        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
         WHERE fecha > ? AND apartado_id IS NULL
     """
@@ -638,14 +640,14 @@ def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int)
     total_apartados = obtener_total_apartados(cursor)
 
     row_prev = cursor.execute("""
-        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones
         WHERE fecha < ? AND apartado_id IS NULL AND id != ?
     """, (t_ingreso, transaccion_id)).fetchone()
     saldo_corriente = float(row_prev[0]) - total_apartados
 
     filas = cursor.execute("""
-        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
         WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
         GROUP BY fecha
@@ -700,14 +702,14 @@ def validar_edicion_transaccion(
     t_min = min(fecha_orig, nueva_fecha)
 
     row_prev = cursor.execute("""
-        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones
         WHERE fecha < ? AND apartado_id IS NULL AND id != ?
     """, (t_min, transaccion_id)).fetchone()
     saldo_corriente = float(row_prev[0]) - total_apartados
 
     filas = cursor.execute("""
-        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
         WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
         GROUP BY fecha
@@ -765,7 +767,7 @@ def obtener_ventana_corte_fecha(
             SET monto = ?, frecuencia = ?
             WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
             AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
-        """, (cfg_ingreso, cfg_frecuencia, NOMINA_PRESUPUESTO))
+        """, (a_centavos(cfg_ingreso), cfg_frecuencia, NOMINA_PRESUPUESTO))
 
     # Obtener ingresos fijos activos para deducir fechas de corte
     ingresos = cursor.execute("""
@@ -880,7 +882,7 @@ def obtener_ventana_corte_fecha(
 
     # Reconocer ingresos reales registrados en transacciones durante la ventana
     query_ingresos_reales = """
-        SELECT COALESCE(SUM(monto), 0.0) FROM transacciones
+        SELECT COALESCE(SUM(monto), 0) / 100.0 FROM transacciones
         WHERE tipo = 'ingreso' AND fecha BETWEEN ? AND ?
     """
     params_ing = [d_inicio.isoformat(), d_fin.isoformat()]
@@ -891,7 +893,7 @@ def obtener_ventana_corte_fecha(
     ingreso_ventana = max(ingreso_ventana, ingresos_reales)
 
     query_rem = """
-        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones WHERE fecha < ?
     """
     params_rem = [d_inicio.isoformat()]
@@ -904,7 +906,7 @@ def obtener_ventana_corte_fecha(
     capacidad_total = round(ingreso_ventana + remanente_disponible, 2)
 
     query_cargos = """
-        SELECT COALESCE(SUM(monto), 0.0) FROM transacciones
+        SELECT COALESCE(SUM(monto), 0) / 100.0 FROM transacciones
         WHERE tipo = 'gasto' AND fecha BETWEEN ? AND ?
     """
     params_cargos = [d_inicio.isoformat(), d_fin.isoformat()]
@@ -1063,7 +1065,7 @@ def sincronizar_fijos_presupuesto_core(
             UPDATE presupuesto_config
             SET ingreso_base = ?, actualizado_en = CURRENT_TIMESTAMP
             WHERE id = 1
-        """, (ingreso_importado,))
+        """, (a_centavos(ingreso_importado),))
         ingreso_actual = ingreso_importado
     else:
         ingreso_actual = float(cfg["ingreso_base"]) if cfg else 0.0
@@ -1097,12 +1099,12 @@ def sincronizar_fijos_presupuesto_core(
                     UPDATE presupuesto_tarjetas
                     SET monto = ?, porcentaje = ?, notas = 'Importado de Fijos y MSI'
                     WHERE id = ?
-                """, (gasto_total, pct_gasto, existente["id"]))
+                """, (a_centavos(gasto_total), pct_gasto, existente["id"]))
             else:
                 cursor.execute("""
                     INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
                     VALUES ('Gastos Fijos', 'home', 'blue', ?, ?, 'Renta, servicios y suscripciones fijas', 10)
-                """, (pct_gasto, gasto_total))
+                """, (pct_gasto, a_centavos(gasto_total)))
 
         if msi_total > 0:
             pct_msi = round((msi_total / ingreso_actual) * 100.0, 2) if ingreso_actual > 0 else 0.0
@@ -1112,12 +1114,12 @@ def sincronizar_fijos_presupuesto_core(
                     UPDATE presupuesto_tarjetas
                     SET monto = ?, porcentaje = ?, notas = 'Cuotas mensuales activas'
                     WHERE id = ?
-                """, (msi_total, pct_msi, existente_msi["id"]))
+                """, (a_centavos(msi_total), pct_msi, existente_msi["id"]))
             else:
                 cursor.execute("""
                     INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
                     VALUES ('Compras a Meses (MSI)', 'credit-card', 'amber', ?, ?, 'Cuotas mensuales de MSI activas', 20)
-                """, (pct_msi, msi_total))
+                """, (pct_msi, a_centavos(msi_total)))
 
     elif modo == "categoria":
         grupos = {}
@@ -1144,12 +1146,12 @@ def sincronizar_fijos_presupuesto_core(
                     UPDATE presupuesto_tarjetas
                     SET monto = ?, porcentaje = ?, notas = ?
                     WHERE id = ?
-                """, (monto_cat, pct_cat, notas, existente["id"]))
+                """, (a_centavos(monto_cat), pct_cat, notas, existente["id"]))
             else:
                 cursor.execute("""
                     INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (cat_nombre, info["icono"], info["color"], pct_cat, monto_cat, notas, orden))
+                """, (cat_nombre, info["icono"], info["color"], pct_cat, a_centavos(monto_cat), notas, orden))
                 orden += 10
 
     else:
@@ -1176,12 +1178,12 @@ def sincronizar_fijos_presupuesto_core(
                     UPDATE presupuesto_tarjetas
                     SET monto = ?, porcentaje = ?, notas = COALESCE(NULLIF(notas, ''), ?)
                     WHERE id = ?
-                """, (monto_item, pct_item, notas, existente["id"]))
+                """, (a_centavos(monto_item), pct_item, notas, existente["id"]))
             else:
                 cursor.execute("""
                     INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (nombre_item, it["icono"], it["color"], pct_item, monto_item, notas, orden))
+                """, (nombre_item, it["icono"], it["color"], pct_item, a_centavos(monto_item), notas, orden))
                 orden += 10
 
     if actualizar_ingreso and ingreso_importado > 0:
@@ -1342,7 +1344,7 @@ def exportar_presupuesto_a_fijos_core(
     """
     hoy = fecha_base or ahora_local().date()
     if cursor.connection and not cursor.connection.row_factory:
-        cursor.connection.row_factory = sqlite3.Row
+        cursor.connection.row_factory = fabrica_filas
     cfg = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     frecuencia = (cfg["frecuencia"] if cfg else "mensual")
     ingreso_base = float(cfg["ingreso_base"] if cfg else 0.0)
@@ -1362,11 +1364,11 @@ def exportar_presupuesto_a_fijos_core(
     ).fetchall()}
     validar_dias_unidades({o: dias_unidades.get(o) for o in sorted(con_tarjetas)})
     excedidas = cursor.execute("""
-        SELECT unidad_orden, SUM(monto) AS total FROM presupuesto_tarjetas
+        SELECT unidad_orden, SUM(monto) / 100.0 AS total FROM presupuesto_tarjetas
         WHERE unidad_orden IS NOT NULL AND unidad_orden <= ?
-        GROUP BY unidad_orden HAVING SUM(monto) > ? + 0.005
+        GROUP BY unidad_orden HAVING SUM(monto) > ?
         ORDER BY unidad_orden
-    """, (activas, ingreso_base)).fetchall()
+    """, (activas, a_centavos(ingreso_base))).fetchall()
     if excedidas:
         orden = excedidas[0]["unidad_orden"]
         raise ValueError(f"Las tarjetas del pago {orden} suman más que su ingreso. Ajústalas antes de exportar.")
@@ -1531,7 +1533,7 @@ def exportar_presupuesto_a_fijos_core(
     creados = actualizados = eliminados = 0
     for item, fila in emparejados:
         item["proxima"] = _sin_cargo_previo(cursor, item, fila["id"] if fila is not None else None)
-        valores = (item["descripcion"], item["tipo"], item["monto"], item["frecuencia"], item["dia"],
+        valores = (item["descripcion"], item["tipo"], a_centavos(item["monto"]), item["frecuencia"], item["dia"],
                    item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"],
                    item.get("total_cuotas"))
         if fila is not None:
@@ -1632,8 +1634,8 @@ def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo:
                 "Primero elimina los retiros posteriores."
             )
     cursor.execute(
-        "UPDATE apartados SET monto_actual = MAX(0.0, ROUND(monto_actual + ?, 2)) WHERE id = ?",
-        (delta, apartado_id),
+        "UPDATE apartados SET monto_actual = MAX(0, monto_actual + ?) WHERE id = ?",
+        (a_centavos(delta), apartado_id),
     )
 
 
@@ -1655,14 +1657,14 @@ def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
 
         tot_ap = obtener_total_apartados(cursor)
         row_prev = cursor.execute("""
-            SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0.0)
+            SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
             FROM transacciones
             WHERE fecha < ? AND apartado_id IS NULL
         """, (t_min,)).fetchone()
         saldo_corriente = float(row_prev[0]) - tot_ap
 
         filas_saldo = cursor.execute("""
-            SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) as delta
+            SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
             FROM transacciones
             WHERE fecha >= ? AND apartado_id IS NULL
             GROUP BY fecha
@@ -1856,7 +1858,7 @@ def calcular_periodos(conn: sqlite3.Connection, hoy: date, n: int = 6) -> Dict[s
             })
 
     saldo = float(conn.execute(
-        "SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0) FROM transacciones WHERE substr(fecha, 1, 10) < ?",
+        "SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0) FROM transacciones WHERE substr(fecha, 1, 10) < ?",
         (desde.isoformat(),),
     ).fetchone()[0])
     periodos = []
@@ -2047,7 +2049,7 @@ def gastos_por_categoria_periodo(conn: sqlite3.Connection, desde: str, hasta: st
     """Gastos normales y fijos del rango agrupados por categoría (sin metas), en la moneda base."""
     filas = conn.execute(
         """
-        SELECT COALESCE(c.nombre, 'Sin categoría') AS categoria, SUM(t.monto) AS total
+        SELECT COALESCE(c.nombre, 'Sin categoría') AS categoria, SUM(t.monto) / 100.0 AS total
         FROM transacciones t
         LEFT JOIN categorias c ON c.id = t.categoria_id
         WHERE t.tipo = 'gasto' AND t.apartado_id IS NULL AND substr(t.fecha, 1, 10) BETWEEN ? AND ?
@@ -2083,13 +2085,13 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     def conv(monto: float, origen: str = "MXN") -> float:
         return convertir(monto, origen, moneda_base_upper, tasa_usd_mxn, tasa_usd_eur)
 
-    cursor.execute("SELECT SUM(monto) as total FROM transacciones WHERE tipo='ingreso'")
+    cursor.execute("SELECT SUM(monto) / 100.0 as total FROM transacciones WHERE tipo='ingreso'")
     ingresos = cursor.fetchone()["total"] or 0.0
 
-    cursor.execute("SELECT SUM(monto) as total FROM transacciones WHERE tipo='gasto'")
+    cursor.execute("SELECT SUM(monto) / 100.0 as total FROM transacciones WHERE tipo='gasto'")
     gastos = cursor.fetchone()["total"] or 0.0
 
-    cursor.execute("SELECT SUM(monto_actual) as total FROM apartados")
+    cursor.execute("SELECT SUM(monto_actual) / 100.0 as total FROM apartados")
     apartados = cursor.fetchone()["total"] or 0.0
 
     filas_inv = cursor.execute("SELECT cantidad, precio_actual, moneda FROM inversiones").fetchall()

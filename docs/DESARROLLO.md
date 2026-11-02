@@ -104,6 +104,15 @@ Pone en cada `?v=` un hash del contenido. `auth.js` y la landing no entran en el
 2. Subir `CURRENT_TENANT_SCHEMA_VERSION`.
 3. Caso en `test_finanzas.py`; `tests/test_migraciones.py` comprueba la cadena completa desde v1.
 
+## Dinero en centavos
+
+La base guarda el dinero en centavos enteros (`INTEGER`, migración v21); el código, la API y la pantalla usan pesos con decimales. La frontera es `dinero.py`:
+
+- **Escribir:** todo parámetro de dinero pasa por `a_centavos(...)`. Los montos con más de dos decimales se redondean al centavo (la media fracción sube).
+- **Leer:** las conexiones de un tenant usan `fabrica_filas`, que devuelve en pesos las columnas `monto`, `monto_actual`, `meta_monto`, `monto_total`, `saldo_inicial`, `ingreso_base` y `capital`. Un decimal en una de ellas falla con `TypeError`.
+- **Totales en SQL:** `SUM(...)`, `CASE` y comparaciones calculadas salen en centavos; se dividen entre `100.0` en la consulta, y un `HAVING` compara contra `a_centavos(...)`. `scripts/verificar_reglas.sh` falla si un `SUM` de dinero no lo hace.
+- **Pruebas:** los `INSERT` y `UPDATE` en bruto de `test_finanzas.py` llevan centavos (`100000` es 1,000 pesos); un valor entero sin convertir queda 100 veces mal sin avisar.
+
 Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (las 3 últimas por usuario). Para migrar todos de una vez, por ejemplo tras un despliegue: `python3 scripts/migrar_todos.py`.
 
 ## Comentarios de usuarios

@@ -21,6 +21,8 @@ import threading
 from datetime import datetime
 from typing import Tuple, Optional
 
+from dinero import fabrica_filas
+
 # =============================================================================
 # 1. CONSTANTES Y RUTAS DE ALMACENAMIENTO MULTI-TENANT
 # =============================================================================
@@ -30,7 +32,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 20
+CURRENT_TENANT_SCHEMA_VERSION = 21
 
 
 # =============================================================================
@@ -92,6 +94,37 @@ def _fecha_valida_mas_cercana(texto: str) -> Optional[str]:
     mes = min(max(mes, 1), 12)
     dia = min(max(dia, 1), calendar.monthrange(anio, mes)[1])
     return f"{anio:04d}-{mes:02d}-{dia:02d}"
+
+
+# Columnas de dinero que la migración 21 pasa de pesos decimales (REAL) a centavos enteros: (tabla, columna, obligatoria)
+_COLUMNAS_A_CENTAVOS = (
+    ("cuentas", "saldo_inicial", True),
+    ("transacciones", "monto", True),
+    ("apartados", "monto_actual", True),
+    ("apartados", "meta_monto", False),
+    ("recurrentes", "monto", True),
+    ("recurrentes", "monto_total", False),
+    ("cuentas_rendimiento", "capital", True),
+    ("presupuesto_config", "ingreso_base", True),
+    ("presupuesto_tarjetas", "monto", True),
+)
+
+
+def _pasar_dinero_a_centavos(cursor: sqlite3.Cursor) -> None:
+    """Cada columna de dinero se reconstruye como INTEGER en centavos: columna nueva, copia redondeada, se quita la
+    vieja y la nueva toma su nombre. Si la columna ya es INTEGER no se toca, así que repetirla es inofensivo."""
+    for tabla, columna, obligatoria in _COLUMNAS_A_CENTAVOS:
+        tipos = {f[1]: (f[2] or "").upper() for f in cursor.execute(f'PRAGMA table_info("{tabla}")')}
+        if columna not in tipos or tipos[columna] == "INTEGER":
+            continue
+        nueva = f"{columna}__centavos"
+        cursor.execute(f'ALTER TABLE "{tabla}" ADD COLUMN "{nueva}" INTEGER' + (" NOT NULL DEFAULT 0" if obligatoria else ""))
+        cursor.execute(
+            f'UPDATE "{tabla}" SET "{nueva}" = CAST(ROUND(COALESCE(CAST("{columna}" AS REAL), 0) * 100.0) AS INTEGER)'
+            + ("" if obligatoria else f' WHERE "{columna}" IS NOT NULL')
+        )
+        cursor.execute(f'ALTER TABLE "{tabla}" DROP COLUMN "{columna}"')
+        cursor.execute(f'ALTER TABLE "{tabla}" RENAME COLUMN "{nueva}" TO "{columna}"')
 
 
 def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
@@ -568,6 +601,14 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("PRAGMA user_version = 20;")
         current_version = 20
 
+    # -------------------------------------------------------------
+    # Versión 21: el dinero se guarda en centavos enteros (INTEGER) en vez de pesos decimales (REAL)
+    # -------------------------------------------------------------
+    if current_version < 21 and CURRENT_TENANT_SCHEMA_VERSION >= 21:
+        _pasar_dinero_a_centavos(cursor)
+        cursor.execute("PRAGMA user_version = 21;")
+        current_version = 21
+
     conn.commit()
 
 
@@ -611,7 +652,7 @@ def get_tenant_conn(db_name_or_path: str) -> sqlite3.Connection:
     db_path = get_tenant_path(db_name_or_path)
     ensure_tenant_directories()
     conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    conn.row_factory = fabrica_filas
     configure_sqlite_pragmas(conn)
     if db_path not in _tenants_migrados:
         with _lock_migraciones:

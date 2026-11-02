@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import sqlite3
 
+from dinero import a_centavos
 from finanzas_core import ahora_local, balance_disponible_a_fecha, clase_movimiento
 from security import (
     get_tenant_db
@@ -36,8 +37,8 @@ def crear_apartado(item: ApartadoCreate, conn: sqlite3.Connection = Depends(get_
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES (?, ?, 0.0, ?)",
-            (item.nombre, item.tipo, item.meta_monto if item.tipo == 'meta' else None)
+            "INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES (?, ?, 0, ?)",
+            (item.nombre, item.tipo, a_centavos(item.meta_monto) if item.tipo == 'meta' else None)
         )
         conn.commit()
         nuevo_id = cursor.lastrowid
@@ -111,7 +112,7 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             desc = f"Ahorro destinado a: {apartado['nombre']}"
             cursor.execute(
                 'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, mov.monto, 'gasto', 1, desc, apartado_id, clase_movimiento('gasto', apartado_id, None, False))
+                (fecha_hoy, a_centavos(mov.monto), 'gasto', 1, desc, apartado_id, clase_movimiento('gasto', apartado_id, None, False))
             )
             
         elif mov.accion == 'retirar':
@@ -123,10 +124,10 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             desc = f"Retiro de ahorro: {apartado['nombre']}"
             cursor.execute(
                 'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, mov.monto, 'ingreso', 1, desc, apartado_id, clase_movimiento('ingreso', apartado_id, None, False))
+                (fecha_hoy, a_centavos(mov.monto), 'ingreso', 1, desc, apartado_id, clase_movimiento('ingreso', apartado_id, None, False))
             )
         
-        cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (nuevo_saldo, apartado_id))
+        cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (a_centavos(nuevo_saldo), apartado_id))
         conn.commit()
         return {"status": "ok", "nuevo_saldo": nuevo_saldo}
     except HTTPException:

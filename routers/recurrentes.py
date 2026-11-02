@@ -7,6 +7,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
+from dinero import a_centavos
 from finanzas_core import (
     cuota_msi,
     validar_fecha_operativa,
@@ -106,7 +107,7 @@ def listar_fijos_por_periodo(n: int = Query(3, ge=1, le=6), conn: sqlite3.Connec
 def listar_recurrentes(conn: sqlite3.Connection = Depends(get_tenant_db)):
     cursor = conn.cursor()
     filas = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto / 100.0 AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
         LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
@@ -162,14 +163,14 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
                                  total_cuotas, cuotas_generadas, monto_total, categoria_id, apartado_id, presupuesto_tarjeta_id, activo)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)
         """,
-        (req.descripcion.strip(), tipo, monto, frecuencia, fecha.day, proxima.isoformat(),
-         total_cuotas, monto_total, categoria_id, req.apartado_id, req.presupuesto_tarjeta_id)
+        (req.descripcion.strip(), tipo, a_centavos(monto), frecuencia, fecha.day, proxima.isoformat(),
+         total_cuotas, a_centavos(monto_total), categoria_id, req.apartado_id, req.presupuesto_tarjeta_id)
     )
     nuevo_id = cursor.lastrowid
     conn.commit()
     materializar_recurrentes(conn, ahora_local().date())
     fila = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto / 100.0 AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
         LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
@@ -240,7 +241,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
     if req.descripcion is not None:
         campos.append("descripcion = ?"); valores.append(req.descripcion.strip())
     if req.monto is not None:
-        campos.append("monto = ?"); valores.append(req.monto)
+        campos.append("monto = ?"); valores.append(a_centavos(req.monto))
     if req.frecuencia is not None:
         if es_msi:
             raise HTTPException(status_code=400, detail="Una compra a meses no admite cambiar la periodicidad.")
@@ -310,7 +311,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
         materializar_recurrentes(conn, ahora_local().date())
 
     fila = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto / 100.0 AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
         LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
@@ -381,7 +382,7 @@ def saltar_recurrente(
     conn.commit()
 
     fila = cursor.execute("""
-        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto AS tarjeta_monto_total
+        SELECT r.*, a.nombre AS apartado_nombre, pt.nombre AS tarjeta_nombre, pt.monto / 100.0 AS tarjeta_monto_total
         FROM recurrentes r
         LEFT JOIN apartados a ON a.id = r.apartado_id
         LEFT JOIN presupuesto_tarjetas pt ON pt.id = r.presupuesto_tarjeta_id
