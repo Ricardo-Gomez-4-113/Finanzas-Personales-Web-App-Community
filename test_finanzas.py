@@ -70,6 +70,7 @@ if 'pydantic' not in sys.modules:
 import database
 from database import configure_sqlite_pragmas, apply_lazy_migrations
 from finanzas_core import (
+    obtener_total_apartados,
     convertir,
     factores_desde_mxn,
     valorar_posiciones,
@@ -331,6 +332,45 @@ def test_importar_fijos_individual_y_limpieza():
 
     cfg = conn.execute("SELECT ingreso_base FROM presupuesto_config WHERE id = 1").fetchone()
     assert cfg["ingreso_base"] == 10000.0
+
+
+def test_importar_fijos_no_funde_tarjetas_de_nombre_parecido():
+    """Solo el mismo nombre actualiza una tarjeta: «Luz» no se funde con «Gasolina y luz del carro»."""
+    from finanzas_core import sincronizar_fijos_presupuesto_core
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Nómina", "ingreso", 20000.0, "mensual", 1, date(2026, 11, 1))
+    insertar_recurrente(conn, "Luz", "gasto", 400.0, "mensual", 8, date(2026, 11, 8))
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Gasolina y luz del carro', 'car', 'blue', 5.0, 1000.0, 'mío', 10)")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('luz', 'zap', 'amber', 1.0, 100.0, '', 20)")
+    conn.commit()
+    sincronizar_fijos_presupuesto_core(conn.cursor(), modo='individual', actualizar_ingreso=False, reemplazar=False)
+    filas = {f["nombre"]: f["monto"] for f in conn.execute("SELECT nombre, monto FROM presupuesto_tarjetas")}
+    assert filas["Gasolina y luz del carro"] == 1000.0, filas   # intacta
+    assert filas["luz"] == 400.0, filas                          # mismo nombre, sin importar mayúsculas
+    assert len(filas) == 2, filas
+
+    # Unificado: una tarjeta cuyo nombre solo contiene «MSI» no es la de compras a meses
+    conn.execute("DELETE FROM presupuesto_tarjetas")
+    conn.execute("INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden) VALUES ('Seguro dental MSI', 'heart', 'red', 2.0, 500.0, '', 10)")
+    conn.commit()
+    insertar_recurrente(conn, "Laptop", "gasto", 1500.0, "mensual", 3, date(2026, 11, 3), total=12, monto_total=18000.0)
+    sincronizar_fijos_presupuesto_core(conn.cursor(), modo='unificado', actualizar_ingreso=False, reemplazar=False)
+    filas = {f["nombre"]: f["monto"] for f in conn.execute("SELECT nombre, monto FROM presupuesto_tarjetas")}
+    assert filas["Seguro dental MSI"] == 500.0 and "Compras a Meses (MSI)" in filas, filas
+
+
+def test_total_de_apartados_no_oculta_errores():
+    assert obtener_total_apartados(nueva_bd().cursor()) == 0.0
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 250)")
+    assert obtener_total_apartados(conn.cursor()) == 250.0
+    conn.execute("DROP TABLE apartados")
+    try:
+        obtener_total_apartados(conn.cursor())
+    except sqlite3.OperationalError:
+        pass
+    else:
+        raise AssertionError("un fallo de la consulta no debe pasar por saldo de cero")
 
 
 def test_migracion_v8_indice_unico():

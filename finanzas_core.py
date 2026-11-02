@@ -524,11 +524,8 @@ def validar_sustentabilidad_gasto_fijo(
 
 def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
     """Calcula la suma de fondos retenidos en apartados activos (monto_actual)."""
-    try:
-        row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0.0) FROM apartados").fetchone()
-        return float(row[0]) if row and row[0] is not None else 0.0
-    except Exception:
-        return 0.0
+    row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0.0) FROM apartados").fetchone()
+    return float(row[0]) if row and row[0] is not None else 0.0
 
 
 def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
@@ -1094,7 +1091,7 @@ def sincronizar_fijos_presupuesto_core(
 
         if gasto_total > 0:
             pct_gasto = round((gasto_total / ingreso_actual) * 100.0, 2) if ingreso_actual > 0 else 0.0
-            existente = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE nombre LIKE '%Gastos Fijos%' LIMIT 1").fetchone()
+            existente = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE LOWER(nombre) = 'gastos fijos' LIMIT 1").fetchone()
             if existente:
                 cursor.execute("""
                     UPDATE presupuesto_tarjetas
@@ -1109,7 +1106,7 @@ def sincronizar_fijos_presupuesto_core(
 
         if msi_total > 0:
             pct_msi = round((msi_total / ingreso_actual) * 100.0, 2) if ingreso_actual > 0 else 0.0
-            existente_msi = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE nombre LIKE '%Meses%' OR nombre LIKE '%MSI%' LIMIT 1").fetchone()
+            existente_msi = cursor.execute("SELECT id FROM presupuesto_tarjetas WHERE LOWER(nombre) IN ('compras a meses (msi)', 'compras a meses') LIMIT 1").fetchone()
             if existente_msi:
                 cursor.execute("""
                     UPDATE presupuesto_tarjetas
@@ -1167,14 +1164,12 @@ def sincronizar_fijos_presupuesto_core(
 
             notas = it["cuotas_info"] if it["es_msi"] else it["categoria_nombre"]
 
+            # Solo el mismo nombre: por subcadena, "Luz" se fundía con "Gasolina y luz" y "Netflix" con "Net"
             existente = cursor.execute("""
                 SELECT id FROM presupuesto_tarjetas 
-                WHERE LOWER(nombre) = LOWER(?)
-                   OR LOWER(nombre) = LOWER(?)
-                   OR (LOWER(nombre) LIKE '%' || LOWER(?) || '%' AND LENGTH(?) >= 3)
-                   OR (LOWER(?) LIKE '%' || LOWER(nombre) || '%' AND LENGTH(nombre) >= 3)
+                WHERE LOWER(nombre) = LOWER(?) OR LOWER(nombre) = LOWER(?)
                 LIMIT 1
-            """, (nombre_item, it["descripcion"], it["descripcion"], it["descripcion"], it["descripcion"])).fetchone()
+            """, (nombre_item, it["descripcion"])).fetchone()
 
             if existente:
                 cursor.execute("""
