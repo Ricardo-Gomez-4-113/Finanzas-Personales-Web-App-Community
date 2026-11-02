@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { confirmar } from './confirmar.js';
 
 
 // Valor especial del select de categoría para crear una nueva
@@ -340,7 +341,7 @@ export async function eliminarTransaccion(id, forzar = false) {
         pregunta = `Advertencia:\n${advertencias.join('\n')}\n\n${pregunta}`;
     }
 
-    if (!forzar && !confirm(pregunta)) return;
+    if (!forzar && !await confirmar({ titulo: 'Eliminar movimiento', mensaje: pregunta, aceptar: 'Eliminar', peligro: true })) return;
 
     try {
         const url = `/api/transacciones/${id}${forzar ? '?forzar=true' : ''}`;
@@ -352,7 +353,7 @@ export async function eliminarTransaccion(id, forzar = false) {
             const err = await response.json().catch(() => ({}));
             const msg = (formatErrorDetail(err.detail, "Este ingreso respalda gastos posteriores y provocaría saldo negativo.")) +
                         "\n\n¿Deseas FORZAR la eliminación de este movimiento?";
-            if (confirm(msg)) {
+            if (await confirmar({ titulo: 'Forzar eliminación', mensaje: msg, aceptar: 'Forzar eliminación', peligro: true })) {
                 await eliminarTransaccion(id, true);
             }
         } else {
@@ -390,7 +391,7 @@ export async function eliminarMovimientosLote(forzar = false) {
         pregunta = `Advertencia previa:\n${advertencias.join('\n')}\n\n${pregunta}`;
     }
 
-    if (!forzar && !confirm(pregunta)) return;
+    if (!forzar && !await confirmar({ titulo: 'Eliminar movimientos', mensaje: pregunta, aceptar: 'Eliminar', peligro: true })) return;
 
     try {
         const response = await apiFetch('/api/transacciones/eliminar-lote', {
@@ -407,7 +408,7 @@ export async function eliminarMovimientosLote(forzar = false) {
             const err = await response.json().catch(() => ({}));
             const msg = (formatErrorDetail(err.detail, "La eliminación provocaría un saldo operativo negativo.")) +
                         "\n\n¿Deseas FORZAR la eliminación de estos movimientos seleccionados?";
-            if (confirm(msg)) {
+            if (await confirmar({ titulo: 'Forzar eliminación', mensaje: msg, aceptar: 'Forzar eliminación', peligro: true })) {
                 await eliminarMovimientosLote(true);
             }
         } else {
@@ -444,7 +445,7 @@ export async function vaciarTodosLosMovimientos(forzar = false) {
     }
     pregunta += "\n\n¿Estás completamente seguro de vaciar todos los movimientos?";
 
-    if (!forzar && !confirm(pregunta)) return;
+    if (!forzar && !await confirmar({ titulo: 'Vaciar movimientos', mensaje: pregunta, aceptar: 'Vaciar todo', peligro: true })) return;
 
     try {
         const response = await apiFetch('/api/transacciones/eliminar-lote', {
@@ -461,7 +462,7 @@ export async function vaciarTodosLosMovimientos(forzar = false) {
             const err = await response.json().catch(() => ({}));
             const msg = (formatErrorDetail(err.detail, "La eliminación provocaría un saldo operativo negativo.")) +
                         "\n\n¿Deseas FORZAR el vaciado de todas formas?";
-            if (confirm(msg)) {
+            if (await confirmar({ titulo: 'Forzar vaciado', mensaje: msg, aceptar: 'Forzar vaciado', peligro: true })) {
                 await vaciarTodosLosMovimientos(true);
             }
         } else {

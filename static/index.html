@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=dc70c3bee5">
-    <link rel="stylesheet" href="/static/css/layout.css?v=dc70c3bee5">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=dc70c3bee5">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=dc70c3bee5">
-    <link rel="stylesheet" href="/static/css/tema.css?v=dc70c3bee5">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=bfac6a82c3">
+    <link rel="stylesheet" href="/static/css/layout.css?v=bfac6a82c3">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=bfac6a82c3">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=bfac6a82c3">
+    <link rel="stylesheet" href="/static/css/tema.css?v=bfac6a82c3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -1994,8 +1994,28 @@
         </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- MODAL: CONFIRMACIÓN (sustituye a confirm())    -->
+    <!-- Va al final: entre modales apilados queda encima. -->
+    <!-- ============================================== -->
+    <div id="modal-confirmar" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirmar-titulo" aria-describedby="confirmar-mensaje">
+        <div class="modal-card modal-card--md">
+            <div class="modal-header">
+                <h3><span id="confirmar-titulo"></span></h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirmar-mensaje" class="modal-instruction confirmar-mensaje"></p>
+                <div id="confirmar-detalle" class="confirmar-detalle"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="btn-confirmar-cancelar">Cancelar</button>
+                <button type="button" class="btn-primary" id="btn-confirmar-aceptar">Continuar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=dc70c3bee5"></script>
+    <script type="module" src="/static/js/main.js?v=bfac6a82c3"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

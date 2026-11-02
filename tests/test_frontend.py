@@ -226,6 +226,15 @@ def _esperar(page, expresion, timeout=10.0):
     raise AssertionError(f"no se cumplió en {timeout}s: {expresion}\nTarjetas ahora: {estado}")
 
 
+def _responder_confirmacion(page, aceptar=True):
+    """Responde al modal de confirmación y devuelve lo que mostraba (título, mensaje y detalle)."""
+    page.wait_for_selector("#modal-confirmar:not(.hidden)")
+    visto = {campo: page.inner_text(f"#confirmar-{campo}") for campo in ("titulo", "mensaje", "detalle")}
+    page.click("#btn-confirmar-aceptar" if aceptar else "#btn-confirmar-cancelar")
+    page.wait_for_selector("#modal-confirmar.hidden", state="attached")
+    return visto
+
+
 def _ir(page, tab):
     page.evaluate(f"document.querySelector('[data-tab=\"{tab}\"]').click()")
     page.wait_for_selector(f"#{tab}.active")
@@ -567,8 +576,14 @@ def test_movimiento_crear_editar_y_borrar(navegador, base):
         page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached")
         _esperar(page, "[...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('e2e-cafe') && tr.textContent.includes('$200.00'))")
 
-        page.once("dialog", lambda d: d.accept())
-        page.locator("#tabla-movimientos tr", has_text="e2e-cafe").locator(".btn-eliminar").click()
+        # La confirmación es un modal propio, no el diálogo del navegador: cancelar conserva la fila y aceptar la borra
+        page.on("dialog", lambda d: (errores.append(f"diálogo nativo: {d.message}"), d.dismiss()))
+        boton = page.locator("#tabla-movimientos tr", has_text="e2e-cafe").locator(".btn-eliminar")
+        boton.click()
+        assert _responder_confirmacion(page, aceptar=False)["titulo"] == "Eliminar movimiento"
+        assert page.locator("#tabla-movimientos tr", has_text="e2e-cafe").count() == 1
+        boton.click()
+        _responder_confirmacion(page)
         _esperar(page, "![...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('e2e-cafe'))")
         assert not errores, errores
     finally:
@@ -771,7 +786,6 @@ def test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base):
     assert r.status_code in (200, 201), r.text
     carpeta = tempfile.mkdtemp(dir=TMP)
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
-    page.on("dialog", lambda d: d.accept())  # confirmación de la restauración
     try:
         _entrar(page, base, usuario, clave)
         page.click("#btn-user-menu-trigger")
@@ -789,6 +803,7 @@ def test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base):
         page.wait_for_selector("#user-dropdown-menu.show")
         with page.expect_file_chooser() as eleccion:
             page.click(".btn-restore")
+            _responder_confirmacion(page)   # el selector de archivo se abre al aceptar
         eleccion.value.set_files(copia)
 
         descripciones = lambda: [t["descripcion"] for t in api.get("/api/transacciones").json()]
@@ -811,6 +826,7 @@ def test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base):
         page.wait_for_selector("#user-dropdown-menu.show")
         with page.expect_file_chooser() as eleccion:
             page.click(".btn-restore")
+            _responder_confirmacion(page)   # el selector de archivo se abre al aceptar
         eleccion.value.set_files(futura)
         page.wait_for_selector(".toast-error", timeout=10000)
         assert "más nueva" in page.inner_text(".toast-error"), page.inner_text(".toast-error")
@@ -1180,6 +1196,66 @@ def test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base
     assert "(aprox.)" not in texto and not aviso, (texto, aviso)
 
 
+def test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base):
+    """Exportar abre un modal con lo que se crea, actualiza y elimina; cancelar o Escape no tocan nada y aceptar sí aplica."""
+    usuario, clave = _usuario_nuevo("expprev")
+    api = _api(base, usuario, clave)
+    assert api.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}).status_code == 200
+    assert api.post("/api/presupuesto/tarjetas", json={"nombre": "Hogar", "porcentaje": 30, "notas": "", "unidad_orden": 1}).status_code in (200, 201)
+    assert api.put("/api/presupuesto/unidades/1", json={"dia_pago": 5}).status_code == 200
+    api.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 9000})
+    meta = next(a["id"] for a in api.get("/api/apartados").json() if a["nombre"] == "Viaje")
+    fijos = [
+        dict(descripcion="Sueldo", tipo="ingreso", frecuencia="mensual", monto=20000, fecha_inicio="2026-12-01", categoria_id=12),
+        dict(descripcion="Gimnasio", tipo="gasto", frecuencia="mensual", monto=500, fecha_inicio="2026-12-01", categoria_id=7),
+        dict(descripcion="Tablet", tipo="gasto", frecuencia="mensual", monto_total=1200, meses=12, fecha_inicio="2026-12-01"),
+        dict(descripcion="Ahorro viaje", tipo="gasto", frecuencia="mensual", monto=300, fecha_inicio="2026-12-01", apartado_id=meta),
+    ]
+    for fijo in fijos:
+        assert api.post("/api/recurrentes", json=fijo).status_code == 201
+    nombres = lambda: sorted(r["descripcion"] for r in api.get("/api/recurrentes").json())
+    antes = nombres()
+    assert "Gimnasio" in antes
+
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    page.on("dialog", lambda d: (errores.append(f"diálogo nativo: {d.message}"), d.dismiss()))
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-presupuesto")
+        page.evaluate("document.getElementById('btn-exportar-pres-fijos').click()")
+        page.wait_for_selector("#modal-exportar-presupuesto:not(.hidden)")
+        page.click("#btn-confirmar-exportar-pres")
+        page.wait_for_selector("#modal-confirmar:not(.hidden)")
+        detalle = page.inner_text("#confirmar-detalle")
+        assert "Se eliminarán (4)" in detalle and "Se crearán" in detalle, detalle
+        for esperado in ("Gimnasio", "Fijo hecho a mano", "Tablet", "Compra a meses", "0 de 12 cuotas", "Ahorro viaje", "Aporte a una meta"):
+            assert esperado in detalle, (esperado, detalle)
+        assert page.inner_text("#btn-confirmar-aceptar") == "Reemplazar fijos"
+
+        # Escape cierra solo la confirmación: el modal de exportar sigue abierto y no se tocó nada
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#modal-confirmar.hidden", state="attached")
+        assert page.locator("#modal-exportar-presupuesto.hidden").count() == 0
+        assert nombres() == antes
+
+        page.click("#btn-confirmar-exportar-pres")
+        _responder_confirmacion(page, aceptar=False)
+        assert nombres() == antes
+
+        page.click("#btn-confirmar-exportar-pres")
+        _responder_confirmacion(page)
+        page.wait_for_selector("#modal-exportar-presupuesto.hidden", state="attached")
+        for _ in range(100):
+            if "Gimnasio" not in nombres():
+                break
+            page.wait_for_timeout(100)
+        despues = nombres()
+        assert "Gimnasio" not in despues and "Tablet" not in despues and "Hogar" in despues, despues
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_modo_discrecion_cubre_todas_las_pestanas(navegador, base):
     """Con el modo privacidad activo, toda cifra visible (en cualquier pestaña) queda desenfocada."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1341,6 +1417,7 @@ if __name__ == "__main__":
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
+                (test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar, lambda: test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),

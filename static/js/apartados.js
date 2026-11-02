@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, escapeHTML, fmt, montoHTML, montoMxnHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
+import { confirmar } from './confirmar.js';
 
 
 // =============================================================================
@@ -201,7 +202,7 @@ export async function realizarMovimiento(id, accion) {
 
 
 export async function eliminarApartado(id) {
-    if (!confirm("¿Seguro que deseas eliminar este apartado? Se perderá el registro de este sobre.")) return;
+    if (!await confirmar({ titulo: 'Eliminar apartado', mensaje: '¿Seguro que deseas eliminar este apartado? Se perderá el registro de este sobre.', aceptar: 'Eliminar', peligro: true })) return;
     
     // Feedback visual inmediato en la tarjeta
     const btnEliminar = document.querySelector(`.card-apartado button[onclick*="eliminarApartado(${id})"]`);

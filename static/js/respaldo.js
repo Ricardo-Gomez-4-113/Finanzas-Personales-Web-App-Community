@@ -4,6 +4,7 @@
 
 import { cargarDatosAdmin } from './admin.js';
 import { apiFetch, estado, formatErrorDetail, recargar, toast } from './core.js';
+import { confirmar } from './confirmar.js';
 
 
 // =============================================================================
@@ -95,15 +96,18 @@ export async function descargarBackup() {
 }
 
 
-export function solicitarImportarBackup() {
+export async function solicitarImportarBackup() {
     const input = document.getElementById('input-restore-db');
     if (!input) return;
-    const confirmar = confirm(
-        "ADVERTENCIA: Restaurar una copia de seguridad reemplazará los datos actuales de tu cuenta con los del archivo seleccionado.\n\n" +
-        "Se creará un respaldo de seguridad automático (.bak) antes de aplicar la restauración.\n\n" +
-        "¿Deseas seleccionar el archivo de respaldo (.db) ahora?"
-    );
-    if (confirmar) {
+    const aceptado = await confirmar({
+        titulo: 'Restaurar copia de seguridad',
+        mensaje: 'Restaurar una copia de seguridad reemplazará los datos actuales de tu cuenta con los del archivo seleccionado.\n\n' +
+            'Se creará un respaldo de seguridad automático (.bak) antes de aplicar la restauración.\n\n' +
+            '¿Deseas seleccionar el archivo de respaldo (.db) ahora?',
+        aceptar: 'Elegir archivo',
+        peligro: true,
+    });
+    if (aceptado) {
         input.value = '';
         input.click();
     }

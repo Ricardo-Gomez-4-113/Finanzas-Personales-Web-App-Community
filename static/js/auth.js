@@ -6,6 +6,7 @@ import { cargarDatosAdmin } from './admin.js';
 import { apiFetch, cargarTiposCambio, estado, recargar, toast } from './core.js';
 import { renderMenuUsuario } from './menu_usuario.js';
 import { cambiarPestana } from './ui.js';
+import { confirmar } from './confirmar.js';
 
 
 // =============================================================================
@@ -188,8 +189,8 @@ export async function iniciarSesion(e) {
 /**
  * Cierre de sesión voluntario por parte del usuario.
  */
-export function logoutUsuario() {
-    if (confirm("¿Deseas cerrar tu sesión actual?")) {
+export async function logoutUsuario() {
+    if (await confirmar({ titulo: 'Cerrar sesión', mensaje: '¿Deseas cerrar tu sesión actual?', aceptar: 'Cerrar sesión' })) {
         cerrarSesionLimpia();
     }
 }

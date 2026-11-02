@@ -3,6 +3,7 @@
  */
 
 import { actualizarIndicadorTasa, apiFetch, colorVar, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { confirmar } from './confirmar.js';
 
 
 export async function cargarInversiones() {
@@ -426,7 +427,7 @@ if (formInversion) {
 
 
 export async function eliminarInversion(id) {
-    if (!confirm("¿Deseas eliminar esta posición de tu portafolio?")) return;
+    if (!await confirmar({ titulo: 'Eliminar posición', mensaje: '¿Deseas eliminar esta posición de tu portafolio?', aceptar: 'Eliminar', peligro: true })) return;
     try {
         const res = await apiFetch(`/api/inversiones/${id}`, { method: 'DELETE' });
         if (res.ok) {

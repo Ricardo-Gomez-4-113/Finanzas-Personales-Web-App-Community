@@ -5,6 +5,7 @@
 import { apiFetch, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
+import { confirmar } from './confirmar.js';
 
 
 const FRECUENCIA_TXT = { semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual' };
@@ -118,8 +119,12 @@ async function guardarRecurrente(e) {
         const cuota = Math.round((total / meses) * 100) / 100;
         const libre = margenPeriodos();
         if (libre !== null && desdeMXN(cuota) > libre) {
-            const confirmar = confirm(`Esta compra a meses generará una cuota de ${fmtMXN(cuota)} al mes, que supera el libre de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`);
-            if (!confirmar) return;
+            const aceptado = await confirmar({
+                titulo: 'La cuota supera lo libre',
+                mensaje: `Esta compra a meses generará una cuota de ${fmtMXN(cuota)} al mes, que supera el libre de tu periodo más ajustado (${fmt(libre)}) y lo dejaría en déficit.\n\n¿Deseas registrarla de todos modos?`,
+                aceptar: 'Registrar de todos modos',
+            });
+            if (!aceptado) return;
         }
         body = { descripcion, monto_total: total, meses, fecha_inicio: fecha, categoria_id: categoriaId };
     } else {
@@ -327,14 +332,14 @@ async function accionRecurrente(e) {
         } else {
             const textoTipo = item.tipo === 'ingreso' ? 'el próximo ingreso' : 'el próximo pago';
             const pregunta = `¿Saltar ${textoTipo} de "${item.descripcion}" (${item.proxima_fecha})?\n\nLa fecha avanzará al siguiente período (${FRECUENCIA_TXT[item.frecuencia] || item.frecuencia}) sin registrar movimientos en tus cuentas.`;
-            if (confirm(pregunta)) {
+            if (await confirmar({ titulo: 'Saltar pago', mensaje: pregunta, aceptar: 'Saltar' })) {
                 ejecutarSaltarRecurrente(id, false);
             }
         }
         return;
     }
     if (accion === 'eliminar') {
-        if (!confirm('¿Eliminar este registro? Los movimientos ya generados se conservan.')) return;
+        if (!await confirmar({ titulo: 'Eliminar registro', mensaje: '¿Eliminar este registro? Los movimientos ya generados se conservan.', aceptar: 'Eliminar', peligro: true })) return;
         const res = await apiFetch(`/api/recurrentes/${id}`, { method: 'DELETE' });
         if (!res.ok) return toast('No se pudo eliminar el registro.', 'error');
     } else {

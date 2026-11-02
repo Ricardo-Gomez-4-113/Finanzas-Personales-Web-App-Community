@@ -5,6 +5,7 @@
  */
 
 import { apiFetch, escapeHTML, fmtMXN, montoMxnHTML, formatErrorDetail, toast } from './core.js';
+import { confirmar } from './confirmar.js';
 
 let cachePresupuesto = null;
 // Pago al que pertenece la tarjeta del modal (null cuando se edita fuera de un pago)
@@ -408,6 +409,71 @@ export function toggleSeleccionarTodosExportar() {
     if (btn) btn.textContent = algunoDesmarcado ? 'Deseleccionar todos' : 'Seleccionar todos';
 }
 
+const ORIGEN_FIJO = {
+    presupuesto: 'Del presupuesto',
+    manual: 'Fijo hecho a mano',
+    meta: 'Aporte a una meta',
+    msi: 'Compra a meses',
+};
+
+const GRUPOS_VISTA_PREVIA = [
+    { accion: 'eliminado', titulo: 'Se eliminarán', peligro: true },
+    { accion: 'creado', titulo: 'Se crearán' },
+    { accion: 'actualizado', titulo: 'Se actualizarán' },
+];
+
+/** Pide al servidor qué haría la exportación, sin aplicarla. Devuelve null (con aviso) si no se puede. */
+async function pedirVistaPreviaExportar(cuerpo) {
+    const res = await apiFetch('/api/presupuesto/exportar-a-fijos/vista-previa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: cuerpo,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast(formatErrorDetail(err.detail, 'No se pudo preparar la exportación.'), 'error');
+        return null;
+    }
+    return res.json();
+}
+
+function filaVistaPrevia(d) {
+    const fila = document.createElement('div');
+    fila.className = 'confirmar-fila';
+    const nombre = document.createElement('span');
+    nombre.className = 'confirmar-fila-nombre';
+    nombre.append(d.descripcion);
+    const nota = [d.accion === 'eliminado' ? ORIGEN_FIJO[d.origen] : null, d.nota].filter(Boolean).join(' · ');
+    if (nota) {
+        const detalle = document.createElement('span');
+        detalle.className = 'confirmar-fila-nota';
+        detalle.textContent = nota;
+        nombre.append(detalle);
+    }
+    const monto = document.createElement('span');
+    monto.className = 'confirmar-fila-monto';
+    monto.innerHTML = `${d.tipo === 'ingreso' ? '+' : ''}${montoMxnHTML(d.monto)}`;
+    fila.append(nombre, monto);
+    return fila;
+}
+
+/** Una lista por acción (eliminar primero, que es lo que importa revisar), con lo que cada fila es. */
+function detalleVistaPreviaExportar(previa) {
+    const grupos = [];
+    for (const { accion, titulo, peligro } of GRUPOS_VISTA_PREVIA) {
+        const filas = previa.detalles.filter(d => d.accion === accion);
+        if (!filas.length) continue;
+        const grupo = document.createElement('section');
+        grupo.className = `confirmar-grupo${peligro ? ' confirmar-grupo--peligro' : ''}`;
+        const encabezado = document.createElement('h4');
+        encabezado.className = 'confirmar-grupo-titulo';
+        encabezado.textContent = `${titulo} (${filas.length})`;
+        grupo.append(encabezado, ...filas.map(filaVistaPrevia));
+        grupos.push(grupo);
+    }
+    return grupos;
+}
+
 export async function ejecutarExportarPresupuesto() {
     const btn = document.getElementById('btn-confirmar-exportar-pres');
     if (btn) btn.disabled = true;
@@ -436,21 +502,23 @@ export async function ejecutarExportarPresupuesto() {
             return;
         }
 
-        const advertencia = 'Al exportar se sobrescribe todo: se borran todos los fijos (también los que creaste a mano y los aportes a metas) y se reemplazan por lo que marcaste.\n\nLas compras a meses también se borran, salvo las que tengas como tarjeta MSI del presupuesto.\n\n¿Continuar?';
-        if (!confirm(advertencia)) {
-            if (btn) btn.disabled = false;
-            return;
-        }
+        const cuerpo = JSON.stringify({ tarjetas_ids, incluir_ingreso, inicio_cargos, fecha_base });
+        const previa = await pedirVistaPreviaExportar(cuerpo);
+        if (!previa) return;
+        const habraBajas = previa.eliminados > 0;
+        const aceptado = await confirmar({
+            titulo: 'Esto es lo que cambiará',
+            mensaje: 'Al exportar se reemplazan tus fijos por los del presupuesto. Los movimientos ya registrados no se tocan.',
+            detalle: detalleVistaPreviaExportar(previa),
+            aceptar: habraBajas ? 'Reemplazar fijos' : 'Exportar',
+            peligro: habraBajas,
+        });
+        if (!aceptado) return;
 
         const res = await apiFetch('/api/presupuesto/exportar-a-fijos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                tarjetas_ids,
-                incluir_ingreso,
-                inicio_cargos,
-                fecha_base
-            })
+            body: cuerpo
         });
 
         if (!res.ok) {
@@ -650,7 +718,7 @@ export async function guardarTarjetaPresupuesto(e) {
 
 
 export async function eliminarTarjetaPresupuesto(id, nombre) {
-    if (!confirm(`¿Eliminar la tarjeta "${nombre}" del presupuesto?`)) return;
+    if (!await confirmar({ titulo: 'Eliminar tarjeta', mensaje: `¿Eliminar la tarjeta "${nombre}" del presupuesto?`, aceptar: 'Eliminar', peligro: true })) return;
     try {
         const res = await apiFetch(`/api/presupuesto/tarjetas/${id}`, { method: 'DELETE' });
         if (!res.ok) {

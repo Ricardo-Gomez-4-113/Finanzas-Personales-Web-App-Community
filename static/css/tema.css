@@ -1716,3 +1716,28 @@
     :root .btn-eliminar::after { content: ""; position: absolute; inset: -8px; }
     :root .tab-btn::after { content: ""; position: absolute; inset: -3px 0; }
 }
+
+/* Modal de confirmación y detalle de lo que cambiará (js/confirmar.js) */
+:root .confirmar-mensaje { white-space: pre-line; margin: 0; }
+:root .confirmar-detalle { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+:root .confirmar-detalle:empty { display: none; }
+:root .confirmar-grupo-titulo {
+    margin: 0 0 6px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+:root .confirmar-grupo--peligro .confirmar-grupo-titulo { color: var(--danger-text); }
+:root .confirmar-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px solid var(--border-color);
+    font-size: var(--fs-sm);
+}
+:root .confirmar-fila-nombre { min-width: 0; overflow-wrap: anywhere; }
+:root .confirmar-fila-nota { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
+:root .confirmar-fila-monto { flex: none; font-variant-numeric: tabular-nums; }
