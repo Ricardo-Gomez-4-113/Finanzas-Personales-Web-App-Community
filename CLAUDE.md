@@ -17,7 +17,7 @@ Rules:
 
 1. Todo cambio se implementa y prueba primero en este repositorio (Community).
 2. Si las suites pasan, se hace commit y push a `main`.
-3. El mismo cambio se pasa después a la edición privada (SaaS), donde se vuelve a probar antes de su propio commit y push.
+3. El mismo cambio se pasa después a la edición privada (SaaS) con `~/bin/portar-a-saas.sh <commit> --probar` (mezcla `index.html` sin tocar la landing y corre las suites del SaaS); luego su propio commit y push.
 
 Convenciones:
 - Commits en español con formato `tipo(area): descripción`, sin líneas `Co-Authored-By` ni atribución a asistentes.
@@ -28,12 +28,12 @@ Convenciones:
 ## Estructura relevante
 
 - `main.py`: servidor FastAPI, middleware de seguridad y rutas SPA.
-- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 19 (`CURRENT_TENANT_SCHEMA_VERSION`).
+- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 20 (`CURRENT_TENANT_SCHEMA_VERSION`).
 - `finanzas_core.py`: cálculo financiero puro (conversiones, rendimientos, frecuencias, sub-periodos, reparto en centavos).
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.
 - `mercado.py`: tipos de cambio y precios, con caché y valores de respaldo.
 - `routers/`: `auth`, `admin`, `movimientos`, `apartados`, `inversiones`, `recurrentes`, `respaldo`, `presupuesto`.
-- `static/`: SPA con módulos ES6 y hojas de estilo en `static/css/`.
+- `static/`: SPA con módulos ES6 y hojas de estilo en `static/css/`. `static/js/confirmar.js` es el modal de confirmación (`confirmar({...})` devuelve una promesa); no se usa `confirm()` nativo.
 - Datos: `data/master.db` (usuarios y auditoría) y `data/tenants/user_{id}.db` (una base por usuario).
 
 ## Registro de cambios (revisión de backend, Fase 1)
@@ -54,7 +54,7 @@ Cada entrada indica el commit y qué incluye.
 - Suites de backend en Docker: `./tests/run_tests.sh` (finanzas, migraciones, mercado, acciones, aislamiento de API y escenario de API).
 - Batería completa, con cobertura y navegador: `./tests/run_todo.sh` (unos 6 minutos).
 - Cobertura de `routers/`: `./tests/run_cobertura.sh`. Mínimo 80 %; solo debe subir. Subirlo en el propio script al añadir pruebas.
-- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 39 pruebas`.
+- Frontend con Playwright: `./tests/run_frontend.sh`. El script instala Playwright con pip; si la red corta la instalación, se salta sin fallar (`SKIP`). Debe verse `OK: 49 pruebas`.
 
 Estado al cierre de la Fase 1: suites de backend en verde (finanzas 108, migraciones 8, respaldo 2, mercado 4, acciones 2, aislamiento 33, escenario 18) y frontend 19 de 19.
 
@@ -92,6 +92,49 @@ Estado de los seis puntos (cada uno con su prueba, publicado en Community y en e
 6. **Comentarios:** tabla `comentarios` en la base maestra, `POST /api/comentarios`, 5 por hora, y `scripts/comentarios.py` para consultarlos.
 
 Prueba intermitente: `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` falló una vez esperando filas de movimientos y pasó en la siguiente corrida. No está corregida la causa.
+
+## Auditoría de mejoras (puntos 1 a 11, noviembre de 2026)
+
+Los mismos cambios existen en el SaaS con sus propios hashes. Hashes de Community:
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Fecha imposible dejaba `/api/resumen` en 500 (`e9d1a80`). La migración v19 repara las ya guardadas (`33dffac`). | Hecho |
+| 2 | Editar un gasto se saltaba la validación de saldo (`e9d1a80`). | Hecho |
+| 3 | El presupuesto reescribía cualquier ingreso que dijera «nómina» (`e9d1a80`): solo toca el enlazado a su tarjeta o `NOMINA_PRESUPUESTO`. | Hecho |
+| 4 | Moneda base EUR/USD en todas las pantallas (`f9f22c6`): los montos se guardan en MXN y el servidor da `factores_desde_mxn` en `/api/tipo-cambio`; el frontend solo multiplica. | Hecho |
+| 5 | Patrimonio neto con efectivo y deuda. | **Descartado**: el patrimonio es metas + inversiones. |
+| 6 | Ligar inversiones y cuentas con rendimiento al efectivo. | **Descartado**: son una calculadora, fuera del núcleo. |
+| 7 | Dos motores de periodos (`1a16d3e`): la validación de «presupuesto del periodo superado» usa el mismo corte que el tablero. | Hecho |
+| 8 | La ventana de cargos y los movimientos de apartados. | Cerrado sin cambios: es coherente con un modelo de efectivo. Lo fija `test_deposito_a_meta_consume_la_capacidad_del_periodo_igual_que_el_saldo` (`796e39f`). |
+| 9 | Tipo de cambio de respaldo (`4f4752c`, `4e092c9`): cada moneda conserva su último valor bueno; `/api/tipo-cambio` informa `en_respaldo`; la etiqueta marca «(aprox.)». El frontend ya no trae el 18.40. | Hecho |
+| 10 | Vista previa de la exportación a Fijos (`0cc3bac`) y modal de confirmación propio (`b20cc23`). | Hecho |
+| 11 | `cfg.get` sobre una fila de SQLite en la exportación (`796e39f`). | Hecho |
+| — | La cinta de periodos muestra «Libre del periodo» (ingresos menos gastos y metas de ese periodo), sin arrastrar el efectivo (`ea1a1bb`). «Libre hasta el cobro» del tablero sí cuenta el efectivo. | Hecho |
+
+Lógica media resuelta (`7bf8b5d`, `6a3405b`):
+- `convertir` lanza `ValueError` sin tasa USD/MXN válida; `convertir_de_mensual` rechaza frecuencias desconocidas; los `except` amplios de la distribución de tarjetas se acotaron.
+- `sugerir_icono_color` compara palabras completas, sin acentos y con plural.
+- Depositar a una meta usa `balance_disponible_a_fecha` (hoy): un ingreso programado a futuro no cuenta.
+- Los mensajes de error del backend rotulan sus importes como MXN.
+- La tarjeta del presupuesto se vincula a su meta por id (`presupuesto_tarjetas.apartado_id`, migración v20; la migración conserva los vínculos que coincidían por nombre). El cargo previo se reconoce también por `recurrente_id`, así que renombrar una tarjeta no duplica el cargo del mes.
+
+Exportar el presupuesto a Fijos:
+- `POST /api/presupuesto/exportar-a-fijos/vista-previa` corre la exportación completa y la revierte (`rollback`); devuelve el mismo detalle que la real. Cada fila trae `accion` (creado, actualizado, eliminado), `origen` (presupuesto, manual, meta, msi) y `nota` (cuotas de una compra a meses).
+- El modal lista primero lo que se eliminará. Cancelar o Escape no tocan nada.
+
+Decisiones del usuario que no se vuelven a proponer:
+- El patrimonio es metas + inversiones; no se suma el efectivo ni se resta la deuda.
+- Las inversiones y cuentas con rendimiento son una calculadora: no generan movimientos de caja.
+- No se puede tener un gasto fijo sin un ingreso fijo activo: el bloqueo es deliberado, no una advertencia.
+
+Abierto:
+- **Decisión pendiente:** frecuencia anual (el código la contempla y el `CHECK` de la base no); las dos nociones de «mes» del tablero (calendario y periodo de cobro); moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).
+- `detectar_fijos_recurrentes_core` empareja tarjetas por subcadena (`LIKE '%nombre%'`): «Gas» podría fusionarse con «Gasolina».
+- `obtener_total_apartados` devuelve 0.0 ante cualquier error, lo que oculta fallos de la base.
+- La cuota MSI se calcula también en `recurrentes.js` para la vista previa; el valor guardado sale de `cuota_msi`.
+- Dinero en `REAL`: no se cambia sin una razón concreta.
+- Pruebas de navegador intermitentes: `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` y `test_moneda_base_euro_se_aplica_y_persiste` (cada una falló una vez y pasó en la siguiente corrida).
 
 ## Seguridad (revisión del login C1 a C6 y pruebas de borde)
 
@@ -143,3 +186,4 @@ Un cambio está terminado cuando:
 - Contraste: el texto de estado usa `var(--success-text)`, `var(--danger-text)` y `var(--warning-text)`. Los `--*-color` quedan para fondos, bordes e iconos.
 - Cache-busting: tras cambiar CSS o JS en `static/`, ejecutar `python3 scripts/cache_bust.py`. No editar los `?v=` a mano.
 - Tras cambios de UI, correr `./tests/run_frontend.sh`.
+- Confirmaciones: `confirmar()` de `static/js/confirmar.js`, nunca `confirm()` ni `alert()` nativos. Las pruebas de navegador responden con `_responder_confirmacion`.
