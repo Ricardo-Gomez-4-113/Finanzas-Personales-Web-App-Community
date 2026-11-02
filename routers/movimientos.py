@@ -16,7 +16,7 @@ from finanzas_core import (
     clase_movimiento,
     calcular_resumen,
     gastos_por_categoria_periodo,
-    resumen_mensual_core,
+    historial_por_periodos,
     ventana_periodo_actual,
     deficit_al_eliminar_lote,
     revertir_movimiento_apartado,
@@ -306,9 +306,9 @@ def obtener_resumen(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)
     tasas = obtener_tasas_cambio()
     return calcular_resumen(conn, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), hoy, tasas.get("EUR", TASA_EUR_RESPALDO))
 
-@router.get("/api/resumen-mensual", summary="Historial agrupado por mes")
-def resumen_mensual(conn: sqlite3.Connection = Depends(get_tenant_db)):
-    return resumen_mensual_core(conn)
+@router.get("/api/historial-periodos", summary="Historial agrupado por periodo de cobro (mes, quincena o semana)")
+def historial_periodos(conn: sqlite3.Connection = Depends(get_tenant_db)):
+    return historial_por_periodos(conn, ahora_local().date())
 
 @router.get("/api/transacciones", summary="Listar todas las transacciones del tenant")
 def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):

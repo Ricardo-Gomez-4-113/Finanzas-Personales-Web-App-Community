@@ -233,7 +233,7 @@ export function cerrarSesionLimpia(errorMsg = '') {
     const tApt = document.getElementById('contenedor-apartados');
     if (tApt) tApt.innerHTML = '';
 
-    const lMes = document.getElementById('lista-resumen-mensual');
+    const lMes = document.getElementById('lista-historial-periodos');
     if (lMes) lMes.innerHTML = '';
 
     const tAdm = document.getElementById('tabla-usuarios-admin');

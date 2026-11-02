@@ -95,7 +95,7 @@ from finanzas_core import (
     convertir_frecuencias,
     convertir_de_mensual,
     calcular_periodo_actual,
-    resumen_mensual_core,
+    historial_por_periodos,
     revertir_movimiento_apartado,
 )
 
@@ -745,21 +745,21 @@ def test_tarjetas_kpi_mes_en_curso_excluyen_eliminados():
     conn = nueva_bd()
     cursor = conn.cursor()
 
-    # 1. En métricas patrimoniales (calcular_resumen): gastos normales y mes actual excluyen transacciones eliminadas
+    # 1. En métricas patrimoniales (calcular_resumen) y en el historial: los gastos excluyen transacciones eliminadas
     cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 1500.0, 'gasto')")
     tx_id = cursor.lastrowid
     conn.commit()
 
     r1 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
     assert r1['periodos'][0]['gastos']['normales'] == 1500.0
-    assert r1['mes_actual']['gastos'] == 1500.0
+    assert historial_por_periodos(conn, date(2026, 11, 20))['periodos'][0]['gastos'] == 1500.0
 
     cursor.execute("DELETE FROM transacciones WHERE id = ?", (tx_id,))
     conn.commit()
 
     r2 = calcular_resumen(conn, 'MXN', 18.0, date(2026, 11, 20))
     assert r2['periodos'][0]['gastos']['normales'] == 0.0
-    assert r2['mes_actual']['gastos'] == 0.0
+    assert historial_por_periodos(conn, date(2026, 11, 20))['periodos'] == []
 
     # 2. En tarjetas KPI del presupuesto (get_presupuesto): resumen asignado y disponible excluyen tarjetas eliminadas
     cursor.execute("UPDATE presupuesto_config SET ingreso_base = 10000.0 WHERE id = 1")
@@ -2115,11 +2115,93 @@ def test_resumen_mensual_excluye_movimientos_de_apartados():
     conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-06', 4500, 'gasto', 1)")
     conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-07', 500, 'ingreso', 1)")
     conn.commit()
-    mes = resumen_mensual_core(conn)
-    assert mes == [{"mes": "2026-10", "ingresos": 28500.0, "gastos": 1500.0}], mes
-    # Coincide con el mes actual que usa el Resumen
-    r = calcular_resumen(conn, 'MXN', 18, date(2026, 10, 31))
-    assert r["mes_actual"]["gastos"] == mes[0]["gastos"] and r["mes_actual"]["ingresos"] == mes[0]["ingresos"], r["mes_actual"]
+    h = historial_por_periodos(conn, date(2026, 10, 31))
+    assert h["granularidad"] == "mes"   # sin ingreso fijo, meses calendario
+    assert h["periodos"] == [{"inicio": "2026-10-01", "fin": "2026-10-31", "ingresos": 28500.0, "gastos": 1500.0, "en_curso": True}], h
+
+
+def _historial(conn, hoy, **kw):
+    h = historial_por_periodos(conn, hoy, **kw)
+    return h["granularidad"], [(p["inicio"], p["fin"], p["ingresos"], p["gastos"], p["en_curso"]) for p in h["periodos"]]
+
+
+def test_historial_quincenal_sigue_los_cortes_de_la_nomina():
+    # Mismo escenario de referencia de tests/escenario.py, a mano: nómina quincenal que cobra el 15 y a fin de mes
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Nómina", 'ingreso', 14000.0, 'quincenal', 15, date(2026, 10, 31))
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Viaje', 'meta', 0, 18000)")
+    movs = [("2026-08-15", 299, 'gasto'), ("2026-09-01", 9500, 'gasto'), ("2026-09-10", 2000, 'gasto'),
+            ("2026-09-15", 14000, 'ingreso'), ("2026-09-15", 299, 'gasto'), ("2026-09-30", 14000, 'ingreso'),
+            ("2026-10-01", 9500, 'gasto'), ("2026-10-05", 3000, 'gasto'), ("2026-10-10", 2000, 'gasto'),
+            ("2026-10-15", 14000, 'ingreso'), ("2026-10-15", 299, 'gasto')]
+    for fecha, monto, tipo in movs:
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-20', 6000, 'gasto', 1)")   # depósito a meta: no cuenta
+    conn.commit()
+    granularidad, periodos = _historial(conn, date(2026, 10, 20))
+    assert granularidad == "quincena"
+    assert periodos == [
+        ("2026-10-15", "2026-10-30", 14000.0, 299.0, True),
+        ("2026-09-30", "2026-10-14", 14000.0, 14500.0, False),
+        ("2026-09-15", "2026-09-29", 14000.0, 299.0, False),
+        ("2026-08-31", "2026-09-14", 0.0, 11500.0, False),
+        ("2026-08-15", "2026-08-30", 0.0, 299.0, False),
+    ], periodos
+    assert sum(p[2] for p in periodos) == 42000.0 and sum(p[3] for p in periodos) == 26897.0   # todo lo no guardado en metas
+
+
+def test_historial_mensual_corta_en_el_dia_de_cobro():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Sueldo", 'ingreso', 5000.0, 'mensual', 15, date(2026, 11, 15))
+    for fecha, monto, tipo in (("2026-08-20", 30, 'gasto'), ("2026-09-20", 100, 'gasto'), ("2026-10-14", 50, 'gasto'),
+                               ("2026-10-15", 5000, 'ingreso'), ("2026-11-03", 10, 'gasto')):
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
+    conn.commit()
+    granularidad, periodos = _historial(conn, date(2026, 11, 5))
+    assert granularidad == "mes"
+    assert periodos == [
+        ("2026-10-15", "2026-11-14", 5000.0, 10.0, True),
+        ("2026-09-15", "2026-10-14", 0.0, 150.0, False),   # 20 sep y 14 oct caen antes del cobro del 15 de octubre
+        ("2026-08-15", "2026-09-14", 0.0, 30.0, False),    # 20 ago
+    ], periodos
+
+
+def test_historial_semanal_rellena_las_semanas_sin_movimientos():
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Pago semanal", 'ingreso', 1000.0, 'semanal', 9, date(2026, 11, 9))
+    for fecha, monto in (("2026-10-20", 10), ("2026-11-06", 20)):
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, 'gasto')", (fecha, monto))
+    conn.commit()
+    granularidad, periodos = _historial(conn, date(2026, 11, 8))
+    assert granularidad == "semana"
+    assert periodos == [
+        ("2026-11-02", "2026-11-08", 0.0, 20.0, True),
+        ("2026-10-26", "2026-11-01", 0.0, 0.0, False),   # semana sin movimientos: aparece en cero
+        ("2026-10-19", "2026-10-25", 0.0, 10.0, False),
+    ], periodos
+
+
+def test_historial_sin_ingreso_fijo_usa_meses_y_respeta_el_tope():
+    conn = nueva_bd()
+    for fecha, monto, tipo in (("2026-08-10", 5, 'gasto'), ("2026-10-05", 100, 'ingreso')):
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES (?, ?, ?)", (fecha, monto, tipo))
+    conn.commit()
+    granularidad, periodos = _historial(conn, date(2026, 10, 31))
+    assert granularidad == "mes"
+    assert periodos == [("2026-10-01", "2026-10-31", 100.0, 0.0, True), ("2026-09-01", "2026-09-30", 0.0, 0.0, False),
+                        ("2026-08-01", "2026-08-31", 0.0, 5.0, False)], periodos
+    assert [p[0] for p in _historial(conn, date(2026, 10, 31), maximo=2)[1]] == ["2026-10-01", "2026-09-01"]
+    # Sin movimientos no hay periodos
+    assert historial_por_periodos(nueva_bd(), date(2026, 10, 31)) == {"granularidad": "mes", "periodos": []}
+
+
+def test_historial_incluye_el_periodo_de_un_movimiento_futuro():
+    conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-12-20', 80, 'gasto')")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 10, 'gasto')")
+    conn.commit()
+    _, periodos = _historial(conn, date(2026, 10, 31))
+    assert [p[0] for p in periodos] == ["2026-12-01", "2026-11-01", "2026-10-01"] and periodos[0][3] == 80.0 and not periodos[0][4], periodos
 
 
 def test_saldo_de_apartados_coincide_con_sus_movimientos():
@@ -2187,12 +2269,12 @@ def test_conciliacion_resumen_historial_y_periodo():
     conn.commit()
     hoy = date(2026, 10, 20)
     r = calcular_resumen(conn, 'MXN', 18, hoy)
-    mes = resumen_mensual_core(conn)[0]
+    mes = historial_por_periodos(conn, hoy)["periodos"][0]
     per = calcular_periodo_actual(conn, hoy, r["balance"])
     # Disponible = todo lo que entró menos todo lo que salió, incluido lo guardado en metas
     assert r["balance"] == 28500 - 1500 - 4500 == 22500.0, r["balance"]
-    assert r["mes_actual"]["gastos"] == mes["gastos"] == 1500.0
-    assert r["mes_actual"]["ingresos"] == mes["ingresos"] == 28500.0
+    # El historial del periodo en curso no cuenta lo guardado en metas
+    assert mes["gastos"] == 1500.0 and mes["ingresos"] == 28500.0
     assert r["apartados"] == 4500.0 and r["patrimonio_neto"] == 4500.0
     assert per["disponible"] == r["balance"], per
     # Lo guardado en metas más lo disponible es el efectivo total: 22,500 + 4,500 = 27,000

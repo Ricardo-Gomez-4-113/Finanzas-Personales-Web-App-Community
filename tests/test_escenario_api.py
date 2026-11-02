@@ -62,19 +62,15 @@ def test_cifras_del_resumen():
     assert r["deuda_msi"] == escenario.ESPERADO["deuda_msi"], r["deuda_msi"]
 
 
-def test_mes_actual_excluye_metas():
-    mes = _resumen()["mes_actual"]
-    assert mes["ingresos"] == escenario.ESPERADO["mes_actual"]["ingresos"], mes
-    assert mes["gastos"] == escenario.ESPERADO["mes_actual"]["gastos"], mes
-
-
-def test_historial_mensual_coincide_con_el_mes_actual():
-    historial = CLIENT.get("/api/resumen-mensual", headers=ESTADO["h"]).json()
-    assert [(m["mes"], m["ingresos"], m["gastos"]) for m in historial] == \
-        [(e["mes"], e["ingresos"], e["gastos"]) for e in escenario.ESPERADO["historial"]], historial
-    octubre = historial[0]
-    mes = _resumen()["mes_actual"]
-    assert (octubre["ingresos"], octubre["gastos"]) == (mes["ingresos"], mes["gastos"])
+def test_historial_sigue_la_frecuencia_de_cobro_y_excluye_metas():
+    historial = CLIENT.get("/api/historial-periodos", headers=ESTADO["h"]).json()
+    assert historial["granularidad"] == "quincena", historial     # la nómina del escenario es quincenal
+    assert [(p["inicio"], p["fin"], p["ingresos"], p["gastos"]) for p in historial["periodos"]] == \
+        [(e["inicio"], e["fin"], e["ingresos"], e["gastos"]) for e in escenario.ESPERADO["historial"]], historial
+    assert [p["en_curso"] for p in historial["periodos"]] == [True, False, False, False, False]
+    # Mismo corte que la cinta de periodos del tablero
+    cinta = _resumen()["periodos"][0]
+    assert (historial["periodos"][0]["inicio"], historial["periodos"][0]["fin"]) == (cinta["inicio"], cinta["fin"]), (historial["periodos"][0], cinta)
 
 
 def test_periodo_libre_hasta_el_cobro():
@@ -183,7 +179,7 @@ def test_excel_coincide_con_el_resumen():
 def test_respaldo_se_restaura_identico():
     h = ESTADO["h"]
     antes = _resumen()
-    historial_antes = CLIENT.get("/api/resumen-mensual", headers=h).json()
+    historial_antes = CLIENT.get("/api/historial-periodos", headers=h).json()
     descarga = CLIENT.get("/api/backup", headers=h)
     assert descarga.status_code == 200, descarga.text
     assert descarga.content[:16] == b"SQLite format 3\x00"
@@ -191,7 +187,7 @@ def test_respaldo_se_restaura_identico():
     assert r.status_code == 200, r.text
     assert _resumen()["balance"] == antes["balance"]
     assert _resumen()["patrimonio_neto"] == antes["patrimonio_neto"]
-    assert CLIENT.get("/api/resumen-mensual", headers=h).json() == historial_antes
+    assert CLIENT.get("/api/historial-periodos", headers=h).json() == historial_antes
 
 
 def _usuario_flujos():
@@ -267,8 +263,7 @@ if __name__ == "__main__":
         _preparar()
         registradas = [
             (test_cifras_del_resumen, test_cifras_del_resumen),
-            (test_mes_actual_excluye_metas, test_mes_actual_excluye_metas),
-            (test_historial_mensual_coincide_con_el_mes_actual, test_historial_mensual_coincide_con_el_mes_actual),
+            (test_historial_sigue_la_frecuencia_de_cobro_y_excluye_metas, test_historial_sigue_la_frecuencia_de_cobro_y_excluye_metas),
             (test_periodo_libre_hasta_el_cobro, test_periodo_libre_hasta_el_cobro),
             (test_periodos_siguen_la_nomina_y_encadenan_el_saldo, test_periodos_siguen_la_nomina_y_encadenan_el_saldo),
             (test_metas_guardan_lo_correcto, test_metas_guardan_lo_correcto),

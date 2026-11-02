@@ -62,19 +62,23 @@ def sembrar(client, headers):
 #   Meta Viaje: deposita 6,000 y retira 1,000 hoy -> 5,000 guardados
 #   Meta Fondo: deposita 2,000 hoy                -> 2,000 guardados
 #   Disponible = 42,000 - 19,000 - 897 - 4,000 - 3,000 - 6,000 + 1,000 - 2,000 = 8,103
-#   Octubre: ingresos 14,000 (15 oct); gastos 9,500 + 299 + 2,000 + 3,000 = 14,799 (sin metas)
-#   Septiembre: ingresos 28,000; gastos 9,500 + 299 + 2,000 = 11,799
-#   Agosto: gastos 299
+#   Historial por quincena (cobra el 15 y a fin de mes; periodo = del cobro al día anterior al siguiente), sin metas:
+#     15-30 oct (en curso): ingresos 14,000 (15 oct); gastos 299 (Netflix 15 oct)
+#     30 sep-14 oct: ingresos 14,000 (30 sep); gastos 9,500 (1 oct) + 3,000 (5 oct) + 2,000 (10 oct) = 14,500
+#     15-29 sep: ingresos 14,000 (15 sep); gastos 299 (Netflix 15 sep)
+#     31 ago-14 sep: gastos 9,500 (1 sep) + 2,000 (10 sep) = 11,500
+#     15-30 ago: gastos 299 (Netflix 15 ago)
 ESPERADO = {
     "disponible": 8103.0,
     "apartados": 7000.0,
     "patrimonio_neto": 7000.0,
     "deuda_msi": 20000.0,
-    "mes_actual": {"ingresos": 14000.0, "gastos": 14799.0},
     "historial": [
-        {"mes": "2026-10", "ingresos": 14000.0, "gastos": 14799.0},
-        {"mes": "2026-09", "ingresos": 28000.0, "gastos": 11799.0},
-        {"mes": "2026-08", "ingresos": 0.0, "gastos": 299.0},
+        {"inicio": "2026-10-15", "fin": "2026-10-30", "ingresos": 14000.0, "gastos": 299.0},
+        {"inicio": "2026-09-30", "fin": "2026-10-14", "ingresos": 14000.0, "gastos": 14500.0},
+        {"inicio": "2026-09-15", "fin": "2026-09-29", "ingresos": 14000.0, "gastos": 299.0},
+        {"inicio": "2026-08-31", "fin": "2026-09-14", "ingresos": 0.0, "gastos": 11500.0},
+        {"inicio": "2026-08-15", "fin": "2026-08-30", "ingresos": 0.0, "gastos": 299.0},
     ],
     "meta_viaje": 5000.0,
     "meta_fondo": 2000.0,

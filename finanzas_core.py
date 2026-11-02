@@ -1572,19 +1572,52 @@ def exportar_presupuesto_a_fijos_core(
     }
 
 
-def resumen_mensual_core(conn: sqlite3.Connection) -> list:
-    """Ingresos y gastos por mes, sin movimientos de apartados (depósitos y retiros de metas
-    no son ingreso ni gasto real). Misma regla que `mes_actual` en calcular_resumen."""
-    filas = conn.execute("""
-        SELECT strftime('%Y-%m', fecha) AS mes,
-               COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) AS ingresos,
-               COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE 0 END), 0) AS gastos
-        FROM transacciones
-        WHERE apartado_id IS NULL
-        GROUP BY mes
-        ORDER BY mes DESC
-    """).fetchall()
-    return [dict(f) for f in filas]
+GRANULARIDAD_POR_FRECUENCIA = {'mensual': 'mes', 'quincenal': 'quincena', 'semanal': 'semana'}
+
+
+def historial_por_periodos(conn: sqlite3.Connection, hoy: date, maximo: int = 104) -> Dict[str, Any]:
+    """Ingresos y gastos por periodo de cobro, del más reciente al más antiguo, sin movimientos de apartados
+    (depósitos y retiros de metas no son ingreso ni gasto real).
+
+    Los periodos siguen la frecuencia del ingreso fijo principal, con el mismo corte que el tablero: uno por mes
+    de cobro, por quincena o por semana (`granularidad`). Sin ingreso fijo son meses calendario.
+    Van seguidos, sin saltos: un periodo sin movimientos aparece en cero. Se devuelven a lo más `maximo`."""
+    filas = conn.execute(
+        "SELECT fecha, tipo, monto FROM transacciones WHERE apartado_id IS NULL ORDER BY fecha"
+    ).fetchall()
+    principal = _ingreso_principal(_recurrentes_vigentes(conn))
+    granularidad = GRANULARIDAD_POR_FRECUENCIA[principal["frecuencia"]] if principal else 'mes'
+    if not filas:
+        return {"granularidad": granularidad, "periodos": []}
+
+    primero = date.fromisoformat(filas[0]["fecha"])
+    ultimo = max(hoy, date.fromisoformat(filas[-1]["fecha"]))
+    limites = []
+    if principal is None:
+        anio, mes = primero.year, primero.month
+        while (anio, mes) <= (ultimo.year, ultimo.month):
+            limites.append((date(anio, mes, 1), date(anio, mes, ultimo_dia_mes(anio, mes))))
+            anio, mes = (anio + 1, 1) if mes == 12 else (anio, mes + 1)
+    else:
+        frecuencia, dia = principal["frecuencia"], principal["dia"]
+        inicio, fin = periodo_de_cobro_que_contiene(principal, primero)
+        while inicio <= ultimo:
+            limites.append((inicio, fin))
+            inicio = fin + timedelta(days=1)
+            fin = siguiente_fecha(inicio, frecuencia, dia) - timedelta(days=1)
+
+    periodos = [{"inicio": i.isoformat(), "fin": f.isoformat(), "ingresos": 0.0, "gastos": 0.0,
+                 "en_curso": i <= hoy <= f} for i, f in limites]
+    # Los movimientos y los periodos van ordenados por fecha: se recorren juntos
+    pos = 0
+    for fila in filas:
+        while fila["fecha"] > periodos[pos]["fin"]:
+            pos += 1
+        clave = "ingresos" if fila["tipo"] == 'ingreso' else "gastos"
+        periodos[pos][clave] += float(fila["monto"])
+    for p in periodos:
+        p["ingresos"], p["gastos"] = round(p["ingresos"], 2), round(p["gastos"], 2)
+    return {"granularidad": granularidad, "periodos": list(reversed(periodos))[:maximo]}
 
 
 def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo: str, monto: float) -> None:
@@ -2042,7 +2075,6 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     Resumen patrimonial en la moneda base.
     - balance: transacciones materializadas (las cuotas MSI bajan el balance solo al vencer).
     - patrimonio_neto: suma apartados (metas) + inversiones (el efectivo operativo se gestiona por separado).
-    - mes_actual: excluye movimientos de apartados (no son gasto ni ingreso real).
     - deuda_msi: incluye las compras pausadas; la deuda sigue pendiente aunque no se cobre.
     - periodos: flujo por periodo del ingreso fijo (ver calcular_periodos).
     """
@@ -2070,21 +2102,6 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
     # Pausadas incluidas: una compra a meses pausada sigue debiéndose
     deuda_msi = sum(deuda_pendiente(r) for r in cursor.execute("SELECT * FROM recurrentes").fetchall())
 
-    mes = f"{hoy.year:04d}-{hoy.month:02d}"
-    cursor.execute(
-        """
-        SELECT 
-            COALESCE(SUM(CASE WHEN tipo = 'gasto' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_gastos,
-            COALESCE(SUM(CASE WHEN tipo = 'ingreso' AND apartado_id IS NULL THEN monto ELSE 0 END), 0.0) AS mes_ingresos
-        FROM transacciones
-        WHERE strftime('%Y-%m', fecha) = ?
-        """,
-        (mes,)
-    )
-    fila_mes = cursor.fetchone()
-    mes_gastos = float(fila_mes["mes_gastos"]) if fila_mes else 0.0
-    mes_ingresos = float(fila_mes["mes_ingresos"]) if fila_mes else 0.0
-
     balance = ingresos - gastos
     patrimonio = conv(apartados) + inversiones_total
 
@@ -2097,11 +2114,6 @@ def calcular_resumen(conn: sqlite3.Connection, moneda_base: str, tasa_usd_mxn: f
         "apartados": round(conv(apartados), 2),
         "inversiones": round(inversiones_total, 2),
         "deuda_msi": round(conv(deuda_msi), 2),
-        "mes_actual": {
-            "ingresos": round(conv(mes_ingresos), 2),
-            "gastos": round(conv(mes_gastos), 2),
-            "ahorro": round(conv(mes_ingresos - mes_gastos), 2),
-        },
         "patrimonio_neto": round(patrimonio, 2),
         "periodo": _periodo_en_moneda(calcular_periodo_actual(conn, hoy, balance), conv),
         "periodos": _periodos_en_moneda(calcular_periodos(conn, hoy)["periodos"], conv),

@@ -55,7 +55,7 @@ Todas salen de `finanzas_core.py`. Si una pantalla muestra una cifra distinta, e
 | Disponible (balance) | Resumen, periodo de cobro | Suma de ingresos menos gastos de **todas** las transacciones (incluye depósitos y retiros de metas, que mueven dinero hacia y desde el ahorro). |
 | Dinero en metas | Resumen, Metas | Suma de `monto_actual` de los apartados; coincide con depósitos menos retiros de sus movimientos. |
 | Patrimonio | Resumen | Metas + valor de inversiones. |
-| Ingresos / gastos del mes | Historial mensual | Solo transacciones **sin** apartado. Los depósitos a metas no son gasto. |
+| Ingresos / gastos por periodo | Historial y gráfica del Resumen | `historial_por_periodos` (`GET /api/historial-periodos`). Un periodo por **mes de cobro, quincena o semana**, según la frecuencia del ingreso fijo principal, con el mismo corte que la cinta de periodos (del cobro al día anterior al siguiente). Sin ingreso fijo, meses calendario. Van seguidos: un periodo sin movimientos sale en cero. Solo transacciones **sin** apartado: los depósitos a metas no son gasto. |
 | Periodo | Resumen, Movimientos | Lo marca el ingreso fijo de mayor monto mensual: del día de cobro al día anterior al siguiente cobro. Sin ingreso fijo, meses calendario. `calcular_periodos` devuelve el periodo en curso y los siguientes. |
 | Ingreso del periodo | Resumen, Movimientos | Ingresos con fecha dentro del periodo: recibidos más los fijos aún por recibir. |
 | Gastos del periodo | Movimientos | Normales + fijos + cuotas MSI con fecha dentro del periodo, registrados o programados, con sus fechas reales (un gasto semanal cuenta 4 o 5 veces, no un promedio). Sin aportes a metas. |

@@ -5,15 +5,15 @@
 import { cerrarModalCrearUsuario, cerrarModalEditarUsuario } from './admin.js';
 import { cargarApartados, cerrarModalCrearApartado } from './apartados.js';
 import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiva, mostrarVistaLanding, mostrarVistaLogin, verificarSesionInicial } from './auth.js';
-import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaMes, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
+import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPeriodo, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=22e92cd82b';
+import { cargarRecurrentes } from './recurrentes.js?v=55ee19cd8a';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=22e92cd82b';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=55ee19cd8a';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -90,32 +90,35 @@ export async function cargarDatos() {
             document.getElementById('lbl-apartados-total-acum').innerHTML = `${montoHTML(dataResumen.apartados)}`;
         }
 
-        // 2. Resumen Mensual Histórico
-        const resMensual = await apiFetch('/api/resumen-mensual');
-        const dataMensual = await leerJson(resMensual, 'No se pudo cargar el resumen mensual.');
-        
-        const contenedorMensual = document.getElementById('lista-resumen-mensual');
-        if (contenedorMensual) {
-            contenedorMensual.innerHTML = '';
-            if (dataMensual.length === 0) {
-                contenedorMensual.innerHTML = '<p class="monthly-vacio">Sin registros mensuales aún.</p>';
+        // 2. Historial por periodo de cobro: mes, quincena o semana, según el ingreso fijo
+        const resHistorial = await apiFetch('/api/historial-periodos');
+        const historial = await leerJson(resHistorial, 'No se pudo cargar el historial.');
+        const por = historial.granularidad;   // «mes», «quincena» o «semana»
+        document.getElementById('titulo-grafica-periodos').textContent = `Ingresos y gastos por ${por}`;
+        document.getElementById('titulo-historial-periodos').textContent = `Historial por ${por}`;
+
+        const contenedorHistorial = document.getElementById('lista-historial-periodos');
+        if (contenedorHistorial) {
+            contenedorHistorial.innerHTML = '';
+            if (historial.periodos.length === 0) {
+                contenedorHistorial.innerHTML = '<p class="monthly-vacio">Sin registros aún.</p>';
             } else {
-                dataMensual.forEach(m => {
+                historial.periodos.forEach(p => {
                     const div = document.createElement('div');
                     div.className = 'monthly-card';
                     div.innerHTML = `
-                        <div><strong>${escapeHTML(etiquetaMes(m.mes))}</strong></div>
+                        <div><strong>${escapeHTML(etiquetaPeriodo(p))}</strong>${p.en_curso ? ' <span class="texto-tenue texto-xs">en curso</span>' : ''}</div>
                         <div class="monthly-info">
-                            <span class="monthly-ingreso">+${montoMxnHTML(m.ingresos)}</span>
-                            <span class="monthly-gasto">-${montoMxnHTML(m.gastos)}</span>
+                            <span class="monthly-ingreso">+${montoMxnHTML(p.ingresos)}</span>
+                            <span class="monthly-gasto">-${montoMxnHTML(p.gastos)}</span>
                         </div>
                     `;
-                    contenedorMensual.appendChild(div);
+                    contenedorHistorial.appendChild(div);
                 });
             }
         }
 
-        actualizarGrafica(dataMensual.slice(0, 12).reverse().map(m => ({ ...m, ingresos: desdeMXN(m.ingresos), gastos: desdeMXN(m.gastos) })));
+        actualizarGrafica(historial.periodos.slice(0, 12).reverse().map(p => ({ ...p, ingresos: desdeMXN(p.ingresos), gastos: desdeMXN(p.gastos) })));
 
         // 3. Resto de datos en paralelo: movimientos, categorías, fijos y MSI, metas e inversiones
         await Promise.all([

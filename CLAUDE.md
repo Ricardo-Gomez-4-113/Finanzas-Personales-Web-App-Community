@@ -127,6 +127,7 @@ Decisiones del usuario que no se vuelven a proponer:
 - El patrimonio es metas + inversiones; no se suma el efectivo ni se resta la deuda.
 - Las inversiones y cuentas con rendimiento son una calculadora: no generan movimientos de caja.
 - No se puede tener un gasto fijo sin un ingreso fijo activo: el bloqueo es deliberado, no una advertencia.
+- El historial y la gráfica del Resumen siguen la frecuencia de cobro del ingreso fijo principal: un periodo por mes de cobro, quincena o semana (meses calendario si no hay ingreso fijo). Se retiró `mes_actual` del resumen (ninguna pantalla lo usaba) y `/api/resumen-mensual` pasó a `/api/historial-periodos` (`historial_por_periodos`).
 - No hay frecuencia anual: solo semanal, quincenal y mensual. Se quitó el código a medias que la contemplaba (`siguiente_fecha`, `mensualizar`, `_ingreso_principal`); la API y la base ya la rechazaban.
 
 Tanda visual (`2857cfd`):
@@ -144,7 +145,7 @@ Tanda visual (`2857cfd`):
 Visual abierto: consolidar las 5 hojas (180 KB) y los `rgba` de colores de marca de la landing (SaaS); los estilos en línea que quedan son anchos dinámicos por dato. En `tema.css` queda un `#000` en una máscara de degradado, donde solo cuenta la transparencia.
 
 Abierto:
-- **Decisión pendiente:** las dos nociones de «mes» del tablero (calendario y periodo de cobro); moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).
+- **Decisión pendiente:** moneda desconocida de Yahoo en el portafolio (hoy se valúa a valor nominal; rechazarla rompería la vista).
 - `detectar_fijos_recurrentes_core` empareja tarjetas por subcadena (`LIKE '%nombre%'`): «Gas» podría fusionarse con «Gasolina».
 - `obtener_total_apartados` devuelve 0.0 ante cualquier error, lo que oculta fallos de la base.
 - La cuota MSI se calcula también en `recurrentes.js` para la vista previa; el valor guardado sale de `cuota_msi`.

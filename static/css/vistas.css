@@ -34,7 +34,7 @@
 
 .monthly-info span { font-weight: bold; margin-left: 8px; }
 
-#lista-resumen-mensual {
+#lista-historial-periodos {
     max-height: 230px;
     overflow-y: auto;
     padding-right: 4px;

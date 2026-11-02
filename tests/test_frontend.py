@@ -256,10 +256,14 @@ def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
         assert page.inner_text("#periodo-disponible") == "$8,103.00"
         assert "31 de octubre" in page.inner_text("#periodo-titulo"), page.inner_text("#periodo-titulo")
         assert "7,000.00" in page.inner_text("#lbl-dash-patrimonio"), page.inner_text("#lbl-dash-patrimonio")
-        historial = page.locator("#lista-resumen-mensual .monthly-card")
-        assert historial.count() == 3, historial.count()
+        # La nómina es quincenal: el historial va por quincena, del cobro al día anterior al siguiente
+        assert page.inner_text("#titulo-historial-periodos") == "Historial por quincena"
+        historial = page.locator("#lista-historial-periodos .monthly-card")
+        assert historial.count() == 5, historial.count()
         primera = historial.nth(0).inner_text()
-        assert "oct 2026" in primera.lower() and "+$14,000.00" in primera and "-$14,799.00" in primera, primera
+        assert "15 oct – 30 oct" in primera.lower() and "en curso" in primera and "+$14,000.00" in primera and "-$299.00" in primera, primera
+        segunda = historial.nth(1).inner_text()
+        assert "30 sep – 14 oct" in segunda.lower() and "+$14,000.00" in segunda and "-$14,500.00" in segunda, segunda
         assert not errores, errores
     finally:
         ctx.close()
@@ -1288,22 +1292,25 @@ def test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base):
         ctx.close()
 
 
-def test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios(navegador, base):
+def test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         page.wait_for_selector("#periodo-libre:not(:empty)")
+        assert page.inner_text("#titulo-grafica-periodos") == "Ingresos y gastos por quincena"
         etiquetas = page.evaluate("import('/static/js/core.js').then(m => m.estado.graficas.barras.data.labels)")
-        assert etiquetas and all(re.fullmatch(r"[a-záéíóú]{3,4} \d{4}", e) for e in etiquetas), etiquetas   # «oct 2026», no «2026-10»
-        # Un mes sin movimientos entre dos con movimientos aparece en cero
+        # Del más antiguo al más reciente, uno por quincena de cobro
+        assert etiquetas == ["15 ago – 30 ago", "31 ago – 14 sep", "15 sep – 29 sep", "30 sep – 14 oct", "15 oct – 30 oct"], etiquetas
+        # Un mes calendario completo se rotula «nov 2026»; un periodo que cruza el año lleva el año
         resultado = page.evaluate("""async () => {
             const { actualizarGrafica } = await import('/static/js/dashboard.js');
             const { estado } = await import('/static/js/core.js');
-            actualizarGrafica([{ mes: '2026-11', ingresos: 100, gastos: 50 }, { mes: '2027-02', ingresos: 300, gastos: 10 }]);
-            const d = estado.graficas.barras.data;
-            return { etiquetas: d.labels, ingresos: d.datasets[0].data, gastos: d.datasets[1].data };
+            actualizarGrafica([
+                { inicio: '2026-11-01', fin: '2026-11-30', ingresos: 100, gastos: 50 },
+                { inicio: '2026-12-15', fin: '2027-01-14', ingresos: 300, gastos: 10 },
+            ]);
+            return estado.graficas.barras.data.labels;
         }""")
-        assert resultado["etiquetas"] == ["nov 2026", "dic 2026", "ene 2027", "feb 2027"], resultado
-        assert resultado["ingresos"] == [100, 0, 0, 300] and resultado["gastos"] == [50, 0, 0, 10], resultado
+        assert resultado == ["nov 2026", "15 dic 2026 – 14 ene 2027"], resultado
         assert not errores, errores
     finally:
         ctx.close()
@@ -1410,11 +1417,11 @@ def test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base):
             ".then(r => r.json()).then(d => d.factores_desde_mxn.EUR)")
         assert 0 < factor < 1, factor
 
-        # Historial mensual: octubre tuvo 14,000 de ingresos y 14,799 de gastos (MXN)
-        _esperar(page, "document.querySelector('#lista-resumen-mensual .monthly-card')?.textContent.includes('€')")
-        primera = page.locator("#lista-resumen-mensual .monthly-card").nth(0).inner_text()
+        # Historial: la quincena en curso tuvo 14,000 de ingresos y 299 de gastos (MXN)
+        _esperar(page, "document.querySelector('#lista-historial-periodos .monthly-card')?.textContent.includes('€')")
+        primera = page.locator("#lista-historial-periodos .monthly-card").nth(0).inner_text()
         ingresos, gastos = [cifra(t) for t in re.findall(r"[+-]€[\d,]+\.\d\d", primera)]
-        assert abs(ingresos - 14000 * factor) < 0.011 and abs(gastos - 14799 * factor) < 0.011, (primera, factor)
+        assert abs(ingresos - 14000 * factor) < 0.011 and abs(gastos - 299 * factor) < 0.011, (primera, factor)
 
         # Movimientos del periodo en curso: Netflix, 299 MXN
         _ir(page, "tab-movimientos")
@@ -1518,7 +1525,7 @@ if __name__ == "__main__":
                 (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
                 (test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar, lambda: test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base)),
                 (test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva, lambda: test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base)),
-                (test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios, lambda: test_grafica_mensual_etiqueta_los_meses_y_rellena_los_vacios(navegador, base)),
+                (test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro, lambda: test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro(navegador, base)),
                 (test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad, lambda: test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad(navegador, base)),
                 (test_barra_de_seleccion_multiple_aparece_al_marcar_un_movimiento, lambda: test_barra_de_seleccion_multiple_aparece_al_marcar_un_movimiento(navegador, base)),
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),

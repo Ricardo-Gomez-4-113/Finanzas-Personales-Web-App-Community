@@ -127,6 +127,19 @@ export function etiquetaMes(mes) {
         .format(new Date(Date.UTC(anio, numMes - 1, 1))).replace('.', '');
 }
 
+/** Etiqueta de un periodo: «oct 2026» si es un mes calendario completo; si no, «15 oct – 30 oct» (con año si cruza uno). */
+export function etiquetaPeriodo({ inicio, fin }) {
+    const [anioIni, mesIni, diaIni] = inicio.split('-').map(Number);
+    const [anioFin, mesFin, diaFin] = fin.split('-').map(Number);
+    if (diaIni === 1 && anioIni === anioFin && mesIni === mesFin && diaFin === new Date(Date.UTC(anioFin, mesFin, 0)).getUTCDate()) {
+        return etiquetaMes(inicio.slice(0, 7));
+    }
+    const corta = (iso, conAnio) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', ...(conAnio ? { year: 'numeric' } : {}), timeZone: 'UTC' })
+        .format(new Date(`${iso}T00:00:00Z`)).replace(/\./g, '');
+    const cruzaAnio = anioIni !== anioFin;
+    return `${corta(inicio, cruzaAnio)} – ${corta(fin, cruzaAnio)}`;
+}
+
 // Un `title` con importes revela lo que el modo privacidad oculta. Cada elemento guarda su texto sin importes
 // (data-titulo) y con ellos (data-titulo-monto), y el `title` sigue al modo vigente.
 function aplicarTituloPrivado(el) {
