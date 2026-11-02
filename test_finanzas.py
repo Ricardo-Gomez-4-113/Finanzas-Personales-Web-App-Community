@@ -2704,6 +2704,48 @@ def test_ventana_quincenal_corta_en_fin_de_mes_real_y_semanal_es_una_semana():
     assert (v["inicio"], v["fin"], v["ingreso_ventana"]) == ("2026-11-09", "2026-11-15", 3000.0), v
 
 
+def test_exportar_tarjeta_antigua_dividida_sin_dia_no_falla():
+    # cfg es una fila de SQLite (sin .get): exportar una tarjeta antigua con subperiodos sin día lanzaba AttributeError
+    from finanzas_core import exportar_presupuesto_a_fijos_core
+    import json as _json
+    for subdivision, dias_esperados in (('quincenas', [1, 16]), ('ninguna', [1, 2])):
+        conn = nueva_bd()
+        conn.execute("UPDATE presupuesto_config SET ingreso_base = 10000, frecuencia = 'mensual', subdivision_tipo = ? WHERE id = 1", (subdivision,))
+        conn.execute("""
+            INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, notas, orden, distribucion_subperiodos)
+            VALUES ('Despensa', 'shopping-bag', 'amber', 40.0, 4000.0, 'Comida', 1, ?)
+        """, (_json.dumps([{"id": "a", "nombre": "Primera", "monto": 2500.0, "dia": None},
+                           {"id": "b", "nombre": "Segunda", "monto": 1500.0, "dia": None}]),))
+        conn.commit()
+        exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
+        filas = conn.execute("SELECT descripcion, monto, dia FROM recurrentes WHERE descripcion LIKE 'Despensa%' ORDER BY monto DESC").fetchall()
+        assert [(f["monto"], f["dia"]) for f in filas] == list(zip([2500.0, 1500.0], dias_esperados)), (subdivision, [tuple(f) for f in filas])
+
+
+def test_deposito_a_meta_consume_la_capacidad_del_periodo_igual_que_el_saldo():
+    # Lo depositado a una meta sale del dinero disponible: la regla del periodo y la de saldo deben coincidir.
+    # (No es un error que los depósitos cuenten como cargos de la ventana; excluirlos aflojaría la regla.)
+    from finanzas_core import validar_limite_cargos_ventana, validar_saldo_disponible_fecha
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Sueldo", 'ingreso', 14000.0, 'quincenal', 15, date(2026, 11, 30))
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-15', 14000, 'ingreso', 'Sueldo', 1)")
+    conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 6000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id, apartado_id) VALUES ('2026-11-16', 6000, 'gasto', 'Ahorro destinado a: Viaje', 1, 1)")
+    conn.commit()
+    cur = conn.cursor()
+
+    def acepta(regla, *args):
+        try:
+            regla(cur, *args)
+            return True
+        except ValueError:
+            return False
+
+    for monto, cabe in ((7000.0, True), (8000.0, True), (9000.0, False)):   # quedan 8,000 libres
+        assert acepta(validar_limite_cargos_ventana, '2026-11-20', monto) is cabe, ("periodo", monto)
+        assert acepta(validar_saldo_disponible_fecha, '2026-11-20', monto, 'gasto') is cabe, ("saldo", monto)
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

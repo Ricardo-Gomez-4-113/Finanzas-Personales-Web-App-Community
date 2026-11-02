@@ -1418,7 +1418,7 @@ def exportar_presupuesto_a_fijos_core(
                 s_monto = round(float(sp["monto"]), 2)
                 s_dia = int(sp["dia"]) if sp.get("dia") is not None else (int(t["dia_pago"]) if "dia_pago" in t.keys() and t["dia_pago"] is not None else None)
                 if s_dia is None:
-                    if frecuencia == 'quincenal' or (cfg and cfg.get("subdivision_tipo") == 'quincenas'):
+                    if frecuencia == 'quincenal' or (cfg and "subdivision_tipo" in cfg.keys() and cfg["subdivision_tipo"] == 'quincenas'):
                         s_dia = 1 if idx_sp == 0 else 16
                     else:
                         s_dia = idx_sp + 1
