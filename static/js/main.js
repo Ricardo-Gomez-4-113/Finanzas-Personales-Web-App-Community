@@ -9,11 +9,11 @@ import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPerio
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=89ea659c1f';
+import { cargarRecurrentes } from './recurrentes.js?v=e81679bac4';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=89ea659c1f';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=e81679bac4';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -109,8 +109,8 @@ export async function cargarDatos() {
                     div.innerHTML = `
                         <div><strong>${escapeHTML(etiquetaPeriodo(p))}</strong>${p.en_curso ? ' <span class="texto-tenue texto-xs">en curso</span>' : ''}</div>
                         <div class="monthly-info">
-                            <span class="monthly-ingreso">+${montoMxnHTML(p.ingresos)}</span>
-                            <span class="monthly-gasto">-${montoMxnHTML(p.gastos)}</span>
+                            <span class="monthly-ingreso${Number(p.ingresos) ? '' : ' es-cero'}">+${montoMxnHTML(p.ingresos)}</span>
+                            <span class="monthly-gasto${Number(p.gastos) ? '' : ' es-cero'}">−${montoMxnHTML(p.gastos)}</span>
                         </div>
                     `;
                     contenedorHistorial.appendChild(div);

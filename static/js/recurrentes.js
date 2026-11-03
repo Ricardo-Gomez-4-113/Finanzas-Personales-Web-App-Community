@@ -562,7 +562,13 @@ function pintarCintaMovimientos(periodos) {
 function pintarKpisPeriodo() {
     const p = periodosKpi.find(x => x.inicio === inicioKpiSeleccionado);
     if (!p) return;
-    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = montoHTML(v); };
+    const setTxt = (id, v) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = montoHTML(v);
+        // Un importe en cero no es ingreso ni gasto: la tarjeta lo muestra en tinta neutra
+        el.closest('.card')?.classList.toggle('es-cero', !Number(v));
+    };
     setTxt('lbl-rec-ingreso', p.ingresos.total);
     setTxt('lbl-rec-gastos-normales', p.gastos.normales);
     setTxt('lbl-rec-fijos', p.gastos.fijos);
@@ -593,7 +599,13 @@ export async function cargarRecurrentes() {
         periodosKpi = periodos;
         fijosPorPeriodo = porPeriodo;
         pintarCintaMovimientos(porPeriodo.periodos || []);
-        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = montoHTML(v); };
+        const setTxt = (id, v) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = montoHTML(v);
+            // Un importe en cero no es ingreso ni gasto: la tarjeta lo muestra en tinta neutra
+            el.closest('.card')?.classList.toggle('es-cero', !Number(v));
+        };
         setTxt('lbl-fijos-deuda', resumen.deuda_msi || 0);
 
 

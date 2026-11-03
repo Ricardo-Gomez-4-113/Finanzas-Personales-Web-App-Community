@@ -651,7 +651,7 @@
 }
 
 :root .monthly-card:last-child { border-bottom: 0; }
-:root .monthly-card strong { font-weight: 500; color: var(--text-color); text-transform: capitalize; }
+:root .monthly-card strong { font-weight: 500; color: var(--text-color); }
 :root .monthly-info { gap: 18px; font-size: var(--fs-sm); }
 
 :root .chart-container { position: relative; height: 260px; }
@@ -1891,6 +1891,27 @@
 :root .monthly-vacio { text-align: center; color: var(--text-muted); }
 :root .monthly-ingreso { color: var(--success-text); }
 :root .monthly-gasto { color: var(--danger-text); }
+
+/* Un importe en cero va en tinta neutra: el rojo y el verde son para cifras distintas de cero */
+:root .card.es-cero p,
+:root .monthly-ingreso.es-cero,
+:root .monthly-gasto.es-cero { color: var(--text-muted); }
+
+/* Un solo nivel de tarjeta: un panel dentro de otro panel no lleva borde ni fondo propio */
+:root .panel .panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* Insignias: relleno tenue, sin borde */
+:root .badge-tag { border: none; }
+
+/* Botones: planos, sin sombra en reposo ni al pasar el cursor (el botón «+» conserva la suya) */
+:root button:not(.fab),
+:root button:not(.fab):hover,
+:root button:not(.fab):active { box-shadow: none; }
 
 /* Login y utilidades que sustituyen estilos en línea */
 :root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }

@@ -302,9 +302,9 @@ def test_resumen_muestra_las_cifras_del_escenario(navegador, base):
         historial = page.locator("#lista-historial-periodos .monthly-card")
         assert historial.count() == 5, historial.count()
         primera = historial.nth(0).inner_text()
-        assert "15 oct – 30 oct" in primera.lower() and "en curso" in primera and "+$14,000.00" in primera and "-$299.00" in primera, primera
+        assert "15 oct – 30 oct" in primera.lower() and "en curso" in primera and "+$14,000.00" in primera and "−$299.00" in primera, primera
         segunda = historial.nth(1).inner_text()
-        assert "30 sep – 14 oct" in segunda.lower() and "+$14,000.00" in segunda and "-$14,500.00" in segunda, segunda
+        assert "30 sep – 14 oct" in segunda.lower() and "+$14,000.00" in segunda and "−$14,500.00" in segunda, segunda
         assert not errores, errores
     finally:
         ctx.close()
@@ -1004,6 +1004,23 @@ def test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base):
         ctx.close()
 
 
+def test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base):
+    """Un importe en cero no se pinta en rojo; el historial usa el menos tipográfico pegado a la cifra;
+    un panel dentro de otro panel no lleva borde propio."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#lbl-rec-gastos-normales:not(:empty)")
+        color_cero = page.evaluate("getComputedStyle(document.getElementById('lbl-rec-gastos-normales')).color")
+        color_fijos = page.evaluate("getComputedStyle(document.getElementById('lbl-rec-fijos')).color")
+        assert color_cero != color_fijos, f"el cero se ve igual que un gasto: {color_cero}"
+        assert page.evaluate("document.getElementById('lbl-rec-gastos-normales').closest('.card').classList.contains('es-cero')")
+        anidados = page.evaluate("[...document.querySelectorAll('.panel .panel')].filter(p => getComputedStyle(p).borderTopWidth !== '0px').length")
+        assert anidados == 0, f"{anidados} paneles anidados con borde propio"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1499,7 +1516,7 @@ def test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base):
         # Historial: la quincena en curso tuvo 14,000 de ingresos y 299 de gastos (MXN)
         _esperar(page, "document.querySelector('#lista-historial-periodos .monthly-card')?.textContent.includes('€')")
         primera = page.locator("#lista-historial-periodos .monthly-card").nth(0).inner_text()
-        ingresos, gastos = [cifra(t) for t in re.findall(r"[+-]€[\d,]+\.\d\d", primera)]
+        ingresos, gastos = [cifra(t) for t in re.findall(r"[+−-]€[\d,]+\.\d\d", primera)]
         assert abs(ingresos - 14000 * factor) < 0.011 and abs(gastos - 299 * factor) < 0.011, (primera, factor)
 
         # Movimientos del periodo en curso: Netflix, 299 MXN
@@ -1593,6 +1610,7 @@ if __name__ == "__main__":
                 (test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos, lambda: test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(navegador, base)),
                 (test_importe_grande_no_se_parte_en_movil, lambda: test_importe_grande_no_se_parte_en_movil(navegador, base)),
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
+                (test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico, lambda: test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
