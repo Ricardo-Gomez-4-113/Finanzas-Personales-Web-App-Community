@@ -148,6 +148,23 @@ def test_login_pie_legal_a_13px_y_en_tipo_oracion(navegador, base):
             ctx.close()
 
 
+def test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta(navegador, base):
+    """En Inversiones la página no lleva borde ni fondo: cada bloque es el único nivel de tarjeta."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base)
+        _ir(page, "tab-inversiones")
+        estilo = page.evaluate("""(() => {
+            const s = getComputedStyle(document.querySelector('.inversiones-section'));
+            return [s.borderTopWidth, s.backgroundColor];
+        })()""")
+        assert estilo[0] == "0px", f"la página de Inversiones tiene borde {estilo[0]}"
+        assert estilo[1] == "rgba(0, 0, 0, 0)", f"la página de Inversiones tiene fondo {estilo[1]}"
+        assert not errores, "errores de JavaScript en Inversiones:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1776,6 +1793,7 @@ if __name__ == "__main__":
                 (test_login_incorrecto_muestra_error, lambda: test_login_incorrecto_muestra_error(navegador, base)),
                 (test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena, lambda: test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base)),
                 (test_login_pie_legal_a_13px_y_en_tipo_oracion, lambda: test_login_pie_legal_a_13px_y_en_tipo_oracion(navegador, base)),
+                (test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta, lambda: test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

@@ -1465,6 +1465,9 @@
 /* Los campos de la calculadora se alinean por arriba: la ayuda de la base de días no los empuja */
 :root .calc-rf-card .form-row-3col { align-items: start; }
 
+/* Inversiones: la página es el propio panel, sin borde; sus bloques son el único nivel de tarjeta */
+:root .inversiones-section { background: transparent; border: none; box-shadow: none; padding: 0; }
+
 /* Calculadora de renta fija: la página es el propio panel; sus bloques son el único nivel de tarjeta */
 :root .calc-rf-panel { background: transparent; border: none; box-shadow: none; padding: 0; }
 
