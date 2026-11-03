@@ -133,6 +133,21 @@ def test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base):
         ctx.close()
 
 
+def test_login_pie_legal_a_13px_y_en_tipo_oracion(navegador, base):
+    """La línea legal del login se lee: al menos 13 px, y «Términos» y «Aviso de privacidad» en tipo oración."""
+    for viewport in VIEWPORTS.values():
+        ctx, page, errores = _contexto(navegador, viewport)
+        try:
+            page.goto(base + "/login")
+            page.wait_for_selector("#vista-login:not(.hidden)")
+            tamano = page.evaluate("parseFloat(getComputedStyle(document.querySelector('.login-legal')).fontSize)")
+            assert tamano >= 13, f"la línea legal mide {tamano} px"
+            assert page.inner_text(".login-legal").count("Aviso de privacidad") == 1
+            assert not errores, "errores de JavaScript en el login:\n" + "\n".join(errores)
+        finally:
+            ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1760,6 +1775,7 @@ if __name__ == "__main__":
             registradas = [
                 (test_login_incorrecto_muestra_error, lambda: test_login_incorrecto_muestra_error(navegador, base)),
                 (test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena, lambda: test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base)),
+                (test_login_pie_legal_a_13px_y_en_tipo_oracion, lambda: test_login_pie_legal_a_13px_y_en_tipo_oracion(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

@@ -1300,8 +1300,6 @@
 
 :root .btn-ver-clave[aria-pressed="true"] { color: var(--gold-color); }
 
-:root .login-legal { font-size: 0.8125rem; }
-
 @media (max-width: 520px) {
     /* En celular la tarjeta es la propia página: sin borde ni sombra */
     :root .login-wrapper { padding: 16px; }
@@ -2091,8 +2089,8 @@
 :root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }
 :root .link-forgot-password { font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500; }
 :root .login-pie { text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
-:root .login-legal { font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0; line-height: 1.4; }
-:root .login-legal a { color: var(--gold-color); text-decoration: underline; }
+:root .login-legal { font-size: 0.8125rem; color: var(--text-muted); margin: 12px 0 0; line-height: 1.4; }
+:root .login-legal a { color: var(--gold-color); text-decoration: underline; white-space: nowrap; }
 :root .col-chk { width: 44px; text-align: center; }
 :root .celda-centro { text-align: center; }
 :root .msg-ok { color: var(--success-text); }
