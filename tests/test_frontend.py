@@ -1116,6 +1116,24 @@ def test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base):
     finally:
         ctx.close()
 
+def test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base):
+    """Metas: el título y el botón usan «meta», la acción de eliminar dice «Eliminar» (no una ✕),
+    el total ahorrado no es una cápsula y una meta con poco avance se ve como una franja."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-apartados")
+        page.wait_for_selector(".card-apartado")
+        assert "Metas de ahorro" in page.inner_text("#tab-apartados"), "el título debe decir «Metas de ahorro»"
+        assert page.locator("#tab-apartados button", has_text="Crear apartado").count() == 0, "el botón no debe decir «Crear apartado»"
+        assert page.inner_text(".btn-eliminar-apartado").strip() == "Eliminar"
+        borde = page.evaluate("getComputedStyle(document.querySelector('.apartado-total-pill')).borderTopWidth")
+        assert borde == "0px", f"el total ahorrado no debe ser una cápsula con borde: {borde}"
+        ancho = page.evaluate("[...document.querySelectorAll('.progress-bar-fill')].map(f => f.getBoundingClientRect().width)")
+        assert min(ancho) >= 4, f"una barra de avance mínima debe verse: {ancho}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1711,6 +1729,7 @@ if __name__ == "__main__":
                 (test_movimientos_en_movil_sin_deslizar_y_con_papelera, lambda: test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base)),
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
+                (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

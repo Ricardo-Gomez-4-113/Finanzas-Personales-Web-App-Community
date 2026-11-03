@@ -1445,6 +1445,15 @@
 
 :root .btn-eliminar-apartado:hover { background: var(--danger-subtle); color: var(--danger-text); }
 
+/* Eliminar una meta: texto visible, no una ✕; siempre pide confirmación */
+:root .btn-eliminar-apartado { width: auto; height: 26px; padding: 0 8px; font-size: var(--fs-xs); font-weight: 500; }
+
+/* El total ahorrado es una cifra con su etiqueta, no una cápsula */
+:root .apartado-total-pill { background: transparent; border: none; border-radius: 0; padding: 0; }
+
+/* Una meta con avance mínimo (3 %) se ve como una franja, no desaparece */
+:root .progress-bar-fill:not([style*="width: 0%"]) { min-width: 4px; }
+
 /* ---------- Presupuesto ---------- */
 :root .pnl-badge {
     border-radius: 999px;

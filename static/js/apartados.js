@@ -49,7 +49,7 @@ export async function cargarApartados() {
             }
 
             card.innerHTML = `
-                <button type="button" class="btn-eliminar-apartado" data-on-click="${escapeHTML(JSON.stringify([["eliminarApartado", item.id]]))}" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">×</button>
+                <button type="button" class="btn-eliminar-apartado" data-on-click="${escapeHTML(JSON.stringify([["eliminarApartado", item.id]]))}" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">Eliminar</button>
                 <div class="apartado-cabecera">
                     <h3 class="apartado-nombre">${escapeHTML(item.nombre)}</h3>
                     <span class="badge-tag ${item.tipo === 'meta' ? 'badge-fijo' : ''}">${item.tipo === 'meta' ? 'Meta' : 'Sobre libre'}</span>
