@@ -104,6 +104,35 @@ def test_login_incorrecto_muestra_error(navegador, base):
     page.close()
 
 
+def test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base):
+    """En móvil el login no muestra el botón «+»; el botón conserva su texto tras un error;
+    el botón de ojo alterna el tipo del campo y su estado accesible; el error no mueve la tarjeta."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        page.goto(base + "/login")
+        page.wait_for_selector("#vista-login:not(.hidden)")
+        assert page.is_hidden("#btn-fab"), "el botón + no debe verse en el login"
+        page.fill("#login-username", "nadie")
+        page.fill("#login-password", "clave-equivocada")
+        arriba_antes = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#login-error:not(.hidden)", timeout=10000)
+        assert page.inner_text("#btn-login-submit") == "Entrar", page.inner_text("#btn-login-submit")
+        arriba_despues = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
+        assert abs(arriba_despues - arriba_antes) < 2, f"la tarjeta se movió {arriba_antes} -> {arriba_despues}"
+        assert page.get_attribute("#login-error", "role") == "alert"
+        assert page.get_attribute("#login-password", "type") == "password"
+        page.click(".btn-ver-clave")
+        assert page.get_attribute("#login-password", "type") == "text"
+        assert page.get_attribute(".btn-ver-clave", "aria-pressed") == "true"
+        page.click(".btn-ver-clave")
+        assert page.get_attribute("#login-password", "type") == "password"
+        assert page.get_attribute(".btn-ver-clave", "aria-pressed") == "false"
+        assert not errores, "errores de JavaScript en el login:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1493,6 +1522,7 @@ if __name__ == "__main__":
             navegador = p.chromium.launch()
             registradas = [
                 (test_login_incorrecto_muestra_error, lambda: test_login_incorrecto_muestra_error(navegador, base)),
+                (test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena, lambda: test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

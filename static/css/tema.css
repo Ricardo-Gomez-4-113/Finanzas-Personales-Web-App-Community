@@ -1188,9 +1188,20 @@
 /* ---------- Acceso ---------- */
 :root .login-wrapper {
     background-color: var(--bg-color);
-    background-image:
-        radial-gradient(900px 480px at 50% -10%, var(--gold-subtle), transparent 70%);
+    background-image: none;
+    min-height: 100dvh;
+    align-items: flex-start;
+    /* La tarjeta no se centra: así el mensaje de error no la empuja al aparecer */
+    padding-top: clamp(32px, 12vh, 120px);
 }
+
+/* Sin degradado de fondo mientras se ve el login */
+:root:has(#vista-login:not(.hidden)) body {
+    background-image: none;
+}
+
+/* El botón «+» es de la app: no aparece en el login ni en la landing */
+:root:has(#vista-app.hidden) .fab { display: none; }
 
 :root .login-card {
     background: var(--panel-bg);
@@ -1207,6 +1218,66 @@
 }
 
 :root .login-brand p { color: var(--text-muted); }
+
+:root .login-logo-wrap .finora-logo-svg { filter: none; box-shadow: none; }
+
+:root .login-card .btn-block {
+    width: 100%;
+    height: 48px;
+    margin-top: 18px;
+}
+
+/* Foco del sistema: un contorno champán de 2 px, sin el halo de los campos */
+:root #form-login input:focus,
+:root #form-login .form-group:has(input:focus) {
+    box-shadow: none;
+}
+
+:root #form-login input:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+/* Campo de contraseña con botón para mostrarla */
+:root .campo-clave { position: relative; }
+
+:root .campo-clave input { padding-right: 48px; }
+
+:root .btn-ver-clave {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+:root .btn-ver-clave:hover { background: var(--primary-subtle); color: var(--text-color); }
+
+:root .btn-ver-clave[aria-pressed="true"] { color: var(--gold-color); }
+
+:root .login-legal { font-size: 0.8125rem; }
+
+@media (max-width: 520px) {
+    /* En celular la tarjeta es la propia página: sin borde ni sombra */
+    :root .login-wrapper { padding: 16px; }
+    :root .login-card {
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        padding: 16px 0 0;
+    }
+}
 
 /* ---------- Movimiento reducido ---------- */
 @media (prefers-reduced-motion: reduce) {
@@ -1783,7 +1854,6 @@
 :root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }
 :root .link-forgot-password { font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500; }
 :root .login-pie { text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
-:root .login-volver { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; transition: color 0.18s ease; }
 :root .login-legal { font-size: 0.74rem; color: var(--text-muted); margin: 12px 0 0; line-height: 1.4; }
 :root .login-legal a { color: var(--gold-color); text-decoration: underline; }
 :root .col-chk { width: 44px; text-align: center; }

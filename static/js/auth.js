@@ -155,6 +155,7 @@ export async function iniciarSesion(e) {
 
     if (!username || !password) return;
 
+    const textoBoton = btnSubmit.textContent;
     btnSubmit.disabled = true;
     btnSubmit.textContent = 'Verificando credenciales...';
     if (loginError) loginError.classList.add('hidden');
@@ -181,7 +182,7 @@ export async function iniciarSesion(e) {
         loginError.classList.remove('hidden');
     } finally {
         btnSubmit.disabled = false;
-        btnSubmit.textContent = 'Ingresar a la Plataforma';
+        btnSubmit.textContent = textoBoton;
     }
 }
 
@@ -436,8 +437,21 @@ export async function enviarRestablecerPassword(e) {
     }
 }
 
+/**
+ * Muestra u oculta la contraseña del login. Solo cambia el tipo del campo y el estado del botón.
+ */
+export function alternarVerClave(btnEl) {
+    const campo = btnEl.closest('.campo-clave')?.querySelector('input');
+    if (!campo) return;
+    const mostrar = campo.type === 'password';
+    campo.type = mostrar ? 'text' : 'password';
+    btnEl.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
+    btnEl.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+}
+
 Object.assign(window, {
     abrirModalRecuperarPassword,
+    alternarVerClave,
     aceptarAvisoCorreoAdmin,
     cerrarModalRecuperarPassword,
     enviarRestablecerPassword,
