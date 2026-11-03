@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=d320edb5c2">
-    <link rel="stylesheet" href="/static/css/layout.css?v=d320edb5c2">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=d320edb5c2">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=d320edb5c2">
-    <link rel="stylesheet" href="/static/css/tema.css?v=d320edb5c2">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=06818b6c1d">
+    <link rel="stylesheet" href="/static/css/layout.css?v=06818b6c1d">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=06818b6c1d">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=06818b6c1d">
+    <link rel="stylesheet" href="/static/css/tema.css?v=06818b6c1d">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -346,6 +346,11 @@
 
             <section class="cinta-bloque" aria-labelledby="cinta-titulo">
                 <h2 id="cinta-titulo" class="cinta-titulo">Lo que te queda por periodo</h2>
+                <ul class="cinta-leyenda" aria-label="Qué representa cada color de la barra">
+                    <li><span class="cinta-seg cinta-seg-fijos" aria-hidden="true"></span>Fijos</li>
+                    <li><span class="cinta-seg cinta-seg-msi" aria-hidden="true"></span>Compras a meses</li>
+                    <li><span class="cinta-seg cinta-seg-libre" aria-hidden="true"></span>Libre</li>
+                </ul>
                 <div id="cinta-periodos"></div>
             </section>
 
@@ -2018,7 +2023,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=d320edb5c2"></script>
+    <script type="module" src="/static/js/main.js?v=06818b6c1d"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

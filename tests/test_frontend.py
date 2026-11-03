@@ -1046,6 +1046,22 @@ def test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base):
     finally:
         ctx.close()
 
+def test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base):
+    """El Resumen explica los colores de la cinta, el hero no lleva degradado y la dona
+    de un solo bloque ocupa el ancho del contenido."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#cinta-periodos .cinta-periodo")
+        assert page.locator("#cinta-leyenda, .cinta-leyenda li").count() == 3, "la leyenda de la cinta debe tener tres elementos"
+        fondo = page.evaluate("getComputedStyle(document.getElementById('periodo-hero')).backgroundImage")
+        assert fondo == "none", f"el hero aún tiene degradado: {fondo[:60]}"
+        ancho = page.evaluate("document.querySelector('.dashboard-grid > .panel:only-child')?.getBoundingClientRect().width || 0")
+        contenido = page.evaluate("document.querySelector('#tab-dashboard').getBoundingClientRect().width")
+        assert ancho > contenido * 0.9, f"la dona no ocupa el ancho: {ancho} de {contenido}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1420,7 +1436,7 @@ def test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro(navegador, b
         assert page.inner_text("#titulo-grafica-periodos") == "Ingresos y gastos por quincena"
         etiquetas = page.evaluate("import('/static/js/core.js').then(m => m.estado.graficas.barras.data.labels)")
         # Del más antiguo al más reciente, uno por quincena de cobro
-        assert etiquetas == ["15 ago – 30 ago", "31 ago – 14 sep", "15 sep – 29 sep", "30 sep – 14 oct", "15 oct – 30 oct"], etiquetas
+        assert etiquetas == [["15 ago", "30 ago"], ["31 ago", "14 sep"], ["15 sep", "29 sep"], ["30 sep", "14 oct"], ["15 oct", "30 oct"]], etiquetas
         # Un mes calendario completo se rotula «nov 2026»; un periodo que cruza el año lleva el año
         resultado = page.evaluate("""async () => {
             const { actualizarGrafica } = await import('/static/js/dashboard.js');
@@ -1431,7 +1447,7 @@ def test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro(navegador, b
             ]);
             return estado.graficas.barras.data.labels;
         }""")
-        assert resultado == ["nov 2026", "15 dic 2026 – 14 ene 2027"], resultado
+        assert resultado == ["nov 2026", ["15 dic 2026", "14 ene 2027"]], resultado
         assert not errores, errores
     finally:
         ctx.close()
@@ -1637,6 +1653,7 @@ if __name__ == "__main__":
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
                 (test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico, lambda: test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base)),
                 (test_moneda_una_vez_y_pestanas_internas_cortas_en_movil, lambda: test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base)),
+                (test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho, lambda: test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

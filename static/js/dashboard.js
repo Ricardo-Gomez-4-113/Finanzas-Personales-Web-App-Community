@@ -31,12 +31,21 @@ export function repintarGraficas() {
 }
 
 /** Barras de ingresos y gastos por periodo, del más antiguo al más reciente. */
+// Un periodo de quincena o semana va en dos líneas («15 ago» / «30 ago») para que no se inclinen los rótulos
+const diaMes = (iso, conAnio) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', ...(conAnio ? { year: 'numeric' } : {}), timeZone: 'UTC' })
+    .format(new Date(`${iso}T00:00:00Z`)).replace(/\./g, '');
+const etiquetaEnDosLineas = p => {
+    if (!etiquetaPeriodo(p).includes(' – ')) return etiquetaPeriodo(p);
+    const cruzaAnio = p.inicio.slice(0, 4) !== p.fin.slice(0, 4);
+    return [diaMes(p.inicio, cruzaAnio), diaMes(p.fin, cruzaAnio)];
+};
+
 export function actualizarGrafica(dataMensual) {
     ultimoMensual = dataMensual;
     const canvas = document.getElementById('graficaFinanzas');
     if (!canvas) return;
     const e = estiloGraficas();
-    const meses = dataMensual.map(etiquetaPeriodo);
+    const meses = dataMensual.map(etiquetaEnDosLineas);
     const ingresos = dataMensual.map(m => m.ingresos);
     const gastos = dataMensual.map(m => m.gastos);
 
@@ -65,7 +74,7 @@ export function actualizarGrafica(dataMensual) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { ticks: { color: e.texto, font: e.fuente }, grid: { display: false }, border: { color: e.rejilla } },
+                x: { ticks: { color: e.texto, font: e.fuente, maxRotation: 0, autoSkip: false }, grid: { display: false }, border: { color: e.rejilla } },
                 y: {
                     beginAtZero: true,
                     ticks: { color: e.texto, font: e.fuente, maxTicksLimit: 5, callback: v => fmt(v, monedaDeMonto()).replace(/\.00$/, '') },
@@ -73,7 +82,7 @@ export function actualizarGrafica(dataMensual) {
                 },
             },
             plugins: {
-                legend: { align: 'end', labels: { color: e.texto, font: e.fuente, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 } },
+                legend: { position: 'top', align: 'start', labels: { color: e.texto, font: e.fuente, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 } },
                 tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y, monedaDeMonto())}` } },
             },
         },

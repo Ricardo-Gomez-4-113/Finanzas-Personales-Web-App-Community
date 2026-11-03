@@ -302,9 +302,7 @@
 /* ---------- Resumen: periodo de cobro (la pieza protagonista) ---------- */
 :root .periodo-hero {
     position: relative;
-    background:
-        linear-gradient(180deg, var(--gold-subtle), transparent 55%),
-        var(--panel-bg);
+    background: var(--surface-level2);
     border: 1px solid var(--gold-border);
     border-radius: var(--radius-l);
     box-shadow: var(--card-shadow);
@@ -1903,6 +1901,31 @@
 :root .card.es-cero p,
 :root .monthly-ingreso.es-cero,
 :root .monthly-gasto.es-cero { color: var(--text-muted); }
+
+/* Leyenda de la cinta de periodos: qué significa cada color de la barra */
+:root .cinta-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 6px 0 12px;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+:root .cinta-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+
+:root .cinta-leyenda .cinta-seg { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+/* Historial: las cifras se alinean en columna */
+:root .monthly-info { font-variant-numeric: tabular-nums; }
+
+/* La dona de un solo bloque ocupa el ancho; la gráfica no se estira más de lo necesario */
+:root .dashboard-grid > .panel:only-child { grid-column: 1 / -1; }
+:root .dashboard-grid > .panel:only-child .chart-container-dona { max-width: 460px; }
+
+/* Estado vacío: una sola invitación, sin el «sin cobro» repetido en cada periodo */
+:root .inicio-vacio { border: none; background: var(--surface-level2); }
+:root:has(#inicio-vacio:not(.hidden)) .cinta-periodo-sin-ingreso { display: none; }
 
 /* Un solo nivel de tarjeta: un panel dentro de otro panel no lleva borde ni fondo propio */
 :root .panel .panel {
