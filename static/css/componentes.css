@@ -780,12 +780,12 @@ tbody tr:hover {
     background: var(--panel-bg);
     color: var(--text-color);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--accent-color);
+    border-left: 1px solid var(--border-color);
     box-shadow: var(--card-shadow);
     font-size: 0.9rem;
 }
-.toast-ok { border-left-color: var(--success-color); }
-.toast-error { border-left-color: var(--danger-color); }
+.toast-ok { color: var(--success-text); }
+.toast-error { color: var(--danger-text); }
 
 /* ==========================================================================
    Utilidades y componentes de la Fase 5 (fijos, MSI, filtros y etiquetas)

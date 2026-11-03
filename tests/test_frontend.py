@@ -165,6 +165,47 @@ def test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta(navegador, base):
         ctx.close()
 
 
+def test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado(navegador, base):
+    """Los avisos no llevan barra de color a un lado (el estado va en el texto) y los botones de acción no tienen halo dorado."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base)
+        page.evaluate("""document.body.insertAdjacentHTML('beforeend', "<div class='toast toast-error' id='aviso-prueba'>x</div>")""")
+        ancho, color = page.evaluate("""(() => {
+            const s = getComputedStyle(document.getElementById('aviso-prueba'));
+            return [s.borderLeftWidth, s.color];
+        })()""")
+        assert ancho == "1px", f"el aviso tiene barra lateral de {ancho}"
+        assert color != "rgb(0, 0, 0)", "el aviso de error debe llevar el tono de texto de peligro"
+        _ir(page, "tab-calculadora-rf")
+        sombra = page.evaluate("getComputedStyle(document.querySelector('.btn-calc-action')).boxShadow")
+        assert "201, 179, 126" not in sombra and "156, 134, 83" not in sombra, f"el botón de cálculo tiene halo dorado: {sombra}"
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
+def test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(navegador, base):
+    """Los botones con texto dorado no toman el fondo de acento al pasar el cursor: el texto seguiría ilegible."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base)
+        fondo_acento = page.evaluate("""(() => {
+            const p = document.createElement('div');
+            p.style.backgroundColor = 'var(--primary-hover)';
+            document.body.appendChild(p);
+            const c = getComputedStyle(p).backgroundColor;
+            p.remove();
+            return c;
+        })()""")
+        page.hover(".btn-topbar-privacy")
+        fondo = page.evaluate("getComputedStyle(document.querySelector('.btn-topbar-privacy')).backgroundColor")
+        assert fondo != fondo_acento, f"el botón del ojo toma el fondo de acento al pasar el cursor: {fondo}"
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1794,6 +1835,8 @@ if __name__ == "__main__":
                 (test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena, lambda: test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base)),
                 (test_login_pie_legal_a_13px_y_en_tipo_oracion, lambda: test_login_pie_legal_a_13px_y_en_tipo_oracion(navegador, base)),
                 (test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta, lambda: test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta(navegador, base)),
+                (test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado, lambda: test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado(navegador, base)),
+                (test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor, lambda: test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

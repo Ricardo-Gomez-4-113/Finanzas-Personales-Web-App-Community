@@ -22,7 +22,7 @@
 .monthly-card {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--primary-color);
+    border-left: 1px solid var(--border-color);
     padding: 7px 12px;
     margin-bottom: 6px;
     border-radius: 6px;
@@ -310,8 +310,10 @@
     transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
+/* Al pasar el cursor, el dorado se oscurece con una capa neutra: el texto oscuro sigue leyéndose */
 .btn-search-ticker:hover {
-    background-color: var(--accent-hover);
+    background-color: var(--accent-color);
+    box-shadow: inset 0 0 0 999px rgb(var(--sombra-rgb) / 0.12);
     transform: translateY(-1px);
 }
 
@@ -1851,13 +1853,13 @@ input[type="number"].subperiodo-editor-input-pct {
     font-weight: 700;
     border-radius: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--gold-color) 28%, transparent);
+    box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.18);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-calc-action:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--gold-color) 38%, transparent);
+    box-shadow: 0 2px 6px rgb(var(--sombra-rgb) / 0.24);
 }
 
 .btn-calc-action:active {

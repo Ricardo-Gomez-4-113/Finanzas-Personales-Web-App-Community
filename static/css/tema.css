@@ -729,7 +729,7 @@
     padding: 0 18px;
     font-size: var(--fs-sm);
     font-weight: 600;
-    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 6px 16px -8px var(--primary-glow);
+    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 1px 2px rgb(var(--sombra-rgb) / 0.18);
 }
 
 :root .btn-primary:hover,
@@ -739,7 +739,7 @@
     background: var(--primary-hover);
     border-color: var(--primary-hover);
     color: var(--primary-text);
-    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 8px 20px -8px var(--primary-glow);
+    box-shadow: 0 1px 0 rgb(var(--luz-rgb) / 0.12) inset, 0 2px 6px rgb(var(--sombra-rgb) / 0.24);
 }
 
 :root .btn-secondary {
@@ -1191,8 +1191,18 @@
     box-shadow: var(--shadow-float);
 }
 
-:root .toast-ok { border-left: 3px solid var(--success-color); }
-:root .toast-error { border-left: 3px solid var(--danger-color); }
+/* Botones de texto dorado: al pasar el cursor no toman el fondo de acento (dorado en oscuro, azul en claro) */
+:root .btn-topbar-privacy:hover,
+:root .calc-chip:hover,
+:root .btn-chip-tpl:hover,
+:root .pres-chip:hover {
+    background-color: var(--surface-level2);
+}
+
+/* Avisos: sin barra de color a un lado; el estado va en el texto, con el tono de texto */
+:root .toast { border-left: 1px solid var(--border-color); }
+:root .toast-ok { color: var(--success-text); }
+:root .toast-error { color: var(--danger-text); }
 
 :root .fab {
     background: var(--primary-color);
