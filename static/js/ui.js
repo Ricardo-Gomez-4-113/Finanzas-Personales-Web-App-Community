@@ -420,7 +420,7 @@ Object.assign(window, {
 
 
 // =============================================================================
-// Botón flotante "+" (móvil): abre Movimientos y enfoca el monto
+// Botón flotante "+" (móvil): abre Movimientos y su formulario de nuevo movimiento
 // =============================================================================
 
 export function inicializarFab() {
@@ -428,8 +428,9 @@ export function inicializarFab() {
     if (!fab) return;
     fab.addEventListener('click', () => {
         cambiarPestana('tab-movimientos');
-        const monto = document.getElementById('monto');
-        if (monto) setTimeout(() => monto.focus(), 60);
+        // El formulario vive en el historial: si se estaba en Fijos, se vuelve a él antes de abrirlo
+        if (typeof window.cambiarSubtabMovimientos === 'function') window.cambiarSubtabMovimientos('historial');
+        if (typeof window.abrirModalNuevoMovimiento === 'function') window.abrirModalNuevoMovimiento();
     });
 
     // En móvil el botón se oculta mientras se baja la página, para no tapar las tarjetas al leer.

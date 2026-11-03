@@ -199,6 +199,31 @@ export function toast(msg, tipo = 'ok') {
     setTimeout(() => el.remove(), 3500);
 }
 
+// Formularios en modal: abrir con el foco en un campo, cerrar, y un aviso dentro del propio modal
+// (un toast quedaría detrás del velo; el aviso se anuncia con role="alert").
+export function abrirModalFormulario(id, idCampo) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        const campo = idCampo && document.getElementById(idCampo);
+        if (campo) campo.focus();
+    }, 50);
+}
+
+export function cerrarModalFormulario(id) {
+    const modal = document.getElementById(id);
+    if (modal) modal.classList.add('hidden');
+}
+
+export function avisoFormulario(id, texto = '', tipo = 'error') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('msg-ok', 'msg-error');
+    if (texto) el.classList.add(tipo === 'ok' ? 'msg-ok' : 'msg-error');
+    el.textContent = texto;
+}
+
 export const colorVar = (nombre) => getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
 
 export const recargar = () => document.dispatchEvent(new Event('recargar'));

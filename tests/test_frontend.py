@@ -212,6 +212,7 @@ def test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base):
     try:
         _entrar(page, base)
         _ir(page, "tab-movimientos")
+        _abrir_formulario(page, "movimiento")
         page.hover(".link-btn")
         fondo = page.evaluate("getComputedStyle(document.querySelector('.link-btn')).backgroundColor")
         assert fondo == "rgba(0, 0, 0, 0)", f"el enlace toma fondo al pasar el cursor: {fondo}"
@@ -246,6 +247,7 @@ def test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navega
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         _ir(page, "tab-movimientos")
+        _abrir_formulario(page, "movimiento")
         page.fill("#fecha", escenario.HOY)
         page.select_option("#tipo", "gasto")
         page.fill("#monto", "9999999")
@@ -259,6 +261,74 @@ def test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navega
         assert estilo[0] in ("left", "start"), f"el aviso está alineado a {estilo[0]}"
         assert estilo[1] < 600, f"el aviso va en negrita ({estilo[1]})"
         assert page.get_attribute("#mensaje", "role") == "alert", "el aviso debe anunciarse"
+        assert page.is_visible("#modal-nuevo-movimiento #mensaje"), "el aviso aparece dentro del modal"
+        assert not page.is_hidden("#modal-nuevo-movimiento"), "con un error el modal sigue abierto"
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
+def test_formularios_se_abren_con_el_mas_y_la_tabla_ocupa_todo_el_ancho(navegador, base):
+    """Movimientos, Fijos e Inversiones: el formulario vive detrás de un «+», se abre con el foco en su primer campo,
+    se cierra con Escape devolviendo el foco al botón, y la tabla o la gráfica ocupan todo el ancho."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        casos = [
+            ("movimiento", "tab-movimientos", None, "btn-nuevo-movimiento", "modal-nuevo-movimiento", "monto",
+             "#subtab-content-historial .dashboard-grid-movimientos"),
+            ("fijo", "tab-movimientos", "btn-subtab-fijos", "btn-nuevo-fijo", "modal-nuevo-fijo", "rec-desc",
+             "#subtab-content-fijos .dashboard-grid-movimientos"),
+            ("posicion", "tab-inversiones", None, "btn-nueva-posicion", "modal-nueva-posicion", "inv-ticker",
+             ".inversiones-top-grid"),
+        ]
+        for nombre, tab, subtab, boton, modal, campo, rejilla in casos:
+            _ir(page, tab)
+            if subtab:
+                page.evaluate(f"document.getElementById('{subtab}').click()")
+            assert page.is_hidden(f"#{modal}"), f"{nombre}: el modal no debe verse hasta pulsar el «+»"
+            hijos = page.evaluate(f"""(() => {{
+                const g = document.querySelector('{rejilla}');
+                const w = g.getBoundingClientRect().width;
+                return [...g.children].filter(h => getComputedStyle(h).position !== 'fixed')
+                    .map(h => Math.abs(h.getBoundingClientRect().width - w) < 2);
+            }})()""")
+            assert hijos and all(hijos), f"{nombre}: los bloques deben ocupar todo el ancho de su rejilla: {hijos}"
+            page.evaluate(f"document.getElementById('{boton}').scrollIntoView({{block: 'center'}})")
+            page.click(f"#{boton}")
+            page.wait_for_selector(f"#{modal}:not(.hidden)")
+            _esperar(page, f"document.activeElement && document.activeElement.id === '{campo}'")
+            separacion = page.evaluate(f"""(() => {{
+                const barra = document.querySelector('#{modal} .modal-actions');
+                return barra.getBoundingClientRect().top - barra.previousElementSibling.getBoundingClientRect().bottom;
+            }})()""")
+            assert separacion >= 12, f"{nombre}: la barra de botones toca el último campo ({separacion:.0f} px de separación)"
+            page.keyboard.press("Escape")
+            page.wait_for_selector(f"#{modal}.hidden", state="attached")
+            _esperar(page, f"document.activeElement && document.activeElement.id === '{boton}'")
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
+def test_fijo_con_error_muestra_el_aviso_dentro_del_modal(navegador, base):
+    """Un gasto fijo sin ingreso fijo lo rechaza el servidor a propósito: el aviso sale dentro del modal, que sigue abierto,
+    y no como un toast que quedaría detrás del velo."""
+    usuario, clave = _usuario_nuevo("recerr")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        page.evaluate("document.getElementById('btn-subtab-fijos').click()")
+        _abrir_formulario(page, "fijo")
+        page.fill("#rec-desc", "Renta")
+        page.fill("#rec-monto", "5000")
+        page.fill("#rec-fecha", "2026-10-01")
+        page.click("#btn-guardar-recurrente")
+        page.wait_for_selector("#rec-mensaje.msg-error", timeout=10000)
+        assert "ingreso fijo" in page.inner_text("#rec-mensaje").lower(), page.inner_text("#rec-mensaje")
+        assert page.get_attribute("#rec-mensaje", "role") == "alert"
+        assert not page.is_hidden("#modal-nuevo-fijo"), "con un error el modal sigue abierto"
+        assert page.is_visible("#modal-nuevo-fijo #rec-mensaje")
         assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
     finally:
         ctx.close()
@@ -304,6 +374,7 @@ def test_registrar_ingreso_y_modal_accesible(navegador, base):
         _login(page, base)
         page.evaluate("document.querySelector('[data-tab=\"tab-movimientos\"]').click()")
         page.wait_for_selector("#tab-movimientos.active")
+        _abrir_formulario(page, "movimiento")
         page.fill("#fecha", escenario.HOY)  # el servidor de pruebas tiene el reloj fijo: la fecha real caería fuera del periodo
         page.select_option("#tipo", "ingreso")
         page.fill("#monto", "1234.56")
@@ -313,6 +384,7 @@ def test_registrar_ingreso_y_modal_accesible(navegador, base):
             page.select_option("#categoria", opciones[0])
         page.click("#transaccion-form [type=submit]")
         page.wait_for_selector("text=ingreso-desde-playwright", timeout=10000)
+        assert page.is_hidden("#modal-nuevo-movimiento"), "al guardar bien, el modal se cierra"
 
         page.locator(".btn-editar").first.click()
         page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
@@ -406,6 +478,17 @@ def _responder_confirmacion(page, aceptar=True):
     page.click("#btn-confirmar-aceptar" if aceptar else "#btn-confirmar-cancelar")
     page.wait_for_selector("#modal-confirmar.hidden", state="attached")
     return visto
+
+
+def _abrir_formulario(page, que):
+    """Abre el modal del botón «+» de Movimientos («movimiento»), Fijos («fijo») o Inversiones («posicion»)."""
+    boton, modal = {
+        "movimiento": ("btn-nuevo-movimiento", "modal-nuevo-movimiento"),
+        "fijo": ("btn-nuevo-fijo", "modal-nuevo-fijo"),
+        "posicion": ("btn-nueva-posicion", "modal-nueva-posicion"),
+    }[que]
+    page.evaluate(f"document.getElementById('{boton}').click()")  # clic por JS: la barra superior puede tapar el botón
+    page.wait_for_selector(f"#{modal}:not(.hidden)")
 
 
 def _ir(page, tab):
@@ -737,6 +820,7 @@ def test_movimiento_crear_editar_y_borrar(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         _ir(page, "tab-movimientos")
+        _abrir_formulario(page, "movimiento")
         page.fill("#fecha", "2026-10-21")
         page.select_option("#tipo", "gasto")
         page.fill("#monto", "123.45")
@@ -914,6 +998,7 @@ def test_inversion_nueva_aparece_en_el_portafolio(navegador, base):
     try:
         _entrar(page, base, usuario, clave)
         _ir(page, "tab-inversiones")
+        _abrir_formulario(page, "posicion")
         page.fill("#inv-ticker", "VOO")
         page.fill("#inv-cantidad", "2")
         page.fill("#inv-precio-promedio", "100")
@@ -932,6 +1017,7 @@ def test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base):
         _entrar(page, base, usuario, clave)
         _ir(page, "tab-movimientos")
         page.evaluate("document.getElementById('btn-subtab-fijos').click()")  # clic por JS: la barra superior tapa el botón
+        _abrir_formulario(page, "fijo")
         page.evaluate("document.querySelector('input[name=rec-modo][value=ingreso]').click()")
         page.fill("#rec-desc", "Nomina")
         page.fill("#rec-monto", "14000")
@@ -941,6 +1027,7 @@ def test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base):
         page.click("#btn-guardar-recurrente")
         _esperar(page, "document.getElementById('fijos-periodos').textContent.includes('Nomina')")
 
+        _abrir_formulario(page, "fijo")
         page.evaluate("document.querySelector('input[name=rec-modo][value=gasto]').click()")
         page.fill("#rec-desc", "Gimnasio")
         page.fill("#rec-monto", "450")
@@ -1208,7 +1295,8 @@ def test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base):
         assert x_monto > x_fecha, "el monto debe ir a la derecha de la fecha"
         assert page.get_attribute("#tabla-movimientos .btn-eliminar", "aria-label") == "Eliminar movimiento"
         assert page.inner_text("#cinta-movimientos-titulo") == "Periodo"
-        assert page.inner_text("#form-movimiento h3, .dashboard-grid-movimientos .panel:first-child .panel-heading").strip().endswith("Registrar movimiento")
+        _abrir_formulario(page, "movimiento")
+        assert page.inner_text("#modal-nuevo-movimiento-titulo").strip().endswith("Registrar movimiento")
         assert not errores, errores
     finally:
         ctx.close()
@@ -1359,15 +1447,16 @@ def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
     try:
         _ir(page, "tab-movimientos")
-        page.evaluate("document.getElementById('monto').scrollIntoView({block: 'start'})")
-        page.focus("#monto")
-        page.wait_for_timeout(400)
-        fondo_campo, arriba_fab = page.evaluate("""() => {
+        page.click("#btn-subtab-fijos")                 # el «+» debe volver al historial aunque se esté en Fijos
+        page.click("#btn-fab")
+        page.wait_for_selector("#modal-nuevo-movimiento:not(.hidden)")
+        _esperar(page, "document.activeElement && document.activeElement.id === 'monto'")
+        tapado = page.evaluate("""() => {
             const campo = document.getElementById('monto').getBoundingClientRect();
-            const fab = document.getElementById('btn-fab').getBoundingClientRect();
-            return [campo.bottom, fab.top];
+            const el = document.elementFromPoint(campo.left + campo.width / 2, campo.top + campo.height / 2);
+            return !(el && el.id === 'monto');
         }""")
-        assert fondo_campo <= arriba_fab, f"el «+» tapa el campo enfocado: campo termina en {fondo_campo}, el botón empieza en {arriba_fab}"
+        assert not tapado, "el campo enfocado del modal queda tapado por otro elemento (el «+» flotante, p. ej.)"
         assert not errores, errores
     finally:
         ctx.close()
@@ -1393,6 +1482,7 @@ def test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base):
     try:
         _entrar(page, base, usuario, clave)
         _ir(page, "tab-movimientos")
+        _abrir_formulario(page, "movimiento")
         page.fill("#fecha", "2026-10-02")
         page.select_option("#tipo", "gasto")
         page.fill("#monto", "75")
@@ -1571,6 +1661,7 @@ def test_boton_cotizar_no_sobresale_del_campo(navegador, base):
         _login(page, base)
         page.evaluate("document.querySelector('[data-tab=\"tab-inversiones\"]').click()")
         page.wait_for_selector("#tab-inversiones.active")
+        _abrir_formulario(page, "posicion")
         medidas = page.evaluate("""() => {
             const alto = (el) => el.getBoundingClientRect().height;
             const boton = document.querySelector('.btn-search-ticker');
@@ -1898,6 +1989,8 @@ if __name__ == "__main__":
                 (test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor, lambda: test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_login_movil_centrado_y_sin_saltar_al_fallar, lambda: test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base)),
                 (test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia, lambda: test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navegador, base)),
+                (test_formularios_se_abren_con_el_mas_y_la_tabla_ocupa_todo_el_ancho, lambda: test_formularios_se_abren_con_el_mas_y_la_tabla_ocupa_todo_el_ancho(navegador, base)),
+                (test_fijo_con_error_muestra_el_aviso_dentro_del_modal, lambda: test_fijo_con_error_muestra_el_aviso_dentro_del_modal(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

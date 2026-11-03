@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=a7a7eaf797">
-    <link rel="stylesheet" href="/static/css/layout.css?v=a7a7eaf797">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=a7a7eaf797">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=a7a7eaf797">
-    <link rel="stylesheet" href="/static/css/tema.css?v=a7a7eaf797">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=6cdb2ff025">
+    <link rel="stylesheet" href="/static/css/layout.css?v=6cdb2ff025">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=6cdb2ff025">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=6cdb2ff025">
+    <link rel="stylesheet" href="/static/css/tema.css?v=6cdb2ff025">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -467,55 +467,67 @@
             <!-- Subtab 1: Historial y Registro de Movimientos -->
             <div id="subtab-content-historial" class="subtab-content active">
                 <div class="dashboard-grid dashboard-grid-movimientos">
-                    <div class="panel">
-                        <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                            <span>Registrar movimiento</span>
-                        </h2>
-                        <form id="transaccion-form">
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="fecha">Fecha</label>
-                                    <input type="date" id="fecha" required>
+                    <div id="modal-nuevo-movimiento" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-nuevo-movimiento-titulo" data-on-click='[["cerrarModalNuevoMovimiento"]]' data-solo-fondo>
+                        <div class="modal-card modal-card--md">
+                            <div class="modal-header">
+                                <h3 id="modal-nuevo-movimiento-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                    <span>Registrar movimiento</span>
+                                </h3>
+                                <button type="button" class="btn-modal-close" aria-label="Cerrar" data-on-click='[["cerrarModalNuevoMovimiento"]]'>&times;</button>
+                            </div>
+                            <form id="transaccion-form">
+                                <div class="form-row-2col">
+                                    <div class="form-group">
+                                        <label for="fecha">Fecha</label>
+                                        <input type="date" id="fecha" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tipo">Tipo</label>
+                                        <select id="tipo">
+                                            <option value="gasto">Gasto</option>
+                                            <option value="ingreso">Ingreso</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row-2col">
+                                    <div class="form-group">
+                                        <label for="monto">Monto (MXN)</label>
+                                        <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="categoria">Categoría</label>
+                                        <select id="categoria"></select>
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label for="tipo">Tipo</label>
-                                    <select id="tipo">
-                                        <option value="gasto">Gasto</option>
-                                        <option value="ingreso">Ingreso</option>
-                                    </select>
+                                    <label for="descripcion">Descripción</label>
+                                    <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
                                 </div>
-                            </div>
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="monto">Monto (MXN)</label>
-                                    <input type="number" step="0.01" min="0.01" id="monto" placeholder="0.00" required>
+                                <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" data-on-click='[["cerrarModalNuevoMovimiento"], ["cambiarSubtabMovimientos", "fijos"]]'>Ir a fijos y MSI</button></p>
+                                <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" data-on-click='[["cerrarModalNuevoMovimiento"]]'>Cancelar</button>
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                        <span>Guardar movimiento</span>
+                                    </button>
                                 </div>
-                                <div class="form-group">
-                                    <label for="categoria">Categoría</label>
-                                    <select id="categoria"></select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="descripcion">Descripción</label>
-                                <input type="text" id="descripcion" placeholder="Ej. Supermercado, Nómina...">
-                            </div>
-                            <p class="hint-text">¿Es nómina, renta o compra a meses? <button type="button" class="link-btn" data-on-click='[["cambiarSubtabMovimientos", "fijos"]]'>Ir a fijos y MSI</button></p>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">
-                                    <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                    <span>Guardar movimiento</span>
-                                </button>
-                            </div>
-                        </form>
-                        <div id="mensaje" role="alert"></div>
+                            </form>
+                            <div id="mensaje" role="alert"></div>
+                        </div>
                     </div>
 
                     <div class="panel">
-                        <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            <span>Todos los movimientos</span>
-                        </h2>
+                        <div class="panel-cabecera">
+                            <h2 class="panel-heading">
+                                <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                <span>Todos los movimientos</span>
+                            </h2>
+                            <button type="button" id="btn-nuevo-movimiento" class="btn-primary" data-on-click='[["abrirModalNuevoMovimiento"]]'>
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span>Nuevo movimiento</span>
+                            </button>
+                        </div>
                         <div class="filtros-movimientos">
                             <select id="filtro-ventana" aria-label="Ventana de fechas">
                                 <option value="periodo">Periodo de cobro actual</option>
@@ -573,100 +585,113 @@
             <!-- Subtab 2: Fijos y Compras a Meses -->
             <div id="subtab-content-fijos" class="subtab-content">
                 <div class="dashboard-grid dashboard-grid-movimientos">
-                    <div class="panel">
-                        <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                            <span>Agregar fijo o compra a meses</span>
-                        </h2>
-                        <div class="segmented" role="radiogroup" aria-label="Tipo de registro">
-                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="ingreso"><span>Ingreso fijo (nómina)</span></label>
-                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="gasto" checked><span>Gasto fijo</span></label>
-                            <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
+                    <div id="modal-nuevo-fijo" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-nuevo-fijo-titulo" data-on-click='[["cerrarModalNuevoFijo"]]' data-solo-fondo>
+                        <div class="modal-card modal-card--md">
+                            <div class="modal-header">
+                                <h3 id="modal-nuevo-fijo-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                    <span>Agregar fijo o compra a meses</span>
+                                </h3>
+                                <button type="button" class="btn-modal-close" aria-label="Cerrar" data-on-click='[["cerrarModalNuevoFijo"]]'>&times;</button>
+                            </div>
+                            <div class="segmented" role="radiogroup" aria-label="Tipo de registro">
+                                <label class="segmented-opt"><input type="radio" name="rec-modo" value="ingreso"><span>Ingreso fijo (nómina)</span></label>
+                                <label class="segmented-opt"><input type="radio" name="rec-modo" value="gasto" checked><span>Gasto fijo</span></label>
+                                <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
+                            </div>
+                            <form id="form-recurrente">
+                                <h3 class="form-seccion">Datos</h3>
+                                <div class="form-group">
+                                    <label for="rec-desc">Descripción</label>
+                                    <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
+                                </div>
+                                <div id="rec-campos-fijo">
+                                    <div class="form-row-2col">
+                                        <div class="form-group">
+                                            <label for="rec-monto">Monto por pago (MXN)</label>
+                                            <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="rec-frecuencia">Frecuencia</label>
+                                            <select id="rec-frecuencia">
+                                                <option value="mensual">Mensual</option>
+                                                <option value="quincenal">Quincenal</option>
+                                                <option value="semanal">Semanal</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="rec-campos-msi" class="hidden">
+                                    <div class="form-row-2col">
+                                        <div class="form-group">
+                                            <label for="rec-total">Monto total (MXN)</label>
+                                            <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="rec-meses">Meses</label>
+                                            <select id="rec-meses">
+                                                <option value="3">3</option>
+                                                <option value="6">6</option>
+                                                <option value="9">9</option>
+                                                <option value="12" selected>12</option>
+                                                <option value="18">18</option>
+                                                <option value="24">24</option>
+                                                <option value="otro">Otro…</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group hidden" id="rec-meses-otro-wrap">
+                                        <label for="rec-meses-otro">Número de meses (2 a 60)</label>
+                                        <input type="number" min="2" max="60" step="1" id="rec-meses-otro">
+                                    </div>
+                                    <p class="hint-text" id="rec-preview"></p>
+                                </div>
+                                <h3 class="form-seccion">Fecha y categoría</h3>
+                                <div class="form-row-2col">
+                                    <div class="form-group">
+                                        <label for="rec-fecha">Fecha del primer pago</label>
+                                        <input type="date" id="rec-fecha" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rec-categoria">Categoría</label>
+                                        <select id="rec-categoria"></select>
+                                    </div>
+                                </div>
+                                <h3 class="form-seccion">Destino</h3>
+                                <div id="rec-apartado-group" class="modal-apilado">
+                                <div class="form-group">
+                                    <label for="rec-apartado-id">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icono-en-texto"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                                        Aportar automáticamente a una meta (opcional):
+                                    </label>
+                                    <select id="rec-apartado-id">
+                                        <option value="">-- Ninguno (gasto común) --</option>
+                                    </select>
+                                </div>
+                                <p class="modal-nota">Si seleccionas una meta, cada vez que venza el cargo se abonará automáticamente al saldo de tu apartado.</p>
+                                </div>
+                                <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" data-on-click='[["cerrarModalNuevoFijo"]]'>Cancelar</button>
+                                    <button type="submit" class="btn-primary" id="btn-guardar-recurrente">
+                                        <span>Guardar</span>
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="rec-mensaje" class="aviso-form" role="alert"></div>
                         </div>
-                        <form id="form-recurrente">
-                            <h3 class="form-seccion">Datos</h3>
-                            <div class="form-group">
-                                <label for="rec-desc">Descripción</label>
-                                <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
-                            </div>
-                            <div id="rec-campos-fijo">
-                                <div class="form-row-2col">
-                                    <div class="form-group">
-                                        <label for="rec-monto">Monto por pago (MXN)</label>
-                                        <input type="number" step="0.01" min="0.01" id="rec-monto" placeholder="0.00">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rec-frecuencia">Frecuencia</label>
-                                        <select id="rec-frecuencia">
-                                            <option value="mensual">Mensual</option>
-                                            <option value="quincenal">Quincenal</option>
-                                            <option value="semanal">Semanal</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div id="rec-campos-msi" class="hidden">
-                                <div class="form-row-2col">
-                                    <div class="form-group">
-                                        <label for="rec-total">Monto total (MXN)</label>
-                                        <input type="number" step="0.01" min="0.01" id="rec-total" placeholder="0.00">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rec-meses">Meses</label>
-                                        <select id="rec-meses">
-                                            <option value="3">3</option>
-                                            <option value="6">6</option>
-                                            <option value="9">9</option>
-                                            <option value="12" selected>12</option>
-                                            <option value="18">18</option>
-                                            <option value="24">24</option>
-                                            <option value="otro">Otro…</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-group hidden" id="rec-meses-otro-wrap">
-                                    <label for="rec-meses-otro">Número de meses (2 a 60)</label>
-                                    <input type="number" min="2" max="60" step="1" id="rec-meses-otro">
-                                </div>
-                                <p class="hint-text" id="rec-preview"></p>
-                            </div>
-                            <h3 class="form-seccion">Fecha y categoría</h3>
-                            <div class="form-row-2col">
-                                <div class="form-group">
-                                    <label for="rec-fecha">Fecha del primer pago</label>
-                                    <input type="date" id="rec-fecha" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="rec-categoria">Categoría</label>
-                                    <select id="rec-categoria"></select>
-                                </div>
-                            </div>
-                            <h3 class="form-seccion">Destino</h3>
-                            <div id="rec-apartado-group" class="modal-apilado">
-                            <div class="form-group">
-                                <label for="rec-apartado-id">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icono-en-texto"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                                    Aportar automáticamente a una meta (opcional):
-                                </label>
-                                <select id="rec-apartado-id">
-                                    <option value="">-- Ninguno (gasto común) --</option>
-                                </select>
-                            </div>
-                            <p class="modal-nota">Si seleccionas una meta, cada vez que venza el cargo se abonará automáticamente al saldo de tu apartado.</p>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary" id="btn-guardar-recurrente">
-                                    <span>Guardar</span>
-                                </button>
-                            </div>
-                        </form>
                     </div>
 
                     <div class="panel">
-                        <h2 class="panel-heading">
-                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                            <span>Fijos y compras a meses por periodo</span>
-                        </h2>
+                        <div class="panel-cabecera">
+                            <h2 class="panel-heading">
+                                <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                <span>Fijos y compras a meses por periodo</span>
+                            </h2>
+                            <button type="button" id="btn-nuevo-fijo" class="btn-primary" data-on-click='[["abrirModalNuevoFijo"]]'>
+                                <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span>Nuevo fijo o compra a meses</span>
+                            </button>
+                        </div>
                         <p class="card-subtext">Deuda MSI pendiente: <strong id="lbl-fijos-deuda">$0.00</strong></p>
                         <div id="fijos-periodos"></div>
                         <div id="fijos-pausados-bloque" class="fijos-bloque hidden">
@@ -816,10 +841,16 @@
                 <!-- Fila Superior: Formulario de Registro y Gráfica de Asignación en 2 Columnas -->
                 <div class="inversiones-top-grid">
                     
-                    <div class="inversiones-col-form">
-                        <form id="form-inversion" class="card-form">
-                            <h3 class="s-margin-top-0 s-margin-bottom-12px s-font-size-1rem s-color-var-text-color">Registrar posición</h3>
-                            
+                    <div id="modal-nueva-posicion" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-nueva-posicion-titulo" data-on-click='[["cerrarModalNuevaPosicion"]]' data-solo-fondo>
+                        <div class="modal-card modal-card--md">
+                            <div class="modal-header">
+                                <h3 id="modal-nueva-posicion-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                                    <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                                    <span>Registrar posición</span>
+                                </h3>
+                                <button type="button" class="btn-modal-close" aria-label="Cerrar" data-on-click='[["cerrarModalNuevaPosicion"]]'>&times;</button>
+                            </div>
+                            <form id="form-inversion" class="card-form">
                             <h4 class="form-seccion">Activo</h4>
                             <div class="form-group">
                                 <label for="inv-ticker">Ticker (ej. VOO, QQQ, WALMEX.MX)</label>
@@ -862,13 +893,16 @@
                                 <input type="number" step="0.01" min="0.01" id="inv-precio-actual" placeholder="Se obtiene automático">
                             </div>
 
-                            <div class="form-actions">
+                            <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" data-on-click='[["cerrarModalNuevaPosicion"]]'>Cancelar</button>
                                 <button type="submit" class="btn-primary">
                                     <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                                     <span>Guardar activo</span>
                                 </button>
                             </div>
-                        </form>
+                            </form>
+                            <div id="inv-mensaje" class="aviso-form" role="alert"></div>
+                        </div>
                     </div>
 
                     <div class="inversiones-col-chart">
@@ -885,7 +919,7 @@
                                 <div id="dona-sin-datos" class="hidden s-text-align-center s-color-var-text-muted s-padding-30px-10px">
                                     <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="var(--text-muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="s-margin-0-auto-10px-auto s-display-block"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
                                     <strong class="s-color-var-text-color">Sin posiciones registradas</strong>
-                                    <p class="s-margin-5px-0-0-0 s-font-size-0-82rem">Registra tu primer activo a la izquierda para visualizar la gráfica de distribución.</p>
+                                    <p class="s-margin-5px-0-0-0 s-font-size-0-82rem">Registra tu primer activo con el botón «Registrar posición» para ver la gráfica de distribución.</p>
                                 </div>
                             </div>
                         </div>
@@ -895,10 +929,16 @@
 
                 <!-- Fila Inferior: Tabla de Posiciones a Ancho Completo -->
                 <div class="inversiones-tabla-section">
-                    <h3 class="s-margin-16px-0-10px-0 s-font-size-1-05rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
-                        <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                        <span>Mis posiciones (ETFs & acciones)</span>
-                    </h3>
+                    <div class="panel-cabecera">
+                        <h3 class="s-margin-0 s-font-size-1-05rem s-color-var-text-color s-display-flex s-align-items-center s-gap-6px">
+                            <svg class="heading-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span>Mis posiciones (ETFs &amp; acciones)</span>
+                        </h3>
+                        <button type="button" id="btn-nueva-posicion" class="btn-primary" data-on-click='[["abrirModalNuevaPosicion"]]'>
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span>Registrar posición</span>
+                        </button>
+                    </div>
                     <div class="table-responsive">
                         <table>
                             <thead>
@@ -1996,7 +2036,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=a7a7eaf797"></script>
+    <script type="module" src="/static/js/main.js?v=6cdb2ff025"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

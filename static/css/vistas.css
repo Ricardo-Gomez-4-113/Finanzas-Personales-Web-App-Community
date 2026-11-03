@@ -249,21 +249,10 @@
     }
 }
 
-.inversiones-col-form,
 .inversiones-col-chart {
     min-width: 0;
     display: flex;
     flex-direction: column;
-}
-
-.inversiones-col-form .card-form {
-    background: var(--panel-bg);
-    padding: 16px 18px;
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
-    height: 100%;
-    box-sizing: border-box;
 }
 
 .inversiones-tabla-section {
@@ -1082,7 +1071,6 @@
         min-width: 0;
     }
 
-    .inversiones-col-form,
     .inversiones-col-chart,
     .inversiones-tabla-section {
         width: 100%;

@@ -2,7 +2,7 @@
  * static/js/recurrentes.js - Pestaña "Fijos y MSI": nómina, gastos fijos y compras a meses.
  */
 
-import { apiFetch, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { abrirModalFormulario, apiFetch, avisoFormulario, cerrarModalFormulario, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { bloqueTarjetaPartes } from './tarjeta_partes.js';
@@ -101,8 +101,19 @@ function actualizarPreview() {
     }
 }
 
+export function abrirModalNuevoFijo() {
+    avisoFormulario('rec-mensaje');
+    abrirModalFormulario('modal-nuevo-fijo', 'rec-desc');
+}
+
+export function cerrarModalNuevoFijo() {
+    cerrarModalFormulario('modal-nuevo-fijo');
+    avisoFormulario('rec-mensaje');
+}
+
 async function guardarRecurrente(e) {
     e.preventDefault();
+    avisoFormulario('rec-mensaje');
     const btn = document.getElementById('btn-guardar-recurrente');
     const modo = modoActual();
     const descripcion = document.getElementById('rec-desc').value.trim();
@@ -115,8 +126,8 @@ async function guardarRecurrente(e) {
     if (modo === 'msi') {
         const total = parseFloat(document.getElementById('rec-total').value);
         const meses = mesesElegidos();
-        if (!total || total <= 0) return toast('Ingresa el monto total de la compra.', 'error');
-        if (!meses || meses < 2 || meses > 60) return toast('Los meses deben estar entre 2 y 60.', 'error');
+        if (!total || total <= 0) return avisoFormulario('rec-mensaje', 'Ingresa el monto total de la compra.');
+        if (!meses || meses < 2 || meses > 60) return avisoFormulario('rec-mensaje', 'Los meses deben estar entre 2 y 60.');
         const cuota = Math.round((total / meses) * 100) / 100;
         const libre = margenPeriodos();
         if (libre !== null && desdeMXN(cuota) > libre) {
@@ -130,7 +141,7 @@ async function guardarRecurrente(e) {
         body = { descripcion, monto_total: total, meses, fecha_inicio: fecha, categoria_id: categoriaId };
     } else {
         const monto = parseFloat(document.getElementById('rec-monto').value);
-        if (!monto || monto <= 0) return toast('Ingresa un monto mayor a 0.', 'error');
+        if (!monto || monto <= 0) return avisoFormulario('rec-mensaje', 'Ingresa un monto mayor a 0.');
         body = {
             descripcion,
             tipo: modo === 'ingreso' ? 'ingreso' : 'gasto',
@@ -151,9 +162,10 @@ async function guardarRecurrente(e) {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            toast(formatErrorDetail(err.detail, 'No se pudo guardar el registro.'), 'error');
+            avisoFormulario('rec-mensaje', formatErrorDetail(err.detail, 'No se pudo guardar el registro.'));
             return;
         }
+        cerrarModalNuevoFijo();
         toast(modo === 'msi' ? 'Compra a meses registrada.' : 'Registro fijo guardado.', 'ok');
         document.getElementById('form-recurrente').reset();
         document.getElementById('rec-frecuencia').value = 'mensual';
@@ -162,7 +174,7 @@ async function guardarRecurrente(e) {
         actualizarVistaModo();
         recargar();
     } catch (error) {
-        toast('Error de conexión al guardar.', 'error');
+        avisoFormulario('rec-mensaje', 'Error de conexión al guardar.');
     } finally {
         btn.disabled = false;
     }
@@ -670,6 +682,8 @@ export function inicializarRecurrentes() {
 }
 
 Object.assign(window, {
+    abrirModalNuevoFijo,
+    cerrarModalNuevoFijo,
     abrirModalEditarRecurrente,
     cerrarModalEditarRecurrente,
     guardarEdicionRecurrente,

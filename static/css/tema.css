@@ -243,13 +243,37 @@
 }
 
 :root .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px; }
-:root .dashboard-grid-movimientos { grid-template-columns: 340px minmax(0, 1fr); }
+:root .dashboard-grid-movimientos { grid-template-columns: minmax(0, 1fr); }
 :root .dashboard-grid > *,
 :root .panel { min-width: 0; }
 
 @media (max-width: 1024px) {
     :root .dashboard-grid,
     :root .dashboard-grid-movimientos { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Cabecera de un panel con acción: el título a la izquierda y el botón «+» a la derecha */
+:root .panel-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+:root .panel-cabecera > :is(h2, h3) { margin: 0; }
+
+/* Inversiones: la gráfica de asignación ocupa todo el ancho; el formulario vive en un modal */
+:root .inversiones-top-grid { grid-template-columns: minmax(0, 1fr); }
+
+/* Un formulario dentro de un modal no lleva caja propia */
+:root .modal-card .card-form {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    height: auto;
 }
 
 /* Franja de cifras: un solo panel con divisiones, no tarjetas sueltas */
@@ -961,7 +985,9 @@
 
 :root .modal-actions {
     position: sticky;
-    bottom: 0;
+    /* Llega hasta el borde de la tarjeta (el margen negativo ya la pega al borde); con 0 el sticky la subía el
+       relleno de la tarjeta y se comía el espacio sobre los botones aunque el modal no se desplazara */
+    bottom: calc(-1 * var(--modal-pad-y));
     margin: 20px calc(-1 * var(--modal-pad-x)) calc(-1 * var(--modal-pad-y));
     padding: 14px var(--modal-pad-x);
     background: var(--surface-modal);
@@ -1202,6 +1228,9 @@
     background-color: var(--surface-level2);
 }
 
+/* Los avisos quedan por encima de los modales (z-index 9999) */
+:root .toast-root { z-index: 10001; }
+
 /* Avisos: sin barra de color a un lado; el estado va en el texto, con el tono de texto */
 :root .toast { border-left: 1px solid var(--border-color); }
 :root .toast-ok { color: var(--success-text); }
@@ -1399,9 +1428,6 @@
     :root #tabla-movimientos td.col-acciones { grid-column: 3; grid-row: 3; justify-self: end; }
     :root .filtros-movimientos > * { flex: 1 1 100%; }
 }
-
-/* Registrar movimiento no se estira hasta la altura de la tabla */
-:root .dashboard-grid-movimientos > .panel:first-child { align-self: start; }
 
 :root td.col-acciones { display: table-cell; white-space: nowrap; vertical-align: middle; }
 :root td.col-acciones > button + button { margin-left: 2px; }
@@ -2116,7 +2142,10 @@
 :root .msg-error { color: var(--danger-text); }
 
 /* Aviso del formulario de movimientos: texto normal alineado a la izquierda, no un párrafo centrado en negrita */
-:root #mensaje { text-align: left; font-weight: 400; font-size: var(--fs-sm); line-height: 1.5; }
+:root #mensaje,
+:root .aviso-form { margin-top: 14px; text-align: left; font-weight: 400; font-size: var(--fs-sm); line-height: 1.5; }
+:root #mensaje:empty,
+:root .aviso-form:empty { margin: 0; }
 :root .texto-tenue { color: var(--text-muted); }
 :root .texto-xs { font-size: 0.75rem; }
 :root .texto-sm { font-size: 0.85rem; }

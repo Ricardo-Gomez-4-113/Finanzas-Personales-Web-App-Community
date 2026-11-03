@@ -8,12 +8,12 @@ import { cerrarModalRecuperarPassword, cerrarSesionLimpia, establecerSesionActiv
 import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPeriodo, fmt, leerJson, montoHTML, montoMxnHTML, toast } from './core.js';
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
-import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=a7a7eaf797';
-import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
+import { cargarInversiones, cerrarModalEditarInversion, cerrarModalNuevaPosicion, inicializarBuscadorTickers } from './inversiones.js';
+import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=6cdb2ff025';
+import { cargarCategorias, cerrarModalEditarTransaccion, cerrarModalNuevoMovimiento, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=a7a7eaf797';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=6cdb2ff025';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -143,6 +143,9 @@ export async function cargarDatos() {
 
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+        cerrarModalNuevaPosicion();
+        cerrarModalNuevoFijo();
+        cerrarModalNuevoMovimiento();
         cerrarModalEditarInversion();
         cerrarModalEditarTransaccion();
         cerrarModalCrearUsuario();

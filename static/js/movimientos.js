@@ -2,7 +2,7 @@
  * static/js/movimientos.js - Formulario, categorías, tabla con filtros y edición de movimientos de caja.
  */
 
-import { apiFetch, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { abrirModalFormulario, apiFetch, avisoFormulario, cerrarModalFormulario, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { bloqueTarjetaPartes } from './tarjeta_partes.js';
 import { confirmar } from './confirmar.js';
 
@@ -205,6 +205,16 @@ export function renderTablaMovimientos() {
 
 export let guardandoTransaccion = false;
 
+export function abrirModalNuevoMovimiento() {
+    avisoFormulario('mensaje');
+    abrirModalFormulario('modal-nuevo-movimiento', 'monto');
+}
+
+export function cerrarModalNuevoMovimiento() {
+    cerrarModalFormulario('modal-nuevo-movimiento');
+    avisoFormulario('mensaje');
+}
+
 export const formTrans = document.getElementById('transaccion-form');
 
 if (formTrans) {
@@ -247,13 +257,11 @@ if (formTrans) {
             });
 
             if (response.ok) {
-                if (mensajeDiv) {
-                    mensajeDiv.className = 'msg-ok';
-                    mensajeDiv.textContent = '¡Movimiento guardado!';
-                }
                 formTrans.reset();
                 document.getElementById('fecha').value = obtenerFechaLocalISO();
                 llenarSelectsCategoria();
+                cerrarModalNuevoMovimiento();
+                toast('Movimiento guardado.', 'ok');
                 recargar();
             } else {
                 let errText = 'Error al guardar.';
@@ -657,6 +665,8 @@ export function abrirModalEditarTransaccionPorId(id) {
 }
 
 Object.assign(window, {
+    abrirModalNuevoMovimiento,
+    cerrarModalNuevoMovimiento,
     abrirModalEditarTransaccion,
     abrirModalEditarTransaccionPorId,
     cerrarModalEditarTransaccion,

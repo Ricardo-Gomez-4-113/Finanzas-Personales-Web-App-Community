@@ -2,7 +2,7 @@
  * static/js/inversiones.js - Posiciones bursátiles, dona de asignación, buscador y sincronización.
  */
 
-import { actualizarIndicadorTasa, apiFetch, colorVar, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { abrirModalFormulario, actualizarIndicadorTasa, apiFetch, avisoFormulario, cerrarModalFormulario, colorVar, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 
@@ -368,6 +368,16 @@ export async function buscarCotizacionTicker() {
 
 export let guardandoInversion = false;
 
+export function abrirModalNuevaPosicion() {
+    avisoFormulario('inv-mensaje');
+    abrirModalFormulario('modal-nueva-posicion', 'inv-ticker');
+}
+
+export function cerrarModalNuevaPosicion() {
+    cerrarModalFormulario('modal-nueva-posicion');
+    avisoFormulario('inv-mensaje');
+}
+
 export const formInversion = document.getElementById('form-inversion');
 
 if (formInversion) {
@@ -381,9 +391,10 @@ if (formInversion) {
         const actualVal = document.getElementById('inv-precio-actual').value;
         const precio_actual = actualVal ? parseFloat(actualVal) : null;
         const moneda = document.getElementById('inv-moneda')?.value || 'USD';
+        avisoFormulario('inv-mensaje');
 
         if (!ticker || isNaN(cantidad) || cantidad <= 0 || isNaN(precio_promedio) || precio_promedio <= 0) {
-            toast("Completa los campos obligatorios con valores numéricos válidos mayores a cero.", 'error');
+            avisoFormulario('inv-mensaje', "Completa los campos obligatorios con valores numéricos válidos mayores a cero.");
             return;
         }
 
@@ -404,6 +415,8 @@ if (formInversion) {
 
             if (res.ok) {
                 formInversion.reset();
+                cerrarModalNuevaPosicion();
+                toast('Posición registrada.', 'ok');
                 await recargar();
             } else {
                 let errText = "Error al registrar la inversión.";
@@ -411,10 +424,10 @@ if (formInversion) {
                     const err = await res.json();
                     errText = formatErrorDetail(err.detail, errText);
                 } catch (_) {}
-                toast(errText, 'error');
+                avisoFormulario('inv-mensaje', errText);
             }
         } catch (err) {
-            toast("Error de red al guardar la inversión.", 'error');
+            avisoFormulario('inv-mensaje', "Error de red al guardar la inversión.");
         } finally {
             guardandoInversion = false;
             if (btnSubmit) {
@@ -553,6 +566,8 @@ export function abrirModalEditarInversionPorId(id) {
 }
 
 Object.assign(window, {
+    abrirModalNuevaPosicion,
+    cerrarModalNuevaPosicion,
     abrirModalEditarInversion,
     abrirModalEditarInversionPorId,
     buscarCotizacionTicker,
