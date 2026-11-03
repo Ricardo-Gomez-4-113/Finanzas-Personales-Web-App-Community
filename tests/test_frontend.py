@@ -220,6 +220,27 @@ def test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base):
         ctx.close()
 
 
+def test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base):
+    """En móvil la tarjeta del login queda centrada en la pantalla y no se mueve cuando aparece el error."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        page.goto(base + "/login")
+        page.wait_for_selector("#vista-login:not(.hidden)")
+        centro = page.evaluate("(() => { const r = document.querySelector('.login-card').getBoundingClientRect(); return (r.top + r.bottom) / 2; })()")
+        alto_vista = VIEWPORTS["movil"]["height"]
+        assert abs(centro - alto_vista / 2) < 40, f"la tarjeta no está centrada: centro {centro}, pantalla {alto_vista / 2}"
+        arriba_antes = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
+        page.fill("#login-username", "nadie")
+        page.fill("#login-password", "clave-equivocada")
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#login-error:not(.hidden)", timeout=10000)
+        arriba_despues = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
+        assert abs(arriba_despues - arriba_antes) < 2, f"la tarjeta se movió {arriba_antes} -> {arriba_despues}"
+        assert not errores, "errores de JavaScript en el login:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1852,6 +1873,7 @@ if __name__ == "__main__":
                 (test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado, lambda: test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado(navegador, base)),
                 (test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor, lambda: test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor, lambda: test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base)),
+                (test_login_movil_centrado_y_sin_saltar_al_fallar, lambda: test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

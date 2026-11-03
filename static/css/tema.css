@@ -1314,13 +1314,15 @@
 :root .btn-ver-clave[aria-pressed="true"] { color: var(--gold-color); }
 
 @media (max-width: 520px) {
-    /* En celular la tarjeta es la propia página: sin borde ni sombra */
-    :root .login-wrapper { padding: 16px; }
+    /* En celular la tarjeta es la propia página: sin borde ni sombra, y centrada en la pantalla */
+    :root .login-wrapper { padding: 16px; align-items: center; }
+    /* Altura fija con el mensaje de error visible (542 px, medido): al fallar, la tarjeta no se mueve */
     :root .login-card {
         background: transparent;
         border-color: transparent;
         box-shadow: none;
         padding: 16px 0 0;
+        min-height: 542px;
     }
 }
 
