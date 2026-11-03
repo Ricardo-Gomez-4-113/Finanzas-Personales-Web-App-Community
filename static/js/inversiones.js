@@ -34,7 +34,9 @@ export async function cargarInversiones() {
 
         const lblDashPnl = document.getElementById('lbl-dash-pnl');
         if (lblDashPnl) {
-            lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <small class="texto-sm">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
+            lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} <small class="texto-sm">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
+            const etiquetaRendimiento = lblDashPnl.parentElement?.querySelector('small');
+            if (etiquetaRendimiento) etiquetaRendimiento.textContent = `Rendimiento de inversiones en ${estado.monedaGlobal}`;;
             lblDashPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 

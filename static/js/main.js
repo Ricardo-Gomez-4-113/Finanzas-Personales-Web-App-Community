@@ -9,11 +9,11 @@ import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPerio
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes } from './recurrentes.js?v=e81679bac4';
+import { cargarRecurrentes } from './recurrentes.js?v=d320edb5c2';
 import { cargarCategorias, cerrarModalEditarTransaccion, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarFab, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=e81679bac4';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=d320edb5c2';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -52,9 +52,12 @@ export async function cargarDatos() {
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
 
         if (document.getElementById('lbl-dash-patrimonio')) {
-            setHTML('lbl-dash-patrimonio', `${montoHTML(dataResumen.patrimonio_neto)} ${estado.monedaGlobal}`);
+            setHTML('lbl-dash-patrimonio', montoHTML(dataResumen.patrimonio_neto));
             setHTML('lbl-dash-apartados', montoHTML(dataResumen.apartados));
-            setHTML('lbl-dash-inversiones', `${montoHTML(dataResumen.inversiones)} ${estado.monedaGlobal}`);
+            setHTML('lbl-dash-inversiones', montoHTML(dataResumen.inversiones));
+            // La moneda va una vez, en la etiqueta del bloque
+            const etiquetaPatrimonio = document.querySelector('.networth-header small');
+            if (etiquetaPatrimonio) etiquetaPatrimonio.textContent = `Patrimonio en ${estado.monedaGlobal} (metas e inversiones)`;
 
             // Tira de Distribución de Patrimonio (Metas vs Inversiones)
             const vAp = Math.max(0, Number(dataResumen.apartados) || 0);

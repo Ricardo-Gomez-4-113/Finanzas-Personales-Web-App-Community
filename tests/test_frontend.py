@@ -1021,6 +1021,31 @@ def test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, b
     finally:
         ctx.close()
 
+def test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base):
+    """La moneda va una vez, en la etiqueta del bloque (no pegada a cada cifra). En celular, las pestañas
+    internas usan textos cortos y caben en una línea."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        page.wait_for_selector("#lbl-dash-patrimonio:not(:empty)")
+        assert not page.inner_text("#lbl-dash-patrimonio").endswith("MXN"), page.inner_text("#lbl-dash-patrimonio")
+        assert "MXN" in page.inner_text(".networth-header small"), page.inner_text(".networth-header small")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        _ir(page, "tab-movimientos")
+        visibles = page.evaluate("""() => [...document.querySelectorAll('.subtab-btn')].map(b => {
+            const corto = b.querySelector('.sub-corto'), largo = b.querySelector('.sub-largo');
+            return [getComputedStyle(corto).display !== 'none', getComputedStyle(largo).display !== 'none', b.getBoundingClientRect().height];
+        })""")
+        assert all(c and not l for c, l, _ in visibles), f"en móvil deben verse los textos cortos: {visibles}"
+        assert all(h <= 48 for _, _, h in visibles), f"una pestaña interna ocupa dos líneas: {visibles}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1611,6 +1636,7 @@ if __name__ == "__main__":
                 (test_importe_grande_no_se_parte_en_movil, lambda: test_importe_grande_no_se_parte_en_movil(navegador, base)),
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
                 (test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico, lambda: test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base)),
+                (test_moneda_una_vez_y_pestanas_internas_cortas_en_movil, lambda: test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

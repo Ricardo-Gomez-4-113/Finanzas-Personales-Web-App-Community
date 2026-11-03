@@ -617,6 +617,7 @@
 }
 :root .networth-rendimiento small { font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); }
 :root .networth-rendimiento strong {
+    font-family: var(--font-num);
     font-size: var(--fs-xl);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -837,6 +838,10 @@
     margin-bottom: -1px;
     border-bottom: 2px solid transparent;
 }
+
+:root .subtab-btn { white-space: nowrap; }
+
+:root .subtab-btn .sub-corto { display: none; }
 
 :root .subtab-btn:hover { background: transparent; color: var(--text-color); }
 
@@ -1792,6 +1797,8 @@
 /* Barra superior en teléfonos: el título en una sola línea, un paso más chico */
 @media (max-width: 480px) {
     :root .topbar-section-title { font-size: 0.92rem; }
+    :root .subtab-btn .sub-largo { display: none; }
+    :root .subtab-btn .sub-corto { display: inline; }
     /* El nombre, el rol y la flecha: el menú los muestra; en la barra basta el avatar, para que el título quepa en una línea */
     :root .btn-user-trigger .user-trigger-info { display: none; }
     :root .btn-user-trigger .user-dropdown-arrow { display: none; }
@@ -1907,6 +1914,9 @@
 
 /* Insignias: relleno tenue, sin borde */
 :root .badge-tag { border: none; }
+
+/* Un solo radio para los botones; el «+» es círculo y las pestañas no llevan caja */
+:root button:not(.fab):not(.subtab-btn):not(.tab-btn) { border-radius: var(--radius-s); }
 
 /* Botones: planos, sin sombra en reposo ni al pasar el cursor (el botón «+» conserva la suya) */
 :root button:not(.fab),
