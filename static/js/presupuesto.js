@@ -145,7 +145,7 @@ function renderPagos(data) {
         bloque.innerHTML = `
             <div class="pres-pago-head">
                 <div class="pres-pago-titulo">
-                    <h4>${escapeHTML(nombre)}</h4>
+                    <h3>${escapeHTML(nombre)}</h3>
                     <span>Ingreso de este pago: ${montoMxnHTML(u.ingreso)}</span>
                 </div>
                 <label class="pres-pago-dia-label">Día de cobro
@@ -194,7 +194,7 @@ function renderGridTarjetas(pago, grid) {
                 </div>
                 <div class="pres-card-titles">
                     <div class="pres-card-nombre-fila">
-                        <h4 class="pres-card-name">${escapeHTML(t.nombre)}</h4>
+                        <h3 class="pres-card-name">${escapeHTML(t.nombre)}</h3>
                         ${diaBadge}
                     </div>
                     ${t.notas ? `<p class="pres-card-notes">${escapeHTML(t.notas)}</p>` : ''}

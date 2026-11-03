@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=7fe5141537">
-    <link rel="stylesheet" href="/static/css/layout.css?v=7fe5141537">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=7fe5141537">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=7fe5141537">
-    <link rel="stylesheet" href="/static/css/tema.css?v=7fe5141537">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=d366891280">
+    <link rel="stylesheet" href="/static/css/layout.css?v=d366891280">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=d366891280">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=d366891280">
+    <link rel="stylesheet" href="/static/css/tema.css?v=d366891280">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -584,7 +584,7 @@
                             <label class="segmented-opt"><input type="radio" name="rec-modo" value="msi"><span>Compra a meses</span></label>
                         </div>
                         <form id="form-recurrente">
-                            <h4 class="form-seccion">Datos</h4>
+                            <h3 class="form-seccion">Datos</h3>
                             <div class="form-group">
                                 <label for="rec-desc">Descripción</label>
                                 <input type="text" id="rec-desc" maxlength="100" placeholder="Ej. Nómina, Renta, Laptop" required>
@@ -630,7 +630,7 @@
                                 </div>
                                 <p class="hint-text" id="rec-preview"></p>
                             </div>
-                            <h4 class="form-seccion">Fecha y categoría</h4>
+                            <h3 class="form-seccion">Fecha y categoría</h3>
                             <div class="form-row-2col">
                                 <div class="form-group">
                                     <label for="rec-fecha">Fecha del primer pago</label>
@@ -641,7 +641,7 @@
                                     <select id="rec-categoria"></select>
                                 </div>
                             </div>
-                            <h4 class="form-seccion">Destino</h4>
+                            <h3 class="form-seccion">Destino</h3>
                             <div id="rec-apartado-group" class="modal-apilado">
                             <div class="form-group">
                                 <label for="rec-apartado-id">
@@ -670,7 +670,7 @@
                         <p class="card-subtext">Deuda MSI pendiente: <strong id="lbl-fijos-deuda">$0.00</strong></p>
                         <div id="fijos-periodos"></div>
                         <div id="fijos-pausados-bloque" class="fijos-bloque hidden">
-                            <h4>Pausados</h4>
+                            <h3>Pausados</h3>
                             <p class="fijos-bloque-ayuda">No generan cargos hasta que los reanudes.</p>
                             <div id="fijos-pausados"></div>
                         </div>
@@ -742,7 +742,7 @@
                 <!-- Pagos del periodo: cada pago tiene su día de cobro y sus propias tarjetas -->
                 <div id="pres-pagos" class="pres-pagos">
                     <div class="pres-seccion-head">
-                        <h4 class="pres-seccion-titulo">Pagos del periodo</h4>
+                        <h3 class="pres-seccion-titulo">Pagos del periodo</h3>
                         <p class="pres-totales" id="lbl-pres-totales"></p>
                     </div>
                     <p class="pres-seccion-ayuda">Cada pago reparte su ingreso en sus propias tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en el día de ese pago.</p>
@@ -1996,7 +1996,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=7fe5141537"></script>
+    <script type="module" src="/static/js/main.js?v=d366891280"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

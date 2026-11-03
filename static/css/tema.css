@@ -1526,7 +1526,7 @@
 
 :root .pres-alloc-track { border-radius: 999px; background: var(--surface-level2); }
 :root .pres-pago .pres-pago-vacio { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; color: var(--text-muted); }
-:root .pres-pago-titulo h4 { text-align: left; }
+:root .pres-pago-titulo h3 { text-align: left; }
 
 /* ---------- Pestaña Admin: directorio de usuarios ---------- */
 :root .admin-cabecera {
@@ -1627,6 +1627,8 @@
 :root .admin-filtro:last-child { border-right: 0; }
 
 :root .btn-danger-solid:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Botones normales deshabilitados (p. ej. mientras se guarda): se ven apagados, sin cursor de acción */
+:root .btn-primary:disabled, :root .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 :root .admin-filtro span { font-variant-numeric: tabular-nums; }
 
 :root .admin-filtro.is-on {
@@ -2067,6 +2069,12 @@
     box-shadow: none;
     padding: 0;
 }
+
+/* Sin franjas decorativas: los segmentos vacíos y libres del presupuesto son tonos planos */
+:root .pres-slice-empty { background: var(--surface-level2); }
+:root .pres-slice-libre { background: color-mix(in srgb, var(--success-color) 20%, transparent); }
+:root .monthly-card { border-left: 1px solid var(--border-color); }
+:root .hero-networth::before { display: none; }
 
 /* Insignias: relleno tenue, sin borde */
 :root .badge-tag { border: none; }

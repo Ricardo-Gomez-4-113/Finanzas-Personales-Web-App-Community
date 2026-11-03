@@ -1183,6 +1183,26 @@ def test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, ba
     finally:
         ctx.close()
 
+def test_pasada_final_encabezados_franjas_y_deshabilitados(navegador, base):
+    """Pasada final: los encabezados no saltan de nivel (sin h4 bajo h2 en Movimientos ni Presupuesto),
+    no hay franjas decorativas en el hero ni en la cinta, y un botón deshabilitado se ve apagado."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.click("#btn-subtab-fijos")
+        assert page.locator("#tab-movimientos h4").count() == 0, "hay un h4 suelto en Movimientos"
+        _ir(page, "tab-presupuesto")
+        assert page.locator("#tab-presupuesto h4").count() == 0, "hay un h4 suelto en Presupuesto"
+        _ir(page, "tab-dashboard")
+        franja = page.evaluate("getComputedStyle(document.querySelector('.hero-networth'), '::before').display")
+        assert franja == "none", f"el resumen aún tiene franja decorativa: {franja}"
+        opacidad = page.evaluate("""() => { const b = document.createElement('button'); b.className = 'btn-primary'; b.disabled = true;
+            document.body.appendChild(b); const o = getComputedStyle(b).opacity; b.remove(); return o; }""")
+        assert float(opacidad) < 1, f"un botón deshabilitado debe verse apagado: {opacidad}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1781,6 +1801,7 @@ if __name__ == "__main__":
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
                 (test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario, lambda: test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base)),
                 (test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono, lambda: test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, base)),
+                (test_pasada_final_encabezados_franjas_y_deshabilitados, lambda: test_pasada_final_encabezados_franjas_y_deshabilitados(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

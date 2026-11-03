@@ -226,7 +226,7 @@ function filaFijo(i) {
 
 function bloqueFijos(titulo, items) {
     if (items.length === 0) return '';
-    return `<div class="fijos-bloque"><h4>${titulo}</h4>${items.map(filaFijo).join('')}</div>`;
+    return `<div class="fijos-bloque"><h3>${titulo}</h3>${items.map(filaFijo).join('')}</div>`;
 }
 
 function renderFijosPorPeriodo(data) {
