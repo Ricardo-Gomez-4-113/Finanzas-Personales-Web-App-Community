@@ -770,6 +770,9 @@
 
 :root .link-btn { color: var(--gold-color); }
 
+/* Enlace de acción: al pasar el cursor, subrayado y sin fondo de botón */
+:root .link-btn:hover { background-color: transparent; text-decoration: underline; }
+
 /* ---------- Tablas ---------- */
 :root .table-responsive {
     border: 1px solid var(--border-color);
@@ -1618,6 +1621,7 @@
     display: inline-flex;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-s);
+    padding: 3px;
     overflow: hidden;
 }
 

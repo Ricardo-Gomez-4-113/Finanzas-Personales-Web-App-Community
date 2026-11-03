@@ -402,16 +402,6 @@
     border: 1px solid var(--border-color);
 }
 
-.hero-networth::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--panel-bg) 0%, var(--success-color) 50%, var(--success-color) 100%);
-}
-
 .networth-header {
     display: flex;
     flex-direction: column;
@@ -1888,21 +1878,6 @@ input[type="number"].subperiodo-editor-input-pct {
     color: var(--text-muted);
 }
 
-.calc-indicator-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--success-color, var(--success-color));
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 70%, transparent);
-    animation: pulseDot 2.2s infinite cubic-bezier(0.4, 0, 0.6, 1);
-}
-
-@keyframes pulseDot {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 70%, transparent); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px color-mix(in srgb, var(--success-color) 0%, transparent); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-color) 0%, transparent); }
-}
-
 /* Tarjetas de Resultados (Summary Cards) */
 .cards-calc-rf {
     display: grid;
@@ -2380,13 +2355,6 @@ input[type="number"].subperiodo-editor-input-pct {
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.pres-slice-empty {
-    background: repeating-linear-gradient(45deg, rgb(var(--luz-rgb) / 0.05), rgb(var(--luz-rgb) / 0.05) 10px, transparent 10px, transparent 20px);
-}
-
-.pres-slice-libre {
-    background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--success-color) 20%, transparent), color-mix(in srgb, var(--success-color) 20%, transparent) 6px, transparent 6px, transparent 12px);
-}
 
 .pres-alloc-legend {
     display: flex;

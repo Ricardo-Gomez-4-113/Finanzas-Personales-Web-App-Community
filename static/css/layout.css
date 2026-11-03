@@ -257,13 +257,6 @@
     border-radius: 50%;
     background-color: var(--success-color);
     flex-shrink: 0;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--success-color) 70%, transparent);
-    animation: status-pulse 2s infinite ease-in-out;
-}
-
-@keyframes status-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.55; transform: scale(0.92); }
 }
 
 /* Estado Colapsado de Sidebar (Escritorio) */

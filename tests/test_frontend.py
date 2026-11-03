@@ -206,6 +206,20 @@ def test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(n
         ctx.close()
 
 
+def test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base):
+    """«Ir a fijos y MSI» es un enlace dorado: al pasar el cursor no toma el fondo de acento (texto dorado sobre dorado)."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base)
+        _ir(page, "tab-movimientos")
+        page.hover(".link-btn")
+        fondo = page.evaluate("getComputedStyle(document.querySelector('.link-btn')).backgroundColor")
+        assert fondo == "rgba(0, 0, 0, 0)", f"el enlace toma fondo al pasar el cursor: {fondo}"
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1837,6 +1851,7 @@ if __name__ == "__main__":
                 (test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta, lambda: test_inversiones_pagina_sin_borde_un_solo_nivel_de_tarjeta(navegador, base)),
                 (test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado, lambda: test_avisos_sin_barra_de_color_y_botones_sin_brillo_dorado(navegador, base)),
                 (test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor, lambda: test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(navegador, base)),
+                (test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor, lambda: test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
