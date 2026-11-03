@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=a7fea9b023">
-    <link rel="stylesheet" href="/static/css/layout.css?v=a7fea9b023">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=a7fea9b023">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=a7fea9b023">
-    <link rel="stylesheet" href="/static/css/tema.css?v=a7fea9b023">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=4b0e50b4b8">
+    <link rel="stylesheet" href="/static/css/layout.css?v=4b0e50b4b8">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=4b0e50b4b8">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=4b0e50b4b8">
+    <link rel="stylesheet" href="/static/css/tema.css?v=4b0e50b4b8">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -695,7 +695,7 @@
                             </svg>
                             <span>Organizador de presupuesto</span>
                         </h2>
-                        <p class="panel-subtitle">Define la frecuencia de tus ingresos y divídelos en tarjetas por porcentaje ($ ⇄ %) para saber exactamente a dónde va tu dinero.</p>
+                        <p class="panel-subtitle">Define la frecuencia de tus ingresos y repártelos en tarjetas, en pesos o en porcentaje, para saber exactamente a dónde va tu dinero.</p>
                     </div>
                     <div class="pres-header-actions">
                         <button type="button" class="btn-primary" data-on-click='[["abrirModalCrearTarjeta"]]'>
@@ -703,7 +703,7 @@
                             <span>Nueva tarjeta</span>
                         </button>
                         <button type="button" id="btn-exportar-pres-fijos" class="btn-secondary" title="Exportar presupuesto a Movimientos y Fijos con la misma periodicidad" data-on-click='[["abrirModalExportarPresupuesto"]]'>
-                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                             <span>Exportar a movimientos y fijos</span>
                         </button>
                     </div>
@@ -724,9 +724,9 @@
                             <div class="form-group pres-fg-frec">
                                 <label for="pres-frecuencia">Frecuencia de pago</label>
                                 <select id="pres-frecuencia" class="select-calc">
-                                    <option value="quincenal">Quincenal (cada 15 días)</option>
-                                    <option value="mensual" selected>Mensual (cada mes)</option>
-                                    <option value="semanal">Semanal (cada semana)</option>
+                                    <option value="quincenal">Quincenal</option>
+                                    <option value="mensual" selected>Mensual</option>
+                                    <option value="semanal">Semanal</option>
                                 </select>
                             </div>
                             <div class="form-group pres-fg-btn">
@@ -2023,7 +2023,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=a7fea9b023"></script>
+    <script type="module" src="/static/js/main.js?v=4b0e50b4b8"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>

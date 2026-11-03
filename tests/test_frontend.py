@@ -1100,6 +1100,22 @@ def test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base):
     finally:
         ctx.close()
 
+def test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base):
+    """El presupuesto: la página no lleva borde propio, la frecuencia se lee sin paréntesis y la
+    descripción no usa símbolos sueltos."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-presupuesto")
+        page.wait_for_selector(".pres-panel")
+        borde = page.evaluate("getComputedStyle(document.querySelector('.pres-panel')).borderTopWidth")
+        assert borde == "0px", f"el panel de presupuesto no debe llevar borde propio: {borde}"
+        assert "⇄" not in page.inner_text(".pres-header"), "la descripción no debe usar el símbolo ⇄"
+        opciones = page.evaluate("[...document.querySelectorAll('#pres-frecuencia option')].map(o => o.textContent.trim())")
+        assert opciones == ["Quincenal", "Mensual", "Semanal"], opciones
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1694,6 +1710,7 @@ if __name__ == "__main__":
                 (test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho, lambda: test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base)),
                 (test_movimientos_en_movil_sin_deslizar_y_con_papelera, lambda: test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base)),
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
+                (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

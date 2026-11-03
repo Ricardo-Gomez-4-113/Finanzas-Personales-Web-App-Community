@@ -170,7 +170,7 @@ function renderPagos(data) {
 // Tarjetas de un pago: el monto se compara con el ingreso de ese pago y el día es el suyo
 function renderGridTarjetas(pago, grid) {
     if (pago.tarjetas.length === 0) {
-        grid.innerHTML = `<p class="pres-pago-vacio">Sin tarjetas en este pago.</p>`;
+        grid.innerHTML = `<p class="pres-pago-vacio">Aún no hay tarjetas en este pago. Añade una para repartir tu ingreso.</p>`;
         return;
     }
 
