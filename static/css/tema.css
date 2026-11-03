@@ -2114,6 +2114,9 @@
 :root .celda-centro { text-align: center; }
 :root .msg-ok { color: var(--success-text); }
 :root .msg-error { color: var(--danger-text); }
+
+/* Aviso del formulario de movimientos: texto normal alineado a la izquierda, no un párrafo centrado en negrita */
+:root #mensaje { text-align: left; font-weight: 400; font-size: var(--fs-sm); line-height: 1.5; }
 :root .texto-tenue { color: var(--text-muted); }
 :root .texto-xs { font-size: 0.75rem; }
 :root .texto-sm { font-size: 0.85rem; }

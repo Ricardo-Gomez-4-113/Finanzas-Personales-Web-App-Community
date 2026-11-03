@@ -546,6 +546,23 @@ def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
     return round(float(fila[0]), 2)
 
 
+_MESES_ABREVIADOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _fecha_corta(iso: str) -> str:
+    """'2026-11-03' -> '3 nov 2026'. Si no es una fecha ISO válida, se devuelve tal cual."""
+    try:
+        anio, mes, dia = iso.split("-")
+        return f"{int(dia)} {_MESES_ABREVIADOS[int(mes) - 1]} {anio}"
+    except (ValueError, IndexError):
+        return iso
+
+
+def _pesos(valor: float) -> str:
+    """Importe para un mensaje, con el signo menos tipográfico pegado a la cifra: -49.0 -> '−$49.00 MXN'."""
+    return f"−${abs(valor):,.2f} MXN" if valor < -0.004 else f"${abs(valor):,.2f} MXN"
+
+
 def validar_saldo_disponible_fecha(
     cursor: sqlite3.Cursor,
     fecha: str,
@@ -584,15 +601,15 @@ def validar_saldo_disponible_fecha(
         deficit = abs(saldo_operativo - monto)
         if total_apartados > 0 and (saldo_en_cuenta - monto >= -0.001):
             raise ValueError(
-                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} MXN con fecha {fecha}. "
-                f"El saldo disponible operativo es de ${saldo_operativo:,.2f} MXN (saldo en cuenta ${saldo_en_cuenta:,.2f} MXN "
-                f"menos ${total_apartados:,.2f} MXN retenidos en apartados). Este gasto comprometería fondos guardados en apartados."
+                f"Fondos insuficientes: este gasto de {_pesos(monto)} usaría dinero que tienes en tus metas. "
+                f"El {_fecha_corta(fecha)} tienes {_pesos(saldo_en_cuenta)} en la cuenta y {_pesos(total_apartados)} en metas, "
+                f"así que solo puedes gastar {_pesos(max(saldo_operativo, 0.0))}. Baja el monto o retira de una meta."
             )
         else:
             raise ValueError(
-                f"Fondos insuficientes: no es posible registrar un gasto de ${monto:,.2f} MXN con fecha {fecha}. "
-                f"El saldo disponible a esa fecha sería de -${deficit:,.2f} MXN. "
-                f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo transferido de periodos pasados."
+                f"Fondos insuficientes: no alcanza para un gasto de {_pesos(monto)} el {_fecha_corta(fecha)}: "
+                f"tienes {_pesos(max(saldo_operativo, 0.0))} disponibles y te faltan {_pesos(deficit)}. "
+                f"No puedes gastar antes de recibir tus ingresos, salvo que tengas saldo de periodos anteriores."
             )
 
     # Verificar fechas posteriores para asegurar que no se produzca sobregiro acumulativo
@@ -615,12 +632,12 @@ def validar_saldo_disponible_fecha(
             deficit_post = abs(saldo_corriente)
             if total_apartados > 0:
                 raise ValueError(
-                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} MXN "
-                    f"en fecha posterior ({fp['fecha']}) comprometiendo fondos retenidos en apartados."
+                    f"Fondos insuficientes: este gasto dejaría tu saldo en {_pesos(-deficit_post)} el {_fecha_corta(fp['fecha'])} "
+                    f"y comprometería dinero de tus metas."
                 )
             else:
                 raise ValueError(
-                    f"Fondos insuficientes: registrar este gasto provocaría un saldo negativo de -${deficit_post:,.2f} MXN en fecha posterior ({fp['fecha']})."
+                    f"Fondos insuficientes: este gasto dejaría tu saldo en {_pesos(-deficit_post)} el {_fecha_corta(fp['fecha'])}."
                 )
 
 
@@ -735,8 +752,8 @@ def validar_edicion_transaccion(
             deficit = abs(saldo_corriente)
             if solo_gasto:
                 raise ValueError(
-                    f"Fondos insuficientes: este cambio dejaría tu saldo en -${deficit:,.2f} MXN en fecha {f}. "
-                    f"No puedes gastar antes de recibir tus ingresos a menos que cuentes con saldo de periodos pasados."
+                    f"Fondos insuficientes: este cambio dejaría tu saldo en {_pesos(-deficit)} el {_fecha_corta(f)}. "
+                    f"No puedes gastar antes de recibir tus ingresos, salvo que tengas saldo de periodos anteriores."
                 )
             raise ValueError(
                 f"No es posible modificar este ingreso: dicho ingreso respalda gastos ya ejecutados. "

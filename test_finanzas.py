@@ -756,7 +756,7 @@ def test_gasto_previo_a_fecha_de_cobro_sin_remanente_falla():
         assert False, "Debió fallar por no contar con saldo disponible a la fecha"
     except ValueError as e:
         assert "Fondos insuficientes" in str(e)
-        assert "2026-11-10" in str(e)
+        assert "10 nov 2026" in str(e), str(e)
 
 
 def test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso():
@@ -777,6 +777,36 @@ def test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso():
         assert False, "Debió fallar porque 6,000 supera el remanente disponible de 5,000"
     except ValueError as e:
         assert "Fondos insuficientes" in str(e)
+
+
+def test_mensaje_de_fondos_insuficientes_claro_con_menos_tipografico_y_fecha_corta():
+    """El mensaje usa «metas», la fecha como «3 nov 2026» y el signo menos pegado a la cifra, sin «$-» ni fechas ISO."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 100000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 500000, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 100000, 'gasto', 1)")
+    conn.commit()
+
+    # Con dinero en metas: dice cuánto se puede gastar y cuánto está en metas
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=4500.0, tipo='gasto')
+        assert False, "Debió fallar: compromete la meta"
+    except ValueError as e:
+        texto = str(e)
+        assert texto.startswith("Fondos insuficientes:"), texto
+        assert "3 nov 2026" in texto and "$5,000.00 MXN en la cuenta" in texto and "$1,000.00 MXN en metas" in texto, texto
+        assert "solo puedes gastar $4,000.00 MXN" in texto, texto
+        assert "apartados" not in texto.lower() and "2026-11-03" not in texto and "$-" not in texto, texto
+
+    # Sin metas: dice cuánto falta, sin cifras negativas con «$-»
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=9000.0, tipo='gasto')
+        assert False, "Debió fallar: supera el saldo"
+    except ValueError as e:
+        texto = str(e)
+        assert "tienes $4,000.00 MXN disponibles y te faltan $5,000.00 MXN" in texto and "3 nov 2026" in texto, texto
+        assert "$-" not in texto and "-$" not in texto, texto
 
 
 def test_meta_con_ahorro_que_nunca_paso_por_la_cuenta_no_bloquea_el_gasto():
@@ -954,7 +984,7 @@ def test_gasto_respeta_saldo_retenido_en_apartados():
         assert False, "Debió fallar porque 7,000 compromete los 4,000 guardados en apartados"
     except ValueError as e:
         assert "Fondos insuficientes" in str(e)
-        assert "apartados" in str(e).lower()
+        assert "metas" in str(e).lower()
 
     # Si se registra el gasto de 5,000 en BD
     cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 500000, 'gasto')")
@@ -967,7 +997,7 @@ def test_gasto_respeta_saldo_retenido_en_apartados():
         assert False, "Debió fallar porque saldo operativo restante es 1,000"
     except ValueError as e:
         assert "Fondos insuficientes" in str(e)
-        assert "apartados" in str(e).lower()
+        assert "metas" in str(e).lower()
 
     # Validar que crear_transaccion vía API rechaza con HTTP 422
     from routers.movimientos import crear_transaccion, Transaccion

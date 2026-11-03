@@ -241,6 +241,29 @@ def test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base):
         ctx.close()
 
 
+def test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navegador, base):
+    """El aviso de fondos insuficientes va alineado a la izquierda, sin negrita, se anuncia (role=alert) y no trae «$-» ni fechas ISO."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        page.fill("#fecha", escenario.HOY)
+        page.select_option("#tipo", "gasto")
+        page.fill("#monto", "9999999")
+        page.fill("#descripcion", "gasto-que-no-alcanza")
+        page.click("#transaccion-form [type=submit]")
+        page.wait_for_selector("#mensaje.msg-error", timeout=10000)
+        texto = page.inner_text("#mensaje")
+        assert texto.startswith("Fondos insuficientes:"), texto
+        assert "$-" not in texto and escenario.HOY not in texto, texto
+        estilo = page.evaluate("(() => { const s = getComputedStyle(document.getElementById('mensaje')); return [s.textAlign, parseInt(s.fontWeight)]; })()")
+        assert estilo[0] in ("left", "start"), f"el aviso está alineado a {estilo[0]}"
+        assert estilo[1] < 600, f"el aviso va en negrita ({estilo[1]})"
+        assert page.get_attribute("#mensaje", "role") == "alert", "el aviso debe anunciarse"
+        assert not errores, "errores de JavaScript:\n" + "\n".join(errores)
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -1874,6 +1897,7 @@ if __name__ == "__main__":
                 (test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor, lambda: test_boton_de_texto_dorado_no_queda_dorado_sobre_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor, lambda: test_enlace_de_accion_sin_fondo_dorado_al_pasar_el_cursor(navegador, base)),
                 (test_login_movil_centrado_y_sin_saltar_al_fallar, lambda: test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base)),
+                (test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia, lambda: test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),
