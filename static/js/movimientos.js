@@ -190,7 +190,7 @@ export function renderTablaMovimientos() {
             <td class="td-monto ${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${t.tipo === 'gasto' ? '−' : '+'}${montoMxnHTML(t.monto)}</td>
             <td class="col-acciones">
                 <button type="button" class="btn-accion btn-editar" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarTransaccionPorId", t.id]]))}" title="Editar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-                <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarTransaccion", t.id]]))}" title="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarTransaccion", t.id]]))}" title="Eliminar movimiento" aria-label="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
             </td>
         `;
         tbody.appendChild(tr);

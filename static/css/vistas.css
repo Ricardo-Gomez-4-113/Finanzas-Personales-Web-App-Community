@@ -1275,9 +1275,7 @@
     }
 
     #tabla-inversiones th:first-child,
-    #tabla-inversiones td:first-child,
-    #tabla-movimientos th:first-child,
-    #tabla-movimientos td:first-child {
+    #tabla-inversiones td:first-child {
         position: sticky;
         left: 0;
         background-color: var(--panel-bg);

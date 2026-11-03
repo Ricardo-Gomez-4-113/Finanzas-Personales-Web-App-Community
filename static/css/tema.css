@@ -1349,6 +1349,47 @@
 }
 
 /* ---------- Tabla de movimientos ---------- */
+/* Movimientos en celular: cada movimiento es una fila de lista (monto y fecha arriba, descripción,
+   categoría y acciones abajo), sin deslizar la tabla de lado. Solo CSS: el HTML que generan los módulos no cambia. */
+@media (max-width: 768px) {
+    :root table:has(#tabla-movimientos) thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+    :root table:has(#tabla-movimientos),
+    :root table:has(#tabla-movimientos) tbody { display: block; width: 100%; }
+    :root #tabla-movimientos tr {
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr) auto;
+        column-gap: 8px;
+        row-gap: 4px;
+        align-items: center;
+        padding: 12px 6px;
+        border-bottom: 1px solid var(--table-border);
+    }
+    :root #tabla-movimientos td {
+        display: block;
+        padding: 0;
+        border: 0;
+        white-space: normal;
+        font-size: var(--fs-sm);
+    }
+    :root #tabla-movimientos td.celda-centro { grid-column: 1; grid-row: 1 / span 3; }
+    :root #tabla-movimientos td.td-fecha { grid-column: 2; grid-row: 1; font-size: var(--fs-xs); }
+    :root #tabla-movimientos td.td-monto { grid-column: 3; grid-row: 1; text-align: right; }
+    :root #tabla-movimientos td:nth-child(3) { grid-column: 2 / span 2; grid-row: 2; font-weight: 500; }
+    :root #tabla-movimientos td:nth-child(4) { grid-column: 2; grid-row: 3; font-size: var(--fs-xs); color: var(--text-muted); }
+    :root #tabla-movimientos td.td-tipo { display: none; }
+    :root #tabla-movimientos td.col-acciones { grid-column: 3; grid-row: 3; justify-self: end; }
+    :root .filtros-movimientos > * { flex: 1 1 100%; }
+}
+
+/* Registrar movimiento no se estira hasta la altura de la tabla */
+:root .dashboard-grid-movimientos > .panel:first-child { align-self: start; }
+
 :root td.col-acciones { display: table-cell; white-space: nowrap; vertical-align: middle; }
 :root td.col-acciones > button + button { margin-left: 2px; }
 :root .td-fecha { white-space: nowrap; color: var(--text-muted); }

@@ -1062,6 +1062,26 @@ def test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base):
     finally:
         ctx.close()
 
+def test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base):
+    """En celular, cada movimiento es una fila que cabe en el ancho (sin deslizar la tabla), el monto
+    queda a la derecha, la acción de borrar es una papelera con nombre accesible y los textos del
+    formulario son los nuevos."""
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#tabla-movimientos tr .btn-eliminar")
+        desbordada = page.evaluate("(() => { const t = document.querySelector('#tabla-movimientos').closest('.table-responsive'); return t.scrollWidth > t.clientWidth + 1; })()")
+        assert not desbordada, "la lista de movimientos se desliza de lado en el celular"
+        x_fecha, x_monto = page.evaluate("""() => { const f = document.querySelector('#tabla-movimientos td.td-fecha').getBoundingClientRect();
+            const m = document.querySelector('#tabla-movimientos td.td-monto').getBoundingClientRect(); return [f.left, m.left]; }""")
+        assert x_monto > x_fecha, "el monto debe ir a la derecha de la fecha"
+        assert page.get_attribute("#tabla-movimientos .btn-eliminar", "aria-label") == "Eliminar movimiento"
+        assert page.inner_text("#cinta-movimientos-titulo") == "Periodo"
+        assert page.inner_text("#form-movimiento h3, .dashboard-grid-movimientos .panel:first-child .panel-heading").strip().endswith("Registrar movimiento")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1654,6 +1674,7 @@ if __name__ == "__main__":
                 (test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico, lambda: test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base)),
                 (test_moneda_una_vez_y_pestanas_internas_cortas_en_movil, lambda: test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base)),
                 (test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho, lambda: test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base)),
+                (test_movimientos_en_movil_sin_deslizar_y_con_papelera, lambda: test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
