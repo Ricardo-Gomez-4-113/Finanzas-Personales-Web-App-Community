@@ -1004,6 +1004,44 @@ def test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base):
         ctx.close()
 
 
+def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
+    """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
+    demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        assert page.evaluate("getComputedStyle(document.getElementById('topbar-section-title')).textAlign") == "left"
+        page.click("#btn-user-menu-trigger")
+        page.wait_for_selector("#user-dropdown-menu.show")
+        comparar = page.evaluate("""() => {
+            const otra = document.querySelector('#user-dropdown-menu .dropdown-action-btn:not(.dropdown-btn-logout)');
+            const salir = document.querySelector('#user-dropdown-menu .dropdown-btn-logout');
+            const a = getComputedStyle(otra), b = getComputedStyle(salir);
+            return [a.fontSize, b.fontSize, a.fontWeight, b.fontWeight, salir.getBoundingClientRect().height, otra.getBoundingClientRect().height];
+        }""")
+        assert comparar[0] == comparar[1] and comparar[2] == comparar[3], f"Cerrar sesión no coincide con su vecino: {comparar}"
+        assert abs(comparar[4] - comparar[5]) < 1, f"alturas distintas: {comparar}"
+        page.keyboard.press("Escape")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        _ir(page, "tab-movimientos")
+        page.evaluate("document.getElementById('monto').scrollIntoView({block: 'start'})")
+        page.focus("#monto")
+        page.wait_for_timeout(400)
+        fondo_campo, arriba_fab = page.evaluate("""() => {
+            const campo = document.getElementById('monto').getBoundingClientRect();
+            const fab = document.getElementById('btn-fab').getBoundingClientRect();
+            return [campo.bottom, fab.top];
+        }""")
+        assert fondo_campo <= arriba_fab, f"el «+» tapa el campo enfocado: campo termina en {fondo_campo}, el botón empieza en {arriba_fab}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
     try:
@@ -1555,6 +1593,7 @@ if __name__ == "__main__":
                 (test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos, lambda: test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(navegador, base)),
                 (test_importe_grande_no_se_parte_en_movil, lambda: test_importe_grande_no_se_parte_en_movil(navegador, base)),
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
+                (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
                 (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),

@@ -91,7 +91,7 @@
 }
 
 :root .sidebar-nav .tab-btn.active {
-    background: var(--gold-subtle);
+    background: var(--surface-level2);
     color: var(--gold-color);
     border: none;
     box-shadow: inset 2px 0 0 var(--gold-color);
@@ -109,7 +109,7 @@
     font-size: var(--fs-xs);
 }
 
-:root .status-indicator-dot { background: var(--success-color); box-shadow: none; animation: none; }
+:root .status-indicator-dot { background: var(--text-muted); box-shadow: none; animation: none; }
 
 /* ---------- Estructura: barra superior ---------- */
 :root .app-topbar {
@@ -132,6 +132,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
     font-family: var(--font-num);
     font-weight: 500;
     font-size: var(--fs-lg);
@@ -160,6 +161,36 @@
 }
 
 :root .btn-topbar-privacy.active { color: var(--gold-color); border-color: var(--gold-border); background: var(--gold-subtle); }
+
+/* Controles de la barra: una misma altura y un mismo radio */
+:root .select-moneda-topbar,
+:root .btn-topbar-privacy,
+:root .btn-user-trigger {
+    height: 36px;
+    border-radius: var(--radius-s);
+}
+
+:root .btn-topbar-privacy { width: 36px; }
+
+/* El tipo de cambio es información: texto discreto, sin caja */
+:root .badge-tasa-topbar {
+    border: none;
+    background: transparent;
+    padding: 0 4px;
+    color: var(--text-muted);
+}
+
+/* Móvil: el área de toque llega a 44 px sin cambiar el tamaño visible */
+@media (max-width: 768px) {
+    :root .btn-topbar-privacy,
+    :root .btn-user-trigger { position: relative; }
+    :root .btn-topbar-privacy::after,
+    :root .btn-user-trigger::after {
+        content: "";
+        position: absolute;
+        inset: -4px;
+    }
+}
 
 :root .badge-role,
 :root .badge-role-user,
@@ -1164,7 +1195,7 @@
     background: var(--primary-color);
     color: var(--primary-text);
     border: none;
-    box-shadow: 0 12px 28px -10px var(--primary-glow), var(--shadow-float);
+    box-shadow: 0 4px 12px -4px rgb(var(--sombra-rgb) / 0.35);
     transition: transform 220ms ease, opacity 220ms ease;
 }
 
@@ -1758,9 +1789,20 @@
     :root .admin-tabla .admin-detalle td { display: block; padding: 10px 0 0; }
 }
 
-/* Barra superior en teléfonos: el título se lee completo, en dos líneas si hace falta, sin puntos suspensivos */
+/* Barra superior en teléfonos: el título en una sola línea, un paso más chico */
 @media (max-width: 480px) {
-    :root .topbar-section-title { font-size: 0.98rem; line-height: 1.1; white-space: normal; }
+    :root .topbar-section-title { font-size: 0.92rem; }
+    /* El nombre, el rol y la flecha: el menú los muestra; en la barra basta el avatar, para que el título quepa en una línea */
+    :root .btn-user-trigger .user-trigger-info { display: none; }
+    :root .btn-user-trigger .user-dropdown-arrow { display: none; }
+    :root .topbar-right { gap: 8px; }
+    :root .topbar-title-wrap { padding-right: 8px; }
+}
+
+/* Al enfocar un campo bajo el botón «+», el navegador lo sube por encima de él */
+@media (max-width: 768px) {
+    :root html,
+    :root .app-main-content { scroll-padding-bottom: 96px; }
 }
 
 /* Inicio sin movimientos: una invitación a empezar, no un resumen de ceros */

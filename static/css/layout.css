@@ -664,9 +664,6 @@ body.privacy-mode .dato-sensible:hover {
     color: var(--text-main);
     background-color: transparent;
     border: none;
-    height: auto;
-    font-size: inherit;
-    font-weight: inherit;
 }
 
 .dropdown-action-btn.dropdown-btn-logout:hover {
