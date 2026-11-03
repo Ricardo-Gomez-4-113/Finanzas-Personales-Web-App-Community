@@ -363,7 +363,8 @@ def test_importar_fijos_no_funde_tarjetas_de_nombre_parecido():
 def test_total_de_apartados_no_oculta_errores():
     assert obtener_total_apartados(nueva_bd().cursor()) == 0.0
     conn = nueva_bd()
-    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Viaje', 'libre', 25000)")
+    conn.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'libre', 25000)")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 25000, 'gasto', 1)")
     assert obtener_total_apartados(conn.cursor()) == 250.0
     conn.execute("DROP TABLE apartados")
     try:
@@ -778,6 +779,56 @@ def test_gasto_previo_a_fecha_de_cobro_con_remanente_exitoso():
         assert "Fondos insuficientes" in str(e)
 
 
+def test_meta_con_ahorro_que_nunca_paso_por_la_cuenta_no_bloquea_el_gasto():
+    """Una meta con dinero propio (ahorro fuera de la app) sin movimientos no se resta al saldo que se puede gastar."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 937554, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 900000, 'gasto')")
+    cursor.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Fondo de emergencia', 'meta', 5000000)")
+    conn.commit()
+    assert obtener_total_apartados(cursor) == 0.0
+
+    # Hay 375.54 en la cuenta: gastar exactamente esa cantidad es posible
+    validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=375.54, tipo='gasto')
+    # Un centavo de más no
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=375.55, tipo='gasto')
+        assert False, "Debió fallar: supera el saldo en cuenta por un centavo"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+
+
+def test_deposito_real_a_una_meta_si_se_retiene_del_saldo_gastable():
+    """Lo que de verdad se depositó a una meta (movimiento con apartado_id) sí queda fuera del saldo que se puede gastar."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 10000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 937554, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 10000, 'gasto', 1)")
+    conn.commit()
+    assert obtener_total_apartados(cursor) == 100.0
+
+    validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=9275.54, tipo='gasto')
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=9275.55, tipo='gasto')
+        assert False, "Debió fallar: compromete los 100 depositados en la meta"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+
+
+def test_retiro_de_una_meta_con_ahorro_propio_suma_al_saldo_gastable():
+    """Retirar de una meta lleva ese dinero a la cuenta: el saldo gastable sube aunque la meta no tuviera depósitos."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo', 'meta', 4000000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-31', 37554, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 1000000, 'ingreso', 1)")
+    conn.commit()
+    assert obtener_total_apartados(cursor) == -10000.0
+    validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=10375.54, tipo='gasto')
+
+
 def test_cargos_quincena_no_superan_presupuesto_de_quincena():
     conn = nueva_bd()
     cursor = conn.cursor()
@@ -888,8 +939,9 @@ def test_gasto_respeta_saldo_retenido_en_apartados():
     cursor = conn.cursor()
     # Ingreso de 10,000 en la cuenta
     cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 1000000, 'ingreso')")
-    # Apartado con 4,000 retenidos
-    cursor.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Fondo Emergencia', 'libre', 400000)")
+    # Apartado con 4,000 retenidos: el depósito salió de la cuenta, así que queda registrado como movimiento de la meta
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo Emergencia', 'libre', 400000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-01', 400000, 'gasto', 1)")
     conn.commit()
 
     # Saldo en cuenta = 10,000, Apartados = 4,000 -> Saldo Operativo = 6,000

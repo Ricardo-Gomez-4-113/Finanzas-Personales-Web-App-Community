@@ -525,8 +525,14 @@ def validar_sustentabilidad_gasto_fijo(
 
 
 def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
-    """Calcula la suma de fondos retenidos en apartados activos (monto_actual)."""
-    row = cursor.execute("SELECT COALESCE(SUM(monto_actual), 0) / 100.0 FROM apartados").fetchone()
+    """Dinero que de verdad salió de la cuenta hacia las metas: depósitos menos retiros, tal como están
+    registrados en los movimientos. No usa el saldo guardado de la meta (`monto_actual`): una meta con ahorro
+    que nunca pasó por la cuenta (dinero propio, fuera de la app) no se resta al saldo que se puede gastar.
+    Un retiro mayor que los depósitos da un total negativo: ese dinero sí llegó a la cuenta."""
+    row = cursor.execute("""
+        SELECT COALESCE(SUM(CASE WHEN t.tipo = 'gasto' THEN t.monto ELSE -t.monto END) / 100.0, 0)
+        FROM transacciones t JOIN apartados a ON a.id = t.apartado_id
+    """).fetchone()
     return float(row[0]) if row and row[0] is not None else 0.0
 
 
@@ -550,7 +556,7 @@ def validar_saldo_disponible_fecha(
     """
     Regla 3.3: Restricción Temporal de Fondos (No Gastar Antes de Cobrar / Sin Sobregiro).
     Invariante: Saldo Disponible Operativo(T) >= 0 para toda fecha T.
-    Saldo Disponible Operativo = Saldo en Cuenta (externo) - sum(Apartados Activos).
+    Saldo Disponible Operativo = Saldo en Cuenta (externo) - dinero depositado en metas (`obtener_total_apartados`).
     """
     # Editar un movimiento existente se valida simulando la cronología completa sin él y con su versión nueva
     if transaccion_id is not None:
