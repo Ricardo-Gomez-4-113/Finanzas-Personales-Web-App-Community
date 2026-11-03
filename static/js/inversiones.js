@@ -20,15 +20,15 @@ export async function cargarInversiones() {
 
 
         // Tarjetas de Resumen
-        document.getElementById('lbl-inv-invertido').innerHTML = `${montoHTML(resumen.total_invertido)} ${estado.monedaGlobal}`;
-        document.getElementById('lbl-inv-valor').innerHTML = `${montoHTML(resumen.total_valor_actual)} ${estado.monedaGlobal}`;
+        document.getElementById('lbl-inv-invertido').innerHTML = montoHTML(resumen.total_invertido);
+        document.getElementById('lbl-inv-valor').innerHTML = montoHTML(resumen.total_valor_actual);
         
         const lblPnl = document.getElementById('lbl-inv-pnl');
         const signo = resumen.total_pnl >= 0 ? '+' : '';
         const signoMonto = resumen.total_pnl < 0 ? '-' : (resumen.total_pnl > 0 ? '+' : '');
 
         if (lblPnl) {
-            lblPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} ${estado.monedaGlobal} <span id="lbl-inv-pnl-pct" class="pnl-badge">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</span>`;
+            lblPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} <span id="lbl-inv-pnl-pct" class="pnl-badge">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</span>`;
             lblPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 
@@ -36,7 +36,7 @@ export async function cargarInversiones() {
         if (lblDashPnl) {
             lblDashPnl.innerHTML = `${signoMonto}${montoHTML(Math.abs(resumen.total_pnl))} <small class="texto-sm">(${signo}${resumen.total_pnl_porcentaje.toFixed(2)}%)</small>`;
             const etiquetaRendimiento = lblDashPnl.parentElement?.querySelector('small');
-            if (etiquetaRendimiento) etiquetaRendimiento.textContent = `Rendimiento de inversiones en ${estado.monedaGlobal}`;;
+            if (etiquetaRendimiento) etiquetaRendimiento.textContent = `Rendimiento de inversiones en ${estado.monedaGlobal}`;
             lblDashPnl.className = resumen.total_pnl > 0 ? 'pnl-positivo' : (resumen.total_pnl < 0 ? 'pnl-negativo' : 'pnl-neutro');
         }
 

@@ -1134,6 +1134,35 @@ def test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base):
     finally:
         ctx.close()
 
+def test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base):
+    """Inversiones: el título es «Portafolio», la tasa no se repite en el bloque, las cifras no llevan
+    la moneda pegada (va en la etiqueta), el botón de cotizaciones es secundario y en celular la
+    etiqueta «MXN» no se parte."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-inversiones")
+        page.wait_for_selector("#lbl-inv-invertido:not(:empty)")
+        assert page.inner_text(".inversiones-header-title-wrap h2").strip() == "Portafolio"
+        assert page.locator("#badge-tasa-inversiones").count() == 0, "la tasa no debe repetirse en Inversiones"
+        assert not page.inner_text("#lbl-inv-valor").endswith("MXN"), page.inner_text("#lbl-inv-valor")
+        fondo = page.evaluate("getComputedStyle(document.getElementById('btn-sync-precios')).backgroundColor")
+        verde = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--primary-subtle')")
+        assert fondo != verde, "Actualizar cotizaciones no debe llevar el tinte verde"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+    ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
+    try:
+        _ir(page, "tab-inversiones")
+        page.wait_for_selector(".cards-inversiones .inv-card")
+        partida = page.evaluate("""() => [...document.querySelectorAll('.inv-card .lbl-moneda-base')].map(s => {
+            const r = s.getBoundingClientRect(); return Math.round(r.height); })""")
+        assert all(alto < 30 for alto in partida), f"la moneda se parte en dos líneas: {partida}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1730,6 +1759,7 @@ if __name__ == "__main__":
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
+                (test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario, lambda: test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

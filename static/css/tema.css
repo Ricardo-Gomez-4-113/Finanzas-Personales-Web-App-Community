@@ -1445,6 +1445,25 @@
 
 :root .btn-eliminar-apartado:hover { background: var(--danger-subtle); color: var(--danger-text); }
 
+/* Inversiones: la moneda base no se parte (MXN), la cifra del portafolio va en su fila */
+:root .lbl-moneda-base, :root .sin-corte { white-space: nowrap; }
+
+/* Actualizar cotizaciones es un botón secundario: sin el tinte verde */
+:root .btn-sync {
+    background: var(--surface-level2);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+:root .btn-sync:hover { background: var(--primary-subtle); color: var(--text-color); border-color: var(--gold-border); }
+
+/* Sin posiciones: ícono discreto y centrado */
+:root #dona-sin-datos svg { width: 28px; height: 28px; display: block; margin: 0 auto 8px; }
+
+/* En celular, el botón Cotizar tiene un área de toque de 44 px */
+@media (max-width: 480px) {
+    :root .btn-search-ticker { min-height: 44px; min-width: 44px; }
+}
+
 /* Eliminar una meta: texto visible, no una ✕; siempre pide confirmación */
 :root .btn-eliminar-apartado { width: auto; height: 26px; padding: 0 8px; font-size: var(--fs-xs); font-weight: 500; }
 

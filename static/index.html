@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=b7e342b730">
-    <link rel="stylesheet" href="/static/css/layout.css?v=b7e342b730">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=b7e342b730">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=b7e342b730">
-    <link rel="stylesheet" href="/static/css/tema.css?v=b7e342b730">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=e9f0b522da">
+    <link rel="stylesheet" href="/static/css/layout.css?v=e9f0b522da">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=e9f0b522da">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=e9f0b522da">
+    <link rel="stylesheet" href="/static/css/tema.css?v=e9f0b522da">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -786,12 +786,11 @@
                     <div class="inversiones-header-title-wrap">
                         <h2 class="panel-heading s-margin-0">
                             <svg class="heading-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-                            <span>Portafolio de inversiones (ETFs & acciones)</span>
+                            <span>Portafolio</span>
                         </h2>
-                        <p class="s-margin-5px-0-0-0 s-color-var-text-muted s-font-size-0-9rem">Monitoreo de rendimientos, cotizaciones en vivo y distribución de activos.</p>
+                        <p class="s-margin-5px-0-0-0 s-color-var-text-muted s-font-size-0-9rem">Rendimiento y distribución de tus inversiones.</p>
                     </div>
                     <div class="inversiones-header-actions">
-                        <span id="badge-tasa-inversiones" class="badge-tasa">1 USD ≈ — MXN</span>
                         <button type="button" id="btn-sync-precios" class="btn-sync" data-on-click='[["sincronizarPrecios"]]'>
                             <svg class="btn-svg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                             <span>Actualizar cotizaciones</span>
@@ -801,15 +800,15 @@
 
                 <div class="cards cards-inversiones">
                     <div class="card inv-card">
-                        <h3>Capital invertido (<span class="lbl-moneda-base">MXN</span>)</h3>
+                        <h3>Capital invertido <span class="sin-corte">(<span class="lbl-moneda-base">MXN</span>)</span></h3>
                         <p id="lbl-inv-invertido">$0.00</p>
                     </div>
                     <div class="card inv-card">
-                        <h3>Valor de mercado (<span class="lbl-moneda-base">MXN</span>)</h3>
+                        <h3>Valor de mercado <span class="sin-corte">(<span class="lbl-moneda-base">MXN</span>)</span></h3>
                         <p id="lbl-inv-valor">$0.00</p>
                     </div>
                     <div class="card inv-card">
-                        <h3>Ganancia o pérdida (<span class="lbl-moneda-base">MXN</span>)</h3>
+                        <h3>Ganancia o pérdida <span class="sin-corte">(<span class="lbl-moneda-base">MXN</span>)</span></h3>
                         <p id="lbl-inv-pnl">$0.00 <span id="lbl-inv-pnl-pct" class="pnl-badge">(0.00%)</span></p>
                     </div>
                 </div>
@@ -2023,7 +2022,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=b7e342b730"></script>
+    <script type="module" src="/static/js/main.js?v=e9f0b522da"></script>
     <button type="button" class="fab" id="btn-fab" aria-label="Registrar movimiento" title="Registrar movimiento">+</button>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
