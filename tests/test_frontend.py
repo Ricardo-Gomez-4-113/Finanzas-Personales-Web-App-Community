@@ -1082,6 +1082,24 @@ def test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base):
     finally:
         ctx.close()
 
+def test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base):
+    """Las compras a meses muestran su avance con una barra (3 de 12 en el escenario); el filtro de mes
+    vacío dice «Mes» y deja de decirlo al elegir un mes."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-movimientos")
+        assert page.get_attribute("#filtro-mes", "aria-label") == "Filtrar por mes"
+        assert page.evaluate("document.getElementById('filtro-mes').parentElement.dataset.vacio") == "true"
+        page.fill("#filtro-mes", "2026-10")
+        assert page.evaluate("document.getElementById('filtro-mes').parentElement.dataset.vacio") == "false"
+        page.click("#btn-subtab-fijos")
+        page.wait_for_selector("progress.msi-avance")
+        avance = page.evaluate("[...document.querySelectorAll('progress.msi-avance')].map(p => [p.value, p.max])")
+        assert [3, 12] in avance, f"la barra de la compra a 12 meses debe marcar 3 de 12: {avance}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1675,6 +1693,7 @@ if __name__ == "__main__":
                 (test_moneda_una_vez_y_pestanas_internas_cortas_en_movil, lambda: test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base)),
                 (test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho, lambda: test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base)),
                 (test_movimientos_en_movil_sin_deslizar_y_con_papelera, lambda: test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base)),
+                (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

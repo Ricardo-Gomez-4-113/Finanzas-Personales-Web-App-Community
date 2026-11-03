@@ -212,6 +212,7 @@ function filaFijo(i) {
                 </div>
                 <div class="fijo-fila-meta">
                     <span>${escapeHTML(etiquetaFijo(i))}</span>
+                    ${i.es_msi && i.cuota ? `<progress class="msi-avance" max="${Number(i.total_cuotas) || 1}" value="${Number(i.cuota) || 0}" aria-label="${escapeHTML(etiquetaFijo(i))}"></progress>` : ''}
                     ${origen}
                 </div>
             </div>

@@ -1957,6 +1957,43 @@
 
 :root .cinta-leyenda .cinta-seg { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 
+/* Compras a meses: avance de cuotas con la barra del sistema */
+:root progress.msi-avance {
+    display: inline-block;
+    width: 96px;
+    height: 6px;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 0;
+    border-radius: 3px;
+    background: var(--border-color);
+    color: var(--gold-color);
+    -webkit-appearance: none;
+    appearance: none;
+}
+:root progress.msi-avance::-webkit-progress-bar { background: var(--border-color); border-radius: 3px; }
+:root progress.msi-avance::-webkit-progress-value { background: var(--gold-color); border-radius: 3px; }
+:root progress.msi-avance::-moz-progress-bar { background: var(--gold-color); border-radius: 3px; }
+
+/* Filtro de mes: «Mes» cuando está vacío */
+:root .filtro-mes { position: relative; }
+:root .filtro-mes input { width: 100%; }
+:root .filtro-mes[data-vacio="true"]::before {
+    content: "Mes";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    pointer-events: none;
+}
+:root .filtro-mes[data-vacio="true"] input::-webkit-datetime-edit,
+:root .filtro-mes[data-vacio="true"] input::-webkit-datetime-edit-fields-wrapper { color: transparent; }
+
+/* La cinta de Movimientos es más compacta: el periodo cabe sin ocupar la pantalla */
+:root #tab-movimientos .cinta-periodo { padding: 10px 12px; gap: 2px; }
+
 /* Historial: las cifras se alinean en columna */
 :root .monthly-info { font-variant-numeric: tabular-nums; }
 

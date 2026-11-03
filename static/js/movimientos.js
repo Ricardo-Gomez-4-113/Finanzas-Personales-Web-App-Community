@@ -610,6 +610,11 @@ function inicializarMovimientos() {
         el.addEventListener(el.type === 'search' ? 'input' : 'change', renderTablaMovimientos);
         if (el.type === 'search') el.addEventListener('change', renderTablaMovimientos);
     });
+    // El campo de mes vacío muestra «Mes» en vez de su formato nativo
+    const filtroMes = document.getElementById('filtro-mes');
+    const marcarMes = () => filtroMes?.parentElement?.setAttribute('data-vacio', String(!filtroMes.value));
+    filtroMes?.addEventListener('change', marcarMes);
+    marcarMes();
 
     const chkTodos = document.getElementById('chk-mov-todos');
     if (chkTodos) {
