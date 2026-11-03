@@ -1163,6 +1163,26 @@ def test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegad
     finally:
         ctx.close()
 
+def test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, base):
+    """La calculadora: sin indicador «Modo interactivo», tarjetas de resultado con su periodo como título
+    (sin ícono ni insignia), base de días con texto corto y ayuda debajo, y el panel sin borde propio."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        _ir(page, "tab-calculadora-rf")
+        page.wait_for_selector(".card-calc-dia")
+        assert page.locator("#calc-live-indicator").count() == 0, "el indicador «Modo interactivo» debe salir"
+        titulos = page.evaluate("[...document.querySelectorAll('.card-calc h3')].map(h => h.textContent.trim())")
+        assert titulos == ["Por día", "Por mes (30 días)", "Por año"], titulos
+        assert page.locator(".card-calc-icon, .card-calc-badge").count() == 0
+        opciones = page.evaluate("[...document.querySelectorAll('#calc-rf-base option')].map(o => o.textContent.trim())")
+        assert opciones == ["365 días", "360 días"], opciones
+        assert "CETES" in page.inner_text(".calc-ayuda"), "la ayuda debe explicar la base de días"
+        borde = page.evaluate("getComputedStyle(document.querySelector('.calc-rf-panel')).borderTopWidth")
+        assert borde == "0px", f"el panel de la calculadora no debe llevar borde propio: {borde}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
@@ -1760,6 +1780,7 @@ if __name__ == "__main__":
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
                 (test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario, lambda: test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base)),
+                (test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono, lambda: test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, base)),
                 (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),

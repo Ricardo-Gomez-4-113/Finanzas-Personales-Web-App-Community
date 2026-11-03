@@ -1464,6 +1464,21 @@
     :root .btn-search-ticker { min-height: 44px; min-width: 44px; }
 }
 
+/* Los campos de la calculadora se alinean por arriba: la ayuda de la base de días no los empuja */
+:root .calc-rf-card .form-row-3col { align-items: start; }
+
+/* Calculadora de renta fija: la página es el propio panel; sus bloques son el único nivel de tarjeta */
+:root .calc-rf-panel { background: transparent; border: none; box-shadow: none; padding: 0; }
+
+/* Etiqueta de tasas en tipo oración, sin espaciado de letras */
+:root .calc-presets-label { text-transform: none; letter-spacing: 0; }
+
+/* Tasas de referencia: botones compactos del sistema, no cápsulas */
+:root .calc-chip { border-radius: var(--radius-s); }
+
+/* Ayuda de la base de días: explica la opción sin ocupar el campo */
+:root .calc-ayuda { display: block; margin-top: 6px; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; }
+
 /* Eliminar una meta: texto visible, no una ✕; siempre pide confirmación */
 :root .btn-eliminar-apartado { width: auto; height: 26px; padding: 0 8px; font-size: var(--fs-xs); font-weight: 500; }
 
@@ -1863,7 +1878,7 @@
 
 /* Barra superior en teléfonos: el título en una sola línea, un paso más chico */
 @media (max-width: 480px) {
-    :root .topbar-section-title { font-size: 0.92rem; }
+    :root .topbar-section-title { font-size: 0.92rem; line-height: 1.1; white-space: normal; }
     :root .subtab-btn .sub-largo { display: none; }
     :root .subtab-btn .sub-corto { display: inline; }
     /* El nombre, el rol y la flecha: el menú los muestra; en la barra basta el avatar, para que el título quepa en una línea */
