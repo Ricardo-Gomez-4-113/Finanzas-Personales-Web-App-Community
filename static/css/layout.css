@@ -890,33 +890,7 @@ body.privacy-mode .dato-sensible:hover {
     margin: 8px 0;
 }
 
-/* ==========================================================================
-   Botón flotante "+" (solo móvil)
-   ========================================================================== */
-.fab {
-    display: none;
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: none;
-    background: var(--primary-color);
-    color: var(--bg-color);
-    font-size: 1.8rem;
-    line-height: 1;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--card-shadow);
-    cursor: pointer;
-    z-index: 1500;
-}
-.fab:focus-visible { outline: 3px solid var(--accent-color); outline-offset: 3px; }
 @media (max-width: 768px) {
-    .fab { display: flex; }
-    .toast-root { bottom: 88px; }
-
     /* Menú de usuario como hoja inferior: se desliza desde abajo, con las opciones a un pulgar de distancia */
     .user-dropdown-popover {
         position: fixed;

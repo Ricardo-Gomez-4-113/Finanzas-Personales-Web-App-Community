@@ -420,35 +420,6 @@ Object.assign(window, {
 
 
 // =============================================================================
-// Botón flotante "+" (móvil): abre Movimientos y su formulario de nuevo movimiento
-// =============================================================================
-
-export function inicializarFab() {
-    const fab = document.getElementById('btn-fab');
-    if (!fab) return;
-    fab.addEventListener('click', () => {
-        cambiarPestana('tab-movimientos');
-        // El formulario vive en el historial: si se estaba en Fijos, se vuelve a él antes de abrirlo
-        if (typeof window.cambiarSubtabMovimientos === 'function') window.cambiarSubtabMovimientos('historial');
-        if (typeof window.abrirModalNuevoMovimiento === 'function') window.abrirModalNuevoMovimiento();
-    });
-
-    // En móvil el botón se oculta mientras se baja la página, para no tapar las tarjetas al leer.
-    // Reaparece al subir o al dejar de desplazarse. El scroll puede ser de la ventana o de un contenedor.
-    let previo = 0;
-    let temporizador = null;
-    document.addEventListener('scroll', e => {
-        const y = e.target === document ? window.scrollY : e.target.scrollTop;
-        fab.classList.toggle('fab-oculto', y > previo && y > 80);
-        previo = y;
-        clearTimeout(temporizador);
-        temporizador = setTimeout(() => fab.classList.remove('fab-oculto'), 1200);
-    }, { capture: true, passive: true });
-}
-
-
-
-// =============================================================================
 // ACCESIBILIDAD DE MODALES: foco inicial, Tab atrapado dentro y foco de regreso al cerrar
 // =============================================================================
 

@@ -1236,25 +1236,6 @@
 :root .toast-ok { color: var(--success-text); }
 :root .toast-error { color: var(--danger-text); }
 
-:root .fab {
-    background: var(--primary-color);
-    color: var(--primary-text);
-    border: none;
-    box-shadow: 0 4px 12px -4px rgb(var(--sombra-rgb) / 0.35);
-    transition: transform 220ms ease, opacity 220ms ease;
-}
-
-:root .fab.fab-oculto {
-    transform: translateY(160%);
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* Administración no registra movimientos: el FAB y la moneda base no aplican ahí */
-:root:has(#tab-admin.active) .fab { display: none; }
-/* Con el menú de usuario abierto como hoja, el FAB no debe quedar encima de sus opciones */
-:root:has(#user-dropdown-menu.show) .fab { display: none; }
-
 @media (max-width: 720px) {
     :root:has(#tab-admin.active) .select-moneda-topbar { display: none; }
 }
@@ -1275,9 +1256,6 @@
 :root:has(#vista-login:not(.hidden)) body {
     background-image: none;
 }
-
-/* El botón «+» es de la app: no aparece en el login ni en la landing */
-:root:has(#vista-app.hidden) .fab { display: none; }
 
 :root .login-card {
     background: var(--panel-bg);
@@ -1363,7 +1341,7 @@
 
 /* ---------- Móvil ---------- */
 @media (max-width: 768px) {
-    :root .app-main-content { padding: 18px 16px 88px; }
+    :root .app-main-content { padding: 18px 16px 24px; }
     :root .periodo-hero { padding: 20px 18px 16px; }
     :root .periodo-desglose { gap: 10px 22px; }
     :root .periodo-linea { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
@@ -2122,13 +2100,13 @@
 /* Insignias: relleno tenue, sin borde */
 :root .badge-tag { border: none; }
 
-/* Un solo radio para los botones; el «+» es círculo y las pestañas no llevan caja */
-:root button:not(.fab):not(.subtab-btn):not(.tab-btn) { border-radius: var(--radius-s); }
+/* Un solo radio para los botones; las pestañas no llevan caja */
+:root button:not(.subtab-btn):not(.tab-btn) { border-radius: var(--radius-s); }
 
-/* Botones: planos, sin sombra en reposo ni al pasar el cursor (el botón «+» conserva la suya) */
-:root button:not(.fab),
-:root button:not(.fab):hover,
-:root button:not(.fab):active { box-shadow: none; }
+/* Botones: planos, sin sombra en reposo ni al pasar el cursor */
+:root button,
+:root button:hover,
+:root button:active { box-shadow: none; }
 
 /* Login y utilidades que sustituyen estilos en línea */
 :root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }

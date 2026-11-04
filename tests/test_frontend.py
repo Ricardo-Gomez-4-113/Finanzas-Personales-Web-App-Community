@@ -111,7 +111,7 @@ def test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base):
     try:
         page.goto(base + "/login")
         page.wait_for_selector("#vista-login:not(.hidden)")
-        assert page.is_hidden("#btn-fab"), "el botón + no debe verse en el login"
+        assert page.locator("#btn-fab, .fab").count() == 0, "ya no hay botón «+» flotante"
         page.fill("#login-username", "nadie")
         page.fill("#login-password", "clave-equivocada")
         arriba_antes = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
@@ -736,23 +736,6 @@ def test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(nav
         assert mostrados == esperados, (mostrados, esperados)
         assert page.inner_text("#periodo-libre") == f"${escenario.ESPERADO['libre_hasta_cobro']:,.2f}"
         assert "Libre del periodo" in actual.inner_text(), actual.inner_text()
-        assert not errores, errores
-    finally:
-        ctx.close()
-
-
-def test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base):
-    ctx, page, errores = _flujo_escenario(navegador, base, viewport=VIEWPORTS["movil"])
-    try:
-        page.wait_for_selector("#periodo-libre:not(:empty)")
-        # La rueda desplaza el contenedor que sea (ventana o área principal): el evento llega igual
-        page.mouse.move(200, 400)
-        page.mouse.wheel(0, 500)
-        page.wait_for_timeout(300)
-        assert "fab-oculto" in page.get_attribute("#btn-fab", "class"), "al bajar, el botón se oculta"
-        page.mouse.wheel(0, -1000)
-        page.wait_for_timeout(300)
-        assert "fab-oculto" not in page.get_attribute("#btn-fab", "class"), "al subir, el botón vuelve"
         assert not errores, errores
     finally:
         ctx.close()
@@ -1422,7 +1405,7 @@ def test_pasada_final_encabezados_franjas_y_deshabilitados(navegador, base):
     finally:
         ctx.close()
 
-def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
+def test_marco_de_la_app_titulo_menu_y_campo_del_modal_a_la_vista(navegador, base):
     """Escritorio: el título va alineado a la izquierda y «Cerrar sesión» tiene la tipografía de las
     demás opciones del menú. Móvil: el campo enfocado queda por encima del botón «+»."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -1447,16 +1430,15 @@ def test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base, VIEWPORTS["movil"])
     try:
         _ir(page, "tab-movimientos")
-        page.click("#btn-subtab-fijos")                 # el «+» debe volver al historial aunque se esté en Fijos
-        page.click("#btn-fab")
-        page.wait_for_selector("#modal-nuevo-movimiento:not(.hidden)")
+        assert page.locator("#btn-fab, .fab").count() == 0, "ya no hay botón «+» flotante en el celular"
+        _abrir_formulario(page, "movimiento")
         _esperar(page, "document.activeElement && document.activeElement.id === 'monto'")
         tapado = page.evaluate("""() => {
             const campo = document.getElementById('monto').getBoundingClientRect();
             const el = document.elementFromPoint(campo.left + campo.width / 2, campo.top + campo.height / 2);
             return !(el && el.id === 'monto');
         }""")
-        assert not tapado, "el campo enfocado del modal queda tapado por otro elemento (el «+» flotante, p. ej.)"
+        assert not tapado, "el campo enfocado del modal queda tapado por otro elemento"
         assert not errores, errores
     finally:
         ctx.close()
@@ -2004,7 +1986,6 @@ if __name__ == "__main__":
                 (test_fijos_y_msi_aparecen_con_su_avance, lambda: test_fijos_y_msi_aparecen_con_su_avance(navegador, base)),
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
                 (test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo, lambda: test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(navegador, base)),
-                (test_fab_se_oculta_al_bajar_y_vuelve_al_subir, lambda: test_fab_se_oculta_al_bajar_y_vuelve_al_subir(navegador, base)),
                 (test_admin_busca_filtra_y_pide_el_nombre_para_eliminar, lambda: test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
@@ -2033,7 +2014,7 @@ if __name__ == "__main__":
                 (test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario, lambda: test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base)),
                 (test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono, lambda: test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, base)),
                 (test_pasada_final_encabezados_franjas_y_deshabilitados, lambda: test_pasada_final_encabezados_franjas_y_deshabilitados(navegador, base)),
-                (test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab, lambda: test_marco_de_la_app_titulo_menu_y_campo_sobre_el_fab(navegador, base)),
+                (test_marco_de_la_app_titulo_menu_y_campo_del_modal_a_la_vista, lambda: test_marco_de_la_app_titulo_menu_y_campo_del_modal_a_la_vista(navegador, base)),
                 (test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px, lambda: test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base)),
                 (test_red_cortada_al_guardar_no_duplica_al_reintentar, lambda: test_red_cortada_al_guardar_no_duplica_al_reintentar(navegador, base)),
                 (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),
