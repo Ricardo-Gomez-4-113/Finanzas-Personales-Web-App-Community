@@ -14,3 +14,6 @@ graphify-out/
 
 # Registro de fallos de las pruebas (scripts/resumen_logs.py)
 .logs_pruebas/
+
+# Auditoría por uso real: corridas, fallos y bases de prueba (solo datos inventados, se regeneran)
+/auditoria/
