@@ -226,7 +226,12 @@ def _quitar(page, rng, oraculo, modo):
         return {"entrada": {"id": id_mov, "modo": modo}, "objetivo": id_mov, "fantasma": True,
                 "aceptado": False, "mensaje": "", "candidato": None, "fecha_ref": None, "tipo_mov": None,
                 "monto_c": None}
-    botones[indice].evaluate("b => b.click()")
+    # Toque real, como una persona: se desplaza hasta la papelera y la toca con el puntero. Un clic por
+    # código sobre un botón fuera de la pantalla no pasa por el mismo camino que un dedo.
+    # Se busca la papelera por el id del movimiento al momento de tocarla: la tabla se repinta a veces
+    # y una referencia tomada antes queda desconectada del DOM
+    papelera = f"#tabla-movimientos button[data-on-click='[[\"eliminarTransaccion\",{id_mov}]]']"
+    page.locator(papelera).click(timeout=10000)
     try:
         page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)", timeout=5000)
     except Exception as error:
