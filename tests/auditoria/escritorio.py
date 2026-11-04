@@ -1,4 +1,4 @@
-"""tests/auditoria/escritorio.py - Capa B de la auditoría: episodios de uso de Movimientos en el navegador de escritorio.
+"""tests/auditoria/escritorio.py - Capas B (escritorio, 1280×800) y C (celular, 390×844, táctil) de la auditoría.
 
 Cada episodio abre la app en un navegador (1280×800), entra como Laura y hace acciones con clics, igual que una
 persona: registrar un gasto o ingreso, quitar un movimiento (cancelar o eliminar), filtrar la tabla, mirar el
@@ -38,7 +38,11 @@ PESOS_UI = (
     ("filtrar", 6), ("dashboard", 8), ("recargar", 5), ("avanzar_dia", 5),
 )
 FILTROS = ("", "gasto", "ingreso", "cancelado")
-VIEWPORT = {"width": 1280, "height": 800}
+# Escritorio (capa B) y celular (capa C): mismo recorrido, otro dispositivo
+DISPOSITIVOS = {
+    "escritorio": {"viewport": {"width": 1280, "height": 800}},
+    "celular": {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True},
+}
 IGNORAR_EN_COPIA = shutil.ignore_patterns(
     "data", ".git", "tests", "auditoria", "__pycache__", "*.db", "backups", "venv", ".venv",
     "node_modules", "graphify-out", "docs",
@@ -223,7 +227,22 @@ def _quitar(page, rng, oraculo, modo):
                 "aceptado": False, "mensaje": "", "candidato": None, "fecha_ref": None, "tipo_mov": None,
                 "monto_c": None}
     botones[indice].evaluate("b => b.click()")
-    page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)")
+    try:
+        page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)", timeout=5000)
+    except Exception as error:
+        # Diagnóstico: qué había en pantalla cuando el clic no abrió el modal
+        diagnostico = page.evaluate("""(i) => {
+            const b = document.querySelectorAll("#tabla-movimientos button[title='Quitar movimiento']")[i];
+            const r = b ? b.getBoundingClientRect() : null;
+            const modal = document.getElementById('modal-quitar-movimiento');
+            return {botones: document.querySelectorAll("#tabla-movimientos button[title='Quitar movimiento']").length,
+                    indice: i, conectado: !!(b && b.isConnected), en_tabla: !!(b && b.closest('#tabla-movimientos')),
+                    caja: r ? [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)] : null,
+                    fila: b ? b.closest('tr').innerText.slice(0, 120) : null,
+                    modal_clase: modal ? modal.className : null, filtro: document.getElementById('filtro-tipo').value,
+                    ancho_ventana: window.innerWidth};
+        }""", indice)
+        raise RuntimeError(f"el clic en quitar no abrió el cuadro: {diagnostico}") from error
     page.evaluate(f"document.getElementById('btn-quitar-{'cancelar' if modo == 'cancelar' else 'eliminar'}').click()")
     page.wait_for_selector("#modal-quitar-movimiento.hidden", state="attached", timeout=15000)
     # Quitar un ingreso que deja el saldo en negativo abre «Forzar operación» cuando el servidor responde:
@@ -341,7 +360,7 @@ def _verificar_resumen(page, oraculo):
     return []
 
 
-def _episodio(semilla, numero, navegador, servidor, mods, tmp, bit, fallos):
+def _episodio(semilla, numero, navegador, servidor, mods, tmp, bit, fallos, dispositivo):
     rng = random.Random(semilla)
     usuario = f"aud{semilla}"
     hoy = HOY_INICIAL
@@ -351,7 +370,7 @@ def _episodio(semilla, numero, navegador, servidor, mods, tmp, bit, fallos):
         cabecera, ruta_db = personas.crear_laura(cliente, usuario, mods)
     oraculo = Oraculo(ruta_db)
 
-    ctx = navegador.new_context(viewport=VIEWPORT)
+    ctx = navegador.new_context(**DISPOSITIVOS[dispositivo])
     page = ctx.new_page()
     errores, respuestas_5xx = [], []
     page.on("pageerror", lambda e: errores.append(f"pageerror: {e}"))
@@ -424,7 +443,7 @@ def _episodio(semilla, numero, navegador, servidor, mods, tmp, bit, fallos):
     return pasos
 
 
-def correr(semilla, episodios, fuente, carpeta):
+def correr(semilla, episodios, fuente, carpeta, dispositivo="escritorio"):
     from playwright.sync_api import sync_playwright
 
     shutil.rmtree(carpeta, ignore_errors=True)
@@ -443,7 +462,7 @@ def correr(semilla, episodios, fuente, carpeta):
             navegador = pw.chromium.launch(args=["--no-sandbox"])
             try:
                 for numero in range(1, episodios + 1):
-                    pasos_totales += _episodio(semilla + numero - 1, numero, navegador, servidor, mods, tmp, bit, fallos)
+                    pasos_totales += _episodio(semilla + numero - 1, numero, navegador, servidor, mods, tmp, bit, fallos, dispositivo)
             finally:
                 navegador.close()
     finally:
@@ -451,7 +470,7 @@ def correr(semilla, episodios, fuente, carpeta):
         bit.cerrar()
         shutil.rmtree(tmp, ignore_errors=True)
 
-    print(f"Corrida escritorio s{semilla} n{episodios}: {episodios} episodios, {pasos_totales} acciones, carpeta {carpeta}")
+    print(f"Corrida {dispositivo} s{semilla} n{episodios}: {episodios} episodios, {pasos_totales} acciones, carpeta {carpeta}")
     if fallos:
         print(f"FALLO: {len(fallos)} acciones con invariantes rotas")
         for numero, paso, nombre, problemas in fallos[:20]:
@@ -469,5 +488,6 @@ if __name__ == "__main__":
     parser.add_argument("--episodios", type=int, default=100)
     parser.add_argument("--fuente", default=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     parser.add_argument("--carpeta", required=True)
+    parser.add_argument("--dispositivo", choices=sorted(DISPOSITIVOS), default="escritorio")
     args = parser.parse_args()
-    sys.exit(correr(args.semilla, args.episodios, os.path.abspath(args.fuente), os.path.abspath(args.carpeta)))
+    sys.exit(correr(args.semilla, args.episodios, os.path.abspath(args.fuente), os.path.abspath(args.carpeta), args.dispositivo))

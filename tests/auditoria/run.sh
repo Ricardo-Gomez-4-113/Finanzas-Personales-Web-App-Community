@@ -3,6 +3,7 @@
 # Uso: tests/auditoria/run.sh [--capa api|escritorio] [--semilla N] [--episodios N] [--fuente RUTA]
 #   La salida queda en auditoria/corridas/<nombre>/ (bitacora.jsonl, tiempos.jsonl, logs/, fallos/).
 #   api: capa A (API, sin navegador). escritorio: capa B (Chromium a 1280×800, imagen de Playwright).
+#   celular: capa C (mismo recorrido a 390×844, táctil).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -18,7 +19,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 NOMBRE="movimientos-${CAPA}-s${SEMILLA}-n${EPISODIOS}"
-if [ "$CAPA" = "escritorio" ]; then
+DISPOSITIVO=""
+if [ "$CAPA" = "escritorio" ] || [ "$CAPA" = "celular" ]; then
+  DISPOSITIVO="$CAPA"
   IMAGEN="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/python:v1.48.0-jammy}"
   SCRIPT="tests/auditoria/escritorio.py"
   INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 httpx"
@@ -43,5 +46,5 @@ docker run --rm -v "$PWD":/src:ro -v "$PWD/auditoria":/salida "${MONTAJE_FUENTE[
   $INSTALAR >/tmp/pip.log 2>&1 || { tail -5 /tmp/pip.log; exit 1; }
   cd /src
   python3 ${SCRIPT} --semilla ${SEMILLA} --episodios ${EPISODIOS} \
-    --carpeta /salida/corridas/${NOMBRE} --fuente ${RUTA_FUENTE}
+    --carpeta /salida/corridas/${NOMBRE} --fuente ${RUTA_FUENTE} ${DISPOSITIVO:+--dispositivo ${DISPOSITIVO}}
 "
