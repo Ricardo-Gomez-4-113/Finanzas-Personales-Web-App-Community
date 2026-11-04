@@ -15,7 +15,7 @@ from typing import Any, Optional
 # Columnas que guardan dinero en centavos. Cantidades y precios de la bolsa, porcentajes y tasas no.
 COLUMNAS_DINERO = frozenset({
     "monto", "monto_actual", "meta_monto", "monto_total", "saldo_inicial", "ingreso_base", "capital",
-})
+})  # `monto` también es la columna de transacciones_canceladas
 
 
 def a_centavos(valor: Any) -> Optional[int]:

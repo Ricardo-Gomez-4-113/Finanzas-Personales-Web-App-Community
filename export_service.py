@@ -92,6 +92,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     inversiones_db = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
     recurrentes_db = cursor.execute("SELECT * FROM recurrentes ORDER BY activo DESC, proxima_fecha ASC, id ASC").fetchall()
     cuentas_rend_db = cursor.execute("SELECT * FROM cuentas_rendimiento ORDER BY id").fetchall()
+    canceladas_db = cursor.execute("SELECT * FROM transacciones_canceladas ORDER BY fecha DESC, id DESC").fetchall()
     if debe_cerrar:
         conn.close()
 
@@ -601,6 +602,22 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
         _celda(ws5, idx, 6, round(convertir(valor * tasa / 100 / 12, "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
     for col_letter, ancho in zip("ABCDEF", [30, 15, 20, 22, 24, 30]):
         ws5.column_dimensions[col_letter].width = ancho
+
+    # Movimientos cancelados: el dinero ya volvió al saldo, así que no suman en ningún total
+    ws6 = wb.create_sheet(title="Cancelados")
+    _encabezado(ws6, "MOVIMIENTOS CANCELADOS (no suman en ningún total)", [
+        "Fecha", "Tipo", "Descripción", f"Monto ({moneda_base})", "Cancelado el"
+    ])
+    if not canceladas_db:
+        ws6.cell(row=5, column=1, value="No hay movimientos cancelados.").font = font_subtitle
+    for idx, c in enumerate(canceladas_db, start=5):
+        _celda(ws6, idx, 1, c["fecha"])
+        _celda(ws6, idx, 2, c["tipo"].upper())
+        _celda(ws6, idx, 3, c["descripcion"] or "-")
+        _celda(ws6, idx, 4, round(float(c["monto"]) * factor_mxn_a_base, 2), fmt_currency)
+        _celda(ws6, idx, 5, c["cancelado_en"])
+    for col_letter, ancho in zip("ABCDE", [14, 12, 40, 20, 22]):
+        ws6.column_dimensions[col_letter].width = ancho
 
     # =========================================================================
     # PASO 7: RETORNO DEL BUFFER EN MEMORIA (BYTESIO)

@@ -1662,6 +1662,45 @@ def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo:
     )
 
 
+def deshacer_efectos_de_movimiento(cursor: sqlite3.Cursor, trans) -> None:
+    """Lo que hay que ajustar cuando un movimiento sale del saldo, sea al eliminarlo o al cancelarlo:
+    un depósito o retiro de meta se revierte en la meta, y una cuota de fijo o compra a meses baja
+    `cuotas_generadas` (sin mover la próxima fecha: la compra suma una cuota al final) y reactiva el fijo si
+    ya había terminado. Lanza ValueError si la meta no puede revertirse."""
+    if trans["apartado_id"] is not None:
+        revertir_movimiento_apartado(cursor, trans["apartado_id"], trans["tipo"], trans["monto"])
+
+    if trans["recurrente_id"] is not None:
+        rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (trans["recurrente_id"],)).fetchone()
+        if rec:
+            nuevas_cuotas = max(0, int(rec["cuotas_generadas"] or 0) - 1)
+            if rec["total_cuotas"] is not None and rec["activo"] == 0:
+                cursor.execute(
+                    "UPDATE recurrentes SET cuotas_generadas = ?, activo = 1 WHERE id = ?",
+                    (nuevas_cuotas, trans["recurrente_id"])
+                )
+            else:
+                cursor.execute(
+                    "UPDATE recurrentes SET cuotas_generadas = ? WHERE id = ?",
+                    (nuevas_cuotas, trans["recurrente_id"])
+                )
+
+
+def archivar_movimiento_cancelado(cursor: sqlite3.Cursor, trans) -> None:
+    """Copia un movimiento a `transacciones_canceladas` antes de borrarlo de `transacciones`. Es lo único que
+    distingue «Cancelar operación» de «Eliminar»: en el dinero las dos hacen lo mismo."""
+    cursor.execute(
+        """
+        INSERT INTO transacciones_canceladas
+            (id_original, fecha, monto, tipo, categoria_id, descripcion, recurrente_id, apartado_id, rubro, cancelado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (trans["id"], trans["fecha"], a_centavos(trans["monto"]), trans["tipo"], trans["categoria_id"],
+         trans["descripcion"], trans["recurrente_id"], trans["apartado_id"], trans["rubro"],
+         ahora_local().strftime("%Y-%m-%d %H:%M:%S")),
+    )
+
+
 def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
     """Simula borrar `transacciones` y devuelve (déficit, fecha) del primer día con saldo negativo,
     o None si el saldo nunca baja de cero. No deja cambios: todo corre dentro de un savepoint."""

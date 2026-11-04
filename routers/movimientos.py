@@ -21,8 +21,9 @@ from finanzas_core import (
     gastos_por_categoria_periodo,
     historial_por_periodos,
     ventana_periodo_actual,
+    archivar_movimiento_cancelado,
     deficit_al_eliminar_lote,
-    revertir_movimiento_apartado,
+    deshacer_efectos_de_movimiento,
     convertir,
     materializar_recurrentes,
     validar_saldo_disponible_fecha,
@@ -43,6 +44,8 @@ class EliminarLoteRequest(BaseModel):
     ids: Optional[List[int]] = Field(None, max_length=1000)
     todos: bool = False
     forzar: bool = False
+    # «eliminar»: se borra sin rastro. «cancelar»: el dinero vuelve igual, pero queda constancia como cancelado.
+    modo: Literal['eliminar', 'cancelar'] = 'eliminar'
 
 class Transaccion(BaseModel):
     fecha: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha en formato ISO YYYY-MM-DD")
@@ -117,17 +120,20 @@ def crear_transaccion(t: Transaccion, conn: sqlite3.Connection = Depends(get_ten
     conn.commit()
     return {"mensaje": "Transacción guardada con éxito"}
 
-@router.delete("/api/transacciones/{id_transaccion}", summary="Eliminar movimiento")
+@router.delete("/api/transacciones/{id_transaccion}", summary="Eliminar o cancelar un movimiento")
 def eliminar_transaccion(
     id_transaccion: int,
     conn: sqlite3.Connection = Depends(get_tenant_db),
-    forzar: bool = Query(False)
+    forzar: bool = Query(False),
+    modo: str = Query("eliminar", pattern="^(eliminar|cancelar)$")
 ):
     if isinstance(forzar, sqlite3.Connection):
         conn = forzar
         forzar = False
     elif not isinstance(forzar, bool):
         forzar = bool(getattr(forzar, 'default', False))
+    if not isinstance(modo, str):   # llamada directa a la función: el valor por omisión llega como Query(...)
+        modo = getattr(modo, 'default', 'eliminar')
 
     cursor = conn.cursor()
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (id_transaccion,)).fetchone()
@@ -140,34 +146,19 @@ def eliminar_transaccion(
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
-    # Si está vinculado a un apartado de ahorro / meta
-    # Si es gasto (depósito/ahorro): se descuenta de la meta.
-    # Movimiento de meta: se deshace su efecto en el saldo (un retiro devuelve el dinero a la meta)
-    if trans["apartado_id"] is not None:
-        try:
-            revertir_movimiento_apartado(cursor, trans["apartado_id"], trans["tipo"], trans["monto"])
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+    # Movimiento de meta o cuota de un fijo: se deshace su efecto (un retiro devuelve el dinero a la meta)
+    try:
+        deshacer_efectos_de_movimiento(cursor, trans)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    # Si es cuota de un recurrente, decrementar cuotas_generadas si aplica
-    if trans["recurrente_id"] is not None:
-        rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (trans["recurrente_id"],)).fetchone()
-        if rec:
-            cuotas = int(rec["cuotas_generadas"] or 0)
-            nuevas_cuotas = max(0, cuotas - 1)
-            if rec["total_cuotas"] is not None and rec["activo"] == 0:
-                cursor.execute(
-                    "UPDATE recurrentes SET cuotas_generadas = ?, activo = 1 WHERE id = ?",
-                    (nuevas_cuotas, trans["recurrente_id"])
-                )
-            else:
-                cursor.execute(
-                    "UPDATE recurrentes SET cuotas_generadas = ? WHERE id = ?",
-                    (nuevas_cuotas, trans["recurrente_id"])
-                )
-
+    # «Cancelar operación» deja constancia; «Eliminar» no deja rastro. Las dos, en la misma transacción SQL.
+    if modo == 'cancelar':
+        archivar_movimiento_cancelado(cursor, trans)
     cursor.execute("DELETE FROM transacciones WHERE id = ?", (id_transaccion,))
     conn.commit()
+    if modo == 'cancelar':
+        return {"mensaje": "Operación cancelada: el dinero volvió a tu saldo."}
     return {"mensaje": "Transacción eliminada con éxito"}
 
 
@@ -177,6 +168,8 @@ def eliminar_transacciones_lote(
     conn: sqlite3.Connection = Depends(get_tenant_db)
 ):
     cursor = conn.cursor()
+    if req.todos and req.modo == 'cancelar':
+        raise HTTPException(status_code=422, detail="Vaciar todos los movimientos solo se hace con «Eliminar».")
     if req.todos:
         transacciones = cursor.execute("SELECT * FROM transacciones").fetchall()
     elif req.ids:
@@ -212,27 +205,12 @@ def eliminar_transacciones_lote(
 
     # Procesar ajustes en una transacción SQL atómica
     for t in transacciones:
-        if t["apartado_id"] is not None:
-            try:
-                revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
-            except ValueError as e:
-                raise HTTPException(status_code=422, detail=str(e))
-
-        if t["recurrente_id"] is not None:
-            rec = cursor.execute("SELECT * FROM recurrentes WHERE id = ?", (t["recurrente_id"],)).fetchone()
-            if rec:
-                cuotas = int(rec["cuotas_generadas"] or 0)
-                nuevas_cuotas = max(0, cuotas - 1)
-                if rec["total_cuotas"] is not None and rec["activo"] == 0:
-                    cursor.execute(
-                        "UPDATE recurrentes SET cuotas_generadas = ?, activo = 1 WHERE id = ?",
-                        (nuevas_cuotas, t["recurrente_id"])
-                    )
-                else:
-                    cursor.execute(
-                        "UPDATE recurrentes SET cuotas_generadas = ? WHERE id = ?",
-                        (nuevas_cuotas, t["recurrente_id"])
-                    )
+        try:
+            deshacer_efectos_de_movimiento(cursor, t)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        if req.modo == 'cancelar':
+            archivar_movimiento_cancelado(cursor, t)
 
     if req.todos:
         cursor.execute("DELETE FROM transacciones")
@@ -242,8 +220,9 @@ def eliminar_transacciones_lote(
         cursor.execute(f"DELETE FROM transacciones WHERE id IN ({pl})", ids_del)
 
     conn.commit()
+    accion = "cancelaron" if req.modo == 'cancelar' else "eliminaron"
     return {
-        "mensaje": f"Se eliminaron {len(transacciones)} movimientos con éxito",
+        "mensaje": f"Se {accion} {len(transacciones)} movimientos con éxito",
         "eliminados": len(transacciones)
     }
 
@@ -331,6 +310,32 @@ def listar_transacciones(conn: sqlite3.Connection = Depends(get_tenant_db)):
     )
     filas = cursor.fetchall()
     return [dict(fila) for fila in filas]
+
+
+@router.get("/api/transacciones/canceladas", summary="Listar movimientos cancelados (no cuentan en ningún saldo)")
+def listar_transacciones_canceladas(conn: sqlite3.Connection = Depends(get_tenant_db)):
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT t.id, t.id_original, t.fecha, t.monto, t.tipo, t.descripcion, t.categoria_id,
+               c.nombre AS categoria, t.recurrente_id, t.apartado_id, t.cancelado_en
+        FROM transacciones_canceladas t
+        LEFT JOIN categorias c ON c.id = t.categoria_id
+        ORDER BY t.fecha DESC, t.id DESC
+        """
+    )
+    return [{**dict(fila), "estado": "cancelado"} for fila in cursor.fetchall()]
+
+
+@router.delete("/api/transacciones/canceladas/{id_cancelada}", summary="Borrar del todo un movimiento cancelado")
+def borrar_transaccion_cancelada(id_cancelada: int, conn: sqlite3.Connection = Depends(get_tenant_db)):
+    """Un cancelado ya no contaba en el dinero: borrarlo solo quita la constancia, sin tocar saldos ni metas."""
+    cursor = conn.cursor()
+    if not cursor.execute("SELECT 1 FROM transacciones_canceladas WHERE id = ?", (id_cancelada,)).fetchone():
+        raise HTTPException(status_code=404, detail="Movimiento cancelado no encontrado")
+    cursor.execute("DELETE FROM transacciones_canceladas WHERE id = ?", (id_cancelada,))
+    conn.commit()
+    return {"mensaje": "Movimiento cancelado borrado."}
 
 
 # =============================================================================

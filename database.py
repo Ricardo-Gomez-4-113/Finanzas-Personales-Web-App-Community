@@ -32,7 +32,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 21
+CURRENT_TENANT_SCHEMA_VERSION = 22
 
 
 # =============================================================================
@@ -608,6 +608,31 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         _pasar_dinero_a_centavos(cursor)
         cursor.execute("PRAGMA user_version = 21;")
         current_version = 21
+
+    # -------------------------------------------------------------
+    # Versión 22: movimientos cancelados. «Cancelar operación» saca el movimiento de `transacciones` (el dinero
+    # vuelve al saldo, igual que al eliminarlo) pero deja una copia aquí para mostrarlo como cancelado.
+    # Sin llaves foráneas: la copia debe sobrevivir si luego se borra la categoría, el fijo o la meta.
+    # -------------------------------------------------------------
+    if current_version < 22 and CURRENT_TENANT_SCHEMA_VERSION >= 22:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS transacciones_canceladas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_original INTEGER,
+                fecha TEXT NOT NULL,
+                monto INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                categoria_id INTEGER,
+                descripcion TEXT,
+                recurrente_id INTEGER,
+                apartado_id INTEGER,
+                rubro TEXT,
+                cancelado_en TEXT NOT NULL
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trans_canceladas_fecha ON transacciones_canceladas(fecha);")
+        cursor.execute("PRAGMA user_version = 22;")
+        current_version = 22
 
     conn.commit()
 

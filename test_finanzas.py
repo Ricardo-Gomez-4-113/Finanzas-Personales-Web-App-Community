@@ -855,6 +855,149 @@ def test_mensajes_de_eliminar_y_modificar_un_ingreso_claros_con_menos_tipografic
         sin_formato_viejo(texto)
 
 
+def _escenario_cancelar():
+    """Ingreso de 10,000, un gasto de 600 y una meta con un depósito de 1,000 (movimiento de la meta incluido)."""
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 100000)")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-11-01', 1000000, 'ingreso', 'Nómina')")
+    id_ingreso = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion, categoria_id) VALUES ('2026-11-02', 60000, 'gasto', 'Cena', 1)")
+    id_gasto = cur.lastrowid
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-11-03', 100000, 'gasto', 1)")
+    id_deposito = cur.lastrowid
+    conn.commit()
+    return conn, cur, id_ingreso, id_gasto, id_deposito
+
+
+def _disponible(cur):
+    from finanzas_core import balance_disponible_a_fecha
+    return balance_disponible_a_fecha(cur, "2026-12-31")
+
+
+def test_eliminar_y_cancelar_devuelven_el_dinero_pero_solo_cancelar_deja_constancia():
+    from routers.movimientos import eliminar_transaccion, listar_transacciones_canceladas
+    # Eliminar: el dinero vuelve y no queda rastro
+    conn, cur, _, id_gasto, _ = _escenario_cancelar()
+    antes = _disponible(cur)
+    eliminar_transaccion(id_gasto, conn, modo="eliminar")
+    assert _disponible(cur) == antes + 600.0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_gasto,)).fetchone()[0] == 0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 0
+    assert listar_transacciones_canceladas(conn) == []
+
+    # Cancelar: el dinero vuelve igual, pero queda constancia como cancelado
+    conn, cur, _, id_gasto, _ = _escenario_cancelar()
+    antes = _disponible(cur)
+    res = eliminar_transaccion(id_gasto, conn, modo="cancelar")
+    assert "cancelada" in res["mensaje"].lower(), res
+    assert _disponible(cur) == antes + 600.0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_gasto,)).fetchone()[0] == 0
+    canceladas = listar_transacciones_canceladas(conn)
+    assert len(canceladas) == 1, canceladas
+    c = canceladas[0]
+    assert c["estado"] == "cancelado" and c["id_original"] == id_gasto and c["monto"] == 600.0
+    assert c["tipo"] == "gasto" and c["descripcion"] == "Cena" and c["cancelado_en"], c
+
+
+def test_sin_modo_el_borrado_se_comporta_como_antes():
+    from routers.movimientos import eliminar_transaccion
+    conn, cur, _, id_gasto, _ = _escenario_cancelar()
+    eliminar_transaccion(id_gasto, conn)
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 0
+
+
+def test_cancelar_un_ingreso_que_respalda_gastos_exige_forzar_y_luego_archiva():
+    from routers.movimientos import eliminar_transaccion
+    from fastapi import HTTPException
+    conn, cur, id_ingreso, _, _ = _escenario_cancelar()
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-04', 850000, 'gasto')")
+    conn.commit()
+    try:
+        eliminar_transaccion(id_ingreso, conn, forzar=False, modo="cancelar")
+        assert False, "Debió dar 422: el ingreso respalda gastos"
+    except HTTPException as e:
+        assert e.status_code == 422, e
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 0   # nada quedó a medias
+    eliminar_transaccion(id_ingreso, conn, forzar=True, modo="cancelar")
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas WHERE id_original = ?", (id_ingreso,)).fetchone()[0] == 1
+
+
+def test_cancelar_un_deposito_a_meta_revierte_la_meta_igual_que_eliminar():
+    from routers.movimientos import eliminar_transaccion
+    conn, cur, _, _, id_deposito = _escenario_cancelar()
+    eliminar_transaccion(id_deposito, conn, modo="cancelar")
+    assert cur.execute("SELECT monto_actual FROM apartados WHERE id = 1").fetchone()[0] == 0.0
+    fila = cur.execute("SELECT apartado_id, monto FROM transacciones_canceladas").fetchone()
+    assert fila["apartado_id"] == 1 and fila["monto"] == 1000.0, dict(fila)
+    assert obtener_total_apartados(cur) == 0.0   # el movimiento cancelado ya no retiene nada de la cuenta
+
+
+def test_cancelar_una_cuota_baja_cuotas_generadas_y_reactiva_el_fijo_terminado():
+    from routers.movimientos import eliminar_transaccion
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""INSERT INTO recurrentes (id, descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, cuotas_generadas, activo)
+                   VALUES (1, 'Compra TV', 'gasto', 100000, 'mensual', 15, '2026-11-15', 3, 3, 0)""")
+    cur.execute("INSERT INTO transacciones (fecha, monto, tipo, recurrente_id) VALUES ('2026-11-03', 100000, 'gasto', 1)")
+    id_cuota = cur.lastrowid
+    conn.commit()
+    eliminar_transaccion(id_cuota, conn, modo="cancelar")
+    rec = cur.execute("SELECT cuotas_generadas, activo, proxima_fecha FROM recurrentes WHERE id = 1").fetchone()
+    assert rec["cuotas_generadas"] == 2 and rec["activo"] == 1 and rec["proxima_fecha"] == '2026-11-15', dict(rec)
+    assert cur.execute("SELECT recurrente_id FROM transacciones_canceladas").fetchone()["recurrente_id"] == 1
+
+
+def test_si_falla_el_archivado_no_se_borra_nada():
+    from routers.movimientos import eliminar_transaccion
+    conn, cur, _, id_gasto, _ = _escenario_cancelar()
+    antes = _disponible(cur)
+    conn.execute("DROP TABLE transacciones_canceladas")
+    try:
+        eliminar_transaccion(id_gasto, conn, modo="cancelar")
+        assert False, "Debió fallar al archivar"
+    except sqlite3.OperationalError:
+        conn.rollback()
+    assert cur.execute("SELECT COUNT(*) FROM transacciones WHERE id = ?", (id_gasto,)).fetchone()[0] == 1
+    assert _disponible(cur) == antes
+
+
+def test_lote_cancelar_archiva_y_vaciar_todo_solo_permite_eliminar():
+    from routers.movimientos import eliminar_transacciones_lote, EliminarLoteRequest
+    from fastapi import HTTPException
+    conn, cur, _, id_gasto, id_deposito = _escenario_cancelar()
+    antes = _disponible(cur)
+    res = eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_gasto, id_deposito], modo="cancelar"), conn)
+    assert res["eliminados"] == 2 and "cancelaron" in res["mensaje"], res
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 2
+    assert _disponible(cur) == antes + 600.0 + 1000.0
+    try:
+        eliminar_transacciones_lote(EliminarLoteRequest(todos=True, modo="cancelar"), conn)
+        assert False, "Vaciar todo solo se hace con Eliminar"
+    except HTTPException as e:
+        assert e.status_code == 422, e
+    eliminar_transacciones_lote(EliminarLoteRequest(todos=True), conn)   # sin modo = eliminar, como antes
+    assert cur.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 2   # los cancelados no se vacían
+
+
+def test_borrar_un_cancelado_no_cambia_ningun_saldo():
+    from routers.movimientos import eliminar_transaccion, borrar_transaccion_cancelada
+    from fastapi import HTTPException
+    conn, cur, _, id_gasto, _ = _escenario_cancelar()
+    eliminar_transaccion(id_gasto, conn, modo="cancelar")
+    antes = _disponible(cur)
+    id_c = cur.execute("SELECT id FROM transacciones_canceladas").fetchone()["id"]
+    borrar_transaccion_cancelada(id_c, conn)
+    assert cur.execute("SELECT COUNT(*) FROM transacciones_canceladas").fetchone()[0] == 0
+    assert _disponible(cur) == antes
+    try:
+        borrar_transaccion_cancelada(id_c, conn)
+        assert False, "Debió dar 404"
+    except HTTPException as e:
+        assert e.status_code == 404, e
+
+
 def test_meta_con_ahorro_que_nunca_paso_por_la_cuenta_no_bloquea_el_gasto():
     """Una meta con dinero propio (ahorro fuera de la app) sin movimientos no se resta al saldo que se puede gastar."""
     conn = nueva_bd()

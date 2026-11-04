@@ -342,6 +342,41 @@ def test_excel_no_convierte_texto_en_formula(client, ha):
     assert tipos and all(t == "s" for t in tipos), tipos
 
 
+def test_cancelar_un_movimiento_deja_constancia_aislada_y_sale_en_el_excel(client, ha, hb):
+    import io
+    import openpyxl
+    assert client.post("/api/transacciones", json=dict(MOV, tipo="ingreso", monto=1000.0, descripcion="base-A"), headers=ha).status_code in (200, 201)
+    assert client.post("/api/transacciones", json=dict(MOV, monto=200.0, descripcion="cancelame-A"), headers=ha).status_code in (200, 201)
+    id_gasto = next(t["id"] for t in client.get("/api/transacciones", headers=ha).json() if t["descripcion"] == "cancelame-A")
+    antes = client.get("/api/resumen?moneda_base=MXN", headers=ha).json()["balance"]
+
+    assert client.delete(f"/api/transacciones/{id_gasto}?modo=otro", headers=ha).status_code == 422
+    r = client.delete(f"/api/transacciones/{id_gasto}?modo=cancelar", headers=ha)
+    assert r.status_code == 200 and "cancelada" in r.json()["mensaje"].lower(), r.text
+
+    # El dinero vuelve y el movimiento ya no cuenta, pero queda constancia
+    assert client.get("/api/resumen?moneda_base=MXN", headers=ha).json()["balance"] == antes + 200.0
+    assert all(t["descripcion"] != "cancelame-A" for t in client.get("/api/transacciones", headers=ha).json())
+    canceladas = client.get("/api/transacciones/canceladas", headers=ha).json()
+    assert [(c["descripcion"], c["monto"], c["estado"]) for c in canceladas] == [("cancelame-A", 200.0, "cancelado")], canceladas
+
+    # Otro usuario no ve ni borra los cancelados ajenos
+    assert client.get("/api/transacciones/canceladas", headers=hb).json() == []
+    assert client.delete(f"/api/transacciones/canceladas/{canceladas[0]['id']}", headers=hb).status_code == 404
+    assert len(client.get("/api/transacciones/canceladas", headers=ha).json()) == 1
+
+    # El Excel lo lista en su hoja aparte, y no en Movimientos
+    libro = openpyxl.load_workbook(io.BytesIO(client.get("/api/exportar-excel?moneda_base=MXN", headers=ha).content))
+    assert "Cancelados" in libro.sheetnames, libro.sheetnames
+    textos = lambda hoja: [c.value for fila in libro[hoja].iter_rows() for c in fila]
+    assert "cancelame-A" in textos("Cancelados") and "cancelame-A" not in textos("Movimientos")
+
+    # Borrarlo del todo no toca el saldo
+    assert client.delete(f"/api/transacciones/canceladas/{canceladas[0]['id']}", headers=ha).status_code == 200
+    assert client.get("/api/transacciones/canceladas", headers=ha).json() == []
+    assert client.get("/api/resumen?moneda_base=MXN", headers=ha).json()["balance"] == antes + 200.0
+
+
 def test_restore_rechaza_triggers_y_textos_enormes(client, hb):
     antes = client.get("/api/transacciones", headers=hb).json()
     respaldo = client.get("/api/backup", headers=hb).content
@@ -731,6 +766,7 @@ if __name__ == "__main__":
             (test_sincronizar_tiene_enfriamiento, lambda: test_sincronizar_tiene_enfriamiento(client, ha)),
             (test_rendimiento_con_fecha_fuera_de_rango_se_rechaza, lambda: test_rendimiento_con_fecha_fuera_de_rango_se_rechaza(client, ha)),
             (test_excel_no_convierte_texto_en_formula, lambda: test_excel_no_convierte_texto_en_formula(client, ha)),
+            (test_cancelar_un_movimiento_deja_constancia_aislada_y_sale_en_el_excel, lambda: test_cancelar_un_movimiento_deja_constancia_aislada_y_sale_en_el_excel(client, ha, hb)),
             (test_arranque_define_la_ruta_de_clave_inicial, lambda: test_arranque_define_la_ruta_de_clave_inicial(client)),
             (test_distribucion_subperiodos_se_valida_al_guardar, lambda: test_distribucion_subperiodos_se_valida_al_guardar(client, ha)),
             (test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro, lambda: test_listas_de_ids_tienen_tope_y_nombre_de_excel_es_seguro(client, ha)),

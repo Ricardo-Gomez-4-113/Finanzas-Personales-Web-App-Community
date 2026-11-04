@@ -346,6 +346,24 @@ def test_v21_pasa_el_dinero_a_centavos_sin_perder_nada():
         assert {"idx_transacciones_fecha", "uq_transacciones_rec_fecha", "idx_recurrentes_tarjeta"} <= indices, indices
 
 
+def test_v22_crea_la_tabla_de_cancelados_sin_tocar_nada_y_es_idempotente():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 21)
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-10-01', 1999, 'gasto', 'cuenta')")
+        conn.commit()
+        conteos = _conteos(conn)
+
+        _migrar_hasta(conn, 22)
+        assert _version(conn) == 22
+        assert _conteos(conn) == {**conteos, "transacciones_canceladas": 0}
+        columnas = {r[1]: r[2] for r in conn.execute("PRAGMA table_info(transacciones_canceladas)")}
+        assert columnas["monto"] == "INTEGER" and {"id_original", "fecha", "tipo", "descripcion", "cancelado_en"} <= set(columnas), columnas
+        assert conn.execute("PRAGMA foreign_key_list(transacciones_canceladas)").fetchall() == []   # la copia sobrevive a lo que borre el usuario
+
+        _migrar_hasta(conn, 22)   # volver a correrla no falla ni cambia nada
+        assert _version(conn) == 22 and _conteos(conn) == {**conteos, "transacciones_canceladas": 0}
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo
