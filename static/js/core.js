@@ -17,7 +17,7 @@ export const estado = {
     factoresMXN: null,   // lo que vale 1 MXN en cada moneda; lo calcula el servidor (/api/tipo-cambio)
     graficas: { barras: null, dona: null },
     debounceTimerBuscar: null,
-    cache: { transacciones: {}, listaTransacciones: [], categorias: [], inversiones: {}, usuarios: {}, ventana: null }
+    cache: { transacciones: {}, listaTransacciones: [], listaCanceladas: [], categorias: [], inversiones: {}, usuarios: {}, ventana: null }
 };
 if (!['MXN', 'USD', 'EUR'].includes(estado.monedaGlobal)) estado.monedaGlobal = 'MXN';
 

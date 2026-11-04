@@ -334,6 +334,91 @@ def test_fijo_con_error_muestra_el_aviso_dentro_del_modal(navegador, base):
         ctx.close()
 
 
+def test_cancelar_o_eliminar_devuelven_el_dinero_y_solo_cancelar_deja_constancia(navegador, base):
+    """La papelera abre un cuadro: «Eliminar» borra sin rastro y «Cancelar operación» deja el movimiento como cancelado,
+    tachado y sin casilla; en las dos el dinero vuelve. Un cancelado se puede borrar del todo sin tocar el saldo."""
+    usuario, clave = _usuario_nuevo("quitar")
+    api = _api(base, usuario, clave)
+    api.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "sueldo"})
+    api.post("/api/transacciones", json={"fecha": "2026-10-02", "monto": 100, "tipo": "gasto", "categoria_id": 2, "descripcion": "gasto-eliminar"})
+    api.post("/api/transacciones", json={"fecha": "2026-10-03", "monto": 200, "tipo": "gasto", "categoria_id": 2, "descripcion": "gasto-cancelar"})
+    saldo = lambda: api.get("/api/resumen?moneda_base=MXN").json()["balance"]
+    fila = lambda texto: page.locator("#tabla-movimientos tr", has_text=texto)
+    assert saldo() == 700.0
+
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#tabla-movimientos tr .btn-eliminar")
+
+        # Volver y Escape no cambian nada
+        fila("gasto-eliminar").locator(".btn-eliminar").click()
+        visto = _responder_quitar(page, None)
+        assert visto["titulo"] == "Quitar movimiento", visto
+        fila("gasto-eliminar").locator(".btn-eliminar").click()
+        page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)")
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#modal-quitar-movimiento.hidden", state="attached")
+        assert fila("gasto-eliminar").count() == 1 and saldo() == 700.0
+
+        # Eliminar: el dinero vuelve y la fila desaparece sin rastro
+        fila("gasto-eliminar").locator(".btn-eliminar").click()
+        _responder_quitar(page, "eliminar")
+        _esperar(page, "![...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('gasto-eliminar'))")
+        assert saldo() == 800.0
+        assert api.get("/api/transacciones/canceladas").json() == []
+
+        # Cancelar operación: el dinero vuelve, la fila se queda como cancelada
+        fila("gasto-cancelar").locator(".btn-eliminar").click()
+        _responder_quitar(page, "cancelar")
+        _esperar(page, "document.querySelector('#tabla-movimientos tr.fila-cancelada') !== null")
+        assert saldo() == 1000.0
+        cancelada = fila("gasto-cancelar")
+        assert cancelada.count() == 1 and "Cancelado" in cancelada.inner_text()
+        assert cancelada.locator(".chk-mov-item").count() == 0, "un cancelado no se selecciona para el lote"
+        assert cancelada.locator(".btn-editar").count() == 0, "un cancelado no se edita"
+        assert "line-through" in cancelada.locator(".td-monto").evaluate("e => getComputedStyle(e).textDecorationLine")
+
+        # El filtro «Cancelados» solo los muestra a ellos; «Gastos» no los incluye
+        page.select_option("#filtro-tipo", "cancelado")
+        assert page.locator("#tabla-movimientos tr.fila-cancelada").count() == 1
+        assert fila("sueldo").count() == 0
+        page.select_option("#filtro-tipo", "gasto")
+        assert page.locator("#tabla-movimientos tr.fila-cancelada").count() == 0
+        page.select_option("#filtro-tipo", "")
+
+        # Borrar un cancelado del todo no cambia el saldo
+        cancelada.locator(".btn-eliminar").click()
+        _responder_confirmacion(page)
+        _esperar(page, "document.querySelector('#tabla-movimientos tr.fila-cancelada') === null")
+        assert saldo() == 1000.0 and api.get("/api/transacciones/canceladas").json() == []
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_cuadro_de_quitar_en_movil_con_botones_de_44px(navegador, base):
+    usuario, clave = _usuario_nuevo("quitarmovil")
+    _api(base, usuario, clave).post("/api/transacciones", json={"fecha": "2026-10-02", "monto": 100, "tipo": "ingreso", "categoria_id": 12, "descripcion": "cobro-movil"})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-movimientos")
+        page.wait_for_selector("#tabla-movimientos tr .btn-eliminar")
+        page.evaluate("document.querySelector('#tabla-movimientos .btn-eliminar').click()")
+        page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)")
+        assert "ingreso" in page.inner_text("#quitar-mensaje").lower(), "el aviso de un ingreso dice que su dinero sale del saldo"
+        for boton in ("#btn-quitar-cancelar", "#btn-quitar-eliminar", "#btn-quitar-volver"):
+            alto = page.evaluate(f"document.querySelector('{boton}').getBoundingClientRect().height")
+            assert alto >= 44, f"{boton} mide {alto} px"
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), "el cuadro desborda el ancho"
+        page.keyboard.press("Escape")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
@@ -477,6 +562,16 @@ def _responder_confirmacion(page, aceptar=True):
     visto = {campo: page.inner_text(f"#confirmar-{campo}") for campo in ("titulo", "mensaje", "detalle")}
     page.click("#btn-confirmar-aceptar" if aceptar else "#btn-confirmar-cancelar")
     page.wait_for_selector("#modal-confirmar.hidden", state="attached")
+    return visto
+
+
+def _responder_quitar(page, opcion):
+    """Responde al cuadro «Quitar movimiento»: «cancelar» (Cancelar operación), «eliminar» o None (Volver).
+    Devuelve lo que mostraba (título y mensaje)."""
+    page.wait_for_selector("#modal-quitar-movimiento:not(.hidden)")
+    visto = {campo: page.inner_text(f"#quitar-{campo}") for campo in ("titulo", "mensaje")}
+    page.click({"cancelar": "#btn-quitar-cancelar", "eliminar": "#btn-quitar-eliminar", None: "#btn-quitar-volver"}[opcion])
+    page.wait_for_selector("#modal-quitar-movimiento.hidden", state="attached")
     return visto
 
 
@@ -824,10 +919,10 @@ def test_movimiento_crear_editar_y_borrar(navegador, base):
         page.on("dialog", lambda d: (errores.append(f"diálogo nativo: {d.message}"), d.dismiss()))
         boton = page.locator("#tabla-movimientos tr", has_text="e2e-cafe").locator(".btn-eliminar")
         boton.click()
-        assert _responder_confirmacion(page, aceptar=False)["titulo"] == "Eliminar movimiento"
+        assert _responder_quitar(page, None)["titulo"] == "Quitar movimiento"
         assert page.locator("#tabla-movimientos tr", has_text="e2e-cafe").count() == 1
         boton.click()
-        _responder_confirmacion(page)
+        _responder_quitar(page, "eliminar")
         _esperar(page, "![...document.querySelectorAll('#tabla-movimientos tr')].some(tr => tr.textContent.includes('e2e-cafe'))")
         assert not errores, errores
     finally:
@@ -1276,7 +1371,7 @@ def test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base):
         x_fecha, x_monto = page.evaluate("""() => { const f = document.querySelector('#tabla-movimientos td.td-fecha').getBoundingClientRect();
             const m = document.querySelector('#tabla-movimientos td.td-monto').getBoundingClientRect(); return [f.left, m.left]; }""")
         assert x_monto > x_fecha, "el monto debe ir a la derecha de la fecha"
-        assert page.get_attribute("#tabla-movimientos .btn-eliminar", "aria-label") == "Eliminar movimiento"
+        assert page.get_attribute("#tabla-movimientos .btn-eliminar", "aria-label") == "Quitar movimiento"
         assert page.inner_text("#cinta-movimientos-titulo") == "Periodo"
         _abrir_formulario(page, "movimiento")
         assert page.inner_text("#modal-nuevo-movimiento-titulo").strip().endswith("Registrar movimiento")
@@ -1973,6 +2068,8 @@ if __name__ == "__main__":
                 (test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia, lambda: test_error_de_fondos_insuficientes_se_lee_a_la_izquierda_y_se_anuncia(navegador, base)),
                 (test_formularios_se_abren_con_el_mas_y_la_tabla_ocupa_todo_el_ancho, lambda: test_formularios_se_abren_con_el_mas_y_la_tabla_ocupa_todo_el_ancho(navegador, base)),
                 (test_fijo_con_error_muestra_el_aviso_dentro_del_modal, lambda: test_fijo_con_error_muestra_el_aviso_dentro_del_modal(navegador, base)),
+                (test_cancelar_o_eliminar_devuelven_el_dinero_y_solo_cancelar_deja_constancia, lambda: test_cancelar_o_eliminar_devuelven_el_dinero_y_solo_cancelar_deja_constancia(navegador, base)),
+                (test_cuadro_de_quitar_en_movil_con_botones_de_44px, lambda: test_cuadro_de_quitar_en_movil_con_botones_de_44px(navegador, base)),
                 (test_recorrido_pestanas_laptop, lambda: test_recorrido_pestanas_laptop(navegador, base)),
                 (test_recorrido_pestanas_movil, lambda: test_recorrido_pestanas_movil(navegador, base)),
                 (test_registrar_ingreso_y_modal_accesible, lambda: test_registrar_ingreso_y_modal_accesible(navegador, base)),

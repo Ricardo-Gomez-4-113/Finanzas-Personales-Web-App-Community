@@ -9,11 +9,11 @@ import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPerio
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, cerrarModalNuevaPosicion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=b2a3733813';
+import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=c1d66e1474';
 import { cargarCategorias, cerrarModalEditarTransaccion, cerrarModalNuevoMovimiento, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=b2a3733813';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=c1d66e1474';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import { activarAccionesDelegadas } from './acciones.js';
@@ -30,6 +30,13 @@ async function cargarMovimientos() {
         estado.cache.transacciones = {};
         dataTrans.forEach(t => { estado.cache.transacciones[t.id] = t; });
         estado.cache.listaTransacciones = dataTrans;
+        // Los cancelados no cuentan en ningún saldo: se piden aparte y solo se muestran en la tabla
+        try {
+            const resCanceladas = await apiFetch('/api/transacciones/canceladas');
+            estado.cache.listaCanceladas = resCanceladas.ok ? await resCanceladas.json() : [];
+        } catch (_) {
+            estado.cache.listaCanceladas = [];
+        }
         document.getElementById('inicio-vacio')?.classList.toggle('hidden', dataTrans.length > 0);
         renderTablaMovimientos();
     } catch (error) {

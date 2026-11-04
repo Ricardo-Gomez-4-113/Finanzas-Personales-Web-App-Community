@@ -1946,6 +1946,20 @@
 :root .confirmar-mensaje { white-space: pre-line; margin: 0; }
 :root .confirmar-detalle { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
 :root .confirmar-detalle:empty { display: none; }
+
+/* Cuadro «Quitar movimiento» (js/quitar_movimiento.js): dos opciones, cada una con su botón y su explicación */
+:root .quitar-opcion { margin-top: 14px; }
+:root .quitar-opcion > button { width: 100%; height: 40px; }
+:root .quitar-ayuda { margin: 6px 2px 0; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
+@media (max-width: 720px) {
+    :root .quitar-opcion > button,
+    :root #btn-quitar-volver { min-height: 44px; }
+}
+
+/* Movimiento cancelado: sigue en la lista, pero apagado y con el monto tachado */
+:root .fila-cancelada td,
+:root .fila-cancelada .monto-cancelado { color: var(--text-muted); }
+:root .monto-cancelado { text-decoration: line-through; }
 :root .confirmar-grupo-titulo {
     margin: 0 0 6px;
     font-size: var(--fs-xs);

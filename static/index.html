@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=b2a3733813">
-    <link rel="stylesheet" href="/static/css/layout.css?v=b2a3733813">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=b2a3733813">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=b2a3733813">
-    <link rel="stylesheet" href="/static/css/tema.css?v=b2a3733813">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=c1d66e1474">
+    <link rel="stylesheet" href="/static/css/layout.css?v=c1d66e1474">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=c1d66e1474">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=c1d66e1474">
+    <link rel="stylesheet" href="/static/css/tema.css?v=c1d66e1474">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -538,6 +538,7 @@
                                 <option value="">Todos los tipos</option>
                                 <option value="gasto">Gastos</option>
                                 <option value="ingreso">Ingresos</option>
+                                <option value="cancelado">Cancelados</option>
                             </select>
                             <select id="filtro-categoria" aria-label="Filtrar por categoría">
                                 <option value="">Todas las categorías</option>
@@ -2035,8 +2036,31 @@
         </div>
     </div>
 
+    <!-- Quitar un movimiento: «Cancelar operación» (queda constancia) o «Eliminar» (sin rastro). El dinero vuelve en las dos. -->
+    <div id="modal-quitar-movimiento" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="quitar-titulo" aria-describedby="quitar-mensaje">
+        <div class="modal-card modal-card--md">
+            <div class="modal-header">
+                <h3><span id="quitar-titulo"></span></h3>
+            </div>
+            <div class="modal-body">
+                <p id="quitar-mensaje" class="modal-instruction confirmar-mensaje"></p>
+                <div class="quitar-opcion">
+                    <button type="button" class="btn-secondary" id="btn-quitar-cancelar">Cancelar operación</button>
+                    <p id="quitar-ayuda-cancelar" class="quitar-ayuda"></p>
+                </div>
+                <div class="quitar-opcion">
+                    <button type="button" class="btn-danger-solid" id="btn-quitar-eliminar">Eliminar</button>
+                    <p id="quitar-ayuda-eliminar" class="quitar-ayuda"></p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="btn-quitar-volver">Volver</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=b2a3733813"></script>
+    <script type="module" src="/static/js/main.js?v=c1d66e1474"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

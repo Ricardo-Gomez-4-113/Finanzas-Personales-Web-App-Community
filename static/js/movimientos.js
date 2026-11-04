@@ -5,6 +5,7 @@
 import { abrirModalFormulario, apiFetch, avisoFormulario, cerrarModalFormulario, escapeHTML, estado, fmt, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { bloqueTarjetaPartes } from './tarjeta_partes.js';
 import { confirmar } from './confirmar.js';
+import { elegirQuitar } from './quitar_movimiento.js';
 
 
 // Valor especial del select de categoría para crear una nueva
@@ -151,21 +152,26 @@ export function renderTablaMovimientos() {
             : 'Todo el historial';
     }
 
-    const lista = (estado.cache.listaTransacciones || []).filter(t => {
+    const coincide = t => {
         if (mes && !String(t.fecha).startsWith(mes)) return false;
         if (usarVentana) {
             const dia = String(t.fecha).slice(0, 10);
             if (dia < ventana.inicio || dia > ventana.fin) return false;
         }
-        if (tipo && t.tipo !== tipo) return false;
         if (categoria && String(t.categoria_id) !== categoria) return false;
         if (texto && !(t.descripcion || '').toLowerCase().includes(texto)) return false;
         return true;
-    });
+    };
+    // Los cancelados no cuentan en ningún saldo: se ven sin filtro de tipo o con «Cancelados»
+    const vigentes = tipo === 'cancelado' ? [] : (estado.cache.listaTransacciones || []).filter(t => coincide(t) && (!tipo || t.tipo === tipo));
+    const canceladas = (tipo === '' || tipo === 'cancelado')
+        ? (estado.cache.listaCanceladas || []).filter(coincide).map(c => ({ ...c, cancelada: true }))
+        : [];
+    const lista = [...vigentes, ...canceladas].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
     tbody.innerHTML = '';
     if (lista.length === 0) {
-        const mensaje = (estado.cache.listaTransacciones || []).length === 0
+        const mensaje = (estado.cache.listaTransacciones || []).length === 0 && (estado.cache.listaCanceladas || []).length === 0
             ? 'No hay movimientos. Registra tu primer movimiento o agrega tu nómina en Fijos y MSI.'
             : usarVentana && ventana.futuro
                 ? 'Aún no hay movimientos en este periodo. Sus cargos programados están en Fijos y MSI.'
@@ -179,6 +185,22 @@ export function renderTablaMovimientos() {
 
     lista.forEach(t => {
         const tr = document.createElement('tr');
+        if (t.cancelada) {
+            tr.className = 'fila-cancelada';
+            tr.innerHTML = `
+                <td class="celda-centro"></td>
+                <td class="td-fecha" title="${escapeHTML(t.fecha)}">${escapeHTML(fechaTabla(t.fecha))}</td>
+                <td>${escapeHTML(t.descripcion || '-')} <span class="badge-tag badge-cancelado" title="Cancelado el ${escapeHTML(String(t.cancelado_en || '').slice(0, 16))}">Cancelado</span></td>
+                <td>${escapeHTML(t.categoria || 'Sin categoría')}</td>
+                <td class="td-tipo">${t.tipo === 'gasto' ? 'Gasto' : 'Ingreso'}</td>
+                <td class="td-monto monto-cancelado">${t.tipo === 'gasto' ? '−' : '+'}${montoMxnHTML(t.monto)}</td>
+                <td class="col-acciones">
+                    <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["borrarCancelado", t.id]]))}" title="Borrar el movimiento cancelado" aria-label="Borrar el movimiento cancelado"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            return;
+        }
         tr.innerHTML = `
             <td class="celda-centro">
                 <input type="checkbox" class="chk-mov-item" value="${t.id}" data-id="${t.id}" aria-label="Seleccionar movimiento">
@@ -190,7 +212,7 @@ export function renderTablaMovimientos() {
             <td class="td-monto ${t.tipo === 'gasto' ? 'text-gasto' : 'text-ingreso'}">${t.tipo === 'gasto' ? '−' : '+'}${montoMxnHTML(t.monto)}</td>
             <td class="col-acciones">
                 <button type="button" class="btn-accion btn-editar" data-on-click="${escapeHTML(JSON.stringify([["abrirModalEditarTransaccionPorId", t.id]]))}" title="Editar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-                <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarTransaccion", t.id]]))}" title="Eliminar movimiento" aria-label="Eliminar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                <button type="button" class="btn-accion btn-eliminar" data-on-click="${escapeHTML(JSON.stringify([["eliminarTransaccion", t.id]]))}" title="Quitar movimiento" aria-label="Quitar movimiento"><svg class="action-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -329,53 +351,79 @@ export function toggleSeleccionarTodosMovimientos(checked) {
     actualizarSeleccionMovimientos();
 }
 
-export async function eliminarTransaccion(id, forzar = false) {
+export async function eliminarTransaccion(id, forzar = false, modo = null) {
     const t = (estado.cache.listaTransacciones || []).find(item => item.id === id);
-    let advertencias = [];
-    if (t) {
-        if (t.apartado_id) {
-            if (t.tipo === 'gasto') {
-                advertencias.push('• Está ligado a una meta de ahorro (su saldo acumulado se descontará).');
-            } else {
-                advertencias.push('• Corresponde a un retiro de meta de ahorro (el monto no volverá a la meta).');
+
+    if (!forzar) {
+        // El dinero vuelve a tu saldo en las dos opciones; solo cambia si queda constancia
+        const advertencias = [];
+        if (t) {
+            if (t.tipo === 'ingreso') {
+                advertencias.push('• Es un ingreso: ese dinero saldrá de tu saldo.');
+            }
+            if (t.apartado_id) {
+                advertencias.push(t.tipo === 'gasto'
+                    ? '• Es un depósito a una meta: la meta perderá ese dinero.'
+                    : '• Es un retiro de una meta: ese dinero vuelve a la meta.');
+            }
+            if (t.recurrente_id) {
+                advertencias.push('• Es una cuota de un fijo o compra a meses: se suma una cuota al final.');
             }
         }
-        if (t.recurrente_id) {
-            advertencias.push('• Corresponde a un cargo o ingreso fijo (se restará 1 cuota generada).');
-        }
+        modo = await elegirQuitar({
+            titulo: 'Quitar movimiento',
+            mensaje: advertencias.join('\n'),
+            ayudaCancelar: 'El dinero vuelve a tu saldo. El movimiento se queda en la lista como cancelado.',
+            ayudaEliminar: 'El dinero vuelve a tu saldo y el movimiento se borra por completo. No se puede deshacer.',
+        });
+        if (!modo) return;
     }
-
-    let pregunta = "¿Eliminar este movimiento?";
-    if (advertencias.length > 0) {
-        pregunta = `Advertencia:\n${advertencias.join('\n')}\n\n${pregunta}`;
-    }
-
-    if (!forzar && !await confirmar({ titulo: 'Eliminar movimiento', mensaje: pregunta, aceptar: 'Eliminar', peligro: true })) return;
 
     try {
-        const url = `/api/transacciones/${id}${forzar ? '?forzar=true' : ''}`;
+        const url = `/api/transacciones/${id}?modo=${modo}${forzar ? '&forzar=true' : ''}`;
         const response = await apiFetch(url, { method: 'DELETE' });
         if (response.ok) {
-            toast("Movimiento eliminado con éxito.", 'success');
+            toast(modo === 'cancelar' ? 'Operación cancelada: el dinero volvió a tu saldo.' : 'Movimiento eliminado.', 'success');
             recargar();
         } else if (response.status === 422) {
             const err = await response.json().catch(() => ({}));
             const msg = (formatErrorDetail(err.detail, "Este ingreso respalda gastos posteriores y provocaría saldo negativo.")) +
-                        "\n\n¿Deseas FORZAR la eliminación de este movimiento?";
-            if (await confirmar({ titulo: 'Forzar eliminación', mensaje: msg, aceptar: 'Forzar eliminación', peligro: true })) {
-                await eliminarTransaccion(id, true);
+                        "\n\n¿Deseas FORZAR la operación sobre este movimiento?";
+            if (await confirmar({ titulo: 'Forzar operación', mensaje: msg, aceptar: 'Forzar', peligro: true })) {
+                await eliminarTransaccion(id, true, modo);
             }
         } else {
             const err = await response.json().catch(() => ({}));
-            toast(formatErrorDetail(err.detail, "No se pudo eliminar el movimiento."), 'error');
+            toast(formatErrorDetail(err.detail, "No se pudo quitar el movimiento."), 'error');
         }
     } catch (error) {
-        console.error("Error al eliminar:", error);
-        toast("Error de red al intentar eliminar el movimiento.", 'error');
+        console.error("Error al quitar el movimiento:", error);
+        toast("Error de red al intentar quitar el movimiento.", 'error');
     }
 }
 
-export async function eliminarMovimientosLote(forzar = false) {
+/** Borra del todo un movimiento cancelado: ya no contaba en el dinero, así que no cambia ningún saldo. */
+export async function borrarCancelado(id) {
+    if (!await confirmar({
+        titulo: 'Borrar movimiento cancelado',
+        mensaje: 'Se quita de la lista sin dejar rastro. Tu saldo no cambia, porque este movimiento ya no contaba.',
+        aceptar: 'Borrar', peligro: true,
+    })) return;
+    try {
+        const response = await apiFetch(`/api/transacciones/canceladas/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            toast('Movimiento cancelado borrado.', 'success');
+            recargar();
+        } else {
+            const err = await response.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, 'No se pudo borrar el movimiento cancelado.'), 'error');
+        }
+    } catch (error) {
+        toast('Error de red al intentar borrar el movimiento cancelado.', 'error');
+    }
+}
+
+export async function eliminarMovimientosLote(forzar = false, modo = null) {
     const checkboxes = Array.from(document.querySelectorAll('#tabla-movimientos .chk-mov-item:checked'));
     const ids = checkboxes.map(cb => Number(cb.value)).filter(Boolean);
     if (ids.length === 0) {
@@ -387,38 +435,40 @@ export async function eliminarMovimientosLote(forzar = false) {
     const ligadosMeta = items.filter(t => t.apartado_id).length;
     const ligadosFijo = items.filter(t => t.recurrente_id).length;
 
-    let advertencias = [];
-    if (ligadosMeta > 0) {
-        advertencias.push(`• ${ligadosMeta} movimiento(s) ligado(s) a metas (los saldos se reajustarán).`);
+    if (!forzar) {
+        const advertencias = [];
+        if (ligadosMeta > 0) {
+            advertencias.push(`• ${ligadosMeta} movimiento(s) ligado(s) a metas (los saldos se reajustarán).`);
+        }
+        if (ligadosFijo > 0) {
+            advertencias.push(`• ${ligadosFijo} movimiento(s) ligado(s) a fijos o compras a meses (se restarán sus cuotas).`);
+        }
+        modo = await elegirQuitar({
+            titulo: `Quitar ${ids.length} movimiento${ids.length === 1 ? '' : 's'}`,
+            mensaje: advertencias.join('\n'),
+            ayudaCancelar: 'El dinero vuelve a tu saldo. Los movimientos se quedan en la lista como cancelados.',
+            ayudaEliminar: 'El dinero vuelve a tu saldo y los movimientos se borran por completo. No se puede deshacer.',
+        });
+        if (!modo) return;
     }
-    if (ligadosFijo > 0) {
-        advertencias.push(`• ${ligadosFijo} movimiento(s) ligado(s) a fijos o compras a meses (se restarán sus cuotas).`);
-    }
-
-    let pregunta = `¿Deseas eliminar los ${ids.length} movimientos seleccionados?`;
-    if (advertencias.length > 0) {
-        pregunta = `Advertencia previa:\n${advertencias.join('\n')}\n\n${pregunta}`;
-    }
-
-    if (!forzar && !await confirmar({ titulo: 'Eliminar movimientos', mensaje: pregunta, aceptar: 'Eliminar', peligro: true })) return;
 
     try {
         const response = await apiFetch('/api/transacciones/eliminar-lote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids, todos: false, forzar: forzar })
+            body: JSON.stringify({ ids: ids, todos: false, forzar: forzar, modo: modo })
         });
 
         if (response.ok) {
             const res = await response.json().catch(() => ({}));
-            toast(res.mensaje || `Se eliminaron ${ids.length} movimientos.`, 'success');
+            toast(res.mensaje || `Listo: ${ids.length} movimientos.`, 'success');
             recargar();
         } else if (response.status === 422) {
             const err = await response.json().catch(() => ({}));
-            const msg = (formatErrorDetail(err.detail, "La eliminación provocaría un saldo operativo negativo.")) +
-                        "\n\n¿Deseas FORZAR la eliminación de estos movimientos seleccionados?";
-            if (await confirmar({ titulo: 'Forzar eliminación', mensaje: msg, aceptar: 'Forzar eliminación', peligro: true })) {
-                await eliminarMovimientosLote(true);
+            const msg = (formatErrorDetail(err.detail, "La operación provocaría un saldo operativo negativo.")) +
+                        "\n\n¿Deseas FORZAR la operación sobre estos movimientos seleccionados?";
+            if (await confirmar({ titulo: 'Forzar operación', mensaje: msg, aceptar: 'Forzar', peligro: true })) {
+                await eliminarMovimientosLote(true, modo);
             }
         } else {
             const err = await response.json().catch(() => ({}));
@@ -665,6 +715,7 @@ export function abrirModalEditarTransaccionPorId(id) {
 }
 
 Object.assign(window, {
+    borrarCancelado,
     abrirModalNuevoMovimiento,
     cerrarModalNuevoMovimiento,
     abrirModalEditarTransaccion,
