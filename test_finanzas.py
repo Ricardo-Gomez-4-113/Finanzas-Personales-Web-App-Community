@@ -809,6 +809,52 @@ def test_mensaje_de_fondos_insuficientes_claro_con_menos_tipografico_y_fecha_cor
         assert "$-" not in texto and "-$" not in texto, texto
 
 
+def test_mensajes_de_eliminar_y_modificar_un_ingreso_claros_con_menos_tipografico_y_fecha_corta():
+    """Eliminar o modificar un ingreso que respalda gastos, y borrar por lote, usan el mismo formato que «Fondos
+    insuficientes»: signo menos pegado a la cifra, fecha como «5 nov 2026» y sin «-$» ni fechas ISO."""
+    from routers.movimientos import eliminar_transacciones_lote, EliminarLoteRequest
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-01', 1000000, 'ingreso')")
+    id_ingreso = cursor.lastrowid
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-11-05', 600000, 'gasto')")
+    conn.commit()
+
+    def sin_formato_viejo(texto):
+        assert "-$" not in texto and "$-" not in texto, texto
+        assert "2026-11" not in texto, texto
+
+    # Eliminar el ingreso
+    try:
+        validar_eliminacion_transaccion(cursor, id_ingreso)
+        assert False, "Debió fallar: el ingreso respalda un gasto posterior"
+    except ValueError as e:
+        texto = str(e)
+        assert "respalda gastos" in texto, texto
+        assert "ingreso de $10,000.00 MXN del 1 nov 2026" in texto and "quedaría en −$6,000.00 MXN el 5 nov 2026" in texto, texto
+        sin_formato_viejo(texto)
+
+    # Modificar el ingreso a una cantidad que ya no alcanza
+    try:
+        validar_edicion_transaccion(cursor, transaccion_id=id_ingreso, nueva_fecha='2026-11-01', nuevo_monto=5000.0, nuevo_tipo='ingreso')
+        assert False, "Debió fallar: reducir el ingreso deja el saldo en negativo"
+    except ValueError as e:
+        texto = str(e)
+        assert "respalda gastos" in texto, texto
+        assert "quedaría en −$1,000.00 MXN el 5 nov 2026" in texto, texto
+        sin_formato_viejo(texto)
+
+    # Eliminar por lote
+    try:
+        eliminar_transacciones_lote(EliminarLoteRequest(ids=[id_ingreso], forzar=False), conn)
+        assert False, "Debió fallar el lote con 422"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 422, e
+        texto = e.detail
+        assert "quedaría en −$6,000.00 MXN el 5 nov 2026" in texto and "Puedes forzar la eliminación" in texto, texto
+        sin_formato_viejo(texto)
+
+
 def test_meta_con_ahorro_que_nunca_paso_por_la_cuenta_no_bloquea_el_gasto():
     """Una meta con dinero propio (ahorro fuera de la app) sin movimientos no se resta al saldo que se puede gastar."""
     conn = nueva_bd()

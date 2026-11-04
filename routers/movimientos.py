@@ -15,6 +15,8 @@ from dinero import a_centavos
 from finanzas_core import (
     ahora_local,
     clase_movimiento,
+    fecha_corta,
+    pesos_en_mensaje,
     calcular_resumen,
     gastos_por_categoria_periodo,
     historial_por_periodos,
@@ -202,8 +204,9 @@ def eliminar_transacciones_lote(
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"No es posible eliminar los movimientos seleccionados: provocaría un saldo negativo de "
-                    f"-${deficit_encontrado:,.2f} MXN en fecha {fecha_deficit}. Puedes forzar la eliminación si deseas continuar."
+                    f"No es posible eliminar los movimientos seleccionados: tu saldo quedaría en "
+                    f"{pesos_en_mensaje(-deficit_encontrado)} el {fecha_corta(fecha_deficit)}. "
+                    f"Puedes forzar la eliminación si deseas continuar."
                 )
             )
 

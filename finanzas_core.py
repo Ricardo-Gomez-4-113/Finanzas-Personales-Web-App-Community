@@ -549,7 +549,7 @@ def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
 _MESES_ABREVIADOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
 
-def _fecha_corta(iso: str) -> str:
+def fecha_corta(iso: str) -> str:
     """'2026-11-03' -> '3 nov 2026'. Si no es una fecha ISO válida, se devuelve tal cual."""
     try:
         anio, mes, dia = iso.split("-")
@@ -558,7 +558,7 @@ def _fecha_corta(iso: str) -> str:
         return iso
 
 
-def _pesos(valor: float) -> str:
+def pesos_en_mensaje(valor: float) -> str:
     """Importe para un mensaje, con el signo menos tipográfico pegado a la cifra: -49.0 -> '−$49.00 MXN'."""
     return f"−${abs(valor):,.2f} MXN" if valor < -0.004 else f"${abs(valor):,.2f} MXN"
 
@@ -601,14 +601,14 @@ def validar_saldo_disponible_fecha(
         deficit = abs(saldo_operativo - monto)
         if total_apartados > 0 and (saldo_en_cuenta - monto >= -0.001):
             raise ValueError(
-                f"Fondos insuficientes: este gasto de {_pesos(monto)} usaría dinero que tienes en tus metas. "
-                f"El {_fecha_corta(fecha)} tienes {_pesos(saldo_en_cuenta)} en la cuenta y {_pesos(total_apartados)} en metas, "
-                f"así que solo puedes gastar {_pesos(max(saldo_operativo, 0.0))}. Baja el monto o retira de una meta."
+                f"Fondos insuficientes: este gasto de {pesos_en_mensaje(monto)} usaría dinero que tienes en tus metas. "
+                f"El {fecha_corta(fecha)} tienes {pesos_en_mensaje(saldo_en_cuenta)} en la cuenta y {pesos_en_mensaje(total_apartados)} en metas, "
+                f"así que solo puedes gastar {pesos_en_mensaje(max(saldo_operativo, 0.0))}. Baja el monto o retira de una meta."
             )
         else:
             raise ValueError(
-                f"Fondos insuficientes: no alcanza para un gasto de {_pesos(monto)} el {_fecha_corta(fecha)}: "
-                f"tienes {_pesos(max(saldo_operativo, 0.0))} disponibles y te faltan {_pesos(deficit)}. "
+                f"Fondos insuficientes: no alcanza para un gasto de {pesos_en_mensaje(monto)} el {fecha_corta(fecha)}: "
+                f"tienes {pesos_en_mensaje(max(saldo_operativo, 0.0))} disponibles y te faltan {pesos_en_mensaje(deficit)}. "
                 f"No puedes gastar antes de recibir tus ingresos, salvo que tengas saldo de periodos anteriores."
             )
 
@@ -632,12 +632,12 @@ def validar_saldo_disponible_fecha(
             deficit_post = abs(saldo_corriente)
             if total_apartados > 0:
                 raise ValueError(
-                    f"Fondos insuficientes: este gasto dejaría tu saldo en {_pesos(-deficit_post)} el {_fecha_corta(fp['fecha'])} "
+                    f"Fondos insuficientes: este gasto dejaría tu saldo en {pesos_en_mensaje(-deficit_post)} el {fecha_corta(fp['fecha'])} "
                     f"y comprometería dinero de tus metas."
                 )
             else:
                 raise ValueError(
-                    f"Fondos insuficientes: este gasto dejaría tu saldo en {_pesos(-deficit_post)} el {_fecha_corta(fp['fecha'])}."
+                    f"Fondos insuficientes: este gasto dejaría tu saldo en {pesos_en_mensaje(-deficit_post)} el {fecha_corta(fp['fecha'])}."
                 )
 
 
@@ -686,9 +686,9 @@ def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int)
         if saldo_corriente < -0.001:
             deficit = abs(saldo_corriente)
             raise ValueError(
-                f"No es posible eliminar este ingreso de ${monto_ingreso:,.2f} MXN con fecha {t_ingreso}: "
-                f"dicho ingreso respalda gastos ya ejecutados. Provocaría un saldo negativo de -${deficit:,.2f} MXN "
-                f"en fecha {f}."
+                f"No es posible eliminar este ingreso de {pesos_en_mensaje(monto_ingreso)} del {fecha_corta(t_ingreso)}: "
+                f"respalda gastos que ya hiciste. Si lo eliminas, tu saldo quedaría en {pesos_en_mensaje(-deficit)} "
+                f"el {fecha_corta(f)}."
             )
 
 
@@ -752,12 +752,12 @@ def validar_edicion_transaccion(
             deficit = abs(saldo_corriente)
             if solo_gasto:
                 raise ValueError(
-                    f"Fondos insuficientes: este cambio dejaría tu saldo en {_pesos(-deficit)} el {_fecha_corta(f)}. "
+                    f"Fondos insuficientes: este cambio dejaría tu saldo en {pesos_en_mensaje(-deficit)} el {fecha_corta(f)}. "
                     f"No puedes gastar antes de recibir tus ingresos, salvo que tengas saldo de periodos anteriores."
                 )
             raise ValueError(
-                f"No es posible modificar este ingreso: dicho ingreso respalda gastos ya ejecutados. "
-                f"Provocaría un saldo negativo de -${deficit:,.2f} MXN en fecha {f}."
+                f"No es posible modificar este ingreso: respalda gastos que ya hiciste. "
+                f"Con el cambio, tu saldo quedaría en {pesos_en_mensaje(-deficit)} el {fecha_corta(f)}."
             )
 
 
