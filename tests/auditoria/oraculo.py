@@ -46,3 +46,26 @@ class Oraculo:
                 acumulado += delta_dia
                 saldos.append(acumulado)
         return min(saldos) + delta
+
+    def recurrentes(self):
+        """Fijos y compras a meses: (id, tipo, monto, frecuencia, total_cuotas, cuotas_generadas, monto_total, activo, proxima_fecha)."""
+        return tuple(self._leer(
+            "SELECT id, tipo, monto, frecuencia, total_cuotas, cuotas_generadas, monto_total, activo, proxima_fecha "
+            "FROM recurrentes ORDER BY id"
+        ))
+
+    def filas_ligadas(self):
+        """(recurrente, fecha, cuántas filas) de los movimientos que vienen de un fijo."""
+        return tuple(self._leer(
+            "SELECT recurrente_id, fecha, COUNT(*) FROM transacciones WHERE recurrente_id IS NOT NULL "
+            "GROUP BY recurrente_id, fecha"
+        ))
+
+    def filas_ligadas_despues(self, fecha):
+        """Movimientos de fijos con fecha posterior a `fecha`: no deberían existir todavía."""
+        return tuple(self._leer(
+            "SELECT recurrente_id, fecha FROM transacciones WHERE recurrente_id IS NOT NULL AND fecha > ?", (fecha,)
+        ))
+
+    def cuotas_de(self, recurrente_id):
+        return self._leer("SELECT COUNT(*) FROM transacciones WHERE recurrente_id = ?", (recurrente_id,))[0][0]

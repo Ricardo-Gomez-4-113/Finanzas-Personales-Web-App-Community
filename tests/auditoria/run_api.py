@@ -28,6 +28,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
+import fijos  # noqa: E402
 import personas  # noqa: E402
 from bitacora import Bitacora, copiar_base  # noqa: E402
 from oraculo import Oraculo  # noqa: E402
@@ -65,24 +66,27 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-def _episodio(semilla, numero, cliente, mods, bit, fallos):
+SECCIONES = {"movimientos": acciones, "fijos": fijos}
+
+
+def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
     rng = random.Random(semilla)
     usuario = f"aud{semilla}"
     os.environ["FINANZAS_HOY"] = f"{HOY_INICIAL.isoformat()}T10:00:00"
     cabecera, ruta_db = personas.crear_laura(cliente, usuario, mods)
     oraculo = Oraculo(ruta_db)
     meta_id = next(a["id"] for a in cliente.get("/api/apartados", headers=cabecera).json() if a["nombre"] == "Fondo propio")
-    ctx = acciones.Contexto(rng, cliente, cabecera, oraculo, HOY_INICIAL, meta_id)
+    ctx = catalogo.Contexto(rng, cliente, cabecera, oraculo, HOY_INICIAL, meta_id)
     ctx.fijar_hoy()
 
     pasos = rng.randint(PASOS_MIN, PASOS_MAX)
     for paso in range(1, pasos + 1):
-        nombre = acciones.elegir(rng)
-        if nombre in ("cancelar", "eliminar", "editar", "borrar_cancelado"):
+        nombre = catalogo.elegir(rng)
+        if nombre in ("cancelar", "cancelar_cuota", "eliminar", "editar", "borrar_cancelado", "saltar"):
             # Estado antes de la operación: si falla, el fallo muestra qué había antes, no solo lo que quedó
             copiar_base(ruta_db, os.path.join(bit.carpeta, "antes.db"))
         inicio = time.perf_counter()
-        res = acciones.FUNCIONES[nombre](ctx)
+        res = catalogo.FUNCIONES[nombre](ctx)
         if res is None:  # no había movimientos que tocar: se anota y se sigue
             res = {"entrada": {}, "respuesta": None, "pre": None, "fecha_ref": None, "candidato": None, "apartado": False}
             nota = "omitida: no había movimientos"
@@ -91,7 +95,7 @@ def _episodio(semilla, numero, cliente, mods, bit, fallos):
         duracion_ms = round((time.perf_counter() - inicio) * 1000)
 
         saldo_api = cliente.get("/api/resumen?moneda_base=MXN", headers=cabecera).json()["balance"]
-        problemas = acciones.verificar(nombre, res, oraculo, saldo_api)
+        problemas = catalogo.verificar(nombre, res, oraculo, saldo_api)
         respuesta = res["respuesta"]
         datos = {
             "episodio": numero, "semilla": semilla, "persona": usuario, "paso": paso,
@@ -123,9 +127,11 @@ def main():
     parser.add_argument("--episodios", type=int, default=100)
     parser.add_argument("--fuente", default=RAIZ, help="carpeta del código de la app a probar")
     parser.add_argument("--carpeta", default=None, help="donde dejar la bitácora (por defecto auditoria/corridas/...)")
+    parser.add_argument("--seccion", choices=sorted(SECCIONES), default="movimientos")
     args = parser.parse_args()
 
-    nombre_corrida = f"movimientos-api-s{args.semilla}-n{args.episodios}"
+    catalogo = SECCIONES[args.seccion]
+    nombre_corrida = f"{args.seccion}-api-s{args.semilla}-n{args.episodios}"
     carpeta = args.carpeta or os.path.join(RAIZ, "auditoria", "corridas", nombre_corrida)
     carpeta = os.path.abspath(carpeta)
     shutil.rmtree(carpeta, ignore_errors=True)
@@ -139,7 +145,7 @@ def main():
     try:
         with TestClient(mods.app) as cliente:
             for numero in range(1, args.episodios + 1):
-                pasos_totales += _episodio(args.semilla + numero - 1, numero, cliente, mods, bit, fallos)
+                pasos_totales += _episodio(args.semilla + numero - 1, numero, cliente, mods, bit, fallos, catalogo)
     finally:
         bit.cerrar()
         shutil.rmtree(tmp, ignore_errors=True)
