@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
 import personas  # noqa: E402
-from bitacora import Bitacora  # noqa: E402
+from bitacora import Bitacora, copiar_base  # noqa: E402
 from oraculo import Oraculo  # noqa: E402
 
 IGNORAR_EN_COPIA = shutil.ignore_patterns(
@@ -78,6 +78,9 @@ def _episodio(semilla, numero, cliente, mods, bit, fallos):
     pasos = rng.randint(PASOS_MIN, PASOS_MAX)
     for paso in range(1, pasos + 1):
         nombre = acciones.elegir(rng)
+        if nombre in ("cancelar", "eliminar", "editar", "borrar_cancelado"):
+            # Estado antes de la operación: si falla, el fallo muestra qué había antes, no solo lo que quedó
+            copiar_base(ruta_db, os.path.join(bit.carpeta, "antes.db"))
         inicio = time.perf_counter()
         res = acciones.FUNCIONES[nombre](ctx)
         if res is None:  # no había movimientos que tocar: se anota y se sigue
@@ -107,7 +110,10 @@ def _episodio(semilla, numero, cliente, mods, bit, fallos):
 
         if problemas:
             fallos.append((numero, paso, nombre, problemas))
-            bit.fallo(f"{numero:03d}-{paso:02d}-{semilla}", datos, ruta_db)
+            carpeta_fallo = bit.fallo(f"{numero:03d}-{paso:02d}-{semilla}", datos, ruta_db)
+            antes = os.path.join(bit.carpeta, "antes.db")
+            if os.path.exists(antes):
+                shutil.copy(antes, os.path.join(carpeta_fallo, "antes.db"))
     return pasos
 
 

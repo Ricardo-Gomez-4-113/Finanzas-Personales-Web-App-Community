@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
 # Corre la auditoría por uso real en un contenedor efímero (no toca data/ ni el contenedor de producción).
-# Uso: tests/auditoria/run.sh [--semilla N] [--episodios N] [--fuente RUTA]
+# Uso: tests/auditoria/run.sh [--capa api|escritorio] [--semilla N] [--episodios N] [--fuente RUTA]
 #   La salida queda en auditoria/corridas/<nombre>/ (bitacora.jsonl, tiempos.jsonl, logs/, fallos/).
+#   api: capa A (API, sin navegador). escritorio: capa B (Chromium a 1280×800, imagen de Playwright).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 IMAGEN="${TEST_IMAGE:-python:3.11-slim}"
-SEMILLA=1; EPISODIOS=100; FUENTE=""
+SEMILLA=1; EPISODIOS=100; FUENTE=""; CAPA="api"
 while [ $# -gt 0 ]; do
   case "$1" in
+    --capa) CAPA="$2"; shift 2 ;;
     --semilla) SEMILLA="$2"; shift 2 ;;
     --episodios) EPISODIOS="$2"; shift 2 ;;
     --fuente) FUENTE="$2"; shift 2 ;;
     *) echo "opción desconocida: $1"; exit 2 ;;
   esac
 done
-NOMBRE="movimientos-api-s${SEMILLA}-n${EPISODIOS}"
+NOMBRE="movimientos-${CAPA}-s${SEMILLA}-n${EPISODIOS}"
+if [ "$CAPA" = "escritorio" ]; then
+  IMAGEN="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/python:v1.48.0-jammy}"
+  SCRIPT="tests/auditoria/escritorio.py"
+  INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 httpx"
+else
+  SCRIPT="tests/auditoria/run_api.py"
+  INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt httpx"
+fi
 mkdir -p "$PWD/auditoria/corridas"
 
 # La carpeta de salida se monta escribible; el código, de solo lectura. Con --fuente, esa carpeta se monta
@@ -30,8 +40,8 @@ fi
 docker run --rm -v "$PWD":/src:ro -v "$PWD/auditoria":/salida "${MONTAJE_FUENTE[@]}" \
   -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" "$IMAGEN" bash -c "
   set -e
-  pip install -q --no-cache-dir -r /src/requirements.txt httpx >/tmp/pip.log 2>&1 || { tail -5 /tmp/pip.log; exit 1; }
+  $INSTALAR >/tmp/pip.log 2>&1 || { tail -5 /tmp/pip.log; exit 1; }
   cd /src
-  python3 tests/auditoria/run_api.py --semilla ${SEMILLA} --episodios ${EPISODIOS} \
+  python3 ${SCRIPT} --semilla ${SEMILLA} --episodios ${EPISODIOS} \
     --carpeta /salida/corridas/${NOMBRE} --fuente ${RUTA_FUENTE}
 "
