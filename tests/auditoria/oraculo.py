@@ -69,3 +69,19 @@ class Oraculo:
 
     def cuotas_de(self, recurrente_id):
         return self._leer("SELECT COUNT(*) FROM transacciones WHERE recurrente_id = ?", (recurrente_id,))[0][0]
+
+    def config_presupuesto(self):
+        """(ingreso base en centavos, frecuencia, día de pago) del presupuesto, o None si no hay fila."""
+        filas = self._leer("SELECT ingreso_base, frecuencia, dia_pago FROM presupuesto_config WHERE id = 1")
+        return filas[0] if filas else None
+
+    def tarjetas_presupuesto(self):
+        """(id, monto en centavos, pago al que pertenece) de cada tarjeta."""
+        return tuple(self._leer("SELECT id, monto, unidad_orden FROM presupuesto_tarjetas ORDER BY id"))
+
+    def recurrentes_contenido(self):
+        """Contenido de los fijos sin ids: se comparan entre exportaciones, que pueden recrearlos."""
+        return tuple(sorted(self._leer(
+            "SELECT tipo, descripcion, monto, frecuencia, presupuesto_tarjeta_id, activo FROM recurrentes"
+        ), key=lambda f: tuple("" if v is None else str(v) for v in f)))
+

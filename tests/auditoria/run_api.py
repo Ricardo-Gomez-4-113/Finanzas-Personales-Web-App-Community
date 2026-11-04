@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
 import fijos  # noqa: E402
+import presupuesto  # noqa: E402
 import personas  # noqa: E402
 from bitacora import Bitacora, copiar_base  # noqa: E402
 from oraculo import Oraculo  # noqa: E402
@@ -66,7 +67,7 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
@@ -78,6 +79,8 @@ def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
     meta_id = next(a["id"] for a in cliente.get("/api/apartados", headers=cabecera).json() if a["nombre"] == "Fondo propio")
     ctx = catalogo.Contexto(rng, cliente, cabecera, oraculo, HOY_INICIAL, meta_id)
     ctx.fijar_hoy()
+    if hasattr(catalogo, "preparar"):  # ajustes iniciales de la sección (p. ej. el ingreso base del presupuesto)
+        catalogo.preparar(cliente, cabecera)
 
     pasos = rng.randint(PASOS_MIN, PASOS_MAX)
     for paso in range(1, pasos + 1):
