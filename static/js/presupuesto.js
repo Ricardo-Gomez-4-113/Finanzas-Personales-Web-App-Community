@@ -4,7 +4,7 @@
  * su distribución del ingreso y sus tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en su día.
  */
 
-import { apiFetch, escapeHTML, fmtMXN, montoMxnHTML, formatErrorDetail, toast } from './core.js';
+import { apiFetch, escapeHTML, fmtMXN, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 let cachePresupuesto = null;
@@ -537,6 +537,9 @@ export async function ejecutarExportarPresupuesto() {
         if (typeof window.cargarRecurrentes === 'function') {
             window.cargarRecurrentes();
         }
+        // Exportar crea y reemplaza fijos y puede materializar movimientos de hoy: el Resumen y las demás pantallas
+        // se refrescan con el evento general, igual que tras registrar o quitar un movimiento
+        recargar();
     } catch (e) {
         console.error('Error al exportar presupuesto:', e);
         toast('Error de red al exportar a Movimientos y Fijos.', 'error');

@@ -1838,6 +1838,35 @@ def test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, 
         ctx.close()
 
 
+def test_exportar_presupuesto_pide_recargar_el_resumen(navegador, base):
+    """Hallazgo H-4: tras exportar, el Resumen y el resto de pantallas se actualizan sin recargar la página.
+    La app los refresca con el evento «recargar»; exportar tiene que dispararlo."""
+    usuario, clave = _usuario_nuevo("exprecarga")
+    api = _api(base, usuario, clave)
+    assert api.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}).status_code == 200
+    assert api.post("/api/presupuesto/tarjetas", json={"nombre": "Hogar", "porcentaje": 30, "notas": "", "unidad_orden": 1}).status_code in (200, 201)
+    assert api.put("/api/presupuesto/unidades/1", json={"dia_pago": 5}).status_code == 200
+
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-presupuesto")
+        page.evaluate("window.__recargas = 0; document.addEventListener('recargar', () => { window.__recargas += 1; })")
+        page.evaluate("document.getElementById('btn-exportar-pres-fijos').click()")
+        page.wait_for_selector("#modal-exportar-presupuesto:not(.hidden)")
+        page.click("#btn-confirmar-exportar-pres")
+        _responder_confirmacion(page)
+        page.wait_for_selector("#modal-exportar-presupuesto.hidden", state="attached")
+        for _ in range(100):
+            if page.evaluate("window.__recargas") > 0:
+                break
+            page.wait_for_timeout(100)
+        assert page.evaluate("window.__recargas") > 0, "exportar no pidió recargar los datos: el Resumen quedaría desactualizado"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base):
     usuario, clave = _usuario_nuevo("tarjmeta")
     api = _api(base, usuario, clave)
@@ -2123,6 +2152,7 @@ if __name__ == "__main__":
                 (test_boton_cotizar_no_sobresale_del_campo, lambda: test_boton_cotizar_no_sobresale_del_campo(navegador, base)),
                 (test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo, lambda: test_etiqueta_del_tipo_de_cambio_avisa_cuando_es_de_respaldo(navegador, base)),
                 (test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar, lambda: test_exportar_presupuesto_muestra_que_cambia_antes_de_reemplazar(navegador, base)),
+                (test_exportar_presupuesto_pide_recargar_el_resumen, lambda: test_exportar_presupuesto_pide_recargar_el_resumen(navegador, base)),
                 (test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva, lambda: test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base)),
                 (test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro, lambda: test_grafica_del_historial_etiqueta_los_periodos_segun_el_cobro(navegador, base)),
                 (test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad, lambda: test_dolares_se_rotulan_us_y_los_titulos_respetan_el_modo_privacidad(navegador, base)),
