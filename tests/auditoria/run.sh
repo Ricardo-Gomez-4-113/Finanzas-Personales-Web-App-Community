@@ -25,6 +25,8 @@ if [ "$CAPA" = "escritorio" ] || [ "$CAPA" = "celular" ]; then
   DISPOSITIVO="$CAPA"
   IMAGEN="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/python:v1.48.0-jammy}"
   SCRIPT="tests/auditoria/escritorio.py"
+  if [ "$SECCION" = "fijos" ]; then SCRIPT="tests/auditoria/escritorio_fijos.py"; fi
+  if [ "$SECCION" = "presupuesto" ]; then SCRIPT="tests/auditoria/escritorio_presupuesto.py"; fi
   INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 httpx"
 else
   SCRIPT="tests/auditoria/run_api.py --seccion ${SECCION}"
