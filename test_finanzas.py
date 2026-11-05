@@ -1048,6 +1048,77 @@ def test_retiro_de_una_meta_con_ahorro_propio_suma_al_saldo_gastable():
     validar_saldo_disponible_fecha(cursor, fecha='2026-11-03', monto=10375.54, tipo='gasto')
 
 
+def test_un_deposito_a_una_meta_con_fecha_posterior_no_bloquea_un_gasto_anterior():
+    """Hallazgo H-2 de la auditoría: lo que se deposita a una meta el 1 oct no resta de lo que había el 22 sep,
+    si el ingreso que lo paga llega antes o ese mismo día."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Viaje', 'meta', 2500000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-09-15', 1000000, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-01', 2000000, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-01', 2500000, 'gasto', 1)")
+    conn.commit()
+
+    # El 22 sep había 10,000 y el 1 oct quedan 10,000 + 20,000 - 25,000 = 5,000: un gasto de 3,000 cabe en las dos fechas
+    validar_saldo_disponible_fecha(cursor, fecha='2026-09-22', monto=3000, tipo='gasto')
+    # El 2 oct quedan 5,000: uno de 6,000 no cabe
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-10-02', monto=6000, tipo='gasto')
+        assert False, "Debió fallar: el 2 oct solo quedan 5,000"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+
+
+def test_un_retiro_de_meta_posterior_no_da_dinero_antes_de_existir():
+    """Hallazgo H-1: un retiro de la meta fechado el 20 oct no permite gastar el 1 oct."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo', 'meta', 500000)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-20', 500000, 'ingreso', 1)")
+    conn.commit()
+
+    try:
+        validar_saldo_disponible_fecha(cursor, fecha='2026-10-01', monto=50, tipo='gasto')
+        assert False, "Debió fallar: el 1 oct no había dinero; el retiro llega el 20"
+    except ValueError as e:
+        assert "Fondos insuficientes" in str(e)
+    # Después del retiro sí hay con qué
+    validar_saldo_disponible_fecha(cursor, fecha='2026-10-20', monto=50, tipo='gasto')
+
+
+def test_quitar_un_retiro_de_meta_que_respalda_gastos_se_bloquea():
+    """Hallazgo H-3: un retiro de meta es dinero que entró a la cuenta; quitarlo no puede dejar el saldo negativo."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo', 'meta', 500000)")
+    cursor.execute("INSERT INTO transacciones (id, fecha, monto, tipo, apartado_id) VALUES (10, '2026-10-01', 500000, 'ingreso', 1)")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-10-05', 300000, 'gasto')")
+    conn.commit()
+
+    try:
+        validar_eliminacion_transaccion(cursor, 10)
+        assert False, "Debió fallar: sin ese retiro el gasto del 5 oct deja el saldo en negativo"
+    except ValueError as e:
+        assert "No es posible eliminar este ingreso" in str(e), e
+
+
+def test_quitar_un_ingreso_no_cuenta_retiros_de_meta_posteriores_como_dinero_ya_existente():
+    """Hallazgo H-3: un retiro de meta del 17 oct no sostiene un gasto del 20 sep cuando se quita la nómina."""
+    conn = nueva_bd()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO apartados (id, nombre, tipo, monto_actual) VALUES (1, 'Fondo', 'meta', 185500)")
+    cursor.execute("INSERT INTO transacciones (id, fecha, monto, tipo) VALUES (1, '2026-09-15', 1400000, 'ingreso')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-09-20', 100000, 'gasto')")
+    cursor.execute("INSERT INTO transacciones (fecha, monto, tipo, apartado_id) VALUES ('2026-10-17', 185500, 'ingreso', 1)")
+    conn.commit()
+
+    try:
+        validar_eliminacion_transaccion(cursor, 1)
+        assert False, "Debió fallar: sin la nómina, el 20 sep el saldo queda en -1,000"
+    except ValueError as e:
+        assert "No es posible eliminar este ingreso" in str(e), e
+
+
 def test_cargos_quincena_no_superan_presupuesto_de_quincena():
     conn = nueva_bd()
     cursor = conn.cursor()

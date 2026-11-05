@@ -524,15 +524,21 @@ def validar_sustentabilidad_gasto_fijo(
         )
 
 
-def obtener_total_apartados(cursor: sqlite3.Cursor) -> float:
+def obtener_total_apartados(cursor: sqlite3.Cursor, hasta: Optional[str] = None) -> float:
     """Dinero que de verdad salió de la cuenta hacia las metas: depósitos menos retiros, tal como están
     registrados en los movimientos. No usa el saldo guardado de la meta (`monto_actual`): una meta con ahorro
     que nunca pasó por la cuenta (dinero propio, fuera de la app) no se resta al saldo que se puede gastar.
-    Un retiro mayor que los depósitos da un total negativo: ese dinero sí llegó a la cuenta."""
-    row = cursor.execute("""
+    Un retiro mayor que los depósitos da un total negativo: ese dinero sí llegó a la cuenta.
+    Con `hasta` solo cuenta lo movido en esa fecha o antes: un depósito del 1 oct no resta de lo que había el 22 sep."""
+    consulta = """
         SELECT COALESCE(SUM(CASE WHEN t.tipo = 'gasto' THEN t.monto ELSE -t.monto END) / 100.0, 0)
         FROM transacciones t JOIN apartados a ON a.id = t.apartado_id
-    """).fetchone()
+    """
+    parametros = ()
+    if hasta is not None:
+        consulta += " WHERE t.fecha <= ?"
+        parametros = (hasta,)
+    row = cursor.execute(consulta, parametros).fetchone()
     return float(row[0]) if row and row[0] is not None else 0.0
 
 
@@ -573,7 +579,8 @@ def validar_saldo_disponible_fecha(
     """
     Regla 3.3: Restricción Temporal de Fondos (No Gastar Antes de Cobrar / Sin Sobregiro).
     Invariante: Saldo Disponible Operativo(T) >= 0 para toda fecha T.
-    Saldo Disponible Operativo = Saldo en Cuenta (externo) - dinero depositado en metas (`obtener_total_apartados`).
+    Saldo Disponible Operativo(T) = Saldo en Cuenta (externo, hasta T) - dinero depositado en metas hasta T
+    (`obtener_total_apartados` con fecha). Los depósitos y retiros de metas cuentan desde su fecha, no antes.
     """
     # Editar un movimiento existente se valida simulando la cronología completa sin él y con su versión nueva
     if transaccion_id is not None:
@@ -594,7 +601,7 @@ def validar_saldo_disponible_fecha(
         params.append(transaccion_id)
 
     saldo_en_cuenta = float(cursor.execute(query_base, tuple(params)).fetchone()[0])
-    total_apartados = obtener_total_apartados(cursor)
+    total_apartados = obtener_total_apartados(cursor, hasta=fecha)
     saldo_operativo = saldo_en_cuenta - total_apartados
 
     if saldo_operativo - monto < -0.001:
@@ -616,7 +623,7 @@ def validar_saldo_disponible_fecha(
     query_post = """
         SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
-        WHERE fecha > ? AND apartado_id IS NULL
+        WHERE fecha > ?
     """
     params_post = [fecha]
     if transaccion_id is not None:
@@ -654,25 +661,22 @@ def validar_eliminacion_transaccion(cursor: sqlite3.Cursor, transaccion_id: int)
     if trans["tipo"] != 'ingreso':
         return
 
-    # Los movimientos vinculados a apartados son movimientos internos de metas; no bloquean como ingreso externo
-    if "apartado_id" in trans.keys() and trans["apartado_id"] is not None:
-        return
-
+    # Un retiro de meta también es dinero que entró a la cuenta: quitarlo se valida igual que un ingreso externo.
+    # El saldo de cada fecha cuenta todos los movimientos hasta esa fecha, los de metas incluidos.
     t_ingreso = trans["fecha"]
     monto_ingreso = float(trans["monto"])
-    total_apartados = obtener_total_apartados(cursor)
 
     row_prev = cursor.execute("""
         SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones
-        WHERE fecha < ? AND apartado_id IS NULL AND id != ?
+        WHERE fecha < ? AND id != ?
     """, (t_ingreso, transaccion_id)).fetchone()
-    saldo_corriente = float(row_prev[0]) - total_apartados
+    saldo_corriente = float(row_prev[0])
 
     filas = cursor.execute("""
         SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
-        WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
+        WHERE fecha >= ? AND id != ?
         GROUP BY fecha
         ORDER BY fecha ASC
     """, (t_ingreso, transaccion_id)).fetchall()
@@ -721,20 +725,19 @@ def validar_edicion_transaccion(
     if solo_gasto and not (float(nuevo_monto) > float(trans["monto"]) + 0.001 or nueva_fecha < fecha_orig):
         return
 
-    total_apartados = obtener_total_apartados(cursor)
     t_min = min(fecha_orig, nueva_fecha)
 
     row_prev = cursor.execute("""
         SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
         FROM transacciones
-        WHERE fecha < ? AND apartado_id IS NULL AND id != ?
+        WHERE fecha < ? AND id != ?
     """, (t_min, transaccion_id)).fetchone()
-    saldo_corriente = float(row_prev[0]) - total_apartados
+    saldo_corriente = float(row_prev[0])
 
     filas = cursor.execute("""
         SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
         FROM transacciones
-        WHERE fecha >= ? AND apartado_id IS NULL AND id != ?
+        WHERE fecha >= ? AND id != ?
         GROUP BY fecha
         ORDER BY fecha ASC
     """, (t_min, transaccion_id)).fetchall()
