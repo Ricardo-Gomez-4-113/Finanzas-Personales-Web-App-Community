@@ -29,11 +29,38 @@ ARCHIVO_LOG = "app.log"
 TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024
 ARCHIVOS_CONSERVADOS = 5  # app.log.1 … app.log.5: el disco queda acotado a unos 30 MB
 
-CAMPOS_EXTRA = ("id_peticion", "metodo", "ruta", "estado", "duracion_ms", "usuario_id", "tipo", "origen", "linea")
+CAMPOS_EXTRA = ("id_peticion", "metodo", "ruta", "estado", "duracion_ms", "usuario_id", "tipo", "origen", "linea", "codigo")
 MAXIMO_TEXTO = 300
 MAXIMO_TRAZA = 4000
 
 logger = logging.getLogger(NOMBRE_LOGGER)
+
+UMBRAL_LENTA_MS = 1500
+
+# Fragmento del mensaje (en minúsculas) -> código corto y estable. El orden importa: el primero que coincide gana.
+# El registro guarda el código, nunca el mensaje: los mensajes llevan importes y fechas del usuario.
+CODIGOS_RECHAZO = (
+    ("fondos insuficientes", "fondos_insuficientes"),
+    ("gasto fijo sin contar con al menos un ingreso fijo", "fijo_sin_ingreso"),
+    ("ingresos fijos recurrentes no son suficientes", "fijo_supera_ingresos"),
+    ("eliminar este ingreso fijo porque", "ingreso_fijo_sostiene_gastos"),
+    ("eliminar este ingreso", "ingreso_respalda_gastos"),
+    ("modificar este ingreso", "ingreso_respalda_gastos"),
+    ("disponibles de su ingreso", "capacidad_pago"),
+    ("suman más que su ingreso", "capacidad_pago"),
+    ("no tiene el pago", "pago_inactivo"),
+)
+
+
+def codigo_de_rechazo(detalle) -> str:
+    """Código corto del motivo de un rechazo por reglas, a partir del mensaje. «otro» si no se reconoce."""
+    if not isinstance(detalle, str):
+        return "validacion"
+    minusculas = detalle.lower()
+    for fragmento, codigo in CODIGOS_RECHAZO:
+        if fragmento in minusculas:
+            return codigo
+    return "otro"
 
 
 class FormatoJson(logging.Formatter):
@@ -128,6 +155,11 @@ async def registrar_peticion(request: Request, call_next):
             logger.error("Respuesta de error del servidor", extra={"evento": "error_servidor", "estado": estado, "duracion_ms": duracion, **base})
         elif estado in (401, 403):
             logger.warning("Acceso rechazado", extra={"evento": "acceso_rechazado", "estado": estado, "duracion_ms": duracion, **base})
+        elif estado in (409, 422):
+            codigo = getattr(request.state, "codigo_rechazo", "otro")
+            logger.info("Rechazo por reglas", extra={"evento": "rechazo_negocio", "estado": estado, "duracion_ms": duracion, "codigo": codigo, **base})
+        if estado < 500 and duracion > UMBRAL_LENTA_MS:
+            logger.info("Respuesta lenta", extra={"evento": "lenta", "estado": estado, "duracion_ms": duracion, **base})
     response.headers["X-Request-Id"] = id_peticion
     return response
 

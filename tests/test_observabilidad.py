@@ -112,6 +112,54 @@ def test_401_y_403_quedan_como_advertencia_sin_datos_sensibles(client):
         assert dato not in texto, f"el registro guardó un dato sensible: {dato[:12]}..."
 
 
+def test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes(client):
+    _crear_usuario("obs_regla")
+    token = _login(client, "obs_regla")
+    cabecera = {"Authorization": f"Bearer {token}"}
+    antes = len(_registros("rechazo_negocio"))
+    gasto = {"fecha": "2026-11-04", "monto": 123456.78, "tipo": "gasto", "categoria_id": 1, "descripcion": "descripcion-secreta"}
+    r = client.post("/api/transacciones", json=gasto, headers=cabecera)  # sin saldo: lo rechaza una regla de negocio
+    assert r.status_code == 422 and "Fondos insuficientes" in r.text, r.text
+    r = client.post("/api/transacciones", json={**gasto, "monto": 0}, headers=cabecera)  # monto inválido: validación
+    assert r.status_code == 422, r.text
+
+    nuevos = _registros("rechazo_negocio")[antes:]
+    assert [f["codigo"] for f in nuevos] == ["fondos_insuficientes", "validacion"], nuevos
+    assert all(f["nivel"] == "INFO" and f["estado"] == 422 and f["ruta"] == "/api/transacciones" for f in nuevos), nuevos
+    assert all(f.get("id_peticion") for f in nuevos), nuevos
+    texto = _texto_del_registro()
+    for dato in ("123456.78", "123,456", "descripcion-secreta", token):
+        assert dato not in texto, f"el registro guardó un dato del usuario: {dato[:12]}..."
+
+
+def test_respuesta_lenta_se_registra_sin_cuerpo(client):
+    _crear_usuario("obs_lenta")
+    token = _login(client, "obs_lenta")
+    original = observabilidad.UMBRAL_LENTA_MS
+    observabilidad.UMBRAL_LENTA_MS = -1  # cualquier respuesta cuenta como lenta
+    try:
+        antes = len(_registros("lenta"))
+        r = client.get("/api/transacciones", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200, r.text
+    finally:
+        observabilidad.UMBRAL_LENTA_MS = original
+    nuevos = _registros("lenta")[antes:]
+    assert len(nuevos) == 1 and nuevos[0]["ruta"] == "/api/transacciones" and nuevos[0]["estado"] == 200, nuevos
+    assert nuevos[0]["nivel"] == "INFO" and nuevos[0]["duracion_ms"] >= 0, nuevos
+
+
+def test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app():
+    codigo = observabilidad.codigo_de_rechazo
+    assert codigo("Fondos insuficientes: no alcanza para un gasto") == "fondos_insuficientes"
+    assert codigo("No es posible registrar un gasto fijo sin contar con al menos un ingreso fijo recurrente activo (ej. sueldo)") == "fijo_sin_ingreso"
+    assert codigo("No es posible eliminar este ingreso fijo porque existen compromisos de gastos fijos activos") == "ingreso_fijo_sostiene_gastos"
+    assert codigo("No es posible eliminar este ingreso de $1.00 MXN del 1 oct 2026: respalda gastos") == "ingreso_respalda_gastos"
+    assert codigo("El pago 1 solo tiene 0.00 disponibles de su ingreso") == "capacidad_pago"
+    assert codigo("La frecuencia mensual no tiene el pago 2.") == "pago_inactivo"
+    assert codigo("Algo que no se reconoce") == "otro"
+    assert codigo([{"loc": ["body", "monto"]}]) == "validacion"
+
+
 def test_peticion_correcta_no_deja_linea(client):
     _crear_usuario("obs_ok")
     token = _login(client, "obs_ok")
@@ -196,6 +244,19 @@ def test_resumen_cuenta_fallos_y_salta_lineas_rotas():
     assert [r["ts"] for r in res["ultimos"]] == ["b", "c"], res
 
 
+def test_resumen_cuenta_rechazos_por_codigo_y_respuestas_lentas():
+    resumen = _cargar_resumen()
+    carpeta = tempfile.mkdtemp(prefix="finanzas_resumen_rechazos_")
+    with open(os.path.join(carpeta, "app.log"), "w", encoding="utf-8") as f:
+        for codigo in ("fondos_insuficientes", "fondos_insuficientes", "capacidad_pago"):
+            f.write(json.dumps({"nivel": "INFO", "evento": "rechazo_negocio", "estado": 422, "codigo": codigo, "ts": "a"}) + "\n")
+        f.write(json.dumps({"nivel": "INFO", "evento": "lenta", "estado": 200, "duracion_ms": 2000.0, "ts": "b"}) + "\n")
+    res = resumen.resumir(carpeta)
+    assert res["por_codigo"] == [("fondos_insuficientes", 2), ("capacidad_pago", 1)], res
+    assert res["lentas"] == 1, res
+    assert res["por_grupo"] == [] and res["ultimos"] == [], "los rechazos por reglas no son fallos"
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -204,11 +265,15 @@ if __name__ == "__main__":
         registradas = [
             (test_error_inesperado_responde_500_con_id_y_traza, lambda: test_error_inesperado_responde_500_con_id_y_traza(client)),
             (test_401_y_403_quedan_como_advertencia_sin_datos_sensibles, lambda: test_401_y_403_quedan_como_advertencia_sin_datos_sensibles(client)),
+            (test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes, lambda: test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes(client)),
+            (test_respuesta_lenta_se_registra_sin_cuerpo, lambda: test_respuesta_lenta_se_registra_sin_cuerpo(client)),
+            (test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app, test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app),
             (test_peticion_correcta_no_deja_linea, lambda: test_peticion_correcta_no_deja_linea(client)),
             (test_reporte_del_navegador_se_registra_y_valida_su_tamano, lambda: test_reporte_del_navegador_se_registra_y_valida_su_tamano(client)),
             (test_fallo_al_abrir_el_registro_no_rompe_la_app, lambda: test_fallo_al_abrir_el_registro_no_rompe_la_app(client)),
             (test_rotacion_acota_el_disco, test_rotacion_acota_el_disco),
             (test_resumen_cuenta_fallos_y_salta_lineas_rotas, test_resumen_cuenta_fallos_y_salta_lineas_rotas),
+            (test_resumen_cuenta_rechazos_por_codigo_y_respuestas_lentas, test_resumen_cuenta_rechazos_por_codigo_y_respuestas_lentas),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_observabilidad")

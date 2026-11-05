@@ -10,9 +10,11 @@ Este módulo implementa:
 """
 
 from fastapi import FastAPI, Request, status
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 import secrets
 import sqlite3
@@ -97,9 +99,18 @@ app.include_router(salud.router)
 app.include_router(diagnostico.router)
 app.include_router(comentarios.router)
 
+@app.exception_handler(StarletteHTTPException)
+async def rechazos_con_codigo(request: Request, exc: StarletteHTTPException):
+    """Igual que el manejador por omisión, pero antes anota el motivo de un rechazo por reglas (409 o 422)
+    para que el registro de peticiones lo guarde como código, sin el mensaje."""
+    if exc.status_code in (status.HTTP_409_CONFLICT, status.HTTP_422_UNPROCESSABLE_ENTITY):
+        request.state.codigo_rechazo = observabilidad.codigo_de_rechazo(exc.detail)
+    return await http_exception_handler(request, exc)
+
 @app.exception_handler(RequestValidationError)
 async def errores_de_validacion(request: Request, exc: RequestValidationError):
     """Un 422 describe el error sin repetir el valor enviado: un campo de varios MB no vuelve en la respuesta."""
+    request.state.codigo_rechazo = "validacion"
     errores = [{"loc": error.get("loc"), "msg": error.get("msg"), "type": error.get("type")} for error in exc.errors()]
     return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": errores})
 

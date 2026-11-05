@@ -33,6 +33,8 @@ def resumir(origen, ultimos=10):
     total = malformadas = 0
     por_nivel = collections.Counter()
     por_grupo = collections.Counter()
+    por_codigo = collections.Counter()
+    lentas = 0
     recientes = collections.deque(maxlen=ultimos)
     for ruta in archivos_en_orden(origen):
         with open(ruta, encoding="utf-8", errors="replace") as archivo:
@@ -46,6 +48,10 @@ def resumir(origen, ultimos=10):
                     malformadas += 1
                     continue
                 por_nivel[registro.get("nivel", "?")] += 1
+                if registro.get("evento") == "rechazo_negocio":
+                    por_codigo[registro.get("codigo", "otro")] += 1
+                elif registro.get("evento") == "lenta":
+                    lentas += 1
                 if registro.get("nivel") in ("WARNING", "ERROR", "CRITICAL"):
                     por_grupo[(registro.get("evento"), registro.get("metodo"), registro.get("ruta"), registro.get("estado"))] += 1
                     recientes.append(registro)
@@ -54,6 +60,8 @@ def resumir(origen, ultimos=10):
         "malformadas": malformadas,
         "por_nivel": dict(por_nivel),
         "por_grupo": por_grupo.most_common(),
+        "por_codigo": por_codigo.most_common(),
+        "lentas": lentas,
         "ultimos": list(recientes),
     }
 
@@ -64,6 +72,11 @@ def imprimir(resultado):
     print("\nFallos por evento, método, ruta y estado:")
     for (evento, metodo, ruta, estado), cuenta in resultado["por_grupo"] or [(("ninguno", None, None, None), 0)]:
         print(f"  {cuenta:>5}  {evento or '-':<18} {metodo or '-':<6} {ruta or '-':<40} {estado or '-'}")
+    if resultado["por_codigo"] or resultado["lentas"]:
+        print("\nRechazos por reglas, por código (no son fallos: la app dijo que no a propósito):")
+        for codigo, cuenta in resultado["por_codigo"]:
+            print(f"  {cuenta:>5}  {codigo}")
+        print(f"  Respuestas lentas (más de 1.5 s): {resultado['lentas']}")
     print("\nÚltimos fallos:")
     for registro in resultado["ultimos"]:
         detalle = registro.get("excepcion") or registro.get("mensaje")
