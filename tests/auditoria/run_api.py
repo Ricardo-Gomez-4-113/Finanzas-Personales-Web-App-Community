@@ -28,8 +28,10 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
+import copias  # noqa: E402
 import fijos  # noqa: E402
 import metas  # noqa: E402
+import portafolio  # noqa: E402
 import presupuesto  # noqa: E402
 import personas  # noqa: E402
 from bitacora import Bitacora, copiar_base  # noqa: E402
@@ -43,6 +45,24 @@ HOY_INICIAL = datetime.date(2026, 10, 1)
 PASOS_MIN, PASOS_MAX = 5, 30
 
 
+COTIZACIONES = {
+    "USDMXN=X": (19.5, "USD"), "EURUSD=X": (1.08, "USD"), "AAPL": (190.0, "USD"), "MSFT": (410.0, "USD"),
+    "VOO": (480.0, "USD"), "WALMEX.MX": (65.0, "MXN"), "SAP.DE": (150.0, "EUR"),
+}
+
+
+def _cotizaciones_fijas():
+    """El mercado no se consulta por internet: tasas y precios fijos. Se pone antes de importar la app,
+    porque los routers toman la función por su nombre al importarse."""
+    import mercado
+
+    def consulta(ticker):
+        limpio = ticker.strip().upper()
+        return COTIZACIONES.get(limpio, (None, "MXN" if limpio.endswith(".MX") else "USD"))
+
+    mercado.consultar_precio_y_moneda_mercado = consulta
+
+
 def _preparar_app(fuente, carpeta_logs):
     """Copia el código a una carpeta temporal y carga la app desde ahí, con reloj de prueba."""
     tmp = tempfile.mkdtemp(prefix="auditoria_")
@@ -53,6 +73,7 @@ def _preparar_app(fuente, carpeta_logs):
     os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminAuditoria#12345"
     os.environ["FINANZAS_MODO_PRUEBA"] = "1"
     os.environ["FINANZAS_LOG_DIR"] = carpeta_logs
+    _cotizaciones_fijas()
     import database
     import main
     import master_db
@@ -68,7 +89,7 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):

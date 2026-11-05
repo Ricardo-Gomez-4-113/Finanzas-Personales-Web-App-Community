@@ -104,3 +104,20 @@ class Oraculo:
             "FROM transacciones WHERE fecha <= ?", (fecha,)
         )[0][0]
 
+    def posiciones(self):
+        """(id, ticker, cantidad, precio_promedio, precio_actual, moneda) de cada posición bursátil."""
+        return tuple(self._leer(
+            "SELECT id, ticker, cantidad, precio_promedio, precio_actual, moneda FROM inversiones ORDER BY id"
+        ))
+
+    def cuentas_rendimiento(self):
+        """(id, nombre, capital en centavos, tasa anual, fecha base) de cada cuenta con rendimiento."""
+        return tuple(self._leer(
+            "SELECT id, nombre, capital, tasa_anual, fecha_base FROM cuentas_rendimiento ORDER BY id"
+        ))
+
+    def volcado(self):
+        """Contenido completo de cada tabla de la app, para comparar una base antes y después de restaurar un respaldo."""
+        tablas = [t for (t,) in self._leer("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+        return {t: tuple(self._leer(f'SELECT * FROM "{t}" ORDER BY rowid')) for t in tablas}
+
