@@ -85,3 +85,22 @@ class Oraculo:
             "SELECT tipo, descripcion, monto, frecuencia, presupuesto_tarjeta_id, activo FROM recurrentes"
         ), key=lambda f: tuple("" if v is None else str(v) for v in f)))
 
+    def apartados(self):
+        """(id, nombre, tipo, monto_actual en centavos, meta_monto en centavos) de cada meta o sobre."""
+        return tuple(self._leer("SELECT id, nombre, tipo, monto_actual, meta_monto FROM apartados ORDER BY id"))
+
+    def neto_por_apartado(self):
+        """{id de apartado: depósitos − retiros registrados como movimientos, en centavos}."""
+        filas = self._leer(
+            "SELECT apartado_id, SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE -monto END) "
+            "FROM transacciones WHERE apartado_id IS NOT NULL GROUP BY apartado_id"
+        )
+        return {apartado: neto for apartado, neto in filas}
+
+    def saldo_hasta_c(self, fecha):
+        """Disponible en centavos con los movimientos de esa fecha o anteriores (lo que la app llama «hoy»)."""
+        return self._leer(
+            "SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0) "
+            "FROM transacciones WHERE fecha <= ?", (fecha,)
+        )[0][0]
+

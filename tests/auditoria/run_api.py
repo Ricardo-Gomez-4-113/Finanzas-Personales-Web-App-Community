@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
 import fijos  # noqa: E402
+import metas  # noqa: E402
 import presupuesto  # noqa: E402
 import personas  # noqa: E402
 from bitacora import Bitacora, copiar_base  # noqa: E402
@@ -67,7 +68,7 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
