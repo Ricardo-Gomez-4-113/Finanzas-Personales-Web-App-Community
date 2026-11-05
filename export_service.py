@@ -21,6 +21,13 @@ from openpyxl.utils import get_column_letter
 from finanzas_core import ahora_local, convertir, deuda_pendiente, valor_rendimiento
 from mercado import obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 
+def _como_texto(celda):
+    """El texto del usuario nunca es una fórmula: lo que empieza con = + - @ se guarda como texto."""
+    if isinstance(celda.value, str) and celda.value[:1] in ("=", "+", "-", "@"):
+        celda.data_type = "s"
+    return celda
+
+
 def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = None, db_name: str = "user_1.db") -> io.BytesIO:
     """
     Construye y retorna un libro de Excel (.xlsx) en memoria a través de io.BytesIO.
@@ -342,7 +349,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
             c_id = ws2.cell(row=idx, column=1, value=t["id"])
             c_fecha = ws2.cell(row=idx, column=2, value=t["fecha"])
             c_tipo = ws2.cell(row=idx, column=3, value=t["tipo"].upper())
-            c_desc = ws2.cell(row=idx, column=4, value=t["descripcion"] or "-")
+            c_desc = _como_texto(ws2.cell(row=idx, column=4, value=t["descripcion"] or "-"))
             c_monto = ws2.cell(row=idx, column=5, value=monto_conv)
 
             for c in [c_id, c_fecha, c_tipo, c_desc, c_monto]:
@@ -412,7 +419,7 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
         ws3.cell(row=5, column=1, value="Sin posiciones de inversión registradas.").font = font_subtitle
     else:
         for idx, pos in enumerate(posiciones, start=5):
-            c_tkr = ws3.cell(row=idx, column=1, value=pos["ticker"])
+            c_tkr = _como_texto(ws3.cell(row=idx, column=1, value=pos["ticker"]))
             c_mon = ws3.cell(row=idx, column=2, value=pos["moneda"])
             c_cant = ws3.cell(row=idx, column=3, value=pos["cantidad"])
             c_prom = ws3.cell(row=idx, column=4, value=pos["precio_promedio"])
@@ -572,10 +579,10 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
         _celda(ws4, idx, 1, r["descripcion"])
         _celda(ws4, idx, 2, "Gasto" if r["tipo"] == "gasto" else "Ingreso")
         _celda(ws4, idx, 3, r["frecuencia"].capitalize())
-        _celda(ws4, idx, 4, round(convertir(float(r["monto"]), "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
+        _celda(ws4, idx, 4, round(convertir(float(r["monto"]), "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2), '#,##0.00')
         _celda(ws4, idx, 5, r["proxima_fecha"])
         _celda(ws4, idx, 6, f"{r['cuotas_generadas']}/{r['total_cuotas']}" if es_msi else "Indefinido")
-        _celda(ws4, idx, 7, round(convertir(deuda_pendiente(r), "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
+        _celda(ws4, idx, 7, round(convertir(deuda_pendiente(r), "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2), '#,##0.00')
         _celda(ws4, idx, 8, estado_txt)
     for col_letter, ancho in zip("ABCDEFGH", [30, 11, 12, 22, 16, 11, 22, 12]):
         ws4.column_dimensions[col_letter].width = ancho
@@ -592,14 +599,14 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
         capital = float(c["capital"])
         tasa = float(c["tasa_anual"])
         valor = valor_rendimiento(capital, tasa, datetime.strptime(c["fecha_base"], "%Y-%m-%d").date(), hoy_excel)
-        valor_b = convertir(valor, "MXN", moneda_base, tasa_usd_mxn)
+        valor_b = convertir(valor, "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur)
         total_valor += valor_b
         _celda(ws5, idx, 1, c["nombre"])
         _celda(ws5, idx, 2, tasa, '0.00')
-        _celda(ws5, idx, 3, round(convertir(capital, "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
+        _celda(ws5, idx, 3, round(convertir(capital, "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2), '#,##0.00')
         _celda(ws5, idx, 4, round(valor_b, 2), '#,##0.00')
-        _celda(ws5, idx, 5, round(convertir(valor - capital, "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
-        _celda(ws5, idx, 6, round(convertir(valor * tasa / 100 / 12, "MXN", moneda_base, tasa_usd_mxn), 2), '#,##0.00')
+        _celda(ws5, idx, 5, round(convertir(valor - capital, "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2), '#,##0.00')
+        _celda(ws5, idx, 6, round(convertir(valor * tasa / 100 / 12, "MXN", moneda_base, tasa_usd_mxn, tasa_usd_eur), 2), '#,##0.00')
     for col_letter, ancho in zip("ABCDEF", [30, 15, 20, 22, 24, 30]):
         ws5.column_dimensions[col_letter].width = ancho
 

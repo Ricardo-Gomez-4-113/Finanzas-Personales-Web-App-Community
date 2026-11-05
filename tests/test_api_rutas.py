@@ -468,6 +468,50 @@ def test_moneda_base_eur_convierte_gastos_y_excel(client):
     assert "Moneda Base: EUR" in libro[libro.sheetnames[0]]["A2"].value, libro.sheetnames
 
 
+def test_excel_en_euros_con_fijos_y_cuentas_no_falla_y_el_archivo_se_llama_eur(client):
+    """Hallazgo de la auditoría: con base EUR, las hojas de fijos y de cuentas con rendimiento no recibían la tasa del euro
+    y el reporte respondía 500; además el archivo se llamaba «MXN» aunque su contenido estuviera en euros."""
+    import io
+    from datetime import date
+    import openpyxl
+    import export_service
+
+    _crear_usuario("ruta_excel_eur")
+    h = _login(client, "ruta_excel_eur")
+    hoy = date.today().isoformat()
+    assert client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "frecuencia": "mensual", "monto": 1000, "fecha_inicio": hoy, "categoria_id": 12}, headers=h).status_code == 201
+    assert client.post("/api/rendimiento", json={"nombre": "Ahorro", "capital": 2000, "tasa_anual": 0, "fecha_inicio": hoy}, headers=h).status_code == 201
+    with _parchar(export_service, obtener_tasas_cambio=lambda: {"MXN": 20.0, "EUR": 0.5}):
+        r = client.get("/api/exportar-excel?moneda_base=EUR", headers=h)
+    assert r.status_code == 200, r.text[:200]
+    assert "_EUR_" in r.headers["content-disposition"], r.headers["content-disposition"]
+    libro = openpyxl.load_workbook(io.BytesIO(r.content))
+    assert libro["Cuentas con rendimiento"].cell(row=5, column=3).value == 50.0  # 2,000 pesos a 0.5 EUR por cada 20
+    assert libro["Fijos y MSI"].cell(row=5, column=4).value == 25.0  # 1,000 pesos
+
+
+def test_excel_guarda_como_texto_lo_que_escribe_el_usuario(client):
+    """Hallazgo de la auditoría: una descripción, un nombre de meta o un ticker que empieza con = + - @ no puede abrirse
+    como fórmula en Excel."""
+    import io
+    from datetime import date
+    import openpyxl
+
+    _crear_usuario("ruta_excel_texto")
+    h = _login(client, "ruta_excel_texto")
+    hoy = date.today().isoformat()
+    assert client.post("/api/transacciones", json={"fecha": hoy, "monto": 100, "tipo": "ingreso", "categoria_id": 12, "descripcion": "=1+1"}, headers=h).status_code in (200, 201)
+    assert client.post("/api/apartados", json={"nombre": "=2+2", "tipo": "libre"}, headers=h).status_code == 201
+    assert client.post("/api/inversiones", json={"ticker": "=SUM", "cantidad": 1, "precio_promedio": 1, "precio_actual": 1, "moneda": "USD"}, headers=h).status_code == 201
+    r = client.get("/api/exportar-excel?moneda_base=MXN", headers=h)
+    assert r.status_code == 200, r.text[:200]
+    libro = openpyxl.load_workbook(io.BytesIO(r.content))
+    marcas = {"=1+1", "=2+2", "=SUM"}
+    encontradas = [(hoja.title, c.coordinate, c.data_type) for hoja in libro.worksheets for fila in hoja.iter_rows() for c in fila if c.value in marcas]
+    assert len(encontradas) >= 3, encontradas
+    assert all(tipo == "s" for _, _, tipo in encontradas), f"texto del usuario guardado como fórmula: {encontradas}"
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -496,6 +540,8 @@ if __name__ == "__main__":
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
             (test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409, lambda: test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client)),
             (test_moneda_base_eur_convierte_gastos_y_excel, lambda: test_moneda_base_eur_convierte_gastos_y_excel(client)),
+            (test_excel_en_euros_con_fijos_y_cuentas_no_falla_y_el_archivo_se_llama_eur, lambda: test_excel_en_euros_con_fijos_y_cuentas_no_falla_y_el_archivo_se_llama_eur(client)),
+            (test_excel_guarda_como_texto_lo_que_escribe_el_usuario, lambda: test_excel_guarda_como_texto_lo_que_escribe_el_usuario(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
