@@ -132,6 +132,21 @@ def test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes(client):
         assert dato not in texto, f"el registro guardó un dato del usuario: {dato[:12]}..."
 
 
+def test_rechazo_400_de_una_regla_se_registra_con_codigo(client):
+    """Una regla que responde 400 (no solo 409 o 422) también queda registrada, sin el importe del mensaje."""
+    _crear_usuario("obs_400")
+    token = _login(client, "obs_400")
+    cabecera = {"Authorization": f"Bearer {token}"}
+    meta = client.post("/api/apartados", json={"nombre": "Meta 400", "tipo": "meta", "meta_monto": 5000}, headers=cabecera)
+    assert meta.status_code == 201, meta.text
+    antes = len(_registros("rechazo_negocio"))
+    r = client.post(f"/api/apartados/{meta.json()['id']}/movimiento", json={"monto": 987.65, "accion": "depositar"}, headers=cabecera)
+    assert r.status_code == 400, r.text  # no hay saldo: la regla dice que no con un 400
+    nuevos = _registros("rechazo_negocio")[antes:]
+    assert [(f["codigo"], f["estado"]) for f in nuevos] == [("deposito_sin_fondos", 400)], nuevos
+    assert "987.65" not in _texto_del_registro(), "el registro guardó el importe del mensaje"
+
+
 def test_respuesta_lenta_se_registra_sin_cuerpo(client):
     _crear_usuario("obs_lenta")
     token = _login(client, "obs_lenta")
@@ -156,6 +171,10 @@ def test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app():
     assert codigo("No es posible eliminar este ingreso de $1.00 MXN del 1 oct 2026: respalda gastos") == "ingreso_respalda_gastos"
     assert codigo("El pago 1 solo tiene 0.00 disponibles de su ingreso") == "capacidad_pago"
     assert codigo("La frecuencia mensual no tiene el pago 2.") == "pago_inactivo"
+    assert codigo("No puedes guardar dinero que no tienes. Tu balance disponible es de $0.00 MXN") == "deposito_sin_fondos"
+    assert codigo("No puedes retirar más de lo que hay en este apartado") == "retiro_excede_meta"
+    assert codigo("No puedes eliminar un apartado con saldo disponible ($5.00 MXN).") == "meta_con_saldo"
+    assert codigo("Ya existe un apartado con ese nombre.") == "nombre_repetido"
     assert codigo("Algo que no se reconoce") == "otro"
     assert codigo([{"loc": ["body", "monto"]}]) == "validacion"
 
@@ -266,6 +285,7 @@ if __name__ == "__main__":
             (test_error_inesperado_responde_500_con_id_y_traza, lambda: test_error_inesperado_responde_500_con_id_y_traza(client)),
             (test_401_y_403_quedan_como_advertencia_sin_datos_sensibles, lambda: test_401_y_403_quedan_como_advertencia_sin_datos_sensibles(client)),
             (test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes, lambda: test_rechazo_por_reglas_se_registra_con_codigo_y_sin_importes(client)),
+            (test_rechazo_400_de_una_regla_se_registra_con_codigo, lambda: test_rechazo_400_de_una_regla_se_registra_con_codigo(client)),
             (test_respuesta_lenta_se_registra_sin_cuerpo, lambda: test_respuesta_lenta_se_registra_sin_cuerpo(client)),
             (test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app, test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app),
             (test_peticion_correcta_no_deja_linea, lambda: test_peticion_correcta_no_deja_linea(client)),

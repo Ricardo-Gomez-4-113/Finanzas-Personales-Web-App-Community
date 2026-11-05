@@ -36,6 +36,9 @@ MAXIMO_TRAZA = 4000
 logger = logging.getLogger(NOMBRE_LOGGER)
 
 UMBRAL_LENTA_MS = 1500
+# Respuestas con las que la app dice que no a propósito: petición válida que una regla no deja pasar (400 y 409),
+# o datos que no cumplen (422). Un 400 también puede ser una petición mal formada: entonces el código es «otro».
+ESTADOS_RECHAZO = (400, 409, 422)
 
 # Fragmento del mensaje (en minúsculas) -> código corto y estable. El orden importa: el primero que coincide gana.
 # El registro guarda el código, nunca el mensaje: los mensajes llevan importes y fechas del usuario.
@@ -49,6 +52,11 @@ CODIGOS_RECHAZO = (
     ("disponibles de su ingreso", "capacidad_pago"),
     ("suman más que su ingreso", "capacidad_pago"),
     ("no tiene el pago", "pago_inactivo"),
+    ("no puedes guardar dinero que no tienes", "deposito_sin_fondos"),
+    ("no puedes retirar más", "retiro_excede_meta"),
+    ("no puedes eliminar un apartado con saldo", "meta_con_saldo"),
+    ("ya existe un apartado", "nombre_repetido"),
+    ("una meta requiere un monto", "meta_sin_monto"),
 )
 
 
@@ -155,7 +163,7 @@ async def registrar_peticion(request: Request, call_next):
             logger.error("Respuesta de error del servidor", extra={"evento": "error_servidor", "estado": estado, "duracion_ms": duracion, **base})
         elif estado in (401, 403):
             logger.warning("Acceso rechazado", extra={"evento": "acceso_rechazado", "estado": estado, "duracion_ms": duracion, **base})
-        elif estado in (409, 422):
+        elif estado in ESTADOS_RECHAZO:
             codigo = getattr(request.state, "codigo_rechazo", "otro")
             logger.info("Rechazo por reglas", extra={"evento": "rechazo_negocio", "estado": estado, "duracion_ms": duracion, "codigo": codigo, **base})
         if estado < 500 and duracion > UMBRAL_LENTA_MS:

@@ -103,7 +103,7 @@ app.include_router(comentarios.router)
 async def rechazos_con_codigo(request: Request, exc: StarletteHTTPException):
     """Igual que el manejador por omisión, pero antes anota el motivo de un rechazo por reglas (409 o 422)
     para que el registro de peticiones lo guarde como código, sin el mensaje."""
-    if exc.status_code in (status.HTTP_409_CONFLICT, status.HTTP_422_UNPROCESSABLE_ENTITY):
+    if exc.status_code in observabilidad.ESTADOS_RECHAZO:
         request.state.codigo_rechazo = observabilidad.codigo_de_rechazo(exc.detail)
     return await http_exception_handler(request, exc)
 
