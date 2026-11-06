@@ -27,6 +27,7 @@ import types
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import acceso  # noqa: E402
 import acciones  # noqa: E402
 import administracion  # noqa: E402
 import copias  # noqa: E402
@@ -90,7 +91,7 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion, "login": acceso}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
