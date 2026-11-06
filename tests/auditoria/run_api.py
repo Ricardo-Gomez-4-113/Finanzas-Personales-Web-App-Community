@@ -28,6 +28,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import acciones  # noqa: E402
+import administracion  # noqa: E402
 import copias  # noqa: E402
 import fijos  # noqa: E402
 import metas  # noqa: E402
@@ -89,12 +90,14 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
     rng = random.Random(semilla)
     usuario = f"aud{semilla}"
+    # Cada episodio es una persona nueva: los accesos fallidos de uno (a propósito, en Admin) no bloquean al siguiente
+    mods.security._intentos_fallidos_login.clear()
     os.environ["FINANZAS_HOY"] = f"{HOY_INICIAL.isoformat()}T10:00:00"
     cabecera, ruta_db = personas.crear_laura(cliente, usuario, mods)
     oraculo = Oraculo(ruta_db)
