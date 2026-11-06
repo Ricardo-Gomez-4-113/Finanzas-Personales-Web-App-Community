@@ -149,7 +149,7 @@ def verificar(nombre, res, oraculo, saldo_api):
     # Identidad de cada meta: saldo guardado = ahorro propio + depósitos − retiros
     neto = oraculo.neto_por_apartado()
     for id_, nombre_meta, _, guardado, _ in oraculo.apartados():
-        propio = AHORRO_PROPIO_CENTAVOS if nombre_meta == "Fondo propio" else 0
+        propio = getattr(oraculo, "offsets", {}).get(id_, 0)  # ahorro propio de esa meta al empezar el episodio
         esperado = propio + neto.get(id_, 0)
         if guardado != esperado:
             problemas.append(f"la meta «{nombre_meta}» guarda {guardado / 100} y sus movimientos suman {esperado / 100}")

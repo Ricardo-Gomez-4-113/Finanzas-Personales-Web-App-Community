@@ -94,16 +94,22 @@ def _detalle(respuesta):
 SECCIONES = {"movimientos": acciones, "fijos": fijos, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion, "login": acceso}
 
 
-def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo):
+def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo, persona="laura", base_dueno=None):
     rng = random.Random(semilla)
     usuario = f"aud{semilla}"
     # Cada episodio es una persona nueva: los accesos fallidos de uno (a propósito, en Admin) no bloquean al siguiente
     mods.security._intentos_fallidos_login.clear()
     os.environ["FINANZAS_HOY"] = f"{HOY_INICIAL.isoformat()}T10:00:00"
-    cabecera, ruta_db = personas.crear_laura(cliente, usuario, mods)
+    cabecera, ruta_db, hoy_inicial = personas.PERSONAS[persona](cliente, usuario, mods, base_dueno=base_dueno)
+    os.environ["FINANZAS_HOY"] = f"{hoy_inicial.isoformat()}T10:00:00"
     oraculo = Oraculo(ruta_db)
-    meta_id = next(a["id"] for a in cliente.get("/api/apartados", headers=cabecera).json() if a["nombre"] == "Fondo propio")
-    ctx = catalogo.Contexto(rng, cliente, cabecera, oraculo, HOY_INICIAL, meta_id)
+    # Ahorro propio de cada meta: lo guardado que no viene de movimientos. Las metas nuevas del episodio empiezan en 0.
+    neto = oraculo.neto_por_apartado()
+    oraculo.offsets = {a[0]: a[3] - neto.get(a[0], 0) for a in oraculo.apartados()}
+    metas_previas = cliente.get("/api/apartados", headers=cabecera).json()
+    meta_id = metas_previas[0]["id"] if metas_previas else cliente.post(
+        "/api/apartados", json={"nombre": "Meta de prueba", "tipo": "meta", "meta_monto": 10000}, headers=cabecera).json()["id"]
+    ctx = catalogo.Contexto(rng, cliente, cabecera, oraculo, hoy_inicial, meta_id)
     ctx.fijar_hoy()
     if hasattr(catalogo, "preparar"):  # ajustes iniciales de la sección (p. ej. el ingreso base del presupuesto)
         catalogo.preparar(cliente, cabecera)
@@ -157,10 +163,14 @@ def main():
     parser.add_argument("--fuente", default=RAIZ, help="carpeta del código de la app a probar")
     parser.add_argument("--carpeta", default=None, help="donde dejar la bitácora (por defecto auditoria/corridas/...)")
     parser.add_argument("--seccion", choices=sorted(SECCIONES), default="movimientos")
+    parser.add_argument("--persona", choices=sorted(personas.PERSONAS), default="laura")
+    parser.add_argument("--base-dueno", default=None, help="base real del dueño que se copia en las personas dueno_* (por defecto data/tenants/user_1.db de la fuente)")
     args = parser.parse_args()
 
     catalogo = SECCIONES[args.seccion]
-    nombre_corrida = f"{args.seccion}-api-s{args.semilla}-n{args.episodios}"
+    sufijo = "" if args.persona == "laura" else f"-{args.persona}"
+    nombre_corrida = f"{args.seccion}-api{sufijo}-s{args.semilla}-n{args.episodios}"
+    base_dueno = args.base_dueno or os.path.join(os.path.abspath(args.fuente), "data", "tenants", "user_1.db")
     carpeta = args.carpeta or os.path.join(RAIZ, "auditoria", "corridas", nombre_corrida)
     carpeta = os.path.abspath(carpeta)
     shutil.rmtree(carpeta, ignore_errors=True)
@@ -174,7 +184,8 @@ def main():
     try:
         with TestClient(mods.app) as cliente:
             for numero in range(1, args.episodios + 1):
-                pasos_totales += _episodio(args.semilla + numero - 1, numero, cliente, mods, bit, fallos, catalogo)
+                pasos_totales += _episodio(args.semilla + numero - 1, numero, cliente, mods, bit, fallos, catalogo,
+                                           args.persona, base_dueno)
     finally:
         bit.cerrar()
         shutil.rmtree(tmp, ignore_errors=True)

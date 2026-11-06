@@ -8,18 +8,20 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 IMAGEN="${TEST_IMAGE:-python:3.11-slim}"
-SEMILLA=1; EPISODIOS=100; FUENTE=""; CAPA="api"; SECCION="movimientos"
+SEMILLA=1; EPISODIOS=100; FUENTE=""; CAPA="api"; SECCION="movimientos"; PERSONA="laura"
 while [ $# -gt 0 ]; do
   case "$1" in
     --capa) CAPA="$2"; shift 2 ;;
     --seccion) SECCION="$2"; shift 2 ;;
+    --persona) PERSONA="$2"; shift 2 ;;
     --semilla) SEMILLA="$2"; shift 2 ;;
     --episodios) EPISODIOS="$2"; shift 2 ;;
     --fuente) FUENTE="$2"; shift 2 ;;
     *) echo "opción desconocida: $1"; exit 2 ;;
   esac
 done
-NOMBRE="${SECCION}-${CAPA}-s${SEMILLA}-n${EPISODIOS}"
+SUFIJO_PERSONA=""; [ "$PERSONA" = "laura" ] || SUFIJO_PERSONA="-${PERSONA}"
+NOMBRE="${SECCION}-${CAPA}${SUFIJO_PERSONA}-s${SEMILLA}-n${EPISODIOS}"
 DISPOSITIVO=""
 if [ "$CAPA" = "escritorio" ] || [ "$CAPA" = "celular" ]; then
   DISPOSITIVO="$CAPA"
@@ -30,7 +32,7 @@ if [ "$CAPA" = "escritorio" ] || [ "$CAPA" = "celular" ]; then
   if [ "$SECCION" = "metas" ]; then SCRIPT="tests/auditoria/escritorio_metas.py"; fi
   INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 httpx"
 else
-  SCRIPT="tests/auditoria/run_api.py --seccion ${SECCION}"
+  SCRIPT="tests/auditoria/run_api.py --seccion ${SECCION} --persona ${PERSONA}"
   INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt httpx"
 fi
 mkdir -p "$PWD/auditoria/corridas"
