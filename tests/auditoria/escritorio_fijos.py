@@ -191,9 +191,7 @@ def _episodio(semilla, numero, navegador, servidor, mods, bit, fallos, dispositi
                 hoy = hoy + datetime.timedelta(days=rng.choice((1, 1, 2, 7, 15)))
                 servidor.parar()
                 servidor.arrancar(hoy)
-                page.goto(servidor.base + "/")
-                if not page.query_selector("#vista-app:not(.hidden)"):
-                    escritorio._login(page, servidor.base, usuario)
+                escritorio._reentrar(page, servidor.base, usuario)
                 datos = {"entrada": {"hoy": hoy.isoformat()}, "aceptado": None, "mensaje": ""}
             elif nombre == "recargar":
                 page.reload()

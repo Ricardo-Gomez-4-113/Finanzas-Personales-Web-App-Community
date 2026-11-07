@@ -112,6 +112,14 @@ def _login(page, base, usuario):
     page.wait_for_selector("#vista-app:not(.hidden)", timeout=20000)
 
 
+def _reentrar(page, base, usuario):
+    """Abre la app tras reiniciar el servidor: espera a que la página decida entre la app y el login, y solo entra si hace falta."""
+    page.goto(base + "/")
+    page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
+    if not page.query_selector("#vista-app:not(.hidden)"):
+        _login(page, base, usuario)
+
+
 def _ir(page, pestana):
     page.evaluate(f"document.querySelector('[data-tab=\"{pestana}\"]').click()")
     page.wait_for_selector(f"#{pestana}.active")
@@ -395,9 +403,7 @@ def _episodio(semilla, numero, navegador, servidor, mods, tmp, bit, fallos, disp
             hoy = hoy + datetime.timedelta(days=rng.choice((1, 1, 2, 7, 15)))
             servidor.parar()
             servidor.arrancar(hoy)
-            page.goto(servidor.base + "/")
-            if not page.query_selector("#vista-app:not(.hidden)"):
-                _login(page, servidor.base, usuario)
+            _reentrar(page, servidor.base, usuario)
             if page.is_visible("#tab-movimientos"):
                 page.select_option("#filtro-ventana", value="todo")  # al recargar, la página vuelve al periodo actual
             datos = {"entrada": {"hoy": hoy.isoformat()}, "aceptado": None, "mensaje": "", "candidato": None}
