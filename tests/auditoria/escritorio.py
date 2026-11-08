@@ -104,20 +104,24 @@ def _cargar_modulos(tmp):
     return types.SimpleNamespace(database=database, master_db=master_db, security=security)
 
 
-def _login(page, base, usuario):
+def _login(page, base, usuario, clave=None):
     page.goto(base + "/login")
+    # Con una sesión guardada, /login pasa a la app: entonces ya no hay nada que llenar
+    page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
+    if page.query_selector("#vista-app:not(.hidden)"):
+        return
     page.fill("#login-username", usuario)
-    page.fill("#login-password", personas.CLAVE)
+    page.fill("#login-password", clave or personas.CLAVE)
     page.click("#form-login [type=submit]")
     page.wait_for_selector("#vista-app:not(.hidden)", timeout=20000)
 
 
-def _reentrar(page, base, usuario):
+def _reentrar(page, base, usuario, clave=None):
     """Abre la app tras reiniciar el servidor: espera a que la página decida entre la app y el login, y solo entra si hace falta."""
     page.goto(base + "/")
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
     if not page.query_selector("#vista-app:not(.hidden)"):
-        _login(page, base, usuario)
+        _login(page, base, usuario, clave)
 
 
 def _ir(page, pestana):

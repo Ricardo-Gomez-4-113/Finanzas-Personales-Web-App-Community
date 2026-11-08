@@ -181,12 +181,17 @@ def editar_perfil(ctx):
     cab = _con_token(ctx, datos)
     if cab is None:
         return None
-    variante = ctx.rng.choice(("email", "clave_sin_actual", "clave_actual_mala", "clave_ok", "nombre_repetido", "nombre_nuevo"))
+    variante = ctx.rng.choice(("email", "email_sin_actual", "clave_sin_actual", "clave_actual_mala", "clave_ok",
+                               "nombre_repetido", "nombre_nuevo", "nombre_admin"))
     pre = _base(ctx).usuarios()
     otros = [d["username"] for n, d in _cuentas(ctx).items() if n != nombre]
     cuerpo, nueva = {}, None
-    if variante == "email":
-        cuerpo = {"email": f"{datos['username']}@prueba.local"}
+    if variante == "email":  # el correo recupera la cuenta: también pide la contraseña actual
+        cuerpo = {"email": f"{datos['username']}{ctx.rng.randint(1, 10**6)}@prueba.local", "current_password": datos["password"]}
+    elif variante == "email_sin_actual":
+        cuerpo = {"email": f"robado{ctx.rng.randint(1, 10**6)}@prueba.local"}
+    elif variante == "nombre_admin":  # reservado para la cuenta principal
+        cuerpo = {"username": "admin", "current_password": datos["password"]}
     elif variante == "clave_sin_actual":
         nueva = f"{CLAVE_BASE}{ctx.rng.randint(100000, 999999)}"
         cuerpo = {"password": nueva}
@@ -199,10 +204,10 @@ def editar_perfil(ctx):
     elif variante == "nombre_repetido":
         if not otros:
             return None
-        cuerpo = {"username": otros[0]}
+        cuerpo = {"username": otros[0], "current_password": datos["password"]}
     else:
         nueva = f"nvo{ctx.rng.randint(1, 10**6)}"
-        cuerpo = {"username": nueva}
+        cuerpo = {"username": nueva, "current_password": datos["password"]}
     r = ctx.cliente.request("PATCH", "/auth/profile", json=cuerpo, headers=cab)
     res = _res("editar_perfil", r, entrada={"variante": variante}, pre=pre, variante=variante, id=datos["id"], nueva=nueva,
                vieja=datos["password"], nombre_viejo=datos["username"], cuerpo=cuerpo)
@@ -405,6 +410,12 @@ def verificar(nombre, res, oraculo, saldo_api):
         if v == "email":
             if codigo != 200 or ahora[7] != res["cuerpo"]["email"]:
                 problemas.append(f"cambiar el correo respondió {codigo} y quedó {ahora[7]}")
+        elif v in ("email_sin_actual", "nombre_admin"):
+            if codigo != 400:
+                que = "cambiar el correo sin la contraseña actual" if v == "email_sin_actual" else "llamarse «admin»"
+                problemas.append(f"{que} respondió {codigo} y debía ser 400")
+            if ahora[7] != antes[7] or ahora[1] != antes[1]:
+                problemas.append("el correo o el nombre cambió aunque el cambio debía rechazarse")
         elif v in ("clave_sin_actual", "clave_actual_mala"):
             if codigo != 400:
                 problemas.append(f"cambiar la contraseña sin la actual correcta respondió {codigo} y debía ser 400")

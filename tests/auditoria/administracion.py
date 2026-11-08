@@ -95,9 +95,16 @@ def crear_usuario(ctx):
     pre = _estado(ctx)
     repetido = any(u[1] == nombre for u in pre["usuarios"])
     cuerpo = {"username": nombre, "password": clave, "role": rol}
+    sin_clave = None
+    if rol == "admin":  # crear otro administrador pide la contraseña: primero se intenta sin ella
+        sin_clave = _api_admin(ctx, "POST", "/admin/users", cuerpo).status_code
+        tras_sin_clave = _estado(ctx)
+        cuerpo["current_password"] = os.environ["DEFAULT_ADMIN_PASSWORD"]
     respuesta = _api_admin(ctx, "POST", "/admin/users", cuerpo)
     res = _base("crear_usuario", respuesta, entrada={"username": nombre, "role": rol, "escenario": escenario}, pre=pre,
-                escenario=escenario, nombre=nombre, clave=clave, rol=rol, repetido=repetido)
+                escenario=escenario, nombre=nombre, clave=clave, rol=rol, repetido=repetido, sin_clave=sin_clave)
+    if sin_clave is not None:
+        res["sin_clave_cambio"] = tras_sin_clave["usuarios"] != pre["usuarios"]
     if respuesta.status_code == 201:
         datos = respuesta.json()["user"]
         _usuarios_propios(ctx)[datos["id"]] = {"username": nombre, "password": clave, "activo": True, "rol": rol}
@@ -132,7 +139,7 @@ def _cambiar_estado(ctx, activo):
     pre = _estado(ctx)
     respuesta = _api_admin(ctx, "PATCH", f"/admin/users/{id_}/status", {"is_active": activo})
     res = _base("reactivar" if activo else "suspender", respuesta, entrada={"id": id_, "is_active": activo}, pre=pre,
-                objetivo=id_, activo=activo)
+                objetivo=id_, activo=activo, rol=datos["rol"])
     if respuesta.status_code == 200:
         datos["activo"] = activo
     res["login"] = _entrar(ctx, datos["username"], datos["password"]).status_code
@@ -154,9 +161,11 @@ def editar_clave(ctx):
     id_, datos = elegido
     nueva = f"{CLAVE_BASE}{ctx.rng.randint(100000, 999999)}"
     pre = _estado(ctx)
-    respuesta = _api_admin(ctx, "PATCH", f"/admin/users/{id_}", {"password": nueva})
+    sin_clave = _api_admin(ctx, "PATCH", f"/admin/users/{id_}", {"password": nueva}).status_code
+    login_tras_sin_clave = _entrar(ctx, datos["username"], datos["password"]).status_code
+    respuesta = _api_admin(ctx, "PATCH", f"/admin/users/{id_}", {"password": nueva, "current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]})
     res = _base("editar_clave", respuesta, entrada={"id": id_}, pre=pre, objetivo=id_, vieja=datos["password"], nueva=nueva,
-                activo=datos["activo"])
+                activo=datos["activo"], sin_clave=sin_clave, login_tras_sin_clave=login_tras_sin_clave)
     if respuesta.status_code == 200:
         res["login_nueva"] = _entrar(ctx, datos["username"], nueva).status_code
         res["login_vieja"] = _entrar(ctx, datos["username"], datos["password"]).status_code
@@ -171,10 +180,14 @@ def eliminar_usuario(ctx):
     id_, datos = elegido
     pre = _estado(ctx)
     db_name = next((u[4] for u in pre["usuarios"] if u[0] == id_), None)
-    respuesta = _api_admin(ctx, "DELETE", f"/admin/users/{id_}")
-    if respuesta.status_code == 200:
+    sin_clave = _api_admin(ctx, "DELETE", f"/admin/users/{id_}").status_code
+    mala_clave = _api_admin(ctx, "DELETE", f"/admin/users/{id_}", {"current_password": "Mala#clave999"}).status_code
+    tras_rechazos = _estado(ctx)
+    respuesta = _api_admin(ctx, "DELETE", f"/admin/users/{id_}", {"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]})
+    if 200 in (sin_clave, mala_clave) or respuesta.status_code == 200:
         _usuarios_propios(ctx).pop(id_, None)
-    return _base("eliminar_usuario", respuesta, entrada={"id": id_}, pre=pre, objetivo=id_, db_name=db_name)
+    return _base("eliminar_usuario", respuesta, entrada={"id": id_}, pre=pre, objetivo=id_, db_name=db_name,
+                 sin_clave=sin_clave, mala_clave=mala_clave, tras_rechazos=tras_rechazos, rol=datos["rol"])
 
 
 def proteger_admin(ctx):
@@ -183,7 +196,8 @@ def proteger_admin(ctx):
     segundo = next(((i, d) for i, d in sorted(_usuarios_propios(ctx).items()) if d["rol"] == "admin" and d["activo"]), None)
     if segundo is None:  # casi nunca hay otro administrador: se crea uno para que la protección se pruebe de verdad
         nombre, clave = f"adm{ctx.rng.randint(1, 10**6)}", f"{CLAVE_BASE}{ctx.rng.randint(100000, 999999)}"
-        creado = _api_admin(ctx, "POST", "/admin/users", {"username": nombre, "password": clave, "role": "admin"})
+        creado = _api_admin(ctx, "POST", "/admin/users", {"username": nombre, "password": clave, "role": "admin",
+                                                          "current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]})
         if creado.status_code == 201:
             _usuarios_propios(ctx)[creado.json()["user"]["id"]] = {"username": nombre, "password": clave, "activo": True, "rol": "admin"}
             segundo = next(((i, d) for i, d in sorted(_usuarios_propios(ctx).items()) if d["rol"] == "admin" and d["activo"]), None)
@@ -195,10 +209,16 @@ def proteger_admin(ctx):
             cabecera = {"Authorization": f"Bearer {entro.json()['access_token']}"}
             quien = "segundo_admin"
     pre = _estado(ctx)
+    # Con la contraseña correcta de quien lo intenta: lo que debe frenar es la protección de la cuenta principal
+    clave = segundo[1]["password"] if quien == "segundo_admin" else os.environ["DEFAULT_ADMIN_PASSWORD"]
     respuestas = [
         ctx.cliente.request("PATCH", "/admin/users/1/status", json={"is_active": False}, headers=cabecera),
-        ctx.cliente.request("DELETE", "/admin/users/1", headers=cabecera),
+        ctx.cliente.request("DELETE", "/admin/users/1", json={"current_password": clave}, headers=cabecera),
     ]
+    if quien == "segundo_admin":  # la cuenta principal solo la edita ella misma
+        # Con la misma contraseña que ya tiene: si la app lo acepta (violación), el arnés puede seguir entrando
+        respuestas.append(ctx.cliente.request("PATCH", "/admin/users/1", json={"password": os.environ["DEFAULT_ADMIN_PASSWORD"],
+                                                                              "current_password": clave}, headers=cabecera))
     return _base("proteger_admin", respuestas[0], entrada={"quien": quien}, pre=pre, respuestas=respuestas)
 
 
@@ -248,6 +268,8 @@ def verificar(nombre, res, oraculo, saldo_api):
     codigo = respuesta.status_code
 
     if nombre == "crear_usuario":
+        if res.get("sin_clave") is not None and (res["sin_clave"] == 201 or res.get("sin_clave_cambio")):
+            problemas.append(f"se creó un administrador sin la contraseña de quien lo crea ({res['sin_clave']})")
         valido = res["escenario"] == "valido"
         esperado = 201 if (valido and not res["repetido"]) else (400 if (valido and res["repetido"]) else 422)
         if codigo != esperado:
@@ -272,6 +294,12 @@ def verificar(nombre, res, oraculo, saldo_api):
             problemas.append(f"listar usuarios respondió {codigo}")
         elif {u["username"] for u in lista} != {u[1] for u in usuarios} or len(lista) != len(usuarios):
             problemas.append(f"la lista tiene {len(lista)} usuarios y la base maestra {len(usuarios)}")
+    elif nombre == "suspender" and res.get("rol") == "admin":
+        if codigo != 400:
+            problemas.append(f"suspender a otro administrador respondió {codigo} y debía ser 400")
+        # Sin el contador de entradas: tras el intento, el arnés entra con esa cuenta para probar el acceso
+        if tuple(u[:5] for u in usuarios) != tuple(u[:5] for u in pre["usuarios"]):
+            problemas.append("un intento de suspender a un administrador cambió la base maestra")
     elif nombre in ("suspender", "reactivar"):
         if codigo != 200:
             problemas.append(f"{nombre} respondió {codigo}")
@@ -284,6 +312,8 @@ def verificar(nombre, res, oraculo, saldo_api):
             if not res["activo"] and res["login"] == 200:
                 problemas.append("un usuario suspendido pudo entrar")
     elif nombre == "editar_clave":
+        if res.get("sin_clave") != 400 or res.get("login_tras_sin_clave") == 401 and res["activo"]:
+            problemas.append(f"cambiar la contraseña de otra persona sin la del administrador respondió {res.get('sin_clave')}")
         if codigo != 200:
             problemas.append(f"editar la contraseña respondió {codigo}")
         else:
@@ -291,7 +321,14 @@ def verificar(nombre, res, oraculo, saldo_api):
                 problemas.append(f"la contraseña nueva no entra ({res.get('login_nueva')})")
             if res.get("login_vieja") == 200:
                 problemas.append("la contraseña vieja sigue entrando")
+    elif nombre == "eliminar_usuario" and res.get("rol") == "admin":
+        if codigo != 400 or any(u[0] == res["objetivo"] for u in usuarios) is False:
+            problemas.append(f"eliminar a otro administrador respondió {codigo} y debía ser 400 sin borrarlo")
     elif nombre == "eliminar_usuario":
+        if res.get("sin_clave") != 400 or res.get("mala_clave") != 400:
+            problemas.append(f"borrar un usuario sin la contraseña del administrador respondió {res.get('sin_clave')} y con una incorrecta {res.get('mala_clave')}; ambas debían ser 400")
+        elif res["tras_rechazos"]["usuarios"] != pre["usuarios"] or res["tras_rechazos"]["archivos"] != pre["archivos"]:
+            problemas.append("un borrado rechazado por contraseña cambió la base maestra o la carpeta")
         if codigo != 200:
             problemas.append(f"eliminar un usuario respondió {codigo}")
         else:
@@ -304,7 +341,7 @@ def verificar(nombre, res, oraculo, saldo_api):
             if oraculo.volcado() != pre["propia"]:
                 problemas.append("eliminar a otro usuario cambió los datos de la persona")
     elif nombre == "proteger_admin":
-        for intento, r in zip(("suspender", "eliminar"), res["respuestas"]):
+        for intento, r in zip(("suspender", "eliminar", "editar"), res["respuestas"]):
             if r.status_code != 400:
                 problemas.append(f"{intento} la cuenta admin respondió {r.status_code} y debía ser 400")
         if usuarios != pre["usuarios"]:
