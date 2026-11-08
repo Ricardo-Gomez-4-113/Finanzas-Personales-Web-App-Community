@@ -344,6 +344,8 @@ export async function guardarEdicionUsuario(e) {
             // Si el usuario editado es el usuario en sesión activa, actualizar token y UI
             if (estado.usuarioActual && estado.usuarioActual.id === parseInt(userId, 10)) {
                 if (data.new_token) {
+                    // El token rota: lo que salió con el viejo y sigue en vuelo recibirá 401 y no es una sesión vencida
+                    estado.generacionSesion++;
                     localStorage.setItem('jwt_token', data.new_token);
                 }
                 if (data.user) {

@@ -11,6 +11,7 @@ import { reportarFallo } from './diagnostico.js';
 
 export const estado = {
     usuarioActual: null,
+    generacionSesion: 0,  // sube al cerrar o abrir una sesión: una respuesta tardía de otra sesión no cuenta para esta
     monedaGlobal: localStorage.getItem('moneda_global') || 'MXN',
     tasasCambio: { USD: 1.0 },   // las cotiza el servidor (/api/tipo-cambio); sin ellas no se inventa un valor
     tasasEnRespaldo: [],         // monedas cuya tasa no es una cotización real
@@ -64,6 +65,7 @@ export async function apiFetch(url, options = {}) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const generacion = estado.generacionSesion;
     let response;
     try {
         response = await fetch(url, { ...options, headers });
@@ -80,9 +82,15 @@ export async function apiFetch(url, options = {}) {
 
     // Un 401 es sesión vencida. Un 403 solo cierra sesión si la cuenta está desactivada o suspendida;
     // en otros casos (p. ej. una ruta solo de administradores) el llamador muestra el motivo.
+    // El aviso de sesión vencida solo se emite si esta pestaña sigue con la sesión que lanzó la petición. Si ya cerró la
+    // sesión (usuarioActual nulo) o abrió otra distinta, el 401 es de una carga que quedó en vuelo y no hay nada que
+    // vencer; si el token lo borró otra pestaña, aquí usuarioActual sigue puesto y la generación es la misma: sí avisa.
+    // En todos los casos la petición falla con «No autorizado», como siempre, para que ningún llamador lea un cuerpo vacío.
     if (response.status === 401 || (response.status === 403 && await cuentaInactiva(response))) {
         if (!url.includes('/auth/login')) {
-            document.dispatchEvent(new CustomEvent('sesion-expirada', { detail: "Tu sesión ha expirado o tu cuenta ha sido suspendida." }));
+            if (estado.usuarioActual && generacion === estado.generacionSesion) {
+                document.dispatchEvent(new CustomEvent('sesion-expirada', { detail: "Tu sesión ha expirado o tu cuenta ha sido suspendida." }));
+            }
             throw new Error("No autorizado");
         }
     }

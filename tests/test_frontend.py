@@ -1025,6 +1025,125 @@ def test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base):
         ctx.close()
 
 
+def test_cerrar_sesion_con_una_carga_en_curso_no_muestra_sesion_expirada(navegador, base):
+    """Si se cierra la sesión mientras los movimientos siguen cargando, la petición que sale después ya no lleva token y
+    recibe 401: eso no es una sesión vencida, y no debe aparecer en la pantalla de entrada como si lo fuera."""
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+
+        def _retener(route):
+            page.wait_for_timeout(2500)  # la lista de movimientos tarda: da tiempo a cerrar la sesión antes de que siga
+            route.continue_()
+
+        page.route("**/api/transacciones", _retener)
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.evaluate("document.querySelector('.dropdown-btn-logout').click()")
+        _responder_confirmacion(page)
+        page.wait_for_selector("#form-login", state="visible", timeout=10000)
+        page.wait_for_timeout(4000)  # llega la lista retenida y sale la petición de cancelados, ya sin token
+        page.unroute("**/api/transacciones")
+        assert page.is_hidden("#login-error") and not page.inner_text("#login-error").strip(), \
+            f"el login muestra un aviso falso: «{page.inner_text('#login-error')}»"
+    finally:
+        ctx.close()
+
+
+def test_recargar_con_un_token_vencido_pide_entrar_y_lo_explica(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        page.goto(base + "/login")
+        page.evaluate("localStorage.setItem('jwt_token', 'token.vencido.o.falso')")
+        page.goto(base + "/")
+        page.wait_for_selector("#login-username", state="visible", timeout=15000)
+        assert "expirado" in page.inner_text("#login-error"), page.inner_text("#login-error")
+        assert page.evaluate("localStorage.getItem('jwt_token')") is None, "el token vencido no se queda guardado"
+    finally:
+        ctx.close()
+
+
+def test_un_fallo_del_servidor_al_abrir_la_pagina_no_tira_el_token(navegador, base):
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+        token = page.evaluate("localStorage.getItem('jwt_token')")
+        page.route("**/auth/me", lambda route: route.fulfill(status=503, content_type="application/json", body='{"detail": "reiniciando"}'))
+        page.goto(base + "/")
+        page.wait_for_selector("#login-username", state="visible", timeout=15000)
+        assert "verificar la sesión" in page.inner_text("#login-error"), page.inner_text("#login-error")
+        assert page.evaluate("localStorage.getItem('jwt_token')") == token, "un 503 no debe borrar un token válido"
+        page.unroute("**/auth/me")
+    finally:
+        ctx.close()
+
+
+def test_respuesta_tardia_de_la_sesion_anterior_no_cierra_la_nueva(navegador, base):
+    """Cierras sesión y entras de nuevo antes de que llegue la respuesta (un 401) de una carga de la sesión anterior."""
+    ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _login(page, base)
+
+        retenida = {"primera": True, "liberar": False}  # solo la carga de la sesión anterior se retiene y responde 401
+
+        def _tardia(route):
+            if not retenida["primera"]:
+                route.continue_()
+                return
+            retenida["primera"] = False
+            while not retenida["liberar"]:  # espera a que la sesión nueva ya esté dentro: sin tiempos fijos
+                page.wait_for_timeout(100)
+            route.fulfill(status=401, content_type="application/json", body='{"detail": "token de la sesión anterior"}')
+
+        page.route("**/api/transacciones", _tardia)
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        page.evaluate("document.querySelector('.dropdown-btn-logout').click()")
+        _responder_confirmacion(page)
+        page.wait_for_selector("#form-login", state="visible", timeout=10000)
+        page.fill("#login-username", USUARIO)
+        page.fill("#login-password", CLAVE)
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        retenida["liberar"] = True  # ahora llega el 401 tardío de la sesión anterior
+        page.wait_for_timeout(2500)
+        page.unroute("**/api/transacciones")
+        assert page.is_visible("#vista-app"), "el 401 tardío de la sesión anterior cerró la sesión nueva"
+    finally:
+        ctx.close()
+
+
+def test_cambiar_la_contrasena_con_una_carga_en_vuelo_no_cierra_la_sesion_nueva(navegador, base):
+    """El cambio de contraseña rota el token: la carga que salió con el viejo recibe 401, y no es una sesión vencida."""
+    usuario, clave = _usuario_nuevo("rota")
+    nueva = "Nueva#Clave2026"
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        retenida = {"primera": True, "liberar": False}
+
+        def _tardia(route):
+            if not retenida["primera"]:
+                route.continue_()
+                return
+            retenida["primera"] = False
+            while not retenida["liberar"]:
+                page.wait_for_timeout(100)
+            route.fulfill(status=401, content_type="application/json", body='{"detail": "token anterior a la rotación"}')
+
+        page.route("**/api/transacciones", _tardia)
+        page.evaluate("document.dispatchEvent(new Event('recargar'))")
+        _abrir_mi_perfil(page)
+        page.fill("#edit-user-password", nueva)
+        page.fill("#edit-user-current-password", clave)
+        page.click("#form-editar-usuario [type=submit]")
+        page.wait_for_selector("#modal-editar-usuario.hidden", state="attached", timeout=15000)
+        retenida["liberar"] = True  # llega el 401 de la carga que salió con el token anterior
+        page.wait_for_timeout(2500)
+        page.unroute("**/api/transacciones")
+        assert page.is_visible("#vista-app"), "el 401 de una carga con el token anterior cerró la sesión recién renovada"
+    finally:
+        ctx.close()
+
+
 def test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base):
     ctx, page, _errores = _contexto(navegador, VIEWPORTS["laptop"])
     try:
@@ -2164,6 +2283,11 @@ if __name__ == "__main__":
                 (test_fallo_de_red_avisa_al_usuario, lambda: test_fallo_de_red_avisa_al_usuario(navegador, base)),
                 (test_403_de_permisos_no_cierra_la_sesion, lambda: test_403_de_permisos_no_cierra_la_sesion(navegador, base)),
                 (test_403_de_cuenta_desactivada_cierra_la_sesion, lambda: test_403_de_cuenta_desactivada_cierra_la_sesion(navegador, base)),
+                (test_cerrar_sesion_con_una_carga_en_curso_no_muestra_sesion_expirada, lambda: test_cerrar_sesion_con_una_carga_en_curso_no_muestra_sesion_expirada(navegador, base)),
+                (test_recargar_con_un_token_vencido_pide_entrar_y_lo_explica, lambda: test_recargar_con_un_token_vencido_pide_entrar_y_lo_explica(navegador, base)),
+                (test_un_fallo_del_servidor_al_abrir_la_pagina_no_tira_el_token, lambda: test_un_fallo_del_servidor_al_abrir_la_pagina_no_tira_el_token(navegador, base)),
+                (test_respuesta_tardia_de_la_sesion_anterior_no_cierra_la_nueva, lambda: test_respuesta_tardia_de_la_sesion_anterior_no_cierra_la_nueva(navegador, base)),
+                (test_cambiar_la_contrasena_con_una_carga_en_vuelo_no_cierra_la_sesion_nueva, lambda: test_cambiar_la_contrasena_con_una_carga_en_vuelo_no_cierra_la_sesion_nueva(navegador, base)),
                 (test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin, lambda: test_menu_de_usuario_sin_eliminar_cuenta_y_rol_solo_para_admin(navegador, base)),
                 (test_menu_usuario_teclado_y_hoja_movil, lambda: test_menu_usuario_teclado_y_hoja_movil(navegador, base)),
                 (test_inversion_nueva_aparece_en_el_portafolio, lambda: test_inversion_nueva_aparece_en_el_portafolio(navegador, base)),

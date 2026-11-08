@@ -77,18 +77,35 @@ export async function verificarSesionInicial() {
         return;
     }
 
+    // Si mientras espera a /auth/me se abre una sesión (o se cierra), la respuesta ya no le corresponde
+    const generacion = estado.generacionSesion;
+    const vigente = () => generacion === estado.generacionSesion;
+
     try {
         const res = await apiFetch('/auth/me');
+        if (!vigente()) return;
         if (res.ok) {
             const data = await res.json();
+            if (!vigente()) return;
             establecerSesionActiva(data.user, token);
             return;
-        } else {
+        } else if (res.status === 401 || res.status === 403) {
+            // Token vencido o cuenta suspendida: se dice por qué se pide entrar de nuevo
             cerrarSesionLimpia();
-            mostrarVistaLogin();
+            mostrarVistaLogin("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
+            return;
+        } else {
+            // Un fallo del servidor (5xx) no es una sesión inválida: el token se conserva, como con un fallo de red
+            mostrarVistaLogin("Error al verificar la sesión con el servidor.");
             return;
         }
     } catch (e) {
+        if (!vigente()) return;
+        if (e && e.message === "No autorizado") {  // apiFetch no avisa en el arranque (aún no hay sesión): se explica aquí
+            cerrarSesionLimpia();
+            mostrarVistaLogin("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
+            return;
+        }
         mostrarVistaLogin("Error al verificar la sesión con el servidor.");
         return;
     }
@@ -99,6 +116,7 @@ export async function verificarSesionInicial() {
  * Configura la UI para el usuario autenticado y carga sus datos.
  */
 export function establecerSesionActiva(user, token) {
+    estado.generacionSesion++;
     estado.usuarioActual = user;
     localStorage.setItem('jwt_token', token);
     localStorage.setItem('user_info', JSON.stringify(user));
@@ -205,6 +223,7 @@ export async function logoutUsuario() {
  * 4. Muestra la pantalla de login para evitar contaminación visual entre cuentas.
  */
 export function cerrarSesionLimpia(errorMsg = '') {
+    estado.generacionSesion++;
     // 1. Eliminar persistencia local
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_info');
