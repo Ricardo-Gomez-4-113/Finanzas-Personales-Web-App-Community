@@ -53,7 +53,13 @@ Carpeta local (excluida de git en `.git/info/exclude`); parte de su formato vien
 | Reglas por ruta | `.claude/rules/backend.md`, `frontend.md`, `pruebas.md` | Se cargan solas al tocar esos archivos; son las lecciones de la auditoría (H, E, O, L) |
 | Hook antes de commit | `.claude/hooks/antes_de_commit.py` | Automático: bloquea `Co-Authored-By`, `?v=` desactualizados y `verificar_reglas.sh` en rojo; avisa si el mensaje no es `tipo(area): …` |
 
-Los agentes se lanzan solo cuando el usuario los pide. El plan y los hallazgos de la auditoría por uso real viven en
+Los agentes se lanzan solo cuando el usuario los pide, con una excepción que el usuario dejó fija:
+
+- **`revisor-seguridad` siempre en cambios de autenticación**, antes del commit: `routers/auth.py`, `security.py`,
+  las funciones de credenciales de `master_db.py`, `static/js/auth.js` y los formularios de login, perfil, contraseña,
+  recuperación o eliminación de cuenta en `static/index.html`. Sus hallazgos críticos o altos se arreglan antes del commit.
+
+El plan y los hallazgos de la auditoría por uso real viven en
 `~/app-plan/plan-auditoria-uso-real.md`.
 
 ## Cómo verificar
