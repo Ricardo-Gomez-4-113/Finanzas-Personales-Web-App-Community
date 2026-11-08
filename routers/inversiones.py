@@ -24,7 +24,7 @@ class InversionCreate(BaseModel):
     cantidad: float = Field(..., gt=0, le=1e9)
     precio_promedio: float = Field(..., gt=0, le=1e12)
     precio_actual: Optional[float] = Field(None, gt=0, le=1e12)
-    moneda: Optional[Literal['USD', 'MXN', 'EUR']] = "USD"
+    moneda: Optional[Literal['USD', 'MXN', 'EUR']] = None  # sin moneda: la que cotiza el mercado
 
 
 class InversionUpdate(BaseModel):
@@ -57,15 +57,17 @@ def _exigir_moneda_soportada(ticker: str, moneda: str) -> str:
 def crear_inversion(item: InversionCreate, conn: sqlite3.Connection = Depends(get_tenant_db)):
     ticker = item.ticker.strip().upper()
     precio_actual = item.precio_actual
-    moneda = (item.moneda or "USD").strip().upper()
+    moneda = item.moneda.strip().upper() if item.moneda else None
     
     if precio_actual is None or precio_actual <= 0:
         precio_mercado, moneda_mercado = consultar_precio_y_moneda_mercado(ticker)
         precio_actual = precio_mercado if precio_mercado else item.precio_promedio
         if precio_mercado:
             _exigir_moneda_soportada(ticker, moneda_mercado)
-            if not item.moneda:
+            if moneda is None:
                 moneda = moneda_mercado
+    if moneda is None:
+        moneda = "MXN" if ticker.endswith(".MX") else "USD"  # sin cotización ni moneda, como al sincronizar
 
     cursor = conn.cursor()
     try:

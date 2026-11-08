@@ -109,6 +109,24 @@ def test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client):
         assert client.post("/api/inversiones/sincronizar", headers=h).status_code == 422
 
 
+def test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client):
+    _crear_usuario("ruta_moneda_def")
+    h = _login(client, "ruta_moneda_def")
+    en_pesos = {"consultar_precio_y_moneda_mercado": lambda t: (65.0, "MXN")}
+    with _parchar(rinversiones, **en_pesos):
+        assert client.post("/api/inversiones", json={"ticker": "WALMEX.MX", "cantidad": 10, "precio_promedio": 60}, headers=h).status_code == 201
+        # Con moneda explícita manda la persona, no el mercado
+        assert client.post("/api/inversiones", json={"ticker": "AAA", "cantidad": 1, "precio_promedio": 5, "moneda": "USD"}, headers=h).status_code == 201
+    sin_cotizacion = {"consultar_precio_y_moneda_mercado": lambda t: (None, None)}
+    with _parchar(rinversiones, **sin_cotizacion):
+        for ticker in ("FEMSAUBD.MX", "VOO"):
+            assert client.post("/api/inversiones", json={"ticker": ticker, "cantidad": 1, "precio_promedio": 5}, headers=h).status_code == 201
+        # Con precio propio y sin moneda tampoco se consulta el mercado
+        assert client.post("/api/inversiones", json={"ticker": "GAP.MX", "cantidad": 1, "precio_promedio": 5, "precio_actual": 6}, headers=h).status_code == 201
+    monedas = {p["ticker"]: p["moneda"] for p in client.get("/api/inversiones", headers=h).json()["posiciones"]}
+    assert monedas == {"WALMEX.MX": "MXN", "AAA": "USD", "FEMSAUBD.MX": "MXN", "VOO": "USD", "GAP.MX": "MXN"}, monedas
+
+
 def test_monedas_no_soportadas_del_mercado_se_rechazan(client):
     _crear_usuario("ruta_gbp")
     h = _login(client, "ruta_gbp")
@@ -545,6 +563,7 @@ if __name__ == "__main__":
             (test_admin_lista_edita_suspende_y_elimina, lambda: test_admin_lista_edita_suspende_y_elimina(client, hadmin)),
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),
             (test_recuperacion_no_revela_cuentas_y_valida_el_codigo, lambda: test_recuperacion_no_revela_cuentas_y_valida_el_codigo(client)),
+            (test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado, lambda: test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client)),
             (test_cuenta_propia_se_elimina_y_deja_de_entrar, lambda: test_cuenta_propia_se_elimina_y_deja_de_entrar(client)),
             (test_eliminar_la_cuenta_exige_la_contrasena_actual, lambda: test_eliminar_la_cuenta_exige_la_contrasena_actual(client)),
             (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),

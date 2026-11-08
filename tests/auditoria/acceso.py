@@ -239,6 +239,8 @@ def eliminar_cuenta(ctx):
     res = _res("eliminar_cuenta", r, entrada={"usuario": nombre}, pre=pre, id=datos["id"], db_name=db_name,
                archivos_pre=archivos_pre, propia=propia,
                sin_clave=sin_clave, mala_clave=mala_clave)
+    if 200 in (sin_clave, mala_clave) and r.status_code != 200:
+        del cuentas[nombre]  # la app la borró sin la contraseña (se reporta en verificar): ya no hay cuenta que seguir usando
     if r.status_code == 200:
         del cuentas[nombre]
         ctx.tokens_borrados = getattr(ctx, "tokens_borrados", []) + [cab["Authorization"].split(" ", 1)[1]]
