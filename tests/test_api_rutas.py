@@ -326,8 +326,20 @@ def test_recuperacion_no_revela_cuentas_y_valida_el_codigo(client):
 def test_cuenta_propia_se_elimina_y_deja_de_entrar(client):
     _crear_usuario("ruta_borrar")
     h = _login(client, "ruta_borrar")
-    assert client.delete("/auth/delete-account", headers=h).status_code == 200
+    assert client.request("DELETE", "/auth/delete-account", json={"current_password": PASS}, headers=h).status_code == 200
     assert client.post("/auth/login", json={"username": "ruta_borrar", "password": PASS}).status_code == 401
+
+
+def test_eliminar_la_cuenta_exige_la_contrasena_actual(client):
+    _crear_usuario("ruta_borrar_clave")
+    h = _login(client, "ruta_borrar_clave")
+    borrar = lambda cuerpo: client.request("DELETE", "/auth/delete-account", json=cuerpo, headers=h) if cuerpo is not None else client.delete("/auth/delete-account", headers=h)
+    # Con solo el token no se borra nada: ni sin cuerpo, ni sin contraseña, ni con una incorrecta
+    for cuerpo in (None, {}, {"current_password": ""}, {"current_password": "Otra#clave99"}):
+        assert borrar(cuerpo).status_code == 400, cuerpo
+    assert client.post("/auth/login", json={"username": "ruta_borrar_clave", "password": PASS}).status_code == 200
+    assert borrar({"current_password": PASS}).status_code == 200
+    assert client.post("/auth/login", json={"username": "ruta_borrar_clave", "password": PASS}).status_code == 401
 
 
 def test_salud_detalle_es_solo_de_administradores(client):
@@ -534,6 +546,7 @@ if __name__ == "__main__":
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),
             (test_recuperacion_no_revela_cuentas_y_valida_el_codigo, lambda: test_recuperacion_no_revela_cuentas_y_valida_el_codigo(client)),
             (test_cuenta_propia_se_elimina_y_deja_de_entrar, lambda: test_cuenta_propia_se_elimina_y_deja_de_entrar(client)),
+            (test_eliminar_la_cuenta_exige_la_contrasena_actual, lambda: test_eliminar_la_cuenta_exige_la_contrasena_actual(client)),
             (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),

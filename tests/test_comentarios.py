@@ -42,6 +42,10 @@ def _crear_usuario(nombre):
     return master_db.create_user_entry(nombre, security.hash_password(PASS), email=f"{nombre}@test.local")
 
 
+def _borrar_cuenta(client, cabecera):
+    return client.request("DELETE", "/auth/delete-account", json={"current_password": PASS}, headers=cabecera)
+
+
 def _login(client, usuario):
     r = client.post("/auth/login", json={"username": usuario, "password": PASS})
     assert r.status_code == 200, r.text
@@ -98,7 +102,7 @@ def test_al_eliminar_la_cuenta_el_comentario_se_conserva_sin_autor(client):
     h = _login(client, "com_borrar")
     r = client.post("/api/comentarios", json={"tipo": "error", "mensaje": "el boton de guardar falla"}, headers=h)
     assert r.status_code == 201, r.text
-    assert client.delete("/auth/delete-account", headers=h).status_code == 200
+    assert _borrar_cuenta(client, h).status_code == 200
     fila = _fila_en_base(r.json()["id"])
     assert fila is not None and fila[0] is None and fila[2] == "el boton de guardar falla", fila
 

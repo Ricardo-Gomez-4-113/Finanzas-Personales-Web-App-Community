@@ -226,6 +226,8 @@ export function abrirModalEditarUsuario(id, username, role, email) {
         dangerZone.open = false;
         const confirmar = document.getElementById('eliminar-cuenta-confirmar');
         if (confirmar) confirmar.value = '';
+        const contrasenaEliminar = document.getElementById('eliminar-cuenta-contrasena');
+        if (contrasenaEliminar) contrasenaEliminar.value = '';
         const botonEliminar = document.getElementById('btn-eliminar-cuenta-confirmar');
         if (botonEliminar) botonEliminar.disabled = true;
     }
@@ -364,7 +366,7 @@ export function actualizarConfirmacionEliminarCuenta() {
 
 /**
  * Permite a un usuario estándar eliminar definitivamente su propia cuenta y todos sus datos.
- * Bloquea la acción para administradores del sistema y exige escribir el nombre de usuario.
+ * Bloquea la acción para administradores del sistema y exige el nombre de usuario y la contraseña actual.
  */
 export async function eliminarMiCuenta() {
     if (!estado.usuarioActual) return;
@@ -380,9 +382,17 @@ export async function eliminarMiCuenta() {
         return;
     }
 
+    const contrasena = document.getElementById('eliminar-cuenta-contrasena')?.value || '';
+    if (!contrasena) {
+        toast("Escribe tu contraseña actual para eliminar la cuenta.", 'error');
+        return;
+    }
+
     try {
         const res = await apiFetch('/auth/delete-account', {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: contrasena })
         });
 
         if (res.ok) {

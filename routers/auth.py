@@ -50,6 +50,10 @@ class UserUpdateRequest(BaseModel):
     email: Optional[str] = Field(None, max_length=120, description="Correo electrónico del usuario")
 
 
+class EliminarCuentaRequest(BaseModel):
+    current_password: Optional[str] = Field(None, max_length=72, description="Contraseña actual: obligatoria para eliminar la cuenta")
+
+
 class ForgotPasswordRequest(BaseModel):
     identifier: str = Field(..., min_length=2, max_length=120, description="Nombre de usuario o correo electrónico")
 
@@ -61,7 +65,7 @@ class ResetPasswordRequest(BaseModel):
 
 
 def exigir_contrasena_actual(user_id: int, contrasena_actual: Optional[str]) -> None:
-    """Cambiar la propia contraseña exige la actual. Los intentos fallidos comparten el control de tasa del login."""
+    """Cambiar la propia contraseña o eliminar la cuenta exige la actual. Los intentos fallidos comparten el control de tasa del login."""
     clave_tasa = f"perfil:{user_id}"
     reservar_intento_login(clave_tasa)
     usuario = master_db.get_user_by_id(user_id)
@@ -170,9 +174,10 @@ def editar_mi_perfil(req: UserUpdateRequest, current_user: Dict[str, Any] = Depe
     }
 
 @router.delete("/auth/delete-account", summary="Eliminar permanentemente la cuenta del usuario activo")
-def eliminar_mi_cuenta(current_user: Dict[str, Any] = Depends(verify_token)):
+def eliminar_mi_cuenta(req: Optional[EliminarCuentaRequest] = None, current_user: Dict[str, Any] = Depends(verify_token)):
     """
     Permite a los usuarios estándar eliminar permanentemente su propia cuenta y su base de datos tenant.
+    Exige la contraseña actual: un token robado o una sesión abierta no bastan para borrar todo.
     Regla de Seguridad: Los administradores NO pueden eliminar su propia cuenta a través de este endpoint.
     """
     user_id = current_user["id"]
@@ -187,6 +192,8 @@ def eliminar_mi_cuenta(current_user: Dict[str, Any] = Depends(verify_token)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Los administradores del sistema no pueden eliminar su propia cuenta."
         )
+
+    exigir_contrasena_actual(user_id, req.current_password if req else None)
 
     eliminado = master_db.delete_user_and_tenant(user_id)
     if not eliminado:

@@ -1226,6 +1226,14 @@ def test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base):
         assert page.is_disabled(boton), "un nombre parecido no basta"
         page.fill("#eliminar-cuenta-confirmar", usuario)
         _esperar(page, "!document.getElementById('btn-eliminar-cuenta-confirmar').disabled")
+        page.click(boton)  # sin contraseña no se borra: avisa y la cuenta sigue
+        page.wait_for_selector(".toast-error", timeout=5000)
+        assert page.is_visible("#danger-zone-eliminar-cuenta"), "sin contraseña la cuenta no se elimina"
+        page.fill("#eliminar-cuenta-contrasena", clave + "x")
+        page.click(boton)  # contraseña incorrecta: el servidor lo rechaza
+        _esperar(page, "document.querySelectorAll('.toast-error').length >= 1")
+        assert page.is_visible("#danger-zone-eliminar-cuenta"), "con una contraseña incorrecta la cuenta no se elimina"
+        page.fill("#eliminar-cuenta-contrasena", clave)
         page.click(boton)
         page.wait_for_selector("#form-login", state="visible", timeout=15000)
         assert not errores, errores

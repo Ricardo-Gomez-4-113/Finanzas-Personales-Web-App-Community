@@ -233,9 +233,12 @@ def eliminar_cuenta(ctx):
     db_name = next((u[4] for u in pre if u[0] == datos["id"]), None)
     archivos_pre = _base(ctx).archivos()
     propia = ctx.oraculo.volcado()
-    r = ctx.cliente.request("DELETE", "/auth/delete-account", headers=cab)
+    sin_clave = ctx.cliente.request("DELETE", "/auth/delete-account", headers=cab).status_code
+    mala_clave = ctx.cliente.request("DELETE", "/auth/delete-account", json={"current_password": "Mala#clave999"}, headers=cab).status_code
+    r = ctx.cliente.request("DELETE", "/auth/delete-account", json={"current_password": datos["password"]}, headers=cab)
     res = _res("eliminar_cuenta", r, entrada={"usuario": nombre}, pre=pre, id=datos["id"], db_name=db_name,
-               archivos_pre=archivos_pre, propia=propia)
+               archivos_pre=archivos_pre, propia=propia,
+               sin_clave=sin_clave, mala_clave=mala_clave)
     if r.status_code == 200:
         del cuentas[nombre]
         ctx.tokens_borrados = getattr(ctx, "tokens_borrados", []) + [cab["Authorization"].split(" ", 1)[1]]
@@ -423,6 +426,8 @@ def verificar(nombre, res, oraculo, saldo_api):
             if res.get("login_viejo") == 200:
                 problemas.append("el nombre viejo sigue entrando")
     elif nombre == "eliminar_cuenta":
+        if res.get("sin_clave") != 400 or res.get("mala_clave") != 400:
+            problemas.append(f"borrar la cuenta sin contraseña respondió {res.get('sin_clave')} y con una incorrecta {res.get('mala_clave')}; ambas debían ser 400")
         if codigo != 200:
             problemas.append(f"eliminar la propia cuenta respondió {codigo}")
         else:
