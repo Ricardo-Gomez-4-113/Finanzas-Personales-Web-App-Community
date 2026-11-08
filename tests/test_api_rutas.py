@@ -312,12 +312,78 @@ def test_admin_lista_edita_suspende_y_elimina(client, hadmin):
     assert client.patch(f"/admin/users/{uid}/status", json={"is_active": False}, headers=hadmin).status_code == 200
     assert client.post("/auth/login", json={"username": "ruta_adm", "password": PASS}).status_code in (401, 403)
     assert client.patch(f"/admin/users/{uid}/status", json={"is_active": True}, headers=hadmin).status_code == 200
-    assert client.patch(f"/admin/users/{uid}", json={"email": "adm@test.local", "role": "admin"}, headers=hadmin).status_code == 200
+    clave_admin = {"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}
+    # Cambiar el rol pide la contraseña del administrador; el correo solo, no
+    assert client.patch(f"/admin/users/{uid}", json={"email": "adm@test.local", "role": "admin"}, headers=hadmin).status_code == 400
+    # El correo de otra cuenta tampoco se cambia sin la contraseña: con él se recuperaría la cuenta
+    assert client.patch(f"/admin/users/{uid}", json={"email": "adm@test.local"}, headers=hadmin).status_code == 400
+    assert client.patch(f"/admin/users/{uid}", json={"username": "ruta_adm_otro"}, headers=hadmin).status_code == 400
+    assert client.patch(f"/admin/users/{uid}", json={"email": "adm@test.local", **clave_admin}, headers=hadmin).status_code == 200
+    # El nombre «admin» es solo de la cuenta principal
+    assert client.patch(f"/admin/users/{uid}", json={"username": "Admin", **clave_admin}, headers=hadmin).status_code == 400
+    assert client.post("/admin/users", json={"username": "ADMIN", "password": PASS, "role": "user"}, headers=hadmin).status_code == 400
+    assert client.patch(f"/admin/users/{uid}", json={"role": "admin", **clave_admin}, headers=hadmin).status_code == 200
+    # Un administrador no se suspende ni se elimina: primero se le quita el rol
+    assert client.patch(f"/admin/users/{uid}/status", json={"is_active": False}, headers=hadmin).status_code == 400
+    assert client.request("DELETE", f"/admin/users/{uid}", json=clave_admin, headers=hadmin).status_code == 400
+    assert client.patch(f"/admin/users/{uid}", json={"role": "user", **clave_admin}, headers=hadmin).status_code == 200
     assert client.patch(f"/admin/users/{uid}", json={"password": "corta"}, headers=hadmin).status_code == 422
     assert client.patch("/admin/users/999999", json={"email": "x@test.local"}, headers=hadmin).status_code == 404
     assert client.patch("/admin/users/999999/status", json={"is_active": False}, headers=hadmin).status_code == 404
-    assert client.delete(f"/admin/users/{uid}", headers=hadmin).status_code == 200
-    assert client.delete(f"/admin/users/{uid}", headers=hadmin).status_code == 404
+    borrar = lambda cuerpo: client.request("DELETE", f"/admin/users/{uid}", json=cuerpo, headers=hadmin)
+    # Un token de administrador no basta: sin contraseña o con una incorrecta no se borra nada
+    assert client.delete(f"/admin/users/{uid}", headers=hadmin).status_code == 400
+    assert borrar({"current_password": ""}).status_code == 400
+    assert borrar({"current_password": "Otra#clave99"}).status_code == 400
+    assert client.post("/auth/login", json={"username": "ruta_adm", "password": PASS}).status_code == 200
+    assert borrar({"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}).status_code == 200
+    assert borrar({"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}).status_code == 404
+
+
+def test_credenciales_de_otros_y_nuevos_administradores_piden_la_contrasena_del_admin(client, hadmin):
+    """Con un token de administrador robado no se cambia la contraseña de nadie ni se fabrica otro administrador."""
+    clave_admin = {"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}
+    mala = {"current_password": "Otra#clave99"}
+    # Crear un administrador: sin contraseña o con una incorrecta, 400 y no se crea; con la correcta, sí
+    cuerpo = {"username": "ruta_adm2", "password": PASS, "role": "admin"}
+    assert client.post("/admin/users", json=cuerpo, headers=hadmin).status_code == 400
+    assert client.post("/admin/users", json={**cuerpo, **mala}, headers=hadmin).status_code == 400
+    assert client.post("/auth/login", json={"username": "ruta_adm2", "password": PASS}).status_code == 401
+    assert client.post("/admin/users", json={**cuerpo, **clave_admin}, headers=hadmin).status_code == 201
+    # Cambiar la contraseña de otra persona
+    r = client.post("/admin/users", json={"username": "ruta_otra", "password": PASS, "role": "user"}, headers=hadmin)
+    assert r.status_code == 201, r.text
+    otra = r.json()["user"]["id"]
+    assert client.patch(f"/admin/users/{otra}", json={"password": "Nueva#Clave2026"}, headers=hadmin).status_code == 400
+    assert client.patch(f"/admin/users/{otra}", json={"password": "Nueva#Clave2026", **mala}, headers=hadmin).status_code == 400
+    assert client.post("/auth/login", json={"username": "ruta_otra", "password": PASS}).status_code == 200
+    assert client.patch(f"/admin/users/{otra}", json={"password": "Nueva#Clave2026", **clave_admin}, headers=hadmin).status_code == 200
+    assert client.post("/auth/login", json={"username": "ruta_otra", "password": "Nueva#Clave2026"}).status_code == 200
+    # El segundo administrador no edita la cuenta principal (ni su contraseña ni su correo)
+    h2 = _login(client, "ruta_adm2")
+    assert client.patch("/admin/users/1", json={"email": "x@test.local"}, headers=h2).status_code == 400
+    assert client.patch("/admin/users/1", json={"password": "Robada#2026", "current_password": PASS}, headers=h2).status_code == 400
+    assert client.post("/auth/login", json={"username": "admin", "password": os.environ["DEFAULT_ADMIN_PASSWORD"]}).status_code == 200
+    # Ni la suspende ni la elimina, y tampoco al otro administrador
+    assert client.patch("/admin/users/1/status", json={"is_active": False}, headers=h2).status_code == 400
+    id_adm2 = next(u["id"] for u in client.get("/admin/users", headers=hadmin).json() if u["username"] == "ruta_adm2")
+    assert client.request("DELETE", f"/admin/users/{id_adm2}", json=clave_admin, headers=hadmin).status_code == 400
+
+
+def test_correo_sin_forma_de_correo_se_rechaza_y_la_recuperacion_busca_primero_el_nombre(client, hadmin):
+    """Si B pudiera tener como correo el nombre de A, «olvidé mi contraseña» con ese nombre encontraría a B."""
+    # El que se crea primero (id menor) es B, con un correo igual al nombre de A: sin preferencia, SQLite lo devolvería
+    master_db.create_user_entry("ruta_b_correo", security.hash_password(PASS), email="ruta_a_nombre")
+    master_db.create_user_entry("ruta_a_nombre", security.hash_password(PASS), email="a@test.local")
+    assert master_db.get_user_by_identifier("ruta_a_nombre")["username"] == "ruta_a_nombre"
+    assert master_db.get_user_by_identifier("RUTA_A_NOMBRE")["username"] == "ruta_a_nombre"
+    # Por la API ya no se puede guardar un correo sin forma de correo; vacío sí, para quitarlo
+    clave_admin = {"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}
+    assert client.post("/admin/users", json={"username": "ruta_c_correo", "password": PASS, "email": "otro_nombre"}, headers=hadmin).status_code == 422
+    h = _login(client, "ruta_a_nombre")
+    assert client.patch("/auth/profile", json={"email": "admin", "current_password": PASS}, headers=h).status_code == 422
+    assert client.patch("/auth/profile", json={"email": "", "current_password": PASS}, headers=h).status_code == 200
+    assert client.patch("/auth/profile", json={"email": "nuevo@test.local", "current_password": PASS}, headers=h).status_code == 200
 
 
 def test_perfil_propio_se_lee_y_se_edita(client):
@@ -325,8 +391,12 @@ def test_perfil_propio_se_lee_y_se_edita(client):
     h = _login(client, "ruta_perfil")
     r = client.get("/auth/me", headers=h)
     assert r.status_code == 200 and r.json()["user"]["username"] == "ruta_perfil", r.text
-    assert client.patch("/auth/profile", json={"email": "perfil@test.local"}, headers=h).status_code == 200
-    assert client.patch("/auth/profile", json={"username": "usuario_a"}, headers=h).status_code == 400
+    assert client.patch("/auth/profile", json={"email": "perfil@test.local"}, headers=h).status_code == 400
+    assert client.patch("/auth/profile", json={"email": "perfil@test.local", "current_password": PASS}, headers=h).status_code == 200
+    # Mandar el mismo nombre y correo que ya tiene (como hace la pantalla) no pide contraseña
+    assert client.patch("/auth/profile", json={"username": "ruta_perfil", "email": "PERFIL@test.local"}, headers=h).status_code == 200
+    assert client.patch("/auth/profile", json={"username": "usuario_a", "current_password": PASS}, headers=h).status_code == 400
+    assert client.patch("/auth/profile", json={"username": "ADMIN", "current_password": PASS}, headers=h).status_code == 400
     assert client.patch("/auth/profile", json={"username": "no válido!"}, headers=h).status_code == 422
 
 
@@ -358,6 +428,23 @@ def test_eliminar_la_cuenta_exige_la_contrasena_actual(client):
     assert client.post("/auth/login", json={"username": "ruta_borrar_clave", "password": PASS}).status_code == 200
     assert borrar({"current_password": PASS}).status_code == 200
     assert client.post("/auth/login", json={"username": "ruta_borrar_clave", "password": PASS}).status_code == 401
+
+
+def test_contrasena_con_acentos_de_mas_de_72_bytes_da_422_y_no_500(client):
+    """El tope de 72 es de bcrypt y se cuenta en bytes: 40 eñes son 40 caracteres pero 80 bytes."""
+    larga, cabe = "ñ" * 40, "ñ" * 30 + "Ab#1"
+    ha = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
+    assert client.post("/admin/users", json={"username": "ruta_enie", "password": larga, "role": "user"}, headers=ha).status_code == 422
+    assert client.post("/admin/users", json={"username": "ruta_enie", "password": cabe, "role": "user"}, headers=ha).status_code == 201
+    h = _login(client, "ruta_enie", cabe)
+    assert client.patch("/auth/profile", json={"password": larga, "current_password": cabe}, headers=h).status_code == 422
+    # El tope en bytes no quita los de longitud del campo opcional: corta sigue en 422, en el perfil y en admin
+    assert client.patch("/auth/profile", json={"password": "Ab#1ñ56", "current_password": cabe}, headers=h).status_code == 422
+    id_enie = next(u["id"] for u in client.get("/admin/users", headers=ha).json() if u["username"] == "ruta_enie")
+    assert client.patch(f"/admin/users/{id_enie}", json={"password": larga}, headers=ha).status_code == 422
+    assert client.patch(f"/admin/users/{id_enie}", json={"password": "Ab#1ñ56"}, headers=ha).status_code == 422
+    assert client.post("/auth/reset-password", json={"identifier": "ruta_enie", "code": "123456", "new_password": larga}).status_code == 422
+    assert client.post("/auth/login", json={"username": "ruta_enie", "password": cabe}).status_code == 200
 
 
 def test_salud_detalle_es_solo_de_administradores(client):
@@ -561,10 +648,13 @@ if __name__ == "__main__":
             (test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real, lambda: test_vista_previa_de_la_exportacion_no_cambia_nada_y_coincide_con_la_real(client)),
             (test_recurrentes_listar_editar_saltar_y_borrar, lambda: test_recurrentes_listar_editar_saltar_y_borrar(client)),
             (test_admin_lista_edita_suspende_y_elimina, lambda: test_admin_lista_edita_suspende_y_elimina(client, hadmin)),
+            (test_credenciales_de_otros_y_nuevos_administradores_piden_la_contrasena_del_admin, lambda: test_credenciales_de_otros_y_nuevos_administradores_piden_la_contrasena_del_admin(client, hadmin)),
+            (test_correo_sin_forma_de_correo_se_rechaza_y_la_recuperacion_busca_primero_el_nombre, lambda: test_correo_sin_forma_de_correo_se_rechaza_y_la_recuperacion_busca_primero_el_nombre(client, hadmin)),
             (test_perfil_propio_se_lee_y_se_edita, lambda: test_perfil_propio_se_lee_y_se_edita(client)),
             (test_recuperacion_no_revela_cuentas_y_valida_el_codigo, lambda: test_recuperacion_no_revela_cuentas_y_valida_el_codigo(client)),
             (test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado, lambda: test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client)),
             (test_cuenta_propia_se_elimina_y_deja_de_entrar, lambda: test_cuenta_propia_se_elimina_y_deja_de_entrar(client)),
+            (test_contrasena_con_acentos_de_mas_de_72_bytes_da_422_y_no_500, lambda: test_contrasena_con_acentos_de_mas_de_72_bytes_da_422_y_no_500(client)),
             (test_eliminar_la_cuenta_exige_la_contrasena_actual, lambda: test_eliminar_la_cuenta_exige_la_contrasena_actual(client)),
             (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),

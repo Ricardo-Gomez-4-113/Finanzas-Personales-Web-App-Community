@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=a6ce6e25c5">
-    <link rel="stylesheet" href="/static/css/layout.css?v=a6ce6e25c5">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=a6ce6e25c5">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=a6ce6e25c5">
-    <link rel="stylesheet" href="/static/css/tema.css?v=a6ce6e25c5">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=5de4ec0837">
+    <link rel="stylesheet" href="/static/css/layout.css?v=5de4ec0837">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=5de4ec0837">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=5de4ec0837">
+    <link rel="stylesheet" href="/static/css/tema.css?v=5de4ec0837">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -63,12 +63,12 @@
             <form id="form-login" data-on-submit='[["iniciarSesion", "$event"]]'>
                 <div class="form-group">
                     <label for="login-username">Usuario</label>
-                    <input type="text" id="login-username" placeholder="Tu nombre de usuario" required autocomplete="username">
+                    <input type="text" id="login-username" maxlength="50" placeholder="Tu nombre de usuario" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="login-password">Contraseña</label>
                     <div class="campo-clave">
-                        <input type="password" id="login-password" placeholder="Tu contraseña" required autocomplete="current-password">
+                        <input type="password" id="login-password" maxlength="72" placeholder="Tu contraseña" required autocomplete="current-password">
                         <button type="button" class="btn-ver-clave" aria-label="Mostrar contraseña" aria-pressed="false" data-on-click='[["alternarVerClave", "$this"]]'>
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
@@ -1212,6 +1212,10 @@
                         <label for="eliminar-usuario-confirmar">Escribe el nombre de usuario para confirmar</label>
                         <input type="text" id="eliminar-usuario-confirmar" autocomplete="off">
                     </div>
+                    <div class="form-group">
+                        <label for="eliminar-usuario-contrasena">Tu contraseña de administrador</label>
+                        <input type="password" id="eliminar-usuario-contrasena" maxlength="72" autocomplete="current-password" placeholder="Para confirmar que eres tú">
+                    </div>
                     <p class="modal-nota">Si solo quieres bloquear su acceso, suspende la cuenta desde el menú de la fila.</p>
                 </div>
                 <div class="modal-actions">
@@ -1409,10 +1413,14 @@
                 </div>
                 <div class="form-group">
                     <label for="nuevo-user-role">Rol de acceso</label>
-                    <select id="nuevo-user-role">
+                    <select id="nuevo-user-role" data-on-change='[["actualizarClaveAdminNuevo"]]'>
                         <option value="user" selected>Usuario estándar (solo su base de datos)</option>
                         <option value="admin">Administrador (acceso total y gestión)</option>
                     </select>
+                </div>
+                <div class="form-group hidden" id="group-nuevo-user-admin-clave">
+                    <label for="nuevo-user-admin-clave">Tu contraseña de administrador</label>
+                    <input type="password" id="nuevo-user-admin-clave" maxlength="72" autocomplete="current-password" placeholder="Para crear otro administrador">
                 </div>
                 <p class="modal-nota">Se aprovisionará automáticamente un archivo SQLite independiente para este usuario.</p>
                 <div class="modal-actions">
@@ -1443,17 +1451,17 @@
                 
                 <div class="form-group">
                     <label for="edit-user-username">Nombre de usuario</label>
-                    <input type="text" id="edit-user-username" required minlength="3" placeholder="Nuevo nombre de usuario" autocomplete="off" pattern="^[a-zA-Z0-9_\-]+$">
+                    <input type="text" id="edit-user-username" required minlength="3" maxlength="50" data-on-input='[["actualizarCamposContrasena"]]' placeholder="Nuevo nombre de usuario" autocomplete="off" pattern="^[a-zA-Z0-9_\-]+$">
                 </div>
 
                 <div class="form-group">
                     <label for="edit-user-email">Correo electrónico</label>
-                    <input type="email" id="edit-user-email" placeholder="ejemplo@gmail.com" autocomplete="email">
+                    <input type="email" id="edit-user-email" data-on-input='[["actualizarCamposContrasena"]]' placeholder="ejemplo@gmail.com" autocomplete="email">
                 </div>
                 <p class="modal-nota">Utilizado para recibir códigos de recuperación de contraseña.</p>
                 
                 <div class="form-group hidden" id="group-edit-user-current-password">
-                    <label for="edit-user-current-password">Contraseña actual</label>
+                    <label for="edit-user-current-password" id="lbl-edit-user-current-password">Contraseña actual</label>
                     <input type="password" id="edit-user-current-password" maxlength="72" autocomplete="current-password" placeholder="Para confirmar que eres tú">
                 </div>
 
@@ -1465,7 +1473,7 @@
                 
                 <div class="form-group" id="group-edit-user-role">
                     <label for="edit-user-role">Rol de acceso</label>
-                    <select id="edit-user-role">
+                    <select id="edit-user-role" data-on-change='[["actualizarCamposContrasena"]]'>
                         <option value="user">Usuario estándar (solo su base de datos)</option>
                         <option value="admin">Administrador (acceso total y gestión)</option>
                     </select>
@@ -1835,7 +1843,7 @@
                 </p>
                 <div class="form-group">
                     <label for="recuperar-identifier">Usuario o correo</label>
-                    <input type="text" id="recuperar-identifier" required placeholder="Tu nombre de usuario o correo" autocomplete="username">
+                    <input type="text" id="recuperar-identifier" required maxlength="120" placeholder="Tu nombre de usuario o correo" autocomplete="username">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-on-click='[["cerrarModalRecuperarPassword"]]'>Cancelar</button>
@@ -2064,7 +2072,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=a6ce6e25c5"></script>
+    <script type="module" src="/static/js/main.js?v=5de4ec0837"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

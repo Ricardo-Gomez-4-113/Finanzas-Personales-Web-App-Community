@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 from fastapi import HTTPException, status, Depends, Request, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
+from typing import Annotated
 from typing import Literal, Optional, Dict, Any
 
 import master_db
@@ -17,11 +18,19 @@ from security import (
     limpiar_fallos_login,
     obtener_ip_cliente,
     hash_password,
+    clave_cabe_en_bcrypt,
     verify_password,
     create_access_token,
     verify_token
 )
 from finanzas_core import ahora_local
+
+# Un correo tiene forma de correo (o va vacío para quitarlo): si no, alguien podría poner como correo el nombre de
+# otra persona y la recuperación por nombre encontraría su cuenta en vez de la de ella
+PATRON_CORREO = r"^(|[^@\s]+@[^@\s]+\.[^@\s]+)$"
+
+# Contraseña que se va a guardar: además de max_length, cabe en los 72 bytes de bcrypt
+ClaveNueva = Annotated[str, AfterValidator(clave_cabe_en_bcrypt)]
 
 router = APIRouter()
 
@@ -33,9 +42,9 @@ class LoginRequest(BaseModel):
 
 class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Nombre de usuario alfanumérico")
-    password: str = Field(..., min_length=8, max_length=72, description="Contraseña de acceso (mínimo 8 caracteres)")
+    password: ClaveNueva = Field(..., min_length=8, max_length=72, description="Contraseña de acceso (mínimo 8 caracteres)")
     role: Literal['admin', 'user'] = Field('user', description="Rol del usuario: 'admin' o 'user'")
-    email: Optional[str] = Field(None, max_length=120, description="Correo electrónico para recuperación de contraseña")
+    email: Optional[str] = Field(None, max_length=120, pattern=PATRON_CORREO, description="Correo electrónico para recuperación de contraseña")
 
 
 class UserStatusRequest(BaseModel):
@@ -44,10 +53,10 @@ class UserStatusRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Nuevo nombre de usuario")
-    password: Optional[str] = Field(None, min_length=8, max_length=72, description="Nueva contraseña, mínimo 8 caracteres (dejar en blanco para no cambiar)")
+    password: Optional[ClaveNueva] = Field(None, min_length=8, max_length=72, description="Nueva contraseña, mínimo 8 caracteres (dejar en blanco para no cambiar)")
     current_password: Optional[str] = Field(None, max_length=72, description="Contraseña actual: obligatoria para cambiar la propia contraseña")
     role: Optional[Literal['admin', 'user']] = Field(None, description="Rol del usuario: 'admin' o 'user'")
-    email: Optional[str] = Field(None, max_length=120, description="Correo electrónico del usuario")
+    email: Optional[str] = Field(None, max_length=120, pattern=PATRON_CORREO, description="Correo electrónico del usuario (vacío para quitarlo)")
 
 
 class EliminarCuentaRequest(BaseModel):
@@ -61,7 +70,32 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     identifier: str = Field(..., min_length=2, max_length=120, description="Nombre de usuario o correo electrónico")
     code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="Código numérico de 6 dígitos")
-    new_password: str = Field(..., min_length=8, max_length=72, description="Nueva contraseña (mínimo 8 caracteres)")
+    new_password: ClaveNueva = Field(..., min_length=8, max_length=72, description="Nueva contraseña (mínimo 8 caracteres)")
+
+
+NOMBRE_RESERVADO = "admin"  # solo para la cuenta principal (id 1)
+
+
+def exigir_nombre_libre(nombre: Optional[str], user_id: Optional[int] = None) -> None:
+    """Nadie más se llama «admin»: si no, una cuenta comprometida podría hacerse pasar por la principal."""
+    if nombre and nombre.strip().lower() == NOMBRE_RESERVADO and user_id != 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El nombre «admin» está reservado para la cuenta principal.")
+
+
+def _correo_comparable(correo: Optional[str]) -> str:
+    """Minúsculas solo en ASCII: con unicode, «K» (Kelvin) y «k» se igualarían aunque el correo guardado cambie."""
+    correo = (correo or "").strip()
+    return correo.lower() if correo.isascii() else correo
+
+
+def cambia_identidad(req: "UserUpdateRequest", user: Dict[str, Any]) -> bool:
+    """El nombre y el correo también son credenciales: con el nombre se entra y con el correo se recupera la cuenta.
+    Se compara con lo guardado, porque la pantalla manda ambos aunque no cambien."""
+    if req.username is not None and req.username.strip() != user["username"]:
+        return True
+    if req.email is not None and _correo_comparable(req.email) != _correo_comparable(user.get("email")):
+        return True
+    return False
 
 
 def exigir_contrasena_actual(user_id: int, contrasena_actual: Optional[str]) -> None:
@@ -142,11 +176,15 @@ def get_mi_perfil(current_user: Dict[str, Any] = Depends(verify_token)):
 def editar_mi_perfil(req: UserUpdateRequest, current_user: Dict[str, Any] = Depends(verify_token)):
     """
     Permite al usuario autenticado modificar su propio nombre de usuario, correo y/o contraseña.
+    Cualquiera de los tres exige la contraseña actual: con un token robado no se cambia el correo para recuperar la cuenta.
     """
     user_id = current_user["id"]
-    pwd_hash = hash_password(req.password) if (req.password and req.password.strip()) else None
-    if pwd_hash:
+    guardado = master_db.get_user_by_id(user_id)
+    exigir_nombre_libre(req.username, user_id)
+    cambia_clave = bool(req.password and req.password.strip())
+    if cambia_clave or cambia_identidad(req, guardado):  # primero la contraseña actual (con su control de tasa), después bcrypt
         exigir_contrasena_actual(user_id, req.current_password)
+    pwd_hash = hash_password(req.password) if cambia_clave else None
 
     try:
         user_actualizado = master_db.update_user(

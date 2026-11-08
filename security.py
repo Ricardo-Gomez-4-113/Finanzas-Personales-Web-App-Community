@@ -74,6 +74,17 @@ ACCESS_TOKEN_EXPIRE_HOURS = 8
 # Esquema OAuth2 con auto_error=False para personalizar la respuesta 401
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
+LIMITE_BYTES_CLAVE = 72  # bcrypt no acepta más: los acentos y la ñ ocupan dos bytes
+
+
+def clave_cabe_en_bcrypt(clave: Optional[str]) -> Optional[str]:
+    """Validador de Pydantic para contraseñas nuevas: el tope de 72 se cuenta en bytes, no en caracteres.
+    Sin esto, una clave de 40 eñes pasa `max_length=72` y bcrypt la rechaza con un 500."""
+    if clave is not None and len(clave.encode("utf-8")) > LIMITE_BYTES_CLAVE:
+        raise ValueError("La contraseña es demasiado larga: los acentos y la ñ cuentan doble; usa una más corta.")
+    return clave
+
+
 def hash_password(plain_password: str) -> str:
     """Genera un hash seguro utilizando bcrypt con salt automático."""
     pwd_bytes = plain_password.encode("utf-8")

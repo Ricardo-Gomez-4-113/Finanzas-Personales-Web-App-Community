@@ -201,9 +201,10 @@ def get_user_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
             """
             SELECT * FROM users 
             WHERE LOWER(username) = LOWER(?) OR (email IS NOT NULL AND LOWER(email) = LOWER(?))
+            ORDER BY (LOWER(username) = LOWER(?)) DESC
             LIMIT 1
             """,
-            (ident, ident)
+            (ident, ident, ident)
         ).fetchone()
         return dict(row) if row else None
     finally:

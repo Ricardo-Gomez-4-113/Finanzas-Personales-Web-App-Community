@@ -868,9 +868,26 @@ def test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base):
         assert page.is_disabled("#btn-confirmar-eliminar"), "un nombre parcial no habilita el botón"
         page.fill("#eliminar-usuario-confirmar", otro)
         assert page.is_enabled("#btn-confirmar-eliminar")
+        # Con el nombre correcto pero una contraseña de administrador incorrecta no se borra y el cuadro sigue abierto
+        page.fill("#eliminar-usuario-contrasena", "Incorrecta#123")
+        page.click("#btn-confirmar-eliminar")
+        page.wait_for_selector(".toast-error", timeout=10000)
+        assert page.is_visible("#modal-eliminar-usuario"), "con contraseña incorrecta el cuadro sigue abierto"
+        assert page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=otro).count() == 1, "contraseña incorrecta no borra"
         page.click("#btn-cancelar-eliminar")
         page.wait_for_selector("#modal-eliminar-usuario.hidden", state="attached")
+        assert page.input_value("#eliminar-usuario-contrasena") == "", "al cerrar, la contraseña no se queda en el campo"
         assert page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=otro).count() == 1, "cancelar no borra"
+        # Con la contraseña correcta sí se borra
+        fila.locator("button[aria-haspopup='menu']").click()
+        page.locator(".admin-menu:not([hidden]) .admin-menu-peligro").click()
+        page.wait_for_selector("#modal-eliminar-usuario:not(.hidden)")
+        assert page.input_value("#eliminar-usuario-contrasena") == "", "la contraseña no se queda escrita al reabrir"
+        page.fill("#eliminar-usuario-confirmar", otro)
+        page.fill("#eliminar-usuario-contrasena", CLAVE)  # la del administrador que está en sesión
+        page.click("#btn-confirmar-eliminar")
+        page.wait_for_selector("#modal-eliminar-usuario.hidden", state="attached")
+        _esperar(page, f"!document.getElementById('tabla-usuarios-admin').innerText.includes({json.dumps(otro)})")
         assert not errores, errores
     finally:
         ctx.close()
@@ -1210,6 +1227,26 @@ def test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base):
         raise AssertionError("la contraseña anterior debe dejar de funcionar")
     except urllib.error.HTTPError as e:
         assert e.code == 401, e.code
+
+
+def test_login_recorta_igual_que_el_alta_y_una_clave_larga_entra(navegador, base):
+    """El alta recorta la contraseña a 72; el login debe recortar igual, o quien la creó con una más larga nunca
+    puede entrar (el login manda las 83 y la API rechaza más de 72)."""
+    nombre = "fr_larga"
+    larga = "Larga#" + "x" * 77  # 83 caracteres; el campo del alta solo guarda 72
+    master_db.create_user_entry(nombre, security.hash_password(larga[:72]), email=f"{nombre}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        page.goto(base + "/login")
+        assert page.get_attribute("#login-username", "maxlength") == "50"
+        assert page.get_attribute("#login-password", "maxlength") == "72"
+        # Las demás puertas de credenciales, con los mismos límites que su API
+        assert page.get_attribute("#edit-user-username", "maxlength") == "50"
+        assert page.get_attribute("#recuperar-identifier", "maxlength") == "120"
+        _entrar(page, base, nombre, larga)  # teclea las 83: el campo se queda con 72 y entra
+        assert not errores, errores
+    finally:
+        ctx.close()
 
 
 def test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base):
@@ -2133,6 +2170,7 @@ if __name__ == "__main__":
                 (test_fijo_quincenal_y_gasto_con_su_ingreso, lambda: test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base)),
                 (test_respaldo_desde_el_menu_se_descarga_y_se_restaura, lambda: test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base)),
                 (test_mi_perfil_exige_contrasena_actual_para_cambiarla, lambda: test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base)),
+                (test_login_recorta_igual_que_el_alta_y_una_clave_larga_entra, lambda: test_login_recorta_igual_que_el_alta_y_una_clave_larga_entra(navegador, base)),
                 (test_eliminar_cuenta_exige_escribir_el_usuario, lambda: test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base)),
                 (test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango, lambda: test_calculadora_rf_calcula_y_bloquea_tasa_fuera_de_rango(navegador, base)),
                 (test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos, lambda: test_inicio_sin_movimientos_invita_a_empezar_y_se_oculta_al_tener_datos(navegador, base)),

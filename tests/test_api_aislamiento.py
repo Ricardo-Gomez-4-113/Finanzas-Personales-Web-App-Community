@@ -301,9 +301,10 @@ def test_cambiar_contrasena_exige_la_actual_y_8_caracteres(client, hadmin):
     r = client.patch("/auth/profile", json={"password": nueva, "current_password": PASS}, headers=h)
     assert r.status_code == 200, r.text
     assert client.post("/auth/login", json={"username": "usuario_pwd", "password": nueva}).status_code == 200
-    # Cambiar solo el correo no pide contraseña
+    # Cambiar el correo también pide la contraseña: con él se recupera la cuenta
     h2 = {"Authorization": f"Bearer {r.json()['new_token']}"}
-    assert client.patch("/auth/profile", json={"email": "pwd@test.local"}, headers=h2).status_code == 200
+    assert client.patch("/auth/profile", json={"email": "robado@test.local"}, headers=h2).status_code == 400
+    assert client.patch("/auth/profile", json={"email": "pwd@test.local", "current_password": nueva}, headers=h2).status_code == 200
     # Un admin que cambia su propia contraseña por el panel también debe confirmar la actual
     admin_id = client.get("/auth/me", headers=hadmin).json()["user"]["id"]
     assert client.patch(f"/admin/users/{admin_id}", json={"password": "AdminNueva#2026"}, headers=hadmin).status_code == 400
@@ -698,7 +699,7 @@ def test_admin_crea_usuario_con_contrasena_valida_y_sin_duplicar(client, hadmin)
         dup = client.post("/admin/users", json=cuerpo, headers=hadmin)
         assert dup.status_code == 400, dup.text
     finally:
-        client.delete(f"/admin/users/{r.json()['user']['id']}", headers=hadmin)
+        client.request("DELETE", f"/admin/users/{r.json()['user']['id']}", json={"current_password": os.environ["DEFAULT_ADMIN_PASSWORD"]}, headers=hadmin)
 
 
 def test_lote_que_falla_a_mitad_no_deja_cambios_a_medias(client):

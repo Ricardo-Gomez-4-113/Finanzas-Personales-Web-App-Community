@@ -124,6 +124,18 @@ export function cerrarModalCrearUsuario() {
     if (modal) modal.classList.add('hidden');
     const form = document.getElementById('form-crear-usuario');
     if (form) form.reset();
+    actualizarClaveAdminNuevo();
+}
+
+
+/**
+ * Crear otro administrador pide la contraseña de quien lo crea: el campo solo aparece con ese rol.
+ */
+export function actualizarClaveAdminNuevo() {
+    const rol = document.getElementById('nuevo-user-role');
+    const grupo = document.getElementById('group-nuevo-user-admin-clave');
+    if (!rol || !grupo) return;
+    grupo.classList.toggle('hidden', rol.value !== 'admin');
 }
 
 
@@ -137,8 +149,13 @@ export async function guardarNuevoUsuario(e) {
     const email = (document.getElementById('nuevo-user-email')?.value || '').trim();
     const password = document.getElementById('nuevo-user-password').value;
     const role = document.getElementById('nuevo-user-role').value;
+    const claveAdmin = document.getElementById('nuevo-user-admin-clave')?.value || '';
 
     if (!username || !password) return;
+    if (role === 'admin' && !claveAdmin) {
+        toast("Escribe tu contraseña de administrador para crear otro administrador.", 'error');
+        return;
+    }
 
     guardandoUsuario = true;
     const btnSubmit = document.querySelector('#form-crear-usuario button[type="submit"]');
@@ -152,7 +169,7 @@ export async function guardarNuevoUsuario(e) {
         const res = await apiFetch('/admin/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, role, email: email || null })
+            body: JSON.stringify({ username, password, role, email: email || null, ...(role === 'admin' ? { current_password: claveAdmin } : {}) })
         });
 
         if (res.ok) {
@@ -189,6 +206,11 @@ export function abrirModalEditarUsuario(id, username, role, email) {
     // Editar la propia cuenta se presenta como "Mi perfil"; editar a otra persona (admin) conserva el nombre en el título
     const esPropio = !!(estado.usuarioActual && estado.usuarioActual.id === id);
     modal.dataset.propio = esPropio ? '1' : '0';
+    modal.dataset.rolOriginal = role || 'user';
+    modal.dataset.usuarioOriginal = username || '';
+    modal.dataset.correoOriginal = (email || '').trim().toLowerCase();
+    const etiquetaActual = document.getElementById('lbl-edit-user-current-password');
+    if (etiquetaActual) etiquetaActual.textContent = esPropio ? 'Contraseña actual' : 'Tu contraseña de administrador';
     const tituloTexto = document.getElementById('lbl-edit-user-titulo-texto');
     if (tituloTexto) tituloTexto.textContent = esPropio ? 'Mi perfil' : 'Editar usuario:';
     document.getElementById('lbl-edit-user-title').textContent = esPropio ? '' : username;
@@ -278,23 +300,27 @@ export async function guardarEdicionUsuario(e) {
         return;
     }
 
-    const esPropio = document.getElementById('modal-editar-usuario')?.dataset.propio === '1';
+    const modalEditar = document.getElementById('modal-editar-usuario');
+    const esPropio = modalEditar?.dataset.propio === '1';
     const payload = { username, email: email || null };
-    if (password && password.trim().length > 0) {
-        if (password.length < 8) {
-            toast("La nueva contraseña debe tener al menos 8 caracteres.", 'error');
+    const cambiaClave = !!(password && password.trim().length > 0);
+    const cambiaRol = !!(roleSelect && !roleSelect.disabled && role && role !== modalEditar?.dataset.rolOriginal);
+    const cambiaIdentidad = cambiaIdentidadEnModal(modalEditar);
+    if (cambiaClave && password.length < 8) {
+        toast("La nueva contraseña debe tener al menos 8 caracteres.", 'error');
+        return;
+    }
+    // Contraseña, rol, nombre o correo se confirman con la contraseña de quien edita (la suya o la del administrador):
+    // con el correo se recupera la cuenta, así que también es una credencial
+    if (cambiaClave || cambiaRol || cambiaIdentidad) {
+        const actual = document.getElementById('edit-user-current-password')?.value || '';
+        if (!actual) {
+            toast(esPropio ? "Escribe tu contraseña actual para confirmar el cambio." : "Escribe tu contraseña de administrador para confirmar el cambio.", 'error');
             return;
         }
-        if (esPropio) {
-            const actual = document.getElementById('edit-user-current-password')?.value || '';
-            if (!actual) {
-                toast("Escribe tu contraseña actual para cambiarla.", 'error');
-                return;
-            }
-            payload.current_password = actual;
-        }
-        payload.password = password;
+        payload.current_password = actual;
     }
+    if (cambiaClave) payload.password = password;
 
     if (roleSelect && !roleSelect.disabled && role) {
         payload.role = role;
@@ -342,14 +368,28 @@ export async function guardarEdicionUsuario(e) {
 
 
 /**
- * Muestra el campo de contraseña actual solo cuando la persona está cambiando su propia contraseña.
+ * ¿Cambiaron el nombre o el correo respecto a lo que tenía la cuenta al abrir el cuadro?
+ * Un correo vacío no cuenta: la pantalla lo manda como null y el servidor conserva el guardado.
+ */
+function cambiaIdentidadEnModal(modal) {
+    if (!modal) return false;
+    const nombre = (document.getElementById('edit-user-username')?.value || '').trim();
+    const correo = (document.getElementById('edit-user-email')?.value || '').trim().toLowerCase();
+    return nombre !== (modal.dataset.usuarioOriginal || '') || (!!correo && correo !== (modal.dataset.correoOriginal || ''));
+}
+
+
+/**
+ * Muestra el campo de contraseña de quien edita cuando cambia una contraseña, un rol, el nombre o el correo.
  */
 export function actualizarCamposContrasena() {
     const modal = document.getElementById('modal-editar-usuario');
     const grupo = document.getElementById('group-edit-user-current-password');
     const nueva = document.getElementById('edit-user-password');
     if (!modal || !grupo || !nueva) return;
-    grupo.classList.toggle('hidden', !(modal.dataset.propio === '1' && nueva.value.length > 0));
+    const rol = document.getElementById('edit-user-role');
+    const cambiaRol = !!(rol && !rol.disabled && rol.value !== modal.dataset.rolOriginal);
+    grupo.classList.toggle('hidden', !(nueva.value.length > 0 || cambiaRol || cambiaIdentidadEnModal(modal)));
 }
 
 
@@ -403,8 +443,8 @@ export async function eliminarMiCuenta() {
             sessionStorage.clear();
             window.location.reload();
         } else {
-            const err = await res.json();
-            toast(err.detail || "No se pudo eliminar tu cuenta.", 'error');
+            const err = await res.json().catch(() => ({}));
+            toast(formatErrorDetail(err.detail, "No se pudo eliminar tu cuenta."), 'error');
         }
     } catch (e) {
         toast("Error de red al intentar eliminar la cuenta.", 'error');
@@ -469,12 +509,16 @@ function filaUsuarioAdmin(u) {
     const rol = `<span class="badge-role ${u.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}">${escapeHTML(u.role)}</span>`;
     const accesoTxt = u.last_login ? formatoTiempoRelativo(u.last_login) : 'Nunca';
 
+    // Otro administrador no se suspende ni se elimina: primero se le quita el rol (el servidor también lo impide)
+    const esOtroAdmin = u.role === 'admin' && !esPrincipal && !esMismoAdmin;
     const itemsMenu = [];
-    if (!esMismoAdmin) {
+    if (!esMismoAdmin && !esPrincipal && !(esOtroAdmin && u.is_active)) {
         itemsMenu.push(`<button type="button" class="admin-menu-item" role="menuitem" data-on-click='${accionDelegada(["cambiarEstadoUsuario", u.id, !u.is_active])}'>${u.is_active ? 'Suspender acceso' : 'Activar acceso'}</button>`);
     }
     if (esPrincipal && !esMismoAdmin) {
         itemsMenu.push(`<p class="admin-menu-nota">La cuenta principal no se puede eliminar</p>`);
+    } else if (esOtroAdmin) {
+        itemsMenu.push(`<p class="admin-menu-nota">Para suspender o eliminar a un administrador, quítale primero el rol</p>`);
     } else if (!esPrincipal) {
         itemsMenu.push(`<button type="button" class="admin-menu-item admin-menu-peligro" role="menuitem" data-on-click='${accionDelegada(["eliminarUsuarioTenantPorId", u.id])}'>Eliminar usuario</button>`);
     }
@@ -501,7 +545,7 @@ function filaUsuarioAdmin(u) {
             </td>
             <td class="admin-celda-acciones" data-label="Acciones">
                 <button type="button" class="admin-accion" aria-expanded="false" aria-controls="${detalleId}" data-on-click='${accionDelegada(["alternarDetalleUsuario", u.id, "$this"])}'>Detalles</button>
-                <button type="button" class="admin-accion" data-on-click='${accionDelegada(["abrirModalEditarUsuarioPorId", u.id])}'>Editar</button>
+                ${esPrincipal && !esMismoAdmin ? '' : `<button type="button" class="admin-accion" data-on-click='${accionDelegada(["abrirModalEditarUsuarioPorId", u.id])}'>Editar</button>`}
                 ${menuFila}
             </td>
         </tr>
@@ -606,6 +650,7 @@ export function eliminarUsuarioTenantPorId(id) {
     usuarioEnEliminacion = u;
     document.getElementById('eliminar-usuario-nombre').textContent = u.username;
     document.getElementById('eliminar-usuario-confirmar').value = '';
+    document.getElementById('eliminar-usuario-contrasena').value = '';
     document.getElementById('btn-confirmar-eliminar').disabled = true;
     document.getElementById('modal-eliminar-usuario').classList.remove('hidden');
     document.getElementById('btn-cancelar-eliminar').focus();
@@ -613,35 +658,49 @@ export function eliminarUsuarioTenantPorId(id) {
 
 export function cerrarModalEliminarUsuario() {
     document.getElementById('modal-eliminar-usuario')?.classList.add('hidden');
+    // La contraseña no se queda en el campo después de cerrar
+    ['eliminar-usuario-contrasena', 'eliminar-usuario-confirmar'].forEach(id => {
+        const campo = document.getElementById(id);
+        if (campo) campo.value = '';
+    });
     usuarioEnEliminacion = null;
 }
 
 export async function confirmarEliminarUsuario() {
     const u = usuarioEnEliminacion;
     if (!u || document.getElementById('eliminar-usuario-confirmar').value !== u.username) return;
-    await eliminarUsuarioTenant(u.id);
-    cerrarModalEliminarUsuario();
+    const contrasena = document.getElementById('eliminar-usuario-contrasena').value;
+    if (!contrasena) {
+        toast("Escribe tu contraseña de administrador para eliminar al usuario.", 'error');
+        return;
+    }
+    // Si la contraseña es incorrecta, el cuadro sigue abierto para corregirla
+    if (await eliminarUsuarioTenant(u.id, contrasena)) cerrarModalEliminarUsuario();
 }
 
-export async function eliminarUsuarioTenant(userId) {
+export async function eliminarUsuarioTenant(userId, contrasena) {
     try {
         const res = await apiFetch(`/admin/users/${userId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: contrasena })
         });
 
         if (res.ok) {
             cargarDatosAdmin();
-        } else {
-            const err = await res.json();
-            toast(err.detail || "No se pudo eliminar el usuario.", 'error');
+            return true;
         }
+        const err = await res.json().catch(() => ({}));
+        toast(formatErrorDetail(err.detail, "No se pudo eliminar el usuario."), 'error');
     } catch (e) {
         toast("Error de red al eliminar usuario.", 'error');
     }
+    return false;
 }
 
 Object.assign(window, {
     actualizarCamposContrasena,
+    actualizarClaveAdminNuevo,
     actualizarConfirmacionEliminarCuenta,
     abrirModalCrearUsuario,
     abrirModalEditarMiPerfil,
