@@ -183,6 +183,7 @@ def _editar_clave(page, rng, maestro, propios, cliente):
     pre = maestro.usuarios()
     page.locator(f"#tabla-usuarios-admin tr[data-usuario='{id_}'] .admin-accion", has_text="Editar").click(timeout=10000)
     page.wait_for_selector("#modal-editar-usuario:not(.hidden)")
+    escritorio._esperar_foco(page, "edit-user-username")
     page.fill("#edit-user-password", nueva)
     page.fill("#edit-user-current-password", CLAVE_ADMIN)  # el campo aparece al escribir la nueva
     page.evaluate("document.getElementById('form-editar-usuario').requestSubmit()")

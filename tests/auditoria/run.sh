@@ -33,6 +33,7 @@ if [ "$CAPA" = "escritorio" ] || [ "$CAPA" = "celular" ]; then
   if [ "$SECCION" = "inversiones" ]; then SCRIPT="tests/auditoria/escritorio_inversiones.py"; fi
   if [ "$SECCION" = "respaldo" ]; then SCRIPT="tests/auditoria/escritorio_respaldo.py"; fi
   if [ "$SECCION" = "admin" ]; then SCRIPT="tests/auditoria/escritorio_admin.py"; fi
+  if [ "$SECCION" = "login" ]; then SCRIPT="tests/auditoria/escritorio_login.py"; fi
   INSTALAR="pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 httpx"
 else
   SCRIPT="tests/auditoria/run_api.py --seccion ${SECCION} --persona ${PERSONA}"

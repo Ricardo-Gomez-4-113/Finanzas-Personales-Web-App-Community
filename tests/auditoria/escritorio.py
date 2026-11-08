@@ -110,6 +110,7 @@ def _login(page, base, usuario, clave=None):
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
     if page.query_selector("#vista-app:not(.hidden)"):
         return
+    _esperar_foco(page, "login-username")
     page.fill("#login-username", usuario)
     page.fill("#login-password", clave or personas.CLAVE)
     page.click("#form-login [type=submit]")
@@ -122,6 +123,15 @@ def _reentrar(page, base, usuario, clave=None):
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
     if not page.query_selector("#vista-app:not(.hidden)"):
         _login(page, base, usuario, clave)
+
+
+def _esperar_foco(page, id_campo, segundos=2.0):
+    """Los cuadros mueven el foco a su primer campo un momento después de abrirse; escribir antes manda el texto allí."""
+    limite = time.perf_counter() + segundos
+    while time.perf_counter() < limite:
+        if page.evaluate("document.activeElement && document.activeElement.id") == id_campo:
+            return
+        page.wait_for_timeout(50)
 
 
 def _ir(page, pestana):
