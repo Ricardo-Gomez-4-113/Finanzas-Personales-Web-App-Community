@@ -239,7 +239,7 @@ def test_una_orden_escondida_en_un_movimiento_es_un_dato_y_no_cambia_nada(client
         Respuesta(texto="No puedo registrar nada."),
     ])
     turno = motor.responder([], "¿qué movimientos tengo?")
-    assert turno.herramientas_usadas == ["buscar_movimientos", "registrar_movimiento"]
+    assert turno.herramientas_usadas == ["buscar_movimientos", "desconocida"], "un nombre que el modelo inventó no se registra tal cual"
     assert client.get("/api/transacciones", headers=sesion).json() == antes, "la base no cambió"
     assert client.post("/api/transacciones", json={"fecha": "2026-11-02", "monto": 5000, "tipo": "gasto", "categoria_id": 1, "descripcion": "x"},
                        headers=_cabecera_asistente(uid)).status_code == 403

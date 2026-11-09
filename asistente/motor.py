@@ -97,6 +97,7 @@ class Motor:
         instrucciones = INSTRUCCIONES.format(hoy=hoy.isoformat(), capacidad=CONSULTA_Y_PROPONE if self.herramientas.escritura else SOLO_CONSULTA)
         de_la_fecha = {float(hoy.year), float(hoy.month), float(hoy.day)}
         final = "No pude completar la consulta. Intenta de nuevo."
+        conocidas = {d["nombre"] for d in self.herramientas.declaraciones()}
         inicio = self._reloj()
         for _ in range(self.max_rondas + 1):
             if self._reloj() - inicio > self.max_segundos:
@@ -107,7 +108,7 @@ class Motor:
             except Exception as error:  # el modelo es un servicio externo: si falla, la conversación sigue
                 historial.pop()          # el mensaje no se contestó: no queda en el historial
                 return Turno("No pude contestar ahora, intenta en un momento.", usadas, propuestas, tokens, error=type(error).__name__)
-            tokens += int(getattr(respuesta, "tokens", 0) or 0)
+            tokens += max(0, int(getattr(respuesta, "tokens", 0) or 0))
             if not respuesta.llamadas:
                 final = respuesta.texto.strip() or final
                 # Cifras que no están en la pregunta ni en la fecha y ninguna consulta en este turno: el modelo las inventó o las
@@ -127,7 +128,7 @@ class Motor:
             trabajo.append({"rol": "modelo", "texto": respuesta.texto, "llamadas": llamadas})
             resultados = []
             for llamada in llamadas:
-                usadas.append(llamada["nombre"])
+                usadas.append(llamada["nombre"] if llamada["nombre"] in conocidas else "desconocida")   # el nombre lo escribe el modelo: no se registra tal cual
                 resultado = self.herramientas.ejecutar(llamada["nombre"], llamada.get("args"))
                 if isinstance(resultado, dict) and resultado.get("propuesta_id"):
                     propuestas.append(resultado["propuesta_id"])

@@ -91,4 +91,7 @@ class ModeloGemini:
             except Exception:
                 texto = ""
         uso = getattr(respuesta, "usage_metadata", None)
-        return Respuesta(texto=texto, llamadas=llamadas, tokens=int(getattr(uso, "total_token_count", 0) or 0))
+        tokens = int(getattr(uso, "total_token_count", 0) or 0)
+        if tokens <= 0:   # sin cifra de Google, el tope de tokens no puede quedar ciego: se estima por longitud (~3 caracteres por token)
+            tokens = max(1, (len(instrucciones) + len(str(mensajes)) + len(texto) + len(str(llamadas))) // 3)
+        return Respuesta(texto=texto, llamadas=llamadas, tokens=tokens)

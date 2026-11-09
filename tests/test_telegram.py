@@ -632,10 +632,10 @@ def test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_pr
     assert "muchos mensajes seguidos" in tg.a(9001)[-1][1]
     # Adivinar códigos también tiene tope
     bot2, tg2, _ = _bot(client, None, reloj)
-    for i in range(bot_telegram.MAX_MENSAJES_POR_HORA):
+    for i in range(bot_telegram.MAX_INTENTOS_VINCULO_POR_HORA):
         bot2.procesar(_msg(9100, "/start " + "a" * 20 + str(i)))
     bot2.procesar(_msg(9100, "/start " + "b" * 22))
-    assert "muchos mensajes seguidos" in tg2.a(9100)[-1][1]
+    assert "demasiadas veces" in tg2.a(9100)[-1][1]
 
 
 def test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client):
@@ -785,6 +785,104 @@ def test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orde
     despachador.cerrar()
 
 
+def test_la_basura_de_chats_sin_vinculo_y_los_rechazos_no_gastan_el_cupo_de_los_demas(client):
+    """Revisión de seguridad (ALTO): con varias cuentas de Telegram se podía agotar el tope global y dejar sin asistente a todos."""
+    uid, _ = _cuenta(client, "tg_cupo")
+    _vincular(uid, 9601)
+    reloj = Reloj()
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Dime más.")] * 400}, reloj)
+    # Muchos chats sin vínculo mandan basura: ni el tope de turnos ni el del chat legítimo se tocan
+    for chat in range(9700, 9700 + 30):
+        for i in range(bot_telegram.MAX_INTENTOS_VINCULO_POR_HORA + 3):
+            bot.procesar(_msg(chat, f"/start {'x' * 20}{i}"))
+    assert bot._global == [] and len(bot._vinculos_global) <= bot_telegram.MAX_INTENTOS_VINCULO_GLOBAL, "los intentos de vincular tienen su propia cuenta"
+    bot.procesar(_msg(9601, "hola"))
+    assert tg.a(9601)[-1][1] == "Dime más.", "el chat legítimo sigue atendido"
+    # Un mensaje rechazado por el tope diario no gasta cupo de ritmo
+    bot._max_mensajes_dia = 1
+    antes = len(bot._mensajes.get(9601, []))
+    for _ in range(5):
+        bot.procesar(_msg(9601, "otro"))
+    assert len(bot._mensajes.get(9601, [])) == antes and len(bot._global) == 1, "lo rechazado por el día no cuenta como turno"
+    # Los topes de vinculación son aparte del de turnos, y se liberan con la hora
+    reloj.t += 3601
+    bot.procesar(_msg(9700, f"/start {'y' * 22}"))
+    assert "no sirve" in tg.a(9700)[-1][1]
+
+
+def test_el_evento_de_turno_no_registra_nombres_de_herramienta_inventados_por_el_modelo(client):
+    uid, _ = _cuenta(client, "tg_herr")
+    _vincular(uid, 9801)
+    eventos = []
+    guion = [Respuesta(llamadas=[{"nombre": "dame_el_saldo_de_5000_pesos_de_SECRETO", "args": {}}, {"nombre": "metas", "args": {}}]), Respuesta(texto="Sin datos.")]
+    bot, tg, _ = _bot(client, {uid: guion})
+    bot._registrar = lambda nombre, **campos: eventos.append({"evento": nombre, **campos})
+    bot.procesar(_msg(9801, "hola"))
+    turno = [e for e in eventos if e["evento"] == "asistente_turno"][0]
+    assert turno["herramientas"] == ["desconocida", "metas"], turno
+    assert "SECRETO" not in str(eventos)
+
+
+def test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto(client):
+    import os as _os
+    for valor in ("0", "-1", "-500", "abc", "", "  ", "1.5"):
+        _os.environ["ASISTENTE_MAX_MENSAJES_DIA"] = valor
+        assert bot_telegram._entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", 100) == 100, valor
+    _os.environ["ASISTENTE_MAX_MENSAJES_DIA"] = "250"
+    assert bot_telegram._entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", 100) == 250
+    _os.environ.pop("ASISTENTE_MAX_MENSAJES_DIA", None)
+    assert bot_telegram._entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", 100) == 100
+    fuente = open(bot_telegram.__file__, encoding="utf-8").read()
+    assert 'ASISTENTE_SIN_TOPES' in fuente and '"1"' in fuente, "apagar los topes exige una variable explícita"
+
+
+def test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client):
+    import threading as _hilos
+    import time as _tiempo
+    from asistente.motor import Respuesta as _R
+    cuentas = [_cuenta(client, f"tg_cola_{i}")[0] for i in range(2)]
+    _vincular(cuentas[0], 9900)
+    _vincular(cuentas[1], 9901)
+    atendidos, candado = [], _hilos.Lock()
+
+    class Lento:
+        def generar(self, instrucciones, mensajes, declaraciones):
+            _tiempo.sleep(0.25)
+            with candado:
+                atendidos.append([m for m in mensajes if m["rol"] == "usuario"][-1]["texto"])
+            return _R(texto="Listo, dime más.")
+
+    tg, propuestas = TelegramFalso(), Propuestas()
+    bot = bot_telegram.Bot(tg, ServicioLocal(), lambda cuenta, chat: Motor(Lento(), Herramientas(lambda r, p: (200, {}), propuestas, cuenta["id"], lambda: HOY), lambda: HOY),
+                           propuestas, lambda p, c: (True, "ok"))
+    descartados = []
+    despachador = bot_telegram.Despachador(bot, carriles=2, al_descartar=lambda: descartados.append(1))
+    futuros = [despachador.enviar(_msg(9900, f"inundo {i}")) for i in range(12)]   # carril 0
+    otro = despachador.enviar(_msg(9901, "yo soy otro chat"))                      # carril 1
+    for f in futuros + [otro]:
+        if f is not None:
+            f.result(timeout=15)
+    inundo = [a for a in atendidos if a.startswith("inundo")]
+    assert len(inundo) <= bot_telegram.MAX_PENDIENTES_POR_CHAT + 1 and len(descartados) >= 12 - bot_telegram.MAX_PENDIENTES_POR_CHAT - 1, (inundo, len(descartados))
+    assert "yo soy otro chat" in atendidos, "el otro chat se atendió"
+    assert inundo == sorted(inundo, key=lambda s: int(s.split()[1])), "lo que se atendió salió en orden"
+    despachador.cerrar()
+    # El tope por carril también aplica
+    fallos = []
+    d2 = bot_telegram.Despachador(bot, carriles=1, al_descartar=lambda: fallos.append(1), max_por_chat=100, max_por_carril=2)
+    fs = [d2.enviar(_msg(9900 + (i % 2), f"x{i}")) for i in range(8)]
+    for f in fs:
+        if f is not None:
+            f.result(timeout=15)
+    assert len(fallos) >= 5, fallos
+    d2.cerrar()
+    # Purga: miles de chats desconocidos no dejan la memoria creciendo
+    bot._mensajes = {i: [0.0] for i in range(bot_telegram.MAX_ESTADO_EN_MEMORIA + 500)}
+    bot._reloj = lambda: 10_000.0
+    bot._ritmo_excedido(9900)
+    assert len(bot._mensajes) <= 2, len(bot._mensajes)
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -819,6 +917,10 @@ if __name__ == "__main__":
             (test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_dia, lambda: test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_dia(client)),
             (test_los_eventos_del_bot_no_llevan_texto_importes_ni_ids_de_chat, lambda: test_los_eventos_del_bot_no_llevan_texto_importes_ni_ids_de_chat(client)),
             (test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orden, lambda: test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orden(client)),
+            (test_la_basura_de_chats_sin_vinculo_y_los_rechazos_no_gastan_el_cupo_de_los_demas, lambda: test_la_basura_de_chats_sin_vinculo_y_los_rechazos_no_gastan_el_cupo_de_los_demas(client)),
+            (test_el_evento_de_turno_no_registra_nombres_de_herramienta_inventados_por_el_modelo, lambda: test_el_evento_de_turno_no_registra_nombres_de_herramienta_inventados_por_el_modelo(client)),
+            (test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto, lambda: test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto(client)),
+            (test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga, lambda: test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_telegram")
