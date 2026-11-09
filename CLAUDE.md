@@ -34,6 +34,10 @@ Convenciones:
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.
 - `mercado.py`: tipos de cambio y precios, con caché y valores de respaldo.
 - `routers/`: `auth`, `admin`, `movimientos`, `apartados`, `inversiones`, `recurrentes`, `respaldo`, `presupuesto`.
+- `asistente/`: asistente con LLM (Gemini). El motor no conoce el canal; las herramientas llaman a la API con un token de 60 s
+  (`uso = "asistente"`) que `security.verify_token` solo deja pasar por `asistente/permisos.py` (lectura). Probar con
+  `python3 -m asistente.cli --demo --preguntas` (necesita `requirements-asistente.txt` y `GEMINI_API_KEY`). Plan y lecciones:
+  `~/app-plan/plan-asistente-llm.md`. Todo cambio en `permisos.py`, `tokens.py` o la parte del asistente en `security.py` pasa por `revisor-seguridad`.
 - `static/`: SPA con módulos ES6 y hojas de estilo en `static/css/`. `static/js/confirmar.js` es el modal de confirmación (`confirmar({...})` devuelve una promesa); no se usa `confirm()` nativo.
 - Datos: `data/master.db` (usuarios y auditoría) y `data/tenants/user_{id}.db` (una base por usuario).
 
