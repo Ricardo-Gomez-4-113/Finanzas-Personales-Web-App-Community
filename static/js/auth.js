@@ -90,9 +90,9 @@ export async function verificarSesionInicial() {
             establecerSesionActiva(data.user, token);
             return;
         } else if (res.status === 401 || res.status === 403) {
-            // Token vencido o cuenta suspendida: se dice por qué se pide entrar de nuevo
-            cerrarSesionLimpia();
-            mostrarVistaLogin("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
+            // Token vencido o cuenta suspendida: se dice por qué se pide entrar de nuevo. El mensaje va a cerrarSesionLimpia:
+            // sin él, la edición con landing manda a la portada y la explicación se pierde
+            cerrarSesionLimpia("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
             return;
         } else {
             // Un fallo del servidor (5xx) no es una sesión inválida: el token se conserva, como con un fallo de red
@@ -102,8 +102,7 @@ export async function verificarSesionInicial() {
     } catch (e) {
         if (!vigente()) return;
         if (e && e.message === "No autorizado") {  // apiFetch no avisa en el arranque (aún no hay sesión): se explica aquí
-            cerrarSesionLimpia();
-            mostrarVistaLogin("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
+            cerrarSesionLimpia("Tu sesión ha expirado o tu cuenta ha sido suspendida.");
             return;
         }
         mostrarVistaLogin("Error al verificar la sesión con el servidor.");
