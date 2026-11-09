@@ -108,7 +108,10 @@ def _movimiento(page, rng, oraculo, hoy, accion):
     # La lista de tarjetas se repinta sola tras la acción anterior: se espera a que la pantalla se asiente y, si el
     # monto escrito se borró antes del clic, se escribe otra vez (una persona esperaría a ver la pantalla quieta)
     for intento in range(3):
-        page.wait_for_load_state("networkidle")
+        try:
+            page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            pass
         _quitar_avisos(page)
         page.fill(f"#monto-acc-{objetivo}", f"{monto:.2f}")
         page.locator(boton).click(timeout=10000)
@@ -165,6 +168,9 @@ def _episodio(semilla, numero, navegador, servidor, mods, bit, fallos, dispositi
     cabecera, ruta_db = personas.crear_laura(cliente, usuario, mods)
     cliente.headers.update(cabecera)
     oraculo = Oraculo(ruta_db)
+    # Ahorro propio de cada meta: lo guardado que no viene de movimientos (igual que en la capa API)
+    neto = oraculo.neto_por_apartado()
+    oraculo.offsets = {a[0]: a[3] - neto.get(a[0], 0) for a in oraculo.apartados()}
 
     ctx = navegador.new_context(**escritorio.DISPOSITIVOS[dispositivo])
     page = ctx.new_page()
