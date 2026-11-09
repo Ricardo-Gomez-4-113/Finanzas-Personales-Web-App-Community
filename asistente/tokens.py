@@ -4,16 +4,19 @@ from datetime import timedelta
 
 import master_db
 import security
-from asistente.permisos import USO_ASISTENTE
+from asistente.permisos import USO_ASISTENTE, USO_ESCRITURA
 
+SEGUNDOS_DE_ESCRITURA = 20   # solo se usa al ejecutar una propuesta confirmada
 SEGUNDOS_DE_VIDA = 60   # cada llamada a la API lleva un token nuevo: uno filtrado dura un minuto como mucho
 
 
-def emitir_token(user_id, segundos=SEGUNDOS_DE_VIDA):
-    """JWT de la cuenta con `uso = "asistente"`. Falla si la cuenta no existe o está desactivada."""
+def emitir_token(user_id, segundos=None, escritura=False):
+    """JWT de la cuenta con `uso = "asistente"` (lectura) o `"asistente_escritura"` (solo al confirmar una propuesta).
+    Falla si la cuenta no existe o está desactivada."""
+    segundos = segundos if segundos is not None else (SEGUNDOS_DE_ESCRITURA if escritura else SEGUNDOS_DE_VIDA)
     user = master_db.get_user_by_id(int(user_id))
     if not user or not user.get("is_active"):
         raise ValueError("cuenta inexistente o desactivada")
     claims = security.claims_sesion(user)
-    claims["uso"] = USO_ASISTENTE
+    claims["uso"] = USO_ESCRITURA if escritura else USO_ASISTENTE
     return security.create_access_token(claims, timedelta(seconds=segundos))

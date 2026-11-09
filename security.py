@@ -24,7 +24,7 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from database import get_tenant_conn
 import master_db
-from asistente.permisos import USO_ASISTENTE, permitido
+from asistente.permisos import permitido
 
 # Cargar variables de entorno desde .env si existe en el directorio base
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -174,9 +174,9 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
     if not payload:
         raise cred_exception
         
-    # Un token del asistente solo sirve en las rutas de su lista blanca (falla cerrado: sin plantilla de ruta, no pasa)
+    # Un token del asistente solo sirve en las rutas de su lista blanca (falla cerrado: sin plantilla de ruta o con un uso desconocido, no pasa)
     uso = payload.get("uso")
-    if uso is not None and (uso != USO_ASISTENTE or not permitido(request.method, getattr(request.scope.get("route"), "path", None))):
+    if uso is not None and not permitido(uso, request.method, getattr(request.scope.get("route"), "path", None)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token solo sirve para las consultas del asistente.")
 
     user_id = payload.get("sub")

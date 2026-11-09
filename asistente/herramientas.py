@@ -5,7 +5,12 @@ JSON reducido: lo justo para responder. Un rechazo de la API vuelve como `{"erro
 se lo explique a la persona. Las rutas que usan están en `permisos.RUTAS_PERMITIDAS`.
 """
 
+import re
 from datetime import date
+
+from pydantic import ValidationError
+
+from asistente.propuestas import LimiteDePropuestas
 
 MONEDAS = ("MXN", "USD", "EUR")
 MAX_ELEMENTOS = 40
@@ -51,6 +56,43 @@ DECLARACIONES = [
 ]
 
 
+DECLARACIONES_ESCRITURA = [
+    {"nombre": "registrar_movimiento",
+     "descripcion": ("Prepara el registro de un gasto o un ingreso. NO lo registra: queda como propuesta que la persona debe confirmar. "
+                     "Antes llama a `categorias` si no sabes cómo se llama la categoría."),
+     "parametros": {"type": "object", "required": ["tipo", "monto", "categoria"], "properties": {
+         "tipo": {"type": "string", "enum": ["gasto", "ingreso"]},
+         "monto": {"type": "number", "description": "Monto en pesos mexicanos, mayor que cero."},
+         "categoria": {"type": "string", "description": "Nombre exacto de una categoría que existe."},
+         "descripcion": {"type": "string", "description": "Concepto breve (hasta 255 caracteres)."},
+         "fecha": {"type": "string", "description": "AAAA-MM-DD. Si no se dice, hoy."}}}},
+    {"nombre": "mover_a_meta",
+     "descripcion": "Prepara un depósito o un retiro en una meta o apartado. NO lo hace: queda como propuesta que la persona debe confirmar.",
+     "parametros": {"type": "object", "required": ["meta", "accion", "monto"], "properties": {
+         "meta": {"type": "string", "description": "Nombre de la meta o apartado."},
+         "accion": {"type": "string", "enum": ["depositar", "retirar"]},
+         "monto": {"type": "number", "description": "Monto en pesos mexicanos, mayor que cero."}}}},
+    {"nombre": "saltar_fijo",
+     "descripcion": "Prepara saltar el próximo cobro de un gasto o ingreso fijo. NO lo salta: queda como propuesta que la persona debe confirmar.",
+     "parametros": {"type": "object", "required": ["fijo"], "properties": {
+         "fijo": {"type": "string", "description": "Descripción del fijo, como aparece en `fijos_proximos`."}}}},
+]
+
+MAX_TEXTO_RESUMEN = 60
+
+
+def neutralizar(texto, maximo=MAX_TEXTO_RESUMEN):
+    """Texto libre (descripciones, nombres) apto para el resumen que ve la persona: una sola línea, sin comillas angulares que
+    imiten otro campo, sin caracteres de control ni formato, y corto. El cuerpo de la propuesta conserva el texto original."""
+    limpio = "".join(" " if c.isspace() else c for c in str(texto) if c.isprintable() or c.isspace())
+    limpio = re.sub(r"[«»<>&*_`\[\]]", "", limpio)
+    limpio = re.sub(r" +", " ", limpio).strip()
+    return limpio if len(limpio) <= maximo else limpio[:maximo].rstrip() + "…"
+
+
+AVISO_PROPUESTA = "Quedó pendiente: la persona debe confirmarla. No digas que ya se hizo."
+
+
 def acotar(valor, max_elementos=MAX_ELEMENTOS, max_texto=MAX_TEXTO):
     """Recorta listas y textos largos para no mandar la base entera al modelo; avisa cuánto omitió."""
     if isinstance(valor, list):
@@ -68,12 +110,23 @@ def acotar(valor, max_elementos=MAX_ELEMENTOS, max_texto=MAX_TEXTO):
 class Herramientas:
     """`obtener(ruta, params)` devuelve `(estado_http, json)`: en producción es la API real y en las pruebas un TestClient."""
 
-    def __init__(self, obtener):
+    def __init__(self, obtener, propuestas=None, user_id=None, hoy=None):
+        """Con `propuestas` (un `Propuestas`) y `user_id` el modelo también puede preparar escrituras; sin ellos, solo consulta."""
         self._obtener = obtener
+        self.propuestas = propuestas
+        self._user_id = user_id
+        self._hoy = hoy or date.today
+
+    @property
+    def escritura(self):
+        return self.propuestas is not None and self._user_id is not None
+
+    def declaraciones(self):
+        return DECLARACIONES + (DECLARACIONES_ESCRITURA if self.escritura else [])
 
     def ejecutar(self, nombre, argumentos):
         funcion = getattr(self, f"_{nombre}", None)
-        if nombre not in {d["nombre"] for d in DECLARACIONES} or funcion is None:
+        if nombre not in {d["nombre"] for d in self.declaraciones()} or funcion is None:
             return {"error": f"No existe la herramienta «{nombre}»."}
         try:
             return acotar(funcion(**(argumentos or {})))
@@ -164,6 +217,65 @@ class Herramientas:
                 "movimientos": [{"id": m["id"], "fecha": m["fecha"], "tipo": m["tipo"], "monto": m["monto"],
                                  "descripcion": m.get("descripcion"), "categoria": m.get("categoria")}
                                 for m in encontrados[:limite]]}
+
+    # --- escrituras: solo crean una propuesta -----------------------------------------------------------------------
+    @staticmethod
+    def _monto(monto):
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not 0 < monto <= 1e9:
+            raise _ArgumentoInvalido("monto debe ser un número mayor que cero.")
+        return round(float(monto), 2)
+
+    @staticmethod
+    def _por_nombre(lista, clave, nombre, que):
+        if not isinstance(nombre, str) or not nombre.strip() or len(nombre) > 100:
+            raise _ArgumentoInvalido(f"Indica el nombre de {que}.")
+        buscado = nombre.strip().lower()
+        coinciden = [x for x in lista if str(x.get(clave) or "").lower() == buscado]
+        if len(coinciden) != 1:
+            existentes = ", ".join(f"«{x.get(clave)}»" for x in lista[:30]) or "ninguno"
+            raise _ArgumentoInvalido(f"No encuentro {que} «{nombre.strip()}» de forma única. Existen: {existentes}.")
+        return coinciden[0]
+
+    def _proponer(self, accion, metodo, ruta, cuerpo, resumen):
+        try:
+            p = self.propuestas.crear(self._user_id, accion, metodo, ruta, cuerpo, resumen)
+        except LimiteDePropuestas as error:
+            raise _ArgumentoInvalido(str(error))
+        return {"propuesta_id": p.id, "resumen": p.resumen, "estado": "pendiente de confirmación", "aviso": AVISO_PROPUESTA}
+
+    def _registrar_movimiento(self, tipo, monto, categoria, descripcion=None, fecha=None):
+        from routers.movimientos import Transaccion
+        if tipo not in ("gasto", "ingreso"):
+            raise _ArgumentoInvalido("tipo debe ser «gasto» o «ingreso».")
+        if descripcion is not None and (not isinstance(descripcion, str) or len(descripcion) > 255):
+            raise _ArgumentoInvalido("descripcion debe ser una cadena de hasta 255 caracteres.")
+        dia = self._fecha(fecha, "fecha") or self._hoy()
+        categorias = [c for c in self._api("/api/categorias") if c["tipo"] == tipo]
+        cat = self._por_nombre(categorias, "nombre", categoria, f"la categoría de {tipo}s")
+        cuerpo = {"fecha": dia.isoformat(), "monto": self._monto(monto), "tipo": tipo, "categoria_id": cat["id"], "descripcion": descripcion or None}
+        try:
+            Transaccion(**cuerpo)
+        except ValidationError as error:
+            raise _ArgumentoInvalido("El movimiento no es válido: " + "; ".join(str(e["msg"]) for e in error.errors()))
+        resumen = (f"{'Gasto' if tipo == 'gasto' else 'Ingreso'} de ${cuerpo['monto']:,.2f} MXN en «{neutralizar(cat['nombre'])}», "
+                   f"el {dia.isoformat()}" + (f": «{neutralizar(descripcion)}»" if descripcion and neutralizar(descripcion) else ""))
+        return self._proponer("registrar_movimiento", "POST", "/api/transacciones", cuerpo, resumen)
+
+    def _mover_a_meta(self, meta, accion, monto):
+        from routers.apartados import MovimientoApartado
+        if accion not in ("depositar", "retirar"):
+            raise _ArgumentoInvalido("accion debe ser «depositar» o «retirar».")
+        apartado = self._por_nombre(self._api("/api/apartados"), "nombre", meta, "la meta")
+        cuerpo = {"monto": self._monto(monto), "accion": accion}
+        MovimientoApartado(**cuerpo)   # mismo modelo que valida la ruta
+        resumen = f"{'Depositar' if accion == 'depositar' else 'Retirar'} ${cuerpo['monto']:,.2f} MXN {'en' if accion == 'depositar' else 'de'} la meta «{neutralizar(apartado['nombre'])}»"
+        return self._proponer("mover_a_meta", "POST", f"/api/apartados/{int(apartado['id'])}/movimiento", cuerpo, resumen)
+
+    def _saltar_fijo(self, fijo):
+        activos = [r for r in self._api("/api/recurrentes") if r.get("activo")]
+        rec = self._por_nombre(activos, "descripcion", fijo, "el fijo")
+        resumen = f"Saltar el próximo cobro de «{neutralizar(rec['descripcion'])}»"
+        return self._proponer("saltar_fijo", "POST", f"/api/recurrentes/{int(rec['id'])}/saltar", {"contabilizar_cuota": False}, resumen)
 
 
 class _ArgumentoInvalido(Exception):
