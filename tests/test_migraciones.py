@@ -364,6 +364,28 @@ def test_v22_crea_la_tabla_de_cancelados_sin_tocar_nada_y_es_idempotente():
         assert _version(conn) == 22 and _conteos(conn) == {**conteos, "transacciones_canceladas": 0}
 
 
+def test_un_alter_que_falla_por_otra_causa_no_marca_la_migracion_como_hecha():
+    """El ALTER TABLE ADD COLUMN solo se tolera si la columna ya existe; cualquier otro error del SQL debe salir."""
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 15)
+        conn.execute("DROP TABLE presupuesto_tarjetas")   # el ALTER de v16 ya no tiene tabla donde agregar la columna
+        conn.commit()
+        try:
+            _migrar_hasta(conn, 16)
+        except sqlite3.OperationalError as error:
+            assert "no such table" in str(error), error
+        else:
+            raise AssertionError("la migración v16 terminó sin error aunque su ALTER TABLE falló")
+        assert _version(conn) == 15, "la versión no debe subir si la migración falló"
+
+        # Con la columna ya agregada (base a medio migrar) sigue siendo idempotente
+        conn2 = _db_en_version(os.path.join(tmp, "u.db"), 16)
+        conn2.execute("PRAGMA user_version = 15")
+        conn2.commit()
+        _migrar_hasta(conn2, 16)
+        assert _version(conn2) == 16
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar_modulo

@@ -116,10 +116,11 @@ Un cambio está terminado cuando:
 
 ## Abierto
 
-- **Migraciones:** los `ALTER TABLE ADD COLUMN` de versiones pasadas están en `try/except sqlite3.OperationalError`. Son
-  idempotentes, pero ese `except` también oculta errores de SQL reales. No se modifican migraciones pasadas.
 - **Prueba intermitente:** `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` falló una vez esperando filas;
-  no se probó la causa. Si vuelve a fallar, investigar aparte.
-- **Visual:** consolidar las 5 hojas de estilo (180 KB); en `tema.css` queda un `#000` en una máscara de degradado.
+  no se pudo reproducir (12 corridas seguidas en verde, tres a la vez con la máquina cargada). Si vuelve a fallar en la
+  batería completa, guardar la captura y el log de ese momento antes de repetirla.
+- **Visual:** consolidar las 5 hojas de estilo (180 KB). Hay unos 210 selectores definidos en más de una hoja (`tema.css`
+  repite 71 de `componentes.css` y 78 de `vistas.css`); fusionarlos cambia la cascada y exige el volcado de
+  `~/bin/regresion-visual` antes y después de cada tramo.
 - **Respaldo nocturno automático:** quitado de Community; pendiente para producción con permisos correctos en `data/backups`.
 - **Seguridad, límite conocido:** una IP puede probar 20 cuentas por ventana de 5 min; una botnet no queda frenada.

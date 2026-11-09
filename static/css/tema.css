@@ -572,8 +572,8 @@
         scroll-snap-type: x mandatory;
         scrollbar-width: none;
         /* Desvanecido en el borde: indica que hay más periodos a la derecha */
-        mask-image: linear-gradient(to right, #000 90%, transparent);
-        -webkit-mask-image: linear-gradient(to right, #000 90%, transparent);
+        mask-image: linear-gradient(to right, rgb(var(--sombra-rgb)) 90%, transparent);
+        -webkit-mask-image: linear-gradient(to right, rgb(var(--sombra-rgb)) 90%, transparent);
     }
 
     :root .cinta-periodo {

@@ -127,6 +127,12 @@ def _pasar_dinero_a_centavos(cursor: sqlite3.Cursor) -> None:
         cursor.execute(f'ALTER TABLE "{tabla}" RENAME COLUMN "{nueva}" TO "{columna}"')
 
 
+def _tolerar_columna_existente(error: sqlite3.OperationalError) -> None:
+    """Deja pasar solo «duplicate column name» (el ALTER TABLE ADD COLUMN ya se aplicó); cualquier otro error de SQL sale."""
+    if "duplicate column name" not in str(error).lower():
+        raise error
+
+
 def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     """
     Verifica PRAGMA user_version en la base de datos del usuario y aplica
@@ -212,18 +218,18 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 2:
         try:
             cursor.execute("ALTER TABLE inversiones ADD COLUMN moneda TEXT NOT NULL DEFAULT 'USD';")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
 
         try:
             cursor.execute("UPDATE inversiones SET moneda = 'MXN' WHERE (ticker LIKE '%.MX' OR ticker LIKE '%.mx') AND moneda = 'USD';")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
 
         try:
             cursor.execute("ALTER TABLE transacciones ADD COLUMN cuenta_id INTEGER DEFAULT 1 REFERENCES cuentas(id);")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
 
         cursor.execute("PRAGMA user_version = 2;")
         current_version = 2
@@ -280,12 +286,12 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         """)
         try:
             cursor.execute("ALTER TABLE transacciones ADD COLUMN recurrente_id INTEGER REFERENCES recurrentes(id) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         try:
             cursor.execute("ALTER TABLE transacciones ADD COLUMN apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transacciones_rec ON transacciones(recurrente_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transacciones_apa ON transacciones(apartado_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_tarjeta ON recurrentes(presupuesto_tarjeta_id);")
@@ -368,12 +374,12 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 6 and CURRENT_TENANT_SCHEMA_VERSION >= 6:
         try:
             cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN subdivision_tipo TEXT NOT NULL DEFAULT 'ninguna';")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         try:
             cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN subdivision_config TEXT NOT NULL DEFAULT '[]';")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("PRAGMA user_version = 6;")
         current_version = 6
 
@@ -383,8 +389,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 7 and CURRENT_TENANT_SCHEMA_VERSION >= 7:
         try:
             cursor.execute("ALTER TABLE recurrentes ADD COLUMN apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_apartado ON recurrentes(apartado_id);")
         cursor.execute("PRAGMA user_version = 7;")
         current_version = 7
@@ -417,8 +423,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 9 and CURRENT_TENANT_SCHEMA_VERSION >= 9:
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN distribucion_subperiodos TEXT DEFAULT NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("PRAGMA user_version = 9;")
         current_version = 9
 
@@ -428,8 +434,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 10 and CURRENT_TENANT_SCHEMA_VERSION >= 10:
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN dia_pago INTEGER DEFAULT NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("PRAGMA user_version = 10;")
         current_version = 10
 
@@ -439,8 +445,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 11 and CURRENT_TENANT_SCHEMA_VERSION >= 11:
         try:
             cursor.execute("ALTER TABLE presupuesto_config ADD COLUMN dia_pago INTEGER DEFAULT NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("PRAGMA user_version = 11;")
         current_version = 11
 
@@ -450,8 +456,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 12 and CURRENT_TENANT_SCHEMA_VERSION >= 12:
         try:
             cursor.execute("ALTER TABLE recurrentes ADD COLUMN presupuesto_tarjeta_id INTEGER REFERENCES presupuesto_tarjetas(id) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_recurrentes_tarjeta ON recurrentes(presupuesto_tarjeta_id);")
         cursor.execute("PRAGMA user_version = 12;")
         current_version = 12
@@ -464,8 +470,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 13 and CURRENT_TENANT_SCHEMA_VERSION >= 13:
         try:
             cursor.execute("ALTER TABLE transacciones ADD COLUMN rubro TEXT;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("UPDATE transacciones SET rubro = 'metas' WHERE rubro IS NULL AND apartado_id IS NOT NULL;")
         cursor.execute("UPDATE transacciones SET rubro = 'ingreso' WHERE rubro IS NULL AND tipo = 'ingreso';")
         cursor.execute("""
@@ -492,8 +498,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("INSERT OR IGNORE INTO presupuesto_unidades (orden, dia_pago) VALUES (1, NULL), (2, NULL), (3, NULL), (4, NULL);")
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN unidad_orden INTEGER REFERENCES presupuesto_unidades(orden) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_presupuesto_unidad ON presupuesto_tarjetas(unidad_orden);")
         cursor.execute("PRAGMA user_version = 14;")
         current_version = 14
@@ -523,12 +529,12 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 16 and CURRENT_TENANT_SCHEMA_VERSION >= 16:
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'normal' CHECK (tipo IN ('normal', 'msi'));")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN msi_cuotas INTEGER CHECK (msi_cuotas IS NULL OR msi_cuotas BETWEEN 2 AND 60);")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("PRAGMA user_version = 16;")
         current_version = 16
 
@@ -587,8 +593,8 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
     if current_version < 20 and CURRENT_TENANT_SCHEMA_VERSION >= 20:
         try:
             cursor.execute("ALTER TABLE presupuesto_tarjetas ADD COLUMN apartado_id INTEGER REFERENCES apartados(id) ON DELETE SET NULL;")
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as error:
+            _tolerar_columna_existente(error)
         cursor.execute("""
             UPDATE presupuesto_tarjetas
             SET apartado_id = (
