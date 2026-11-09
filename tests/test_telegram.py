@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timedelta, timezone
 
 try:
@@ -198,6 +199,13 @@ class TelegramFalso:
         self.enviados = []     # (chat_id, texto, botones)
         self.ediciones = []    # (chat_id, message_id, botones)
         self.callbacks = []    # (id, texto)
+        self.escritos = []     # chat_id de cada aviso «escribiendo…»
+        self.falla_escribiendo = False
+
+    def escribiendo(self, chat_id):
+        self.escritos.append(chat_id)
+        if self.falla_escribiendo:
+            raise RuntimeError("Telegram caído")
 
     def enviar(self, chat_id, texto, botones=None):
         self.enviados.append((chat_id, texto, botones))
@@ -464,6 +472,8 @@ def test_el_telegram_real_no_usa_formato_ni_filtra_el_token(client):
     url, datos = enviados[-1]
     assert url.endswith("/sendMessage") and "parse_mode" not in datos and datos["text"] == "hola <b>x</b> *y*"
     assert datos["reply_markup"]["inline_keyboard"] == [[{"text": "Confirmar", "callback_data": "c:abc"}, {"text": "Cancelar", "callback_data": "x:abc"}]]
+    tg.escribiendo(1)
+    assert enviados[-1][0].endswith("/sendChatAction") and enviados[-1][1] == {"chat_id": 1, "action": "typing"}
     tg.editar_botones(1, 7, None)
     assert enviados[-1][1]["reply_markup"] == {"inline_keyboard": []}
     assert "parse_mode" not in open(bot_telegram.__file__, encoding="utf-8").read().replace("`parse_mode`", "").replace("parse_mode`", "").replace("«parse_mode»", "").split("# --- Telegram real")[1]
@@ -636,6 +646,36 @@ def test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_pr
         bot2.procesar(_msg(9100, "/start " + "a" * 20 + str(i)))
     bot2.procesar(_msg(9100, "/start " + "b" * 22))
     assert "demasiadas veces" in tg2.a(9100)[-1][1]
+
+
+def test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el_turno(client):
+    uid, _ = _cuenta(client, "tg_escribiendo")
+    _vincular(uid, 6450)
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Listo, dime más.")] * 5})
+    modelo = bot.modelos.setdefault(uid, ModeloFalso([Respuesta(texto="Listo, dime más.")] * 5))
+    generar = modelo.generar
+
+    def lento(*a):
+        time.sleep(0.4)
+        return generar(*a)
+
+    modelo.generar = lento
+    anterior = bot_telegram.AVISO_ESCRIBIENDO_SEG
+    bot_telegram.AVISO_ESCRIBIENDO_SEG = 0.1
+    try:
+        bot.procesar(_msg(6450, "hola"))
+        n = len(tg.escritos)
+        assert n >= 3 and set(tg.escritos) == {6450}, f"debe repetirse mientras el modelo piensa: {n}"
+        assert tg.a(6450)[-1][1] == "Listo, dime más."
+        time.sleep(0.3)
+        assert len(tg.escritos) == n, "al terminar el turno se apaga el aviso"
+        tg.falla_escribiendo = True
+        bot.procesar(_msg(6450, "otra"))
+        assert tg.a(6450)[-1][1] == "Listo, dime más.", "si el aviso falla, el turno sigue"
+        bot.procesar(_msg(6450, "/ayuda"))
+        assert len(tg.escritos) >= n and tg.a(6450)[-1][1] == bot_telegram.AYUDA
+    finally:
+        bot_telegram.AVISO_ESCRIBIENDO_SEG = anterior
 
 
 def test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client):
@@ -911,6 +951,7 @@ if __name__ == "__main__":
             (test_la_api_interna_solo_da_tokens_de_chats_vinculados, lambda: test_la_api_interna_solo_da_tokens_de_chats_vinculados(client)),
             (test_el_bot_funciona_igual_por_la_api_interna_que_en_proceso, lambda: test_el_bot_funciona_igual_por_la_api_interna_que_en_proceso(client)),
             (test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_propuestas, lambda: test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_propuestas(client)),
+            (test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el_turno, lambda: test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el_turno(client)),
             (test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot, lambda: test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client)),
             (test_un_vinculo_caducado_no_ocupa_el_chat, lambda: test_un_vinculo_caducado_no_ocupa_el_chat(client)),
             (test_las_imagenes_de_docker_no_llevan_bases_ni_secretos, lambda: test_las_imagenes_de_docker_no_llevan_bases_ni_secretos(client)),

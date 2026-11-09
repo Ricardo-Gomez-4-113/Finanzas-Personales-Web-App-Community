@@ -14,6 +14,7 @@ Reglas que no se negocian:
   solo se registra el tipo).
 """
 
+import contextlib
 import json
 import os
 import re
@@ -34,6 +35,7 @@ MAX_PENDIENTES_POR_CHAT = 3      # actualizaciones en cola de un mismo chat (las
 MAX_PENDIENTES_POR_CARRIL = 50   # cola máxima de un carril
 MAX_ESTADO_EN_MEMORIA = 2000     # entradas por diccionario antes de purgar las caducadas
 MAX_TEXTO_TELEGRAM = 3500        # el límite de Telegram es 4096
+AVISO_ESCRIBIENDO_SEG = 4        # Telegram apaga «escribiendo…» a los 5 s
 _ID_PROPUESTA = re.compile(r"^[A-Za-z0-9_-]{6,24}$")
 
 EXPLICACION = ("Soy el asistente de tus finanzas. Para usarme, vincula este chat con tu cuenta: abre la app, entra a Mi perfil, "
@@ -141,7 +143,8 @@ class Bot:
         inicio = time.perf_counter()
         turno = None
         try:
-            turno = self.crear_motor(cuenta, chat_id).responder(historial, texto)
+            with self._escribiendo(chat_id):
+                turno = self.crear_motor(cuenta, chat_id).responder(historial, texto)
         finally:
             if turno is not None:
                 self._sumar_tokens(cuenta["id"], turno.tokens)
@@ -153,6 +156,28 @@ class Bot:
             if propuesta:
                 self.tg.enviar(chat_id, "Confirma esta operación:\n" + propuesta.resumen,
                                botones=[[("Confirmar", f"c:{id_}"), ("Cancelar", f"x:{id_}")]])
+
+    @contextlib.contextmanager
+    def _escribiendo(self, chat_id):
+        """Mantiene el aviso «escribiendo…» mientras el modelo piensa (Telegram lo apaga a los 5 s, así que se repite). Un fallo aquí nunca afecta al turno."""
+        aviso = getattr(self.tg, "escribiendo", None)
+        parar = threading.Event()
+
+        def repetir():
+            while not parar.is_set():
+                try:
+                    aviso(chat_id)
+                except Exception:
+                    pass
+                parar.wait(AVISO_ESCRIBIENDO_SEG)
+
+        hilo = threading.Thread(target=repetir, daemon=True) if aviso else None
+        if hilo:
+            hilo.start()
+        try:
+            yield
+        finally:
+            parar.set()
 
     def _comando(self, chat_id, username, comando, argumento):
         if comando == "/start":
@@ -394,6 +419,9 @@ class TelegramHTTP:
         if botones:
             datos["reply_markup"] = {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in fila] for fila in botones]}
         return self._llamar("sendMessage", **datos)
+
+    def escribiendo(self, chat_id):
+        return self._llamar("sendChatAction", chat_id=chat_id, action="typing")
 
     def editar_botones(self, chat_id, message_id, botones=None):
         markup = {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in fila] for fila in botones]} if botones else {"inline_keyboard": []}
