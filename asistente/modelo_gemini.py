@@ -50,7 +50,8 @@ class ModeloGemini:
         salida = []
         for m in mensajes:
             if m["rol"] == "usuario":
-                salida.append(t.Content(role="user", parts=[t.Part(text=m["texto"])]))
+                adjuntos = [t.Part.from_bytes(data=a["datos"], mime_type=a["mime"]) for a in m.get("adjuntos", [])]
+                salida.append(t.Content(role="user", parts=adjuntos + [t.Part(text=m["texto"] or "(sin texto)")]))
             elif m["rol"] == "modelo":
                 partes = [t.Part(text=m["texto"])] if m.get("texto") else []
                 # Gemini 3 exige devolver la firma de pensamiento de cada llamada a función; es un dato opaco que se guarda tal cual
@@ -93,5 +94,7 @@ class ModeloGemini:
         uso = getattr(respuesta, "usage_metadata", None)
         tokens = int(getattr(uso, "total_token_count", 0) or 0)
         if tokens <= 0:   # sin cifra de Google, el tope de tokens no puede quedar ciego: se estima por longitud (~3 caracteres por token)
-            tokens = max(1, (len(instrucciones) + len(str(mensajes)) + len(texto) + len(str(llamadas))) // 3)
+            sin_bytes = [{k: v for k, v in m.items() if k != "adjuntos"} for m in mensajes]
+            adjuntos = sum(len(m.get("adjuntos", [])) for m in mensajes)
+            tokens = max(1, (len(instrucciones) + len(str(sin_bytes)) + len(texto) + len(str(llamadas))) // 3 + 1000 * adjuntos)
         return Respuesta(texto=texto, llamadas=llamadas, tokens=tokens)

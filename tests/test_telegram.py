@@ -37,11 +37,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 import master_db  # noqa: E402
 import security  # noqa: E402
 from main import app  # noqa: E402
-from asistente import bot_telegram, vinculos  # noqa: E402
+from asistente import bot_telegram, medios, vinculos  # noqa: E402
 from asistente.api import ejecutar_propuesta, obtener_con_cliente, obtener_con_proveedor  # noqa: E402
 from asistente.herramientas import Herramientas  # noqa: E402
 from asistente.modelo_falso import ModeloFalso  # noqa: E402
-from asistente.motor import Motor, Respuesta  # noqa: E402
+from asistente.motor import AVISO_CIFRAS_DEL_ARCHIVO, Motor, Respuesta  # noqa: E402
 from asistente.propuestas import Propuestas  # noqa: E402
 from asistente.servicio import ServicioHTTP, ServicioLocal, SinVinculo  # noqa: E402
 
@@ -192,6 +192,7 @@ def test_desvincular_desde_el_perfil_y_desde_el_bot(client):
 # --- Bot con un Telegram falso --------------------------------------------------------------------------------------
 
 HOY = date(2026, 11, 9)
+medios_max = medios.MAX_BYTES
 
 
 class TelegramFalso:
@@ -199,8 +200,16 @@ class TelegramFalso:
         self.enviados = []     # (chat_id, texto, botones)
         self.ediciones = []    # (chat_id, message_id, botones)
         self.callbacks = []    # (id, texto)
+        self.archivos = {}     # file_id -> bytes que «descarga» el bot
+        self.descargas = []    # file_id de cada descarga pedida
         self.escritos = []     # chat_id de cada aviso «escribiendo…»
         self.falla_escribiendo = False
+
+    def descargar(self, file_id, max_bytes):
+        self.descargas.append(file_id)
+        if file_id not in self.archivos:
+            raise RuntimeError("sin archivo")
+        return self.archivos[file_id]
 
     def escribiendo(self, chat_id):
         self.escritos.append(chat_id)
@@ -678,6 +687,211 @@ def test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el
         bot_telegram.AVISO_ESCRIBIENDO_SEG = anterior
 
 
+OGG = b"OggS\x00\x02" + b"\x00" * 40
+JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 40
+PDF = b"%PDF-1.7 " + b"\x00" * 40
+
+
+def _medio_msg(chat_id, **campos):
+    m = _msg(chat_id, None)
+    m["message"].pop("text")
+    m["message"].update(campos)
+    return m
+
+
+def _usuarios(modelo):
+    return [m for m in modelo.llamadas[-1]["mensajes"] if m["rol"] == "usuario"]
+
+
+def test_una_nota_de_voz_y_una_foto_llegan_al_modelo_pero_el_historial_no_guarda_los_archivos(client):
+    uid, _ = _cuenta(client, "tg_medios")
+    _vincular(uid, 6600)
+    eventos = []
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Te escuché.")] * 6})
+    bot._registrar = lambda nombre, **campos: eventos.append({"evento": nombre, **campos})
+    tg.archivos.update({"v1": OGG, "f1": JPG})
+    bot.procesar(_medio_msg(6600, voice={"file_id": "v1", "duration": 5, "file_size": 400}))
+    ultimo = _usuarios(bot.modelos[uid])[-1]
+    assert ultimo["adjuntos"] == [{"mime": "audio/ogg", "datos": OGG}] and ultimo["texto"] == "[nota de voz]", ultimo
+    assert tg.a(6600)[-1][1] == "Te escuché."
+    bot.procesar(_medio_msg(6600, photo=[{"file_id": "chica", "file_size": 100}, {"file_id": "f1", "file_size": 900}], caption="el súper de hoy"))
+    ultimo = _usuarios(bot.modelos[uid])[-1]
+    assert ultimo["adjuntos"][0]["mime"] == "image/jpeg" and ultimo["texto"] == "[foto] el súper de hoy", "usa la foto más grande y el pie es el texto"
+    assert tg.descargas == ["v1", "f1"]
+    bot.procesar(_msg(6600, "y ahora solo texto"))
+    previos = _usuarios(bot.modelos[uid])
+    assert len(previos) == 3 and not any("adjuntos" in m for m in previos), "los bytes no se quedan en el historial"
+    assert [e["medio"] for e in eventos if e["evento"] == "asistente_turno"] == ["audio", "foto", ""]
+    assert "OggS" not in str(eventos) and "v1" not in str(eventos) and "súper" not in str(eventos)
+
+
+def test_lo_que_no_es_foto_ni_audio_valido_se_rechaza_sin_llegar_al_modelo(client):
+    uid, _ = _cuenta(client, "tg_medios_malos")
+    _vincular(uid, 6601)
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="No debería llamarse.")] * 5})
+    tg.archivos.update({"pdf": PDF, "ok": JPG, "ogg": OGG, "grande": OGG + b"\x00" * (medios.MAX_BYTES_AUDIO + 10)})
+    casos = [
+        (dict(photo=[{"file_id": "x", "file_size": medios_max + 1}]), "demasiado grande"),
+        (dict(voice={"file_id": "x", "duration": 600, "file_size": 100}), "muy largo"),
+        (dict(voice={"file_id": "x", "duration": 5, "file_size": medios_max + 1}), "pesa demasiado"),
+        (dict(document={"file_id": "x", "mime_type": "application/pdf", "file_size": 10}), "Solo puedo leer"),
+        (dict(sticker={"file_id": "x"}), "solo entiendo texto"),
+        (dict(video={"file_id": "x"}), "solo entiendo texto"),
+        (dict(photo=[{"file_id": "pdf", "file_size": 50}]), "No reconozco ese formato"),   # dice ser foto y son los bytes de un PDF
+        (dict(photo=[{"file_id": "no_existe", "file_size": 50}]), "No pude descargar"),
+        (dict(document={"file_id": "ogg", "mime_type": "image/png", "file_size": 50}), "No reconozco ese formato"),   # dice ser imagen y son audio: no esquiva el tope de duración
+        (dict(voice={"file_id": "grande", "duration": 5, "file_size": 50}), "pesa demasiado"),   # el tamaño declarado miente; el real manda
+    ]
+    for campos, esperado in casos:
+        antes = len(bot.modelos.get(uid).llamadas) if uid in bot.modelos else 0
+        bot.procesar(_medio_msg(6601, **campos))
+        assert esperado in tg.a(6601)[-1][1], (campos, tg.a(6601)[-1])
+        assert (len(bot.modelos[uid].llamadas) if uid in bot.modelos else 0) == antes, f"{esperado}: no debe llegar al modelo"
+    assert "pdf" in tg.descargas and "x" not in tg.descargas, "lo que se rechaza por tamaño o tipo ni siquiera se descarga"
+
+
+def test_un_chat_sin_vinculo_no_descarga_nada_y_un_pie_con_comando_no_ejecuta_el_comando(client):
+    uid, _ = _cuenta(client, "tg_medios_pie")
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Vista.")] * 3})
+    tg.archivos["f"] = JPG
+    bot.procesar(_medio_msg(6602, photo=[{"file_id": "f", "file_size": 10}]))
+    assert tg.a(6602)[-1][1] == bot_telegram.EXPLICACION and tg.descargas == [], "sin vínculo, ni descarga ni modelo"
+    _vincular(uid, 6602)
+    bot.procesar(_medio_msg(6602, photo=[{"file_id": "f", "file_size": 10}], caption="/desvincular"))
+    assert vinculos.usuario_de_chat(6602) is not None, "un pie de foto no es un comando"
+    assert _usuarios(bot.modelos[uid])[-1]["texto"] == "[foto] /desvincular"
+
+
+def test_el_tope_diario_de_fotos_y_audios_no_frena_los_textos(client):
+    uid, _ = _cuenta(client, "tg_medios_tope")
+    _vincular(uid, 6603)
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Listo.")] * 10})
+    bot._max_medios_dia = 2
+    tg.archivos["f"] = JPG
+    for _ in range(2):
+        bot.procesar(_medio_msg(6603, photo=[{"file_id": "f", "file_size": 10}]))
+    n = len(tg.descargas)
+    bot.procesar(_medio_msg(6603, photo=[{"file_id": "f", "file_size": 10}]))
+    assert "fotos y audios de hoy" in tg.a(6603)[-1][1] and len(tg.descargas) == n, "el tercero se rechaza antes de descargar"
+    bot.procesar(_msg(6603, "pero el texto sigue"))
+    assert tg.a(6603)[-1][1] == "Listo."
+
+
+def test_con_un_archivo_las_cifras_pueden_venir_de_el_y_sin_archivo_siguen_vigiladas(client):
+    uid, _ = _cuenta(client, "tg_medios_cifras")
+    _vincular(uid, 6604)
+    guion = [Respuesta(texto="El ticket dice un total de 245.50 pesos."), Respuesta(texto="El ticket dice un total de 245.50 pesos."),
+             Respuesta(texto="El ticket dice un total de 245.50 pesos.")]
+    bot, tg, _ = _bot(client, {uid: guion})
+    tg.archivos["f"] = JPG
+    bot.procesar(_medio_msg(6604, photo=[{"file_id": "f", "file_size": 10}]))
+    assert "245.50" in tg.a(6604)[-1][1], "con foto, el total del ticket no se descarta"
+    assert tg.a(6604)[-1][1].endswith(AVISO_CIFRAS_DEL_ARCHIVO), "y el código avisa que esas cifras no son de la cuenta"
+    bot.procesar(_msg(6604, "dime otra vez"))
+    assert "245.50" not in tg.a(6604)[-1][1], "sin archivo, una cifra sin consulta sigue descartándose"
+
+
+def test_la_descarga_real_de_telegram_tiene_tope_de_tamano_y_nunca_lleva_el_token(client):
+    token = "123456:SECRETO-DEL-TOKEN"
+    pedidos = []
+
+    class Flujo:
+        def __init__(self, partes, estado=200, largo=None):
+            self.partes, self.status_code = partes, estado
+            self.headers = {"content-length": str(largo)} if largo is not None else {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_bytes(self):
+            return iter(self.partes)
+
+    class Cliente:
+        def __init__(self, partes, ruta="voice/file_1.oga", estado=200, falla=False, largo=None):
+            self.partes, self.ruta, self.estado, self.falla, self.largo = partes, ruta, estado, falla, largo
+
+        def post(self, url, json=None):
+            pedidos.append(url)
+
+            class R:
+                def json(s):
+                    return {"ok": True, "result": {"file_path": self.ruta}}
+            return R()
+
+        def stream(self, metodo, url):
+            pedidos.append(url)
+            if self.falla:
+                raise ConnectionError(f"no se pudo abrir {url}")
+            return Flujo(self.partes, self.estado, self.largo)
+
+    assert bot_telegram.TelegramHTTP(token, Cliente([b"ab", b"cd"])).descargar("f", 10) == b"abcd"
+    assert pedidos[-1] == f"https://api.telegram.org/file/bot{token}/voice/file_1.oga"
+    for cliente in (Cliente([b"x" * 6, b"x" * 6]), Cliente([b"a"], ruta="../etc/passwd"), Cliente([b"a"], ruta="a b"), Cliente([b"a"], estado=404), Cliente([], falla=True), Cliente([b"a"], largo=11)):
+        try:
+            bot_telegram.TelegramHTTP(token, cliente).descargar("f", 10)
+        except RuntimeError as error:
+            assert token not in str(error) and token not in repr(error.__cause__), "el token nunca sale en un error"
+        else:
+            raise AssertionError("debe fallar")
+
+
+def test_una_descarga_a_gotas_se_corta_por_el_plazo_total(client):
+    reloj = {"t": 0.0}
+
+    class Flujo:
+        status_code, headers = 200, {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_bytes(self):
+            for _ in range(100):
+                reloj["t"] += 5   # cada trozo «tarda» 5 s: la descarga no acaba nunca a este paso
+                yield b"x"
+
+    class Cliente:
+        def post(self, url, json=None):
+            class R:
+                def json(s):
+                    return {"ok": True, "result": {"file_path": "voice/a.oga"}}
+            return R()
+
+        def stream(self, metodo, url):
+            return Flujo()
+
+    original = bot_telegram.time.monotonic
+    bot_telegram.time.monotonic = lambda: reloj["t"]
+    try:
+        try:
+            bot_telegram.TelegramHTTP("1:T", Cliente()).descargar("f", 1000)
+        except RuntimeError as error:
+            assert "lenta" in str(error)
+        else:
+            raise AssertionError("debe cortarse")
+    finally:
+        bot_telegram.time.monotonic = original
+
+
+def test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_bytes(client):
+    from asistente.modelo_gemini import ModeloGemini
+    try:
+        from google.genai import types
+    except ImportError:
+        print("  (sin google-genai: se omite)")
+        return
+    m = ModeloGemini.__new__(ModeloGemini)
+    m._types = types
+    contenidos = m._contenidos([{"rol": "usuario", "texto": "", "adjuntos": [{"mime": "image/png", "datos": b"\x89PNG"}]}])
+    partes = contenidos[0].parts
+    assert partes[0].inline_data.mime_type == "image/png" and partes[1].text == "(sin texto)"
+
+
 def test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client):
     uid, _ = _cuenta(client, "tg_lento")
     from asistente.motor import Motor as _Motor
@@ -952,6 +1166,14 @@ if __name__ == "__main__":
             (test_el_bot_funciona_igual_por_la_api_interna_que_en_proceso, lambda: test_el_bot_funciona_igual_por_la_api_interna_que_en_proceso(client)),
             (test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_propuestas, lambda: test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_propuestas(client)),
             (test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el_turno, lambda: test_el_aviso_escribiendo_dura_lo_que_tarda_el_modelo_y_un_fallo_no_rompe_el_turno(client)),
+            (test_una_nota_de_voz_y_una_foto_llegan_al_modelo_pero_el_historial_no_guarda_los_archivos, lambda: test_una_nota_de_voz_y_una_foto_llegan_al_modelo_pero_el_historial_no_guarda_los_archivos(client)),
+            (test_lo_que_no_es_foto_ni_audio_valido_se_rechaza_sin_llegar_al_modelo, lambda: test_lo_que_no_es_foto_ni_audio_valido_se_rechaza_sin_llegar_al_modelo(client)),
+            (test_un_chat_sin_vinculo_no_descarga_nada_y_un_pie_con_comando_no_ejecuta_el_comando, lambda: test_un_chat_sin_vinculo_no_descarga_nada_y_un_pie_con_comando_no_ejecuta_el_comando(client)),
+            (test_el_tope_diario_de_fotos_y_audios_no_frena_los_textos, lambda: test_el_tope_diario_de_fotos_y_audios_no_frena_los_textos(client)),
+            (test_con_un_archivo_las_cifras_pueden_venir_de_el_y_sin_archivo_siguen_vigiladas, lambda: test_con_un_archivo_las_cifras_pueden_venir_de_el_y_sin_archivo_siguen_vigiladas(client)),
+            (test_la_descarga_real_de_telegram_tiene_tope_de_tamano_y_nunca_lleva_el_token, lambda: test_la_descarga_real_de_telegram_tiene_tope_de_tamano_y_nunca_lleva_el_token(client)),
+            (test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_bytes, lambda: test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_bytes(client)),
+            (test_una_descarga_a_gotas_se_corta_por_el_plazo_total, lambda: test_una_descarga_a_gotas_se_corta_por_el_plazo_total(client)),
             (test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot, lambda: test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client)),
             (test_un_vinculo_caducado_no_ocupa_el_chat, lambda: test_un_vinculo_caducado_no_ocupa_el_chat(client)),
             (test_las_imagenes_de_docker_no_llevan_bases_ni_secretos, lambda: test_las_imagenes_de_docker_no_llevan_bases_ni_secretos(client)),

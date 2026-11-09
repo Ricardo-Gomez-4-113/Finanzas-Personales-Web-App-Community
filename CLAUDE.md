@@ -40,7 +40,8 @@ Convenciones:
   `python3 -m asistente.cli --demo --preguntas` (necesita `requirements-asistente.txt` y `GEMINI_API_KEY`). Plan y lecciones:
   `~/app-plan/plan-asistente-llm.md`. Telegram: QR de un solo uso desde el menú de usuario (`routers/asistente_telegram.py`, `asistente/vinculos.py`;
   tablas `telegram_*` en la base maestra); el bot (`asistente/bot_telegram.py`, `Dockerfile.bot`, perfil `asistente` del compose) no toca la base: usa
-  `/internal/asistente/*` con `ASISTENTE_SECRETO_INTERNO`. Topes diarios por cuenta (`ASISTENTE_MAX_MENSAJES_DIA`, `ASISTENTE_MAX_TOKENS_DIA`) y eventos JSON del bot en `docker logs finanzas-bot`.
+  `/internal/asistente/*` con `ASISTENTE_SECRETO_INTERNO`. Topes diarios por cuenta (`ASISTENTE_MAX_MENSAJES_DIA`, `ASISTENTE_MAX_TOKENS_DIA`, `ASISTENTE_MAX_MEDIOS_DIA`) y eventos JSON del bot en `docker logs finanzas-bot`.
+  Fotos y notas de voz (`asistente/medios.py`): máx. 5 MB y 90 s, el tipo sale de los primeros bytes (no de Telegram), se descargan solo con vínculo y cupo, nunca se guardan (el historial lleva `[foto]`/`[nota de voz]`) y con archivo la guardia de cifras sin consulta se relaja (las escrituras siguen exigiendo confirmación).
   Auditoría del asistente: `tests/auditoria/run.sh --seccion asistente` (ver la skill `auditoria-uso-real`). Todo cambio en `permisos.py`, `tokens.py` o la parte del asistente en `security.py` pasa por `revisor-seguridad`.
 - `static/`: SPA con módulos ES6 y hojas de estilo en `static/css/`. `static/js/confirmar.js` es el modal de confirmación (`confirmar({...})` devuelve una promesa); no se usa `confirm()` nativo.
 - Datos: `data/master.db` (usuarios y auditoría) y `data/tenants/user_{id}.db` (una base por usuario).

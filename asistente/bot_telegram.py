@@ -23,6 +23,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from asistente import medios
+
 TTL_CONVERSACION = 1800          # segundos sin hablar para olvidar la conversación
 MAX_MENSAJES_POR_HORA = 40       # por chat
 MAX_MENSAJES_GLOBAL_POR_HORA = 300   # entre todos los chats: tope de costo del modelo
@@ -34,14 +36,16 @@ MAX_INTENTOS_VINCULO_GLOBAL = 200    # entre todos los chats; cuenta aparte, par
 MAX_PENDIENTES_POR_CHAT = 3      # actualizaciones en cola de un mismo chat (las demás se descartan)
 MAX_PENDIENTES_POR_CARRIL = 50   # cola máxima de un carril
 MAX_ESTADO_EN_MEMORIA = 2000     # entradas por diccionario antes de purgar las caducadas
+MAX_MEDIOS_DIA = 20             # fotos y audios por cuenta y por día (configurable: ASISTENTE_MAX_MEDIOS_DIA); cuestan más que un texto
 MAX_TEXTO_TELEGRAM = 3500        # el límite de Telegram es 4096
+PLAZO_DESCARGA_SEG = 30           # tiempo total para bajar un archivo de Telegram
 AVISO_ESCRIBIENDO_SEG = 4        # Telegram apaga «escribiendo…» a los 5 s
 _ID_PROPUESTA = re.compile(r"^[A-Za-z0-9_-]{6,24}$")
 
 EXPLICACION = ("Soy el asistente de tus finanzas. Para usarme, vincula este chat con tu cuenta: abre la app, entra a Mi perfil, "
                "elige «Asistente en Telegram» y escanea el código QR con el teléfono.")
 AYUDA = ("Pregúntame por tu saldo, tus gastos, tus metas, tus fijos o tus inversiones. También puedo preparar un gasto, un ingreso, "
-         "un depósito en una meta o saltar un fijo: siempre te pido confirmar con un botón.\n\n"
+         "un depósito en una meta o saltar un fijo: siempre te pido confirmar con un botón. Puedes escribirme, mandarme una nota de voz o la foto de un ticket.\n\n"
          "/olvidar borra lo que hablamos. /desvincular quita este chat de tu cuenta.")
 
 
@@ -52,7 +56,7 @@ def _recortar(texto):
 
 class Bot:
     def __init__(self, telegram, servicio, crear_motor, propuestas, ejecutar, reloj=time.monotonic, registrar=None,
-                 max_mensajes_dia=MAX_MENSAJES_DIA, max_tokens_dia=MAX_TOKENS_DIA, dia=None):
+                 max_mensajes_dia=MAX_MENSAJES_DIA, max_tokens_dia=MAX_TOKENS_DIA, dia=None, max_medios_dia=MAX_MEDIOS_DIA):
         """`servicio` responde de qué cuenta es un chat y vincula/desvincula (`asistente/servicio.py`);
         `crear_motor(cuenta, chat_id) -> Motor`; `propuestas` es el `Propuestas` que comparten las herramientas;
         `ejecutar(propuesta, chat_id) -> (ok, texto)` ejecuta una propuesta ya confirmada.
@@ -67,6 +71,7 @@ class Bot:
         self._registrar = registrar
         self._max_mensajes_dia = max_mensajes_dia
         self._max_tokens_dia = max_tokens_dia
+        self._max_medios_dia = max_medios_dia
         self._dia = dia or (lambda: time.strftime("%Y-%m-%d"))
         self._candado = threading.RLock()   # protege los diccionarios compartidos entre chats que se atienden a la vez
         self._candados_chat = {}            # chat_id -> Lock: los mensajes de un mismo chat se atienden en orden
@@ -114,15 +119,28 @@ class Bot:
         origen = mensaje.get("from") or {}
         if origen.get("is_bot") or origen.get("id") != chat["id"]:
             return
-        self._mensaje(chat["id"], origen.get("username"), mensaje.get("text"))
+        texto = mensaje.get("text")
+        try:
+            medio = medios.elegir(mensaje)
+        except medios.Rechazo as rechazo:
+            if self.servicio.usuario_de_chat(chat["id"]):
+                self.tg.enviar(chat["id"], str(rechazo))
+            else:
+                self.tg.enviar(chat["id"], EXPLICACION)
+            return
+        if medio:
+            texto = mensaje.get("caption")   # el pie de la foto es lo que la persona escribe; un «/comando» ahí no se ejecuta
+            if not isinstance(texto, str):
+                texto = ""
+        self._mensaje(chat["id"], origen.get("username"), texto, medio)
 
     # --- mensajes --------------------------------------------------------------------------------------------------
-    def _mensaje(self, chat_id, username, texto):
+    def _mensaje(self, chat_id, username, texto, medio=None):
         if not isinstance(texto, str):
             cuenta = self.servicio.usuario_de_chat(chat_id)
-            self.tg.enviar(chat_id, "Por ahora solo entiendo texto." if cuenta else EXPLICACION)
+            self.tg.enviar(chat_id, medios.NO_ENTIENDE if cuenta else EXPLICACION)
             return
-        if texto.startswith("/"):
+        if not medio and texto.startswith("/"):
             partes = texto.split(maxsplit=1)
             return self._comando(chat_id, username, partes[0].split("@")[0].lower(), partes[1].strip() if len(partes) > 1 else "")
         cuenta = self.servicio.usuario_de_chat(chat_id)
@@ -134,7 +152,12 @@ class Bot:
             self._evento("asistente_limite", tipo="ritmo", cuenta=cuenta["id"])
             self.tg.enviar(chat_id, "Has escrito muchos mensajes seguidos. Intenta de nuevo en un rato.")
             return
-        if not self._anotar_dia(cuenta["id"]):
+        limite = self._anotar_dia(cuenta["id"], bool(medio))
+        if limite == "medios":
+            self._evento("asistente_limite", tipo="medios", cuenta=cuenta["id"])
+            self.tg.enviar(chat_id, "Llegaste al límite de fotos y audios de hoy. Puedes seguir escribiendo; mañana vuelves a poder mandarlos.")
+            return
+        if limite:
             self._evento("asistente_limite", tipo="dia", cuenta=cuenta["id"])
             self.tg.enviar(chat_id, "Llegaste al límite de mensajes de hoy con el asistente. Mañana puedes seguir; mientras tanto, la app sigue disponible.")
             return
@@ -144,12 +167,17 @@ class Bot:
         turno = None
         try:
             with self._escribiendo(chat_id):
-                turno = self.crear_motor(cuenta, chat_id).responder(historial, texto)
+                adjuntos = [self._descargar(medio)] if medio else []
+                turno = self.crear_motor(cuenta, chat_id).responder(historial, texto, adjuntos)
+        except medios.Rechazo as rechazo:
+            self.tg.enviar(chat_id, str(rechazo))
+            return
         finally:
             if turno is not None:
                 self._sumar_tokens(cuenta["id"], turno.tokens)
         self._evento("asistente_turno", cuenta=cuenta["id"], duracion_ms=round((time.perf_counter() - inicio) * 1000),
-                     herramientas=turno.herramientas_usadas, propuestas=len(turno.propuestas), tokens=turno.tokens, error=turno.error)
+                     herramientas=turno.herramientas_usadas, propuestas=len(turno.propuestas), tokens=turno.tokens, error=turno.error,
+                     medio=medio["tipo"] if medio else "")
         self.tg.enviar(chat_id, _recortar(turno.texto))
         for id_ in turno.propuestas:
             propuesta = self.propuestas.obtener(id_, cuenta["id"])
@@ -322,17 +350,37 @@ class Bot:
         dia = self._dia()
         uso = self._uso_dia.get(user_id)
         if not uso or uso["dia"] != dia:
-            uso = self._uso_dia[user_id] = {"dia": dia, "mensajes": 0, "tokens": 0}
+            uso = self._uso_dia[user_id] = {"dia": dia, "mensajes": 0, "tokens": 0, "medios": 0}
         return uso
 
-    def _anotar_dia(self, user_id):
-        """Cuenta el mensaje contra el tope diario de la cuenta (mensajes y tokens). False si ya no cabe (y entonces no cuenta)."""
+    def _anotar_dia(self, user_id, con_medio=False):
+        """Cuenta el mensaje contra el tope diario de la cuenta (mensajes, tokens y, si trae foto o audio, medios).
+        None si cabe; si no, el motivo («dia» o «medios») y entonces no cuenta nada."""
         with self._candado:
             uso = self._uso_de(user_id)
             if (self._max_mensajes_dia and uso["mensajes"] >= self._max_mensajes_dia) or (self._max_tokens_dia and uso["tokens"] >= self._max_tokens_dia):
-                return False
+                return "dia"
+            if con_medio and self._max_medios_dia and uso["medios"] >= self._max_medios_dia:
+                return "medios"
             uso["mensajes"] += 1
-            return True
+            if con_medio:
+                uso["medios"] += 1
+            return None
+
+    def _descargar(self, medio):
+        """Baja el archivo de Telegram y lo identifica por sus bytes. Lanza `Rechazo` con un texto para la persona."""
+        try:
+            datos = self.tg.descargar(medio["file_id"], medios.MAX_BYTES_AUDIO if medio["tipo"] == "audio" else medios.MAX_BYTES)
+        except Exception:
+            raise medios.Rechazo("No pude descargar ese archivo. Intenta de nuevo.") from None
+        real = medios.tipo_real(datos) if isinstance(datos, (bytes, bytearray)) else None
+        if real is None:
+            raise medios.Rechazo("No reconozco ese formato. Acepto fotos (JPG, PNG, WEBP) y audios (OGG, MP3, WAV, FLAC).")
+        if real[0] != medio["tipo"]:   # lo que Telegram dice que es y lo que son los bytes deben coincidir: así los topes de cada tipo no se esquivan
+            raise medios.Rechazo("No reconozco ese formato. Acepto fotos (JPG, PNG, WEBP) y audios (OGG, MP3, WAV, FLAC).")
+        if real[0] == "audio" and len(datos) > medios.MAX_BYTES_AUDIO:
+            raise medios.Rechazo("Ese audio pesa demasiado (máximo 3 MB).")
+        return {"mime": real[1], "datos": datos}
 
     def _sumar_tokens(self, user_id, tokens):
         with self._candado:
@@ -423,6 +471,33 @@ class TelegramHTTP:
     def escribiendo(self, chat_id):
         return self._llamar("sendChatAction", chat_id=chat_id, action="typing")
 
+    def descargar(self, file_id, max_bytes):
+        """Bytes de un archivo de Telegram, con tope de tamaño. Ningún error lleva la URL (trae el token)."""
+        info = self._llamar("getFile", file_id=file_id)
+        ruta = (info or {}).get("file_path")
+        if not isinstance(ruta, str) or not re.fullmatch(r"[A-Za-z0-9_./-]{1,200}", ruta) or ".." in ruta:
+            raise RuntimeError("Telegram no dio una ruta de archivo válida")
+        try:
+            with self._cliente.stream("GET", self._base.replace("/bot", "/file/bot", 1) + ruta) as respuesta:
+                if respuesta.status_code != 200:
+                    raise RuntimeError(f"Telegram no entregó el archivo: {respuesta.status_code}")
+                declarado = respuesta.headers.get("content-length", "") if hasattr(respuesta, "headers") else ""
+                if declarado.isdigit() and int(declarado) > max_bytes:
+                    raise RuntimeError("archivo demasiado grande")
+                limite, partes, total = time.monotonic() + PLAZO_DESCARGA_SEG, [], 0   # el plazo es del total: una descarga a gotas no ocupa un carril
+                for parte in respuesta.iter_bytes():
+                    total += len(parte)
+                    if total > max_bytes:
+                        raise RuntimeError("archivo demasiado grande")
+                    if time.monotonic() > limite:
+                        raise RuntimeError("descarga demasiado lenta")
+                    partes.append(parte)
+        except RuntimeError:
+            raise
+        except Exception:
+            raise RuntimeError("falló la descarga del archivo") from None
+        return b"".join(partes)
+
     def editar_botones(self, chat_id, message_id, botones=None):
         markup = {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in fila] for fila in botones]} if botones else {"inline_keyboard": []}
         return self._llamar("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id, reply_markup=markup)
@@ -466,12 +541,13 @@ def main():
     sin_topes = os.environ.get("ASISTENTE_SIN_TOPES", "").strip() == "1"   # único modo de apagar los topes diarios: explícito
     max_mensajes = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", MAX_MENSAJES_DIA)
     max_tokens = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_TOKENS_DIA", MAX_TOKENS_DIA)
+    max_medios = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_MEDIOS_DIA", MAX_MEDIOS_DIA)
     bot = Bot(telegram, servicio, crear_motor, propuestas, ejecutar, registrar=_evento, max_mensajes_dia=max_mensajes,
-              max_tokens_dia=max_tokens, dia=lambda: ahora_local().date().isoformat())
+              max_tokens_dia=max_tokens, max_medios_dia=max_medios, dia=lambda: ahora_local().date().isoformat())
     despachador = Despachador(bot, TRABAJADORES, al_fallar=lambda tipo: _evento("bot_error", tipo=tipo),
                               al_descartar=lambda: _evento("bot_cola_llena"))
     offset, espera = 0, 1
-    _evento("bot_iniciado", trabajadores=TRABAJADORES, max_mensajes_dia=max_mensajes, max_tokens_dia=max_tokens, sin_topes=sin_topes)
+    _evento("bot_iniciado", trabajadores=TRABAJADORES, max_mensajes_dia=max_mensajes, max_tokens_dia=max_tokens, max_medios_dia=max_medios, sin_topes=sin_topes)
     try:
         while True:
             try:
