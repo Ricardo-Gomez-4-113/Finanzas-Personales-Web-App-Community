@@ -120,12 +120,12 @@ def _a_login(page, base):
         page.evaluate("document.querySelector('.dropdown-btn-logout').click()")
         page.wait_for_selector("#modal-confirmar:not(.hidden)", timeout=10000)
         page.evaluate("document.getElementById('btn-confirmar-aceptar').click()")
-    page.wait_for_selector("#login-username:visible", timeout=20000)
+    escritorio._ver_login(page, base)
 
 
 def _a_app(page, base, est):
     if not _en_app(page):
-        escritorio._login(page, base, est.usuario, est.clave)
+        escritorio._login(page, base, est.usuario, est.clave, en_app=False)
 
 
 def _escribir_login(page, usuario, clave):
@@ -153,7 +153,7 @@ def _reiniciar(servidor, hoy, page, est):
     servidor.parar()
     servidor.arrancar(hoy)
     est.fallos_cuenta = est.fallos_ip = est.fallos_perfil = 0
-    page.goto(servidor.base + "/")
+    page.goto(servidor.base + escritorio.RUTA_APP)
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
 
 
@@ -215,7 +215,7 @@ def _cerrar_sesion(page, base, est):
     _a_app(page, base, est)
     _a_login(page, base)
     token = page.evaluate("localStorage.getItem('jwt_token')")
-    page.goto(base + "/")
+    page.goto(base + escritorio.RUTA_APP)
     _asentar(page)  # sin token, el login se queda; con uno, la app tardaría en aparecer
     page.wait_for_timeout(500)
     problemas = []
@@ -403,7 +403,7 @@ def _episodio(semilla, numero, navegador, servidor, mods, bit, fallos, dispositi
     page.on("pageerror", lambda e: errores.append(f"pageerror: {e}"))
     page.on("console", lambda m: errores.append(f"console: {m.text}") if m.type == "error" and "Failed to load resource" not in m.text else None)
     page.on("response", lambda r: respuestas_5xx.append(f"{r.status} {r.url.split('?')[0]}") if r.status >= 500 and r.status != 503 else None)
-    escritorio._login(page, servidor.base, usuario)
+    escritorio._login(page, servidor.base, usuario, en_app=False)
 
     pasos = rng.randint(PASOS_MIN, PASOS_MAX)
     hechos = 0

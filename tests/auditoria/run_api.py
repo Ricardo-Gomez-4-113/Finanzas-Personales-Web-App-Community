@@ -39,9 +39,12 @@ import personas  # noqa: E402
 from bitacora import Bitacora, copiar_base  # noqa: E402
 from oraculo import Oraculo  # noqa: E402
 
+# Nunca se copian secretos a la copia de prueba: un .env con la clave de correo haría que «olvidé mi contraseña» mandara
+# correos reales a las cuentas de prueba
+SIN_SECRETOS = ".env", ".env.*", "*.pem", "*.key"
 IGNORAR_EN_COPIA = shutil.ignore_patterns(
     "data", ".git", "tests", "auditoria", "__pycache__", "*.db", "backups", "venv", ".venv",
-    "node_modules", "graphify-out", "docs",
+    "node_modules", "graphify-out", "docs", *SIN_SECRETOS,
 )
 HOY_INICIAL = datetime.date(2026, 10, 1)
 PASOS_MIN, PASOS_MAX = 5, 30
@@ -74,6 +77,8 @@ def _preparar_app(fuente, carpeta_logs):
     os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
     os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminAuditoria#12345"
     os.environ["FINANZAS_MODO_PRUEBA"] = "1"
+    for variable in ("RESEND_API_KEY", "SMTP_USER", "SMTP_PASSWORD", "SMTP_HOST"):
+        os.environ[variable] = ""  # sin correo en las pruebas, pase lo que pase con el entorno de quien las lanza
     os.environ["FINANZAS_LOG_DIR"] = carpeta_logs
     _cotizaciones_fijas()
     import database

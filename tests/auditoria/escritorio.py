@@ -43,9 +43,13 @@ DISPOSITIVOS = {
     "escritorio": {"viewport": {"width": 1280, "height": 800}},
     "celular": {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True},
 }
+# Nunca se copian secretos al servidor de prueba: un .env con la clave de correo haría que «olvidé mi contraseña» mandara
+# correos reales a las cuentas de prueba
+SIN_SECRETOS = ".env", ".env.*", "*.pem", "*.key"
+CORREO_VACIO = {"RESEND_API_KEY": "", "SMTP_USER": "", "SMTP_PASSWORD": "", "SMTP_HOST": ""}  # y el proceso de prueba no lo hereda
 IGNORAR_EN_COPIA = shutil.ignore_patterns(
     "data", ".git", "tests", "auditoria", "__pycache__", "*.db", "backups", "venv", ".venv",
-    "node_modules", "graphify-out", "docs",
+    "node_modules", "graphify-out", "docs", *SIN_SECRETOS,
 )
 # Mismo lanzador que las pruebas de navegador: cotizaciones fijas, sin salir a internet.
 LANZADOR = """
@@ -72,7 +76,7 @@ class Servidor:
 
     def arrancar(self, hoy):
         env = {
-            **os.environ, "FINANZAS_MODO_PRUEBA": "1", "FINANZAS_LOG_DIR": self.logs,
+            **os.environ, **CORREO_VACIO, "FINANZAS_MODO_PRUEBA": "1", "FINANZAS_LOG_DIR": self.logs,
             "FINANZAS_HOY": f"{hoy.isoformat()}T10:00:00",
         }
         self.proc = subprocess.Popen(
@@ -104,22 +108,38 @@ def _cargar_modulos(tmp):
     return types.SimpleNamespace(database=database, master_db=master_db, security=security)
 
 
-def _login(page, base, usuario, clave=None):
+def _login(page, base, usuario, clave=None, en_app=True):
     page.goto(base + "/login")
     # Con una sesión guardada, /login pasa a la app: entonces ya no hay nada que llenar
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
-    if page.query_selector("#vista-app:not(.hidden)"):
-        return
-    _esperar_foco(page, "login-username")
-    page.fill("#login-username", usuario)
-    page.fill("#login-password", clave or personas.CLAVE)
-    page.click("#form-login [type=submit]")
-    page.wait_for_selector("#vista-app:not(.hidden)", timeout=20000)
+    if not page.query_selector("#vista-app:not(.hidden)"):
+        _esperar_foco(page, "login-username")
+        page.fill("#login-username", usuario)
+        page.fill("#login-password", clave or personas.CLAVE)
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=20000)
+    if en_app:
+        # Recargar debe volver a la app con la sesión: la URL pasa a /app (en el SaaS, /login siempre muestra el formulario).
+        # El driver de Login lo desactiva para probar lo que ve una persona que recarga donde entró.
+        page.evaluate(f"history.replaceState(null, '', '{RUTA_APP}#app')")
+
+
+# Dónde se abre la app con una sesión: en Community «/» y «/app» sirven lo mismo; en el SaaS «/» es la landing
+RUTA_APP = "/app"
+
+
+def _ver_login(page, base):
+    """Deja a la vista el formulario de entrada. En el SaaS, cerrar sesión lleva a la landing: de ahí se pasa a /login."""
+    try:
+        page.wait_for_selector("#login-username:visible", timeout=5000)
+    except Exception:
+        page.goto(base + "/login")
+        page.wait_for_selector("#login-username:visible", timeout=20000)
 
 
 def _reentrar(page, base, usuario, clave=None):
     """Abre la app tras reiniciar el servidor: espera a que la página decida entre la app y el login, y solo entra si hace falta."""
-    page.goto(base + "/")
+    page.goto(base + RUTA_APP)
     page.wait_for_selector("#vista-app:not(.hidden), #login-username:visible", timeout=60000)
     if not page.query_selector("#vista-app:not(.hidden)"):
         _login(page, base, usuario, clave)
