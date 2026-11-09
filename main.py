@@ -30,7 +30,7 @@ from security import (
     hash_password,
     clave_cabe_en_bcrypt
 )
-from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico, comentarios
+from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico, comentarios, asistente_telegram, asistente_interno
 from limite_cuerpo import LimiteTamanoCuerpo
 
 @asynccontextmanager
@@ -103,6 +103,8 @@ app.include_router(presupuesto.router)
 app.include_router(salud.router)
 app.include_router(diagnostico.router)
 app.include_router(comentarios.router)
+app.include_router(asistente_telegram.router)
+app.include_router(asistente_interno.router)
 
 @app.exception_handler(StarletteHTTPException)
 async def rechazos_con_codigo(request: Request, exc: StarletteHTTPException):

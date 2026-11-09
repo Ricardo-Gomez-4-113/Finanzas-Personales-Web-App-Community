@@ -8,9 +8,11 @@ El motor no conoce Telegram ni Gemini. Un «modelo» es cualquier objeto con
 """
 
 import re
+import time
 from dataclasses import dataclass, field
 
 MAX_RONDAS = 5        # cuántas veces seguidas puede pedir herramientas en un turno
+MAX_SEGUNDOS_POR_TURNO = 60   # un turno lento no bloquea al bot (que atiende a todos los chats uno por uno)
 MAX_LLAMADAS_POR_RONDA = 4
 MAX_LLAMADAS_POR_TURNO = 10
 MAX_MENSAJES = 20     # historial que se conserva entre turnos (10 turnos)
@@ -72,11 +74,13 @@ class Turno:
 
 
 class Motor:
-    def __init__(self, modelo, herramientas, hoy, max_rondas=MAX_RONDAS):
+    def __init__(self, modelo, herramientas, hoy, max_rondas=MAX_RONDAS, max_segundos=MAX_SEGUNDOS_POR_TURNO, reloj=time.monotonic):
         self.modelo = modelo
         self.herramientas = herramientas
         self.hoy = hoy            # función sin argumentos que devuelve la fecha de hoy
         self.max_rondas = max_rondas
+        self.max_segundos = max_segundos
+        self._reloj = reloj
 
     def responder(self, historial, texto):
         """Añade el mensaje al historial (lista que conserva quien llama), ejecuta el turno y devuelve un `Turno`."""
@@ -90,7 +94,11 @@ class Motor:
         instrucciones = INSTRUCCIONES.format(hoy=hoy.isoformat(), capacidad=CONSULTA_Y_PROPONE if self.herramientas.escritura else SOLO_CONSULTA)
         de_la_fecha = {float(hoy.year), float(hoy.month), float(hoy.day)}
         final = "No pude completar la consulta. Intenta de nuevo."
+        inicio = self._reloj()
         for _ in range(self.max_rondas + 1):
+            if self._reloj() - inicio > self.max_segundos:
+                historial.pop()
+                return Turno("No pude contestar ahora, intenta en un momento.", usadas, propuestas, error="TiempoAgotado")
             try:
                 respuesta = self.modelo.generar(instrucciones, trabajo, self.herramientas.declaraciones())
             except Exception as error:  # el modelo es un servicio externo: si falla, la conversación sigue

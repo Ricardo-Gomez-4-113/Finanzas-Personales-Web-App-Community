@@ -1,0 +1,17 @@
+# Imagen del bot de Telegram del asistente (docker compose --profile asistente up -d finanzas-bot).
+# Es la de la app más el SDK de Gemini, que la app no necesita. Corre sin privilegios.
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt requirements-asistente.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-asistente.txt \
+    && useradd --system --no-create-home --uid 10001 bot
+
+COPY . .
+
+USER bot
+
+CMD ["python3", "-m", "asistente.bot_telegram"]

@@ -16,3 +16,34 @@ services:
     volumes:
       # Solo los datos persisten fuera del contenedor (el código va dentro de la imagen)
       - ./data:/app/data
+
+  # Bot de Telegram del asistente. Opcional: no arranca con `docker compose up -d` a secas, solo con
+  # `docker compose --profile asistente up -d finanzas-bot`. Necesita en .env: TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, GEMINI_API_KEY
+  # y ASISTENTE_SECRETO_INTERNO (el mismo valor lo lee la app). Está aislado a propósito: no recibe el .env completo (ni la clave JWT, ni el
+  # correo), no monta la carpeta de datos, no tiene root ni sistema de archivos de escritura. Todo lo que necesita de las cuentas se lo pide a la
+  # app por /internal/asistente, que solo le da tokens de un minuto de chats vinculados.
+  finanzas-bot:
+    profiles: ["asistente"]
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: finanzas-bot
+    restart: unless-stopped
+    depends_on:
+      - finanzas-community
+    environment:
+      APP_URL: http://finanzas-community:8001
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_MODEL_RESPALDO: ${GEMINI_MODEL_RESPALDO:-}
+      ASISTENTE_SECRETO_INTERNO: ${ASISTENTE_SECRETO_INTERNO}
+      # Los módulos de la app que importa exigen una clave JWT para arrancar. Esta es de relleno y NO es la real: el bot no puede firmar nada válido.
+      JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

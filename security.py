@@ -323,6 +323,12 @@ def devolver_intento_login(clave: str, marca: float) -> None:
             if not intentos:
                 _intentos_fallidos_login.pop(clave, None)
 
+def clave_bloqueada(clave: str, limite: int = _MAX_INTENTOS_LOGIN) -> bool:
+    """¿Esta clave ya agotó su cupo en la ventana? Consulta sin anotar ningún intento."""
+    ahora = time.time()
+    with _candado_login:
+        return len([t for t in _intentos_fallidos_login.get(clave, []) if ahora - t < _VENTANA_LOGIN_SEG]) >= limite
+
 def reservar_intento_login_ip(ip: str) -> float:
     """Tope de intentos desde una IP, sin importar la cuenta probada."""
     return reservar_intento_login(f"ip-login:{ip}", limite=_MAX_INTENTOS_IP_LOGIN)

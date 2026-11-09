@@ -33,6 +33,7 @@ os.chdir(TMP)
 sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminTest#12345"
+os.environ["TELEGRAM_BOT_USERNAME"] = "finanzas_demo_bot"   # el servidor de pruebas lo hereda: el menú del asistente de Telegram queda disponible
 
 import escenario  # noqa: E402
 import master_db  # noqa: E402
@@ -2238,6 +2239,85 @@ def test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base):
         ctx.close()
 
 
+def _abrir_asistente_telegram(page):
+    page.click("#btn-user-menu-trigger")
+    page.click("#btn-asistente-telegram")
+    page.wait_for_selector("#modal-telegram:not(.hidden)")
+
+
+def test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta(navegador, base):
+    """Mi menú > Asistente en Telegram: pide la contraseña, muestra el QR de un solo uso y, al escanearlo (aquí lo hace el bot
+    simulado), pasa a «vinculado»; Desconectar quita el vínculo."""
+    from asistente import vinculos
+    usuario, clave = _usuario_nuevo("telegram")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _abrir_asistente_telegram(page)
+        page.wait_for_selector("#telegram-formulario:not(.hidden)")
+        page.fill("#telegram-contrasena", "clave-equivocada")
+        page.click("#btn-generar-telegram")
+        page.wait_for_selector(".toast-error")
+        assert page.is_hidden("#telegram-qr-caja") and page.get_attribute("#telegram-qr", "src") is None, "con la contraseña mal no hay QR"
+        page.fill("#telegram-contrasena", clave)
+        page.click("#btn-generar-telegram")
+        page.wait_for_selector("#telegram-qr-caja:not(.hidden)")
+        assert page.get_attribute("#telegram-qr", "src").startswith("data:image/svg+xml")
+        enlace = page.get_attribute("#telegram-enlace", "href")
+        assert enlace.startswith("https://t.me/finanzas_demo_bot?start="), enlace
+        assert "Vence en" in page.inner_text("#telegram-vence")
+        assert page.input_value("#telegram-contrasena") == "", "la contraseña no se queda en el campo"
+        assert page.evaluate("document.getElementById('telegram-qr').naturalWidth") > 0, "la imagen del QR se pinta"
+        # El bot simulado recibe «/start <código>»: la pantalla lo detecta sola
+        assert vinculos.consumir_codigo(enlace.split("?start=")[1], 8123, "persona_tg")[0] == vinculos.OK
+        page.wait_for_selector("#telegram-vinculado:not(.hidden)", timeout=10000)
+        assert page.inner_text("#telegram-usuario") == "@persona_tg"
+        assert page.get_attribute("#telegram-qr", "src") is None and page.get_attribute("#telegram-enlace", "href") is None, "el código ya no queda en la página"
+        page.click("#btn-desconectar-telegram")
+        _responder_confirmacion(page)
+        page.wait_for_selector("#telegram-formulario:not(.hidden)")
+        assert vinculos.usuario_de_chat(8123) is None
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda(navegador, base):
+    usuario, clave = _usuario_nuevo("telegram_movil")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _abrir_asistente_telegram(page)
+        page.fill("#telegram-contrasena", clave)
+        page.click("#btn-generar-telegram")
+        page.wait_for_selector("#telegram-qr-caja:not(.hidden)")
+        ancho = page.evaluate("({pagina: document.documentElement.scrollWidth, ventana: window.innerWidth, qr: document.getElementById('telegram-qr').getBoundingClientRect().width})")
+        assert ancho["pagina"] <= ancho["ventana"] and 150 <= ancho["qr"] <= ancho["ventana"], ancho
+        page.click("#telegram-qr-caja .btn-secondary")
+        page.wait_for_selector("#modal-telegram.hidden", state="attached")
+        assert page.get_attribute("#telegram-qr", "src") is None and page.get_attribute("#telegram-enlace", "href") is None
+        _abrir_asistente_telegram(page)
+        assert page.is_hidden("#telegram-qr-caja") and page.input_value("#telegram-contrasena") == "", "al reabrir no queda el código anterior"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_asistente_telegram_sin_bot_en_el_servidor_lo_dice(navegador, base):
+    usuario, clave = _usuario_nuevo("telegram_sin_bot")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        page.route("**/api/asistente/telegram", lambda r: r.fulfill(status=200, content_type="application/json",
+                   body='{"disponible": false, "vinculado": false, "username": null, "desde": null}'))
+        _abrir_asistente_telegram(page)
+        page.wait_for_selector("#telegram-no-disponible:not(.hidden)")
+        assert "no está activado" in page.inner_text("#telegram-no-disponible") and page.is_hidden("#telegram-formulario")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
@@ -2331,6 +2411,9 @@ if __name__ == "__main__":
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),
                 (test_comentario_se_envia_desde_el_menu_y_queda_en_la_base, lambda: test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base)),
+                (test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta, lambda: test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta(navegador, base)),
+                (test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda, lambda: test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda(navegador, base)),
+                (test_asistente_telegram_sin_bot_en_el_servidor_lo_dice, lambda: test_asistente_telegram_sin_bot_en_el_servidor_lo_dice(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

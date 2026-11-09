@@ -79,6 +79,13 @@ class Propuestas:
                 return True
             return False
 
+    def cancelar_de_cuenta(self, user_id):
+        """Cancela todas las propuestas pendientes de una cuenta (al desvincular el chat)."""
+        with self._candado:
+            for p in self._por_id.values():
+                if p.user_id == int(user_id) and p.estado == PENDIENTE:
+                    p.estado = CANCELADA
+
     def confirmar(self, id_, user_id, ejecutor):
         """Ejecuta la propuesta una sola vez. `ejecutor(propuesta) -> (ok, texto)`. Devuelve `(ok, texto)` para mostrar."""
         with self._candado:

@@ -8,3 +8,15 @@ __pycache__/
 *.pyc
 .pytest_cache/
 PLAN.md
+
+# Bases de datos, secretos y material que no debe viajar en ninguna imagen (la de la app ni la del bot)
+*.db
+*.db-wal
+*.db-shm
+user_*.db
+.env.*
+.claude/
+graphify-out/
+auditoria/
+docs/
+tests/

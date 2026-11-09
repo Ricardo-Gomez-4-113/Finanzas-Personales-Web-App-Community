@@ -38,7 +38,9 @@ Convenciones:
   (`uso = "asistente"`, lectura) que `security.verify_token` solo deja pasar por `asistente/permisos.py`. El modelo solo *propone* escrituras
   (`asistente/propuestas.py`); ejecutarlas exige la confirmación de la persona y un segundo token de 20 s (`asistente_escritura`). Probar con
   `python3 -m asistente.cli --demo --preguntas` (necesita `requirements-asistente.txt` y `GEMINI_API_KEY`). Plan y lecciones:
-  `~/app-plan/plan-asistente-llm.md`. Todo cambio en `permisos.py`, `tokens.py` o la parte del asistente en `security.py` pasa por `revisor-seguridad`.
+  `~/app-plan/plan-asistente-llm.md`. Telegram: QR de un solo uso desde el menú de usuario (`routers/asistente_telegram.py`, `asistente/vinculos.py`;
+  tablas `telegram_*` en la base maestra); el bot (`asistente/bot_telegram.py`, `Dockerfile.bot`, perfil `asistente` del compose) no toca la base: usa
+  `/internal/asistente/*` con `ASISTENTE_SECRETO_INTERNO`. Todo cambio en `permisos.py`, `tokens.py` o la parte del asistente en `security.py` pasa por `revisor-seguridad`.
 - `static/`: SPA con módulos ES6 y hojas de estilo en `static/css/`. `static/js/confirmar.js` es el modal de confirmación (`confirmar({...})` devuelve una promesa); no se usa `confirm()` nativo.
 - Datos: `data/master.db` (usuarios y auditoría) y `data/tenants/user_{id}.db` (una base por usuario).
 

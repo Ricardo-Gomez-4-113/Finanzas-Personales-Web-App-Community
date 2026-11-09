@@ -24,11 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=991b263999">
-    <link rel="stylesheet" href="/static/css/layout.css?v=991b263999">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=991b263999">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=991b263999">
-    <link rel="stylesheet" href="/static/css/tema.css?v=991b263999">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=3d28b8e283">
+    <link rel="stylesheet" href="/static/css/layout.css?v=3d28b8e283">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=3d28b8e283">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=3d28b8e283">
+    <link rel="stylesheet" href="/static/css/tema.css?v=3d28b8e283">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 </head>
@@ -255,6 +255,12 @@
                                         <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     </span>
                                     <span>Mi perfil</span>
+                                </button>
+                                <button type="button" id="btn-asistente-telegram" class="dropdown-action-btn" data-on-click='[["abrirModalTelegram"], ["cerrarUserDropdown"]]' title="Consulta tus finanzas desde Telegram">
+                                    <span class="action-icon">
+                                        <svg class="ui-svg-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                                    </span>
+                                    <span>Asistente en Telegram</span>
                                 </button>
                                 <button type="button" id="btn-modo" class="dropdown-action-btn btn-theme" data-on-click='[["toggleModoOscuro"]]'>
                                     <span class="action-icon" id="icon-modo-oscuro">
@@ -1808,6 +1814,51 @@
         </div>
     </div>
 
+    <div id="modal-telegram" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-telegram-titulo" data-on-click='[["cerrarModalTelegram"]]' data-solo-fondo>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-telegram-titulo" class="s-display-flex s-align-items-center s-gap-8px">
+                    <span>Asistente en Telegram</span>
+                </h3>
+                <button type="button" class="btn-modal-close" data-on-click='[["cerrarModalTelegram"]]'>&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-nota" id="telegram-cargando">Consultando…</p>
+                <p class="modal-nota hidden" id="telegram-no-disponible">El asistente de Telegram no está activado en este servidor.</p>
+
+                <div class="hidden" id="telegram-vinculado">
+                    <p>Tu cuenta está vinculada con <strong id="telegram-usuario"></strong> en Telegram.</p>
+                    <p class="modal-nota">Escríbele al bot para preguntar por tu saldo, tus gastos o tus metas. Para registrar algo te pide confirmar con un botón. Solo actúa a nombre de esta cuenta.</p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" data-on-click='[["mostrarFormularioTelegram"]]'>Vincular otro chat</button>
+                        <button type="button" class="btn-danger-outline" id="btn-desconectar-telegram" data-on-click='[["desvincularTelegram"]]'>Desconectar</button>
+                    </div>
+                </div>
+
+                <form class="hidden" id="telegram-formulario" data-on-submit='[["generarCodigoTelegram", "$event"]]'>
+                    <p class="modal-nota">Genera un código QR, escanéalo con el teléfono y pulsa «Iniciar» en Telegram. Cada cuenta tiene su propio asistente, y solo actúa a nombre de la cuenta vinculada.</p>
+                    <div class="form-group">
+                        <label for="telegram-contrasena">Tu contraseña actual</label>
+                        <input type="password" id="telegram-contrasena" maxlength="72" autocomplete="current-password" required placeholder="Para confirmar que eres tú">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" data-on-click='[["cerrarModalTelegram"]]'>Cancelar</button>
+                        <button type="submit" class="btn-primary" id="btn-generar-telegram">Generar código QR</button>
+                    </div>
+                </form>
+
+                <div class="hidden" id="telegram-qr-caja">
+                    <img id="telegram-qr" class="telegram-qr" alt="Código QR para vincular el asistente de Telegram" width="220" height="220">
+                    <p class="modal-nota">Escanéalo con la cámara del teléfono, ábrelo en Telegram y pulsa «Iniciar». <span id="telegram-vence"></span></p>
+                    <p class="modal-nota">¿Estás en el mismo teléfono? <a id="telegram-enlace" class="link-btn" target="_blank" rel="noopener noreferrer">Abrir en Telegram</a></p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" data-on-click='[["cerrarModalTelegram"]]'>Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-recuperar-password" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-recuperar-password-titulo" data-on-click='[["cerrarModalRecuperarPassword"]]' data-solo-fondo>
         <div class="modal-card">
             <div class="modal-header">
@@ -2072,7 +2123,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=991b263999"></script>
+    <script type="module" src="/static/js/main.js?v=3d28b8e283"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

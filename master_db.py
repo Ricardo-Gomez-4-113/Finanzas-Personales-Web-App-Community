@@ -166,6 +166,29 @@ def init_master_db() -> None:
             )
         """)
 
+        # Asistente en Telegram: un chat privado por cuenta. El código de vinculación se guarda solo como hash y se usa una vez.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_vinculos (
+                user_id INTEGER PRIMARY KEY,
+                chat_id INTEGER NOT NULL UNIQUE,
+                username TEXT,
+                huella_clave TEXT NOT NULL,
+                creado_en TEXT NOT NULL,
+                ultimo_uso TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_codigos (
+                codigo_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                vence_en TEXT NOT NULL,
+                usado INTEGER NOT NULL DEFAULT 0,
+                creado_en TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
         # Índices optimizados
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -387,6 +410,9 @@ def set_user_status(user_id: int, is_active: int) -> None:
     try:
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET is_active = ? WHERE id = ?", (1 if is_active else 0, user_id))
+        if not is_active:   # una cuenta desactivada pierde su asistente de Telegram: al reactivarla hay que volver a escanear
+            cursor.execute("DELETE FROM telegram_vinculos WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM telegram_codigos WHERE user_id = ?", (user_id,))
         conn.commit()
     finally:
         conn.close()
@@ -397,6 +423,9 @@ def update_subscription_status(user_id: int, status: str) -> None:
     try:
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET subscription_status = ? WHERE id = ?", (status.strip().lower(), user_id))
+        if status.strip().lower() in ("suspended", "cancelled"):   # igual que al desactivar la cuenta
+            cursor.execute("DELETE FROM telegram_vinculos WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM telegram_codigos WHERE user_id = ?", (user_id,))
         conn.commit()
     finally:
         conn.close()
@@ -522,6 +551,8 @@ def delete_user_and_tenant(user_id: int) -> bool:
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM telegram_vinculos WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM telegram_codigos WHERE user_id = ?", (user_id,))
         cursor.execute("UPDATE comentarios SET user_id = NULL WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()

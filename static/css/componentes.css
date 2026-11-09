@@ -817,3 +817,13 @@ tbody tr:hover {
         font-size: 0.8rem;
     }
 }
+
+/* Asistente en Telegram: el QR va sobre fondo marfil (lo trae el propio SVG) para que lo lea cualquier cámara, en tema claro y oscuro */
+.telegram-qr {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto 12px;
+    border-radius: 12px;
+}
