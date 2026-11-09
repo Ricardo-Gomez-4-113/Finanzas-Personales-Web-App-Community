@@ -119,8 +119,11 @@ Un cambio está terminado cuando:
 - **Prueba intermitente:** `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` falló una vez esperando filas;
   no se pudo reproducir (12 corridas seguidas en verde, tres a la vez con la máquina cargada). Si vuelve a fallar en la
   batería completa, guardar la captura y el log de ese momento antes de repetirla.
-- **Visual:** consolidar las 5 hojas de estilo (180 KB). Hay unos 210 selectores definidos en más de una hoja (`tema.css`
-  repite 71 de `componentes.css` y 78 de `vistas.css`); fusionarlos cambia la cascada y exige el volcado de
-  `~/bin/regresion-visual` antes y después de cada tramo.
+- **Visual, consolidar las hojas de estilo (tramo 1 hecho):** `scripts/css_muerto.py static/css [--aplicar]` quita las
+  declaraciones que una regla posterior (mismo selector, o con `:root ` delante, y mismo `@media`) ya sobrescribe siempre;
+  no toca los respaldos de una misma regla ni los selectores que pueden ser `<html>`. Quitó 465 declaraciones (197 KB a
+  182 KB) con 0 diferencias en el volcado de `~/bin/regresion-visual` (206 118 elementos, 110 pantallas). Quedan 144
+  selectores definidos en más de una hoja: son sobrescrituras vivas (`tema.css` cambia un valor de `componentes.css`
+  o `vistas.css`); fusionarlas es el tramo 2 y se hace por pares de hojas, con el volcado antes y después de cada una.
 - **Respaldo nocturno automático:** quitado de Community; pendiente para producción con permisos correctos en `data/backups`.
 - **Seguridad, límite conocido:** una IP puede probar 20 cuentas por ventana de 5 min; una botnet no queda frenada.

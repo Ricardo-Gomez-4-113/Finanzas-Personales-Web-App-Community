@@ -5,30 +5,11 @@
 /* Estructura de Columnas y Grids */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
 }
-
-.dashboard-grid-movimientos {
-    grid-template-columns: 330px 1fr;
-}
-
-@media (max-width: 1024px) {
-    .dashboard-grid,
-    .dashboard-grid-movimientos { grid-template-columns: 1fr; }
-}
+@media (max-width: 1024px) {}
 
 .monthly-card {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-left: 1px solid var(--border-color);
-    padding: 7px 12px;
     margin-bottom: 6px;
-    border-radius: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     font-size: 0.82rem;
 }
 
@@ -41,9 +22,7 @@
 }
 
 .chart-container {
-    position: relative;
     width: 100%;
-    height: 230px;
     max-height: 240px;
     display: flex;
     justify-content: center;
@@ -58,64 +37,37 @@
 
 /* --- ESTILOS DE APARTADOS Y METAS --- */
 .card-apartado {
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 12px 14px;
     background-color: var(--panel-bg); 
     color: var(--text-color);          
-    box-shadow: var(--card-shadow);
-    position: relative;                
+                
 }
 
 /* Botón de borrar apartado */
 .btn-eliminar-apartado {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     background-color: transparent;
-    color: var(--text-muted);
-    border: none;
-    font-size: 1.15rem;
-    font-weight: bold;
     cursor: pointer;
-    padding: 0;
-    width: auto;
     margin: 0;
-    box-shadow: none;
     transition: color 0.15s ease, transform 0.1s ease;
 }
 
 .btn-eliminar-apartado:hover {
-    color: var(--danger-text);
     background-color: transparent;
     transform: scale(1.1);
 }
 
 .acciones-apartado {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
   align-items: center;
 }
 
 .acciones-apartado input {
-  flex: 1;
-  min-width: 0;
   margin: 0;
-  height: 30px;
   padding: 0 8px;
   font-size: 0.84rem;
   border-radius: 6px;
 }
 
 .acciones-apartado button {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
   margin: 0;
-  padding: 0;
-  font-size: 1rem;
-  font-weight: bold;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -128,24 +80,18 @@
 
 .acciones-apartado button:first-of-type {
   background-color: var(--success-subtle);
-  color: var(--success-text);
-  border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
 }
 
 .acciones-apartado button:first-of-type:hover {
   background-color: var(--success-color);
-  color: var(--panel-bg);
 }
 
 .acciones-apartado button:last-of-type {
   background-color: var(--danger-subtle);
-  color: var(--danger-text);
-  border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
 }
 
 .acciones-apartado button:last-of-type:hover {
   background-color: var(--danger-color);
-  color: var(--panel-bg);
 }
 
 /* --- ESTILOS DE INVERSIONES Y ASSET ALLOCATION (FASE 7) --- */
@@ -180,8 +126,6 @@
 
 .btn-sync {
     background-color: var(--primary-subtle);
-    color: var(--primary-color);
-    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
     width: auto;
     margin: 0;
     height: 32px;
@@ -202,8 +146,6 @@
 
 .btn-sync:hover {
     background-color: var(--primary-color);
-    color: var(--panel-bg);
-    border-color: var(--primary-color);
     transform: translateY(-1px);
 }
 
@@ -227,16 +169,9 @@
 [data-theme="dark"] .cards-inversiones .inv-card:hover {
     box-shadow: 0 6px 18px rgb(var(--sombra-rgb) / 0.4);
 }
-
-.pnl-badge {
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
 /* Layout Mejorado de Inversiones (Fila Superior 2 Columnas + Tabla Inferior Ancho Completo) */
 .inversiones-top-grid {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.25fr);
     gap: 16px;
     align-items: stretch;
     margin-bottom: 16px;
@@ -244,7 +179,6 @@
 
 @media (max-width: 1024px) {
     .inversiones-top-grid {
-        grid-template-columns: 1fr;
         gap: 14px;
     }
 }
@@ -327,7 +261,6 @@
 }
 
 .chart-container-dona {
-    position: relative;
     width: 100%;
     flex: 1;
     min-height: 250px;
@@ -371,17 +304,8 @@
 
 /* --- TARJETA HERO: PATRIMONIO NETO CONSOLIDADO (GBM FINTECH) --- */
 .hero-networth {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    box-shadow: var(--card-shadow);
-    display: flex;
     justify-content: space-between;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 14px;
     position: relative;
     overflow: hidden;
 }
@@ -399,40 +323,24 @@
 
 .networth-header small {
     display: block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--gold-color);
-    letter-spacing: 1.2px;
     text-transform: none;
 }
 
 .networth-header h2 {
-    margin: 3px 0 0 0;
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--text-color);
     text-align: left;
     line-height: 1.1;
-    font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
 }
 
 .networth-breakdown {
     display: flex;
     align-items: center;
-    gap: 10px;
     flex-wrap: wrap;
     padding-top: 0;
     border-top: none;
 }
 
 .breakdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgb(var(--sombra-rgb) / 0.02);
-    border: 1px solid var(--border-color);
-    padding: 6px 12px;
     border-radius: 8px;
 }
 
@@ -441,8 +349,6 @@
 }
 
 .breakdown-dot {
-    width: 10px;
-    height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
 }
@@ -455,26 +361,16 @@
 
 .breakdown-info small {
     display: block;
-    font-size: 0.72rem;
-    color: var(--text-muted);
 }
 
 .breakdown-info strong {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-color);
-    font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
 }
 
 /* --- TIRA DE ASSET ALLOCATION PATRIMONIAL (ESTILO KUBERA) --- */
 .networth-alloc-track {
     width: 100%;
-    height: 5px;
-    background: rgb(var(--sombra-rgb) / 0.06);
-    border-radius: 10px;
     display: flex;
-    overflow: hidden;
     margin-top: 10px;
     box-shadow: inset 0 1px 2px rgb(var(--sombra-rgb) / 0.08);
 }
@@ -567,9 +463,6 @@
 
 .apartado-total-pill {
     background-color: var(--gold-subtle);
-    border: 1px solid var(--gold-border);
-    padding: 6px 14px;
-    border-radius: 20px;
     color: var(--text-color);
     display: inline-flex;
     align-items: center;
@@ -854,7 +747,6 @@
         transform: translateX(-100%);
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 1000;
-        box-shadow: 4px 0 20px rgb(var(--sombra-rgb) / 0.25);
     }
 
     .app-sidebar.sidebar-open {
@@ -872,19 +764,9 @@
     .app-topbar {
         padding: 0 14px;
     }
-
-    .topbar-section-title {
-        font-size: 1.05rem;
-    }
-
     .badge-tasa-topbar {
         display: none; /* Ocultar tasa para dar espacio en móviles */
     }
-
-    .app-main-content {
-        padding: 16px 12px;
-    }
-
     .user-trigger-info {
         display: none; /* En pantallas pequeñas solo mostrar avatar y flecha */
     }
@@ -922,40 +804,13 @@
         font-size: 0.78rem;
         border-radius: 6px;
     }
-
-    /* Tarjetas Hero de Patrimonio Neto */
-    .hero-networth {
-        display: block;
-        padding: 14px 16px;
-        border-radius: 12px;
-        margin-bottom: 14px;
-    }
-
-    .networth-header small {
-        font-size: 0.7rem;
-        letter-spacing: 1px;
-    }
-
-    .networth-header h2 {
-        font-size: 1.75rem;
-        margin: 4px 0 12px 0;
-    }
-
     .networth-breakdown {
         display: flex;
-        flex-direction: column;
-        gap: 8px;
         padding-top: 10px;
     }
 
     .breakdown-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 7px 10px;
         border-radius: 8px;
-        background: rgb(var(--sombra-rgb) / 0.02);
-        border: 1px solid var(--border-color);
     }
 
     [data-theme="dark"] .breakdown-item {
@@ -963,20 +818,10 @@
     }
 
     .breakdown-info {
-        display: flex;
         justify-content: space-between;
         align-items: center;
         width: 100%;
     }
-
-    .breakdown-info small {
-        font-size: 0.78rem;
-    }
-
-    .breakdown-info strong {
-        font-size: 0.95rem;
-    }
-
     /* Cuadrícula balanceada de métricas en 2 columnas (nunca tarjetas gigantes apiladas) */
     .cards, .cards-inversiones {
         display: grid;
@@ -1011,14 +856,12 @@
     }
 
     .card h3 {
-        font-size: 0.68rem;
         margin-bottom: 4px;
         word-break: break-word;
         white-space: normal;
     }
 
     .card p {
-        font-size: 1.02rem;
         word-break: break-word;
         overflow-wrap: break-word;
     }
@@ -1035,14 +878,11 @@
 
     .pnl-badge {
         display: inline-block;
-        font-size: 0.78rem;
         margin-top: 2px;
     }
 
     /* Paneles de contenido */
     .panel {
-        padding: 12px;
-        border-radius: 12px;
         margin-bottom: 14px;
         width: 100%;
         max-width: 100%;
@@ -1056,15 +896,12 @@
 
     /* Grids a una sola columna */
     .dashboard-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
         width: 100%;
         max-width: 100%;
         min-width: 0;
     }
 
     .inversiones-top-grid {
-        grid-template-columns: 1fr;
         gap: 14px;
         width: 100%;
         max-width: 100%;
@@ -1114,7 +951,6 @@
 
     /* Gráficas */
     .chart-container {
-        height: 210px;
         max-height: 220px;
         width: 100%;
         max-width: 100%;
@@ -1122,7 +958,6 @@
     }
 
     .chart-container-dona {
-        height: 190px;
         max-height: 200px;
         width: 100%;
         max-width: 100%;
@@ -1147,37 +982,19 @@
         grid-template-columns: 1fr;
         gap: 10px;
     }
-
-    .card-apartado {
-        padding: 14px;
-        border-radius: 10px;
-    }
-
     .acciones-apartado {
-        display: flex;
-        gap: 6px;
-        margin-top: 10px;
         align-items: center;
     }
 
     .acciones-apartado input {
-        flex: 1;
-        min-width: 0;
         margin: 0;
-        height: 34px;
         padding: 0 8px;
         font-size: 16px;
         border-radius: 6px;
     }
 
     .acciones-apartado button {
-        width: 34px;
-        height: 34px;
-        min-width: 34px;
         margin: 0;
-        padding: 0;
-        font-size: 1.1rem;
-        font-weight: bold;
         border-radius: 6px;
     }
 
@@ -1249,8 +1066,6 @@
         position: relative;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
         box-shadow: inset -8px 0 8px -8px rgb(var(--sombra-rgb) / 0.15);
     }
 
@@ -1272,7 +1087,6 @@
 
     th, td {
         padding: 8px 8px;
-        font-size: 0.78rem;
         white-space: nowrap;
     }
 
@@ -1297,16 +1111,12 @@
 
     /* Inputs táctiles sin autozoom en iOS/Android (evitar aplicar a botones) */
     input, select {
-        font-size: 16px;
         height: 38px;
     }
     form > button[type="submit"],
     .card-form button[type="submit"],
     .form-actions button[type="submit"] {
         width: auto;
-        height: 36px;
-        padding: 0 16px;
-        font-size: 0.85rem;
     }
 }
 
@@ -1316,12 +1126,10 @@
     }
     :root .select-moneda-topbar {
         padding: 0 22px 0 8px;
-        height: 30px;
     }
 
     .modal-card {
         padding: 18px 14px;
-        border-radius: 12px;
     }
 
     .login-wrapper {
@@ -1330,13 +1138,7 @@
 
     .login-card {
         padding: 24px 18px;
-        border-radius: 14px;
     }
-
-    .hero-networth {
-        padding: 12px 14px;
-    }
-
     .modal-actions {
         justify-content: flex-end;
         gap: 8px;
@@ -1364,35 +1166,13 @@
         padding: 6px 10px;
         font-size: 0.76rem;
     }
-
-    .hero-networth {
-        padding: 10px 12px;
-    }
-
-    .networth-header h2 {
-        font-size: 1.45rem;
-    }
-
-    .breakdown-info strong {
-        font-size: 0.88rem;
-    }
-
     .cards, .cards-inversiones {
         gap: 6px;
     }
 
     .card {
         padding: 8px 8px;
-    }
-
-    .card h3 {
-        font-size: 0.65rem;
-    }
-
-    .card p {
-        font-size: 0.95rem;
-    }
-}
+    }}
 
 .footer-legal-link {
     font-size: 0.8rem;
@@ -1582,11 +1362,7 @@
     padding: 0;
 }
 .rec-item {
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 12px;
     margin-bottom: 10px;
-    background: var(--panel-bg);
 }
 .rec-item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .rec-item-meta {
@@ -1594,8 +1370,6 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 0.85rem;
-    color: var(--text-muted);
     margin: 8px 0;
 }
 .rec-item-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -1669,8 +1443,6 @@
 .calc-presets-label {
     font-size: 0.78rem;
     font-weight: 700;
-    text-transform: none;
-    letter-spacing: 0.05em;
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -1684,7 +1456,6 @@
 .calc-chip {
     background: var(--bg-color);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
     padding: 5px 14px;
     font-size: 0.78rem;
     font-weight: 600;
@@ -2299,30 +2070,14 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-templates-label {
-    font-size: 0.76rem;
-    font-weight: 700;
-    color: var(--text-muted);
     text-transform: none;
 }
 
 .btn-chip-tpl {
-    font-size: 0.76rem;
-    font-weight: 600;
     padding: 4px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-color);
-    color: var(--text-color);
     cursor: pointer;
     transition: all 0.15s ease;
 }
-
-.btn-chip-tpl:hover {
-    border-color: var(--gold-color);
-    color: var(--gold-color);
-    background: var(--gold-subtle);
-}
-
 .pres-alloc-track-wrap {
     width: 100%;
     height: 18px;
@@ -2422,11 +2177,7 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-suggested-label {
-    font-size: 0.78rem;
-    font-weight: 700;
     text-transform: none;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
     white-space: nowrap;
 }
 
@@ -2437,22 +2188,13 @@ input[type="number"].subperiodo-editor-input-pct {
 }
 
 .pres-chip {
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
     padding: 5px 13px;
-    font-size: 0.78rem;
-    font-weight: 600;
     font-family: inherit;
-    color: var(--text-color);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .pres-chip:hover {
-    border-color: var(--gold-color);
-    color: var(--gold-color);
-    background: var(--gold-subtle);
     transform: translateY(-1px);
 }
 

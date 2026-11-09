@@ -595,9 +595,6 @@
     padding: 18px 24px;
     margin-bottom: 20px;
 }
-
-:root .hero-networth::before { display: none; }
-
 :root .networth-header small {
     font-size: var(--fs-sm);
     font-weight: 500;
@@ -665,7 +662,6 @@
     align-items: baseline;
     background: transparent;
     border: none;
-    border-left: 0;
     border-bottom: 1px solid var(--border-color);
     border-radius: 0;
     padding: 10px 2px;
@@ -830,7 +826,6 @@
     font-weight: 600;
     letter-spacing: 0.01em;
     padding: 2px 8px;
-    border: 1px solid var(--border-color);
     background: var(--surface-level2);
     color: var(--text-muted);
 }
@@ -1455,9 +1450,8 @@
 
 :root .btn-eliminar-apartado {
     position: absolute; top: 12px; right: 12px;
-    width: 26px; height: 26px; padding: 0;
     background: transparent; border: 1px solid transparent; border-radius: var(--radius-s);
-    color: var(--text-muted); box-shadow: none; font-size: 1rem;
+    color: var(--text-muted); box-shadow: none;
 }
 
 :root .btn-eliminar-apartado:hover { background: var(--danger-subtle); color: var(--danger-text); }
@@ -1926,9 +1920,7 @@
     gap: 12px 20px;
     margin-bottom: 16px;
     padding: 16px 20px;
-    border: 1px solid var(--gold-border);
     border-radius: var(--radius-s);
-    background: var(--panel-bg);
 }
 :root .inicio-vacio-texto { margin: 0; color: var(--text-muted); max-width: 52ch; }
 

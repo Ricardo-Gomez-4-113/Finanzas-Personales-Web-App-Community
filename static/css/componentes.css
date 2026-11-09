@@ -66,9 +66,6 @@ html, body {
 }
 
 body {
-    font-family: var(--font-ui);
-    background-color: var(--bg-color);
-    color: var(--text-color);
     margin: 0;
     padding: 0;
     display: block; 
@@ -92,14 +89,6 @@ body {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
-/* Tarjetas superiores */
-.cards {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
 .card {
     flex: 1;
     background: var(--panel-bg);
@@ -122,34 +111,11 @@ body {
 }
 
 .card h3 {
-    margin: 0 0 6px 0;
-    font-size: 0.74rem;
-    color: var(--text-muted);
     text-transform: none;
-    letter-spacing: 0.5px;
-    font-weight: 700;
 }
-
-.card p {
-    margin: 0;
-    font-size: 1.35rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-}
-
 .card.balance p {
     color: var(--success-text);
 }
-
-.card.ingresos p {
-    color: var(--success-text);
-}
-
-.card.gastos p {
-    color: var(--danger-text);
-}
-
 .card.card-fijos-msi p {
     color: var(--text-color);
 }
@@ -157,14 +123,6 @@ body {
 .card.card-rendimiento p {
     color: var(--text-color);
 }
-
-.card-subtext {
-    display: block;
-    margin-top: 4px;
-    font-size: 0.76rem;
-    color: var(--text-muted);
-}
-
 .card.card-deficit {
     border-color: color-mix(in srgb, var(--danger-color) 45%, transparent);
     background: color-mix(in srgb, var(--danger-color) 4%, transparent);
@@ -189,11 +147,6 @@ body {
 }
 
 .panel {
-    background: var(--panel-bg);
-    padding: 16px 18px;
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
     margin-bottom: 16px;
 }
 
@@ -204,9 +157,6 @@ h2 {
     font-size: 1.05rem;
     margin-bottom: 12px;
 }
-
-.form-group { margin-bottom: 10px; }
-
 .form-row-2col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -220,28 +170,15 @@ h2 {
     }
 }
 
-label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.88rem; color: var(--text-color); }
+label { display: block; }
 
 input, select {
     width: 100%;
     height: 36px;
     padding: 0 11px;
-    border: 1px solid var(--border-color);
     background-color: var(--input-bg, var(--panel-bg));
-    color: var(--text-color);
-    border-radius: 6px;
     box-sizing: border-box;
-    font-size: 0.88rem;
-    font-family: inherit;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-input:focus, select:focus {
-    outline: none;
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 35%, transparent);
-}
-
 select option {
     background-color: var(--panel-bg);
     color: var(--text-color);
@@ -253,11 +190,9 @@ select option {
 }
 
 button {
-    font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
     border: none;
-    border-radius: 6px;
     cursor: pointer;
     background-color: var(--primary-color);
     color: var(--primary-text, var(--panel-bg));
@@ -270,13 +205,11 @@ button {
     line-height: 1;
     margin: 0;
     box-sizing: border-box;
-    box-shadow: 0 1px 2px rgb(var(--sombra-rgb) / 0.05);
     transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 button:hover { 
     background-color: var(--primary-hover); 
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--text-color) 20%, transparent);
 }
 
 button:active {
@@ -284,14 +217,6 @@ button:active {
 }
 
 .btn-primary {
-    background: var(--primary-color);
-    color: var(--primary-text, var(--panel-bg));
-    border: 1px solid var(--primary-color);
-    height: 36px;
-    padding: 0 16px;
-    font-size: 0.86rem;
-    font-weight: 700;
-    border-radius: 8px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -299,17 +224,8 @@ button:active {
     gap: 6px;
     width: auto;
     margin: 0;
-    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.15);
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
-
-.btn-primary:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
-    color: var(--primary-text, var(--panel-bg));
-    box-shadow: 0 4px 14px rgb(var(--luz-rgb) / 0.2);
-}
-
 .btn-primary:active {
     transform: scale(0.97);
 }
@@ -330,13 +246,7 @@ button:active {
 }
 
 .btn-secondary {
-    background-color: var(--panel-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    height: 36px;
     padding: 0 16px;
-    font-size: 0.86rem;
-    font-weight: 500;
     border-radius: 6px;
     cursor: pointer;
     display: inline-flex;
@@ -347,11 +257,6 @@ button:active {
     margin: 0;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-
-.btn-secondary:hover {
-    background-color: var(--border-color);
-}
-
 .btn-secondary:active {
     transform: scale(0.97);
 }
@@ -360,14 +265,6 @@ button:active {
 form > button[type="submit"],
 .card-form button[type="submit"],
 .form-actions button[type="submit"] {
-    background: var(--primary-color);
-    color: var(--primary-text, var(--panel-bg));
-    border: 1px solid var(--primary-color);
-    height: 36px;
-    padding: 0 18px;
-    font-size: 0.86rem;
-    font-weight: 700;
-    border-radius: 8px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -375,19 +272,8 @@ form > button[type="submit"],
     gap: 6px;
     width: auto;
     margin-top: 14px;
-    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.15);
     transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
-
-form > button[type="submit"]:hover,
-.card-form button[type="submit"]:hover,
-.form-actions button[type="submit"]:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
-    color: var(--primary-text, var(--panel-bg));
-    box-shadow: 0 4px 14px rgb(var(--luz-rgb) / 0.2);
-}
-
 form > button[type="submit"]:active,
 .card-form button[type="submit"]:active,
 .form-actions button[type="submit"]:active {
@@ -451,14 +337,9 @@ form > button[type="submit"]:active,
 
 .btn-editar {
     background-color: var(--gold-subtle);
-    color: var(--gold-color);
-    border: 1px solid var(--gold-border);
-    height: 26px;
-    padding: 0 8px;
     font-size: 0.76rem;
     width: auto;
     margin: 0;
-    border-radius: 5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -470,7 +351,6 @@ form > button[type="submit"]:active,
 
 .btn-editar:hover {
     background-color: var(--gold-color);
-    color: var(--panel-bg);
 }
 
 [data-theme="dark"] .btn-editar:hover {
@@ -480,14 +360,9 @@ form > button[type="submit"]:active,
 
 .btn-eliminar {
     background-color: color-mix(in srgb, var(--danger-color) 8%, transparent);
-    color: var(--danger-text);
-    border: 1px solid color-mix(in srgb, var(--danger-color) 20%, transparent);
-    height: 26px;
-    padding: 0 8px;
     font-size: 0.76rem;
     width: auto;
     margin: 0;
-    border-radius: 5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -503,7 +378,7 @@ form > button[type="submit"]:active,
 
 .btn-eliminar:hover { 
     background-color: var(--danger-color); 
-    color: var(--panel-bg); 
+ 
 }
 
 /* --- SISTEMA VECTORIAL DE ICONOS SVG & ESTÉTICA DE PATRIMONIO --- */
@@ -511,11 +386,7 @@ form > button[type="submit"]:active,
     display: inline-flex;
     vertical-align: middle;
     margin-right: 8px;
-    width: 20px;
-    height: 20px;
-    color: var(--gold-color);
     flex-shrink: 0;
-    stroke-width: 2;
 }
 
 .btn-svg-icon {
@@ -552,7 +423,6 @@ form > button[type="submit"]:active,
     height: 13px;
     display: inline-block;
     vertical-align: middle;
-    stroke-width: 2.2;
 }
 
 /* Alineación consistente en títulos de encabezados con SVG */
@@ -592,20 +462,13 @@ table td,
 [data-theme="dark"] .text-gasto {
     color: var(--danger-text);
 }
-
-#mensaje { margin-top: 15px; text-align: center; font-weight: 600; font-size: 0.9rem; }
-
 table { width: 100%; border-collapse: collapse; margin-top: 0; }
 
-th, td { padding: 8px 11px; text-align: left; border-bottom: 1px solid var(--table-border); font-size: 0.83rem; color: var(--text-color); }
+th, td { padding: 8px 11px; text-align: left; }
 
 th {
     background-color: var(--th-bg);
-    color: var(--text-muted);
-    font-weight: 700;
-    font-size: 0.75rem;
     text-transform: none;
-    letter-spacing: 0.04em;
     user-select: none;
 }
 
@@ -617,17 +480,14 @@ tbody tr:hover {
     background-color: var(--primary-subtle);
 }
 
-.text-gasto { color: var(--danger-text); font-weight: 700; }
+.text-gasto { font-weight: 700; }
 
-.text-ingreso { color: var(--success-text); font-weight: 700; }
+.text-ingreso { font-weight: 700; }
 
 .table-responsive {
     max-height: 460px;
     overflow-y: auto;
     overflow-x: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--panel-bg);
 }
 
 .table-responsive th {
@@ -639,10 +499,7 @@ tbody tr:hover {
 
 .progress-bar-bg {
   background-color: var(--border-color);
-  border-radius: 4px;
-  height: 8px;
   width: 100%;
-  overflow: hidden;
   margin: 6px 0;
 }
 
@@ -663,8 +520,6 @@ tbody tr:hover {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: color-mix(in srgb, var(--overlay-scrim) 65%, transparent);
-    backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -676,15 +531,11 @@ tbody tr:hover {
 }
 
 .modal-card {
-    background: var(--surface-modal, var(--panel-bg));
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
     width: 100%;
     max-width: 420px;
     max-height: calc(100dvh - 32px);
     overflow-y: auto;
     padding: 22px;
-    box-shadow: 0 15px 35px rgb(var(--sombra-rgb) / 0.4);
     box-sizing: border-box;
     animation: slideUp 0.18s ease-out;
 }
@@ -704,12 +555,10 @@ tbody tr:hover {
     align-items: center;
     margin-bottom: 18px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 1.15rem;
     color: var(--text-color);
 }
 
@@ -753,8 +602,6 @@ tbody tr:hover {
 
 .btn-secondary {
     background-color: var(--bg-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
@@ -768,7 +615,6 @@ tbody tr:hover {
     position: fixed;
     right: 16px;
     bottom: 16px;
-    z-index: 2000;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -776,17 +622,8 @@ tbody tr:hover {
 }
 .toast {
     padding: 10px 14px;
-    border-radius: 8px;
-    background: var(--panel-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    border-left: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
     font-size: 0.9rem;
 }
-.toast-ok { color: var(--success-text); }
-.toast-error { color: var(--danger-text); }
-
 /* ==========================================================================
    Utilidades y componentes de la Fase 5 (fijos, MSI, filtros y etiquetas)
    ========================================================================== */
@@ -797,44 +634,28 @@ tbody tr:hover {
     background: none;
     border: none;
     padding: 0;
-    color: var(--accent-color);
     text-decoration: underline;
     cursor: pointer;
     font: inherit;
 }
 .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
-.empty-state { text-align: center; color: var(--text-muted); padding: 16px 8px; font-size: 0.9rem; }
+.empty-state { text-align: center; padding: 16px 8px; font-size: 0.9rem; }
 .badge-tag {
     display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 2.5px 8.5px;
-    border-radius: 999px;
-    background: var(--surface-subtle);
-    color: var(--text-muted);
     margin-left: 4px;
     vertical-align: middle;
     white-space: nowrap;
-    letter-spacing: 0.02em;
 }
 .badge-fijo {
-    background: var(--indigo-subtle);
-    color: var(--indigo-color);
     border: 1px solid var(--indigo-border);
 }
 .badge-msi {
-    background: var(--gold-subtle);
-    color: var(--gold-color);
     border: 1px solid var(--gold-border);
 }
 .badge-ahorro {
-    background: var(--success-subtle);
-    color: var(--success-text);
     border: 1px solid color-mix(in srgb, var(--success-color) 35%, transparent);
 }
 .badge-presupuesto {
-    background: color-mix(in srgb, var(--cyan-color) 12%, transparent);
-    color: var(--cyan-color);
     border: 1px solid color-mix(in srgb, var(--cyan-color) 35%, transparent);
 }
 .segmented { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
@@ -845,17 +666,10 @@ tbody tr:hover {
     text-align: center;
     padding: 8px 10px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
     cursor: pointer;
     font-size: 0.85rem;
     color: var(--text-muted);
-}
-.segmented-opt input:checked + span {
-    border-color: var(--accent-color);
-    color: var(--text-color);
-    background: var(--accent-subtle);
-}
-.segmented-opt input:focus-visible + span { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+}.segmented-opt input:focus-visible + span { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 
 /* ==========================================================================
    Utilidades atómicas (reemplazan los style="" inline del HTML)
@@ -955,11 +769,6 @@ tbody tr:hover {
 /* Sub-pestañas unificadas de Movimientos y Fijos */
 .subtabs-nav {
     display: inline-flex;
-    background: var(--surface-subtle);
-    padding: 4px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    gap: 6px;
     margin-bottom: 20px;
     max-width: 100%;
 }
@@ -968,27 +777,12 @@ tbody tr:hover {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 18px;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--text-muted);
     font-size: 0.88rem;
-    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast, 0.2s ease);
 }
-
-.subtab-btn:hover {
-    color: var(--text-color);
-    background: rgb(var(--luz-rgb) / 0.04);
-}
-
 .subtab-btn.active {
-    background: var(--panel-bg);
-    color: var(--accent-color);
     border-color: var(--border-color);
-    box-shadow: 0 2px 8px rgb(var(--sombra-rgb) / 0.2);
 }
 
 .subtab-content {
@@ -1002,8 +796,6 @@ tbody tr:hover {
 
 .card-subtext {
     display: block;
-    font-size: 0.72rem;
-    color: var(--text-muted);
     margin-top: 4px;
 }
 
@@ -1022,7 +814,6 @@ tbody tr:hover {
     .subtab-btn {
         flex: 1;
         justify-content: center;
-        padding: 8px 10px;
         font-size: 0.8rem;
     }
 }
