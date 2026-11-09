@@ -63,6 +63,7 @@ CONSULTA_Y_PROPONE = ("Además de consultar puedes PREPARAR tres cosas: registra
 class Respuesta:
     texto: str = ""
     llamadas: list = field(default_factory=list)   # [{"nombre": ..., "args": {...}}]
+    tokens: int = 0                                # lo que gastó esta llamada al modelo (para los topes y el registro)
 
 
 @dataclass
@@ -70,6 +71,7 @@ class Turno:
     texto: str
     herramientas_usadas: list = field(default_factory=list)
     propuestas: list = field(default_factory=list)   # ids de las propuestas que se prepararon en este turno
+    tokens: int = 0   # total gastado en el turno
     error: str = ""   # tipo de la excepción del modelo, si falló (nunca su texto: puede traer datos)
 
 
@@ -89,6 +91,7 @@ class Motor:
         trabajo = list(historial)
         usadas = []
         propuestas = []
+        tokens = 0
         reintento = False
         hoy = self.hoy()
         instrucciones = INSTRUCCIONES.format(hoy=hoy.isoformat(), capacidad=CONSULTA_Y_PROPONE if self.herramientas.escritura else SOLO_CONSULTA)
@@ -98,12 +101,13 @@ class Motor:
         for _ in range(self.max_rondas + 1):
             if self._reloj() - inicio > self.max_segundos:
                 historial.pop()
-                return Turno("No pude contestar ahora, intenta en un momento.", usadas, propuestas, error="TiempoAgotado")
+                return Turno("No pude contestar ahora, intenta en un momento.", usadas, propuestas, tokens, error="TiempoAgotado")
             try:
                 respuesta = self.modelo.generar(instrucciones, trabajo, self.herramientas.declaraciones())
             except Exception as error:  # el modelo es un servicio externo: si falla, la conversación sigue
                 historial.pop()          # el mensaje no se contestó: no queda en el historial
-                return Turno("No pude contestar ahora, intenta en un momento.", usadas, error=type(error).__name__)
+                return Turno("No pude contestar ahora, intenta en un momento.", usadas, propuestas, tokens, error=type(error).__name__)
+            tokens += int(getattr(respuesta, "tokens", 0) or 0)
             if not respuesta.llamadas:
                 final = respuesta.texto.strip() or final
                 # Cifras que no están en la pregunta ni en la fecha y ninguna consulta en este turno: el modelo las inventó o las
@@ -133,4 +137,4 @@ class Motor:
             final = MENSAJE_SIN_PROPUESTA
         historial.append({"rol": "modelo", "texto": final})
         del historial[:-MAX_MENSAJES]
-        return Turno(final, usadas, propuestas)
+        return Turno(final, usadas, propuestas, tokens)

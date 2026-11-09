@@ -677,6 +677,114 @@ def test_las_imagenes_de_docker_no_llevan_bases_ni_secretos(client):
     assert "USER bot" in open(os.path.join(RAIZ, "Dockerfile.bot"), encoding="utf-8").read(), "el bot no corre como root"
 
 
+def test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_dia(client):
+    ua, _ = _cuenta(client, "tg_dia_a")
+    ub, _ = _cuenta(client, "tg_dia_b")
+    _vincular(ua, 9201)
+    _vincular(ub, 9202)
+    hoy = {"dia": "2026-11-09"}
+    eventos = []
+    bot, tg, _ = _bot(client, {ua: [Respuesta(texto="Dime más.")] * 50, ub: [Respuesta(texto="Dime más.")] * 50})
+    bot._max_mensajes_dia, bot._max_tokens_dia, bot._dia = 3, 0, (lambda: hoy["dia"])
+    bot._registrar = lambda nombre, **campos: eventos.append((nombre, campos))
+    for i in range(3):
+        bot.procesar(_msg(9201, f"mensaje {i}"))
+    modelo = bot.modelos[ua]
+    llamadas = len(modelo.llamadas)
+    bot.procesar(_msg(9201, "uno más"))
+    assert "límite de mensajes de hoy" in tg.a(9201)[-1][1] and len(modelo.llamadas) == llamadas, "pasado el tope no se llama al modelo"
+    bot.procesar(_msg(9202, "yo sí puedo"))
+    assert tg.a(9202)[-1][1] == "Dime más.", "el tope es por cuenta: la otra no se afecta"
+    assert ("asistente_limite", {"tipo": "dia", "cuenta": ua}) in eventos
+    hoy["dia"] = "2026-11-10"
+    bot.procesar(_msg(9201, "ya es otro día"))
+    assert tg.a(9201)[-1][1] == "Dime más.", "el tope se reinicia cada día"
+    # Tokens: un turno que gasta mucho agota el presupuesto del día aunque queden mensajes
+    bot2, tg2, _ = _bot(client, {ua: [Respuesta(texto="Listo, dime más.", tokens=150)] * 10})
+    bot2._max_mensajes_dia, bot2._max_tokens_dia, bot2._dia = 0, 100, (lambda: "2026-11-09")
+    bot2.procesar(_msg(9201, "primero"))
+    bot2.procesar(_msg(9201, "segundo"))
+    assert "límite de mensajes de hoy" in tg2.a(9201)[-1][1] and len(bot2.modelos[ua].llamadas) == 1, "con el presupuesto de tokens gastado ya no se llama al modelo"
+
+
+def test_los_eventos_del_bot_no_llevan_texto_importes_ni_ids_de_chat(client):
+    import json as _json
+    uid, h = _cuenta(client, "tg_eventos")
+    _con_fondos(client, h)
+    chat = 9_876_543
+    eventos = []
+    codigo, _ = vinculos.crear_codigo(uid)
+    guion = [Respuesta(llamadas=[{"nombre": "registrar_movimiento", "args": {"tipo": "gasto", "monto": 777.77, "categoria": "Comida", "descripcion": "SECRETO-TEXTO-123"}}], tokens=40),
+             Respuesta(texto="Pendiente.", tokens=10), Respuesta(texto="Hablando de SECRETO-TEXTO-123."), Respuesta(texto="ok")]
+    bot, tg, _ = _bot(client, {uid: guion})
+    bot._registrar = lambda nombre, **campos: eventos.append({"evento": nombre, **campos})
+    bot.procesar(_msg(chat, f"/start {codigo}"))
+    bot.procesar(_msg(chat, "SECRETO-TEXTO-123 gasté 777.77"))
+    confirmar = tg.a(chat)[-1][2][0][0][1]
+    bot.procesar(_cb(chat, confirmar))
+    bot.procesar(_cb(chat, confirmar))
+    bot.procesar(_msg(chat, "/start " + "z" * 30))
+    bot.procesar(_msg(chat, "/desvincular"))
+    nombres = [e["evento"] for e in eventos]
+    assert nombres == ["asistente_vinculo", "asistente_turno", "asistente_escritura", "asistente_escritura", "asistente_vinculo", "asistente_vinculo"], nombres
+    turno = eventos[1]
+    assert turno["cuenta"] == uid and turno["herramientas"] == ["registrar_movimiento"] and turno["propuestas"] == 1 and turno["tokens"] == 50 and turno["error"] == "" and turno["duracion_ms"] >= 0
+    assert [e["resultado"] for e in eventos if e["evento"] == "asistente_escritura"] == ["confirmada", "no_disponible"]
+    assert [e["resultado"] for e in eventos if e["evento"] == "asistente_vinculo"] == ["ok", "invalido", "desvinculado"]
+    volcado = _json.dumps(eventos, ensure_ascii=False)
+    for secreto in ("SECRETO-TEXTO-123", "777", "Comida", str(chat), "tg_eventos", codigo, "Confirma", "$"):
+        assert secreto not in volcado, f"el registro trae «{secreto}»: {volcado}"
+    # Un registro que falla no tumba la conversación
+    bot._registrar = lambda nombre, **campos: (_ for _ in ()).throw(RuntimeError("disco lleno"))
+    _vincular(uid, chat)
+    bot.procesar(_msg(chat, "hola"))
+    assert tg.a(chat)[-1][1] in ("ok", "Hablando de SECRETO-TEXTO-123."), tg.a(chat)[-1]
+
+
+def test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orden(client):
+    import threading as _hilos
+    import time as _tiempo
+    from asistente.motor import Respuesta as _R
+    cuentas = [_cuenta(client, f"tg_par_{i}")[0] for i in range(4)]
+    for i, uid in enumerate(cuentas):
+        _vincular(uid, 9300 + i)
+    orden, candado = [], _hilos.Lock()
+
+    class Lento:
+        def generar(self, instrucciones, mensajes, declaraciones):
+            _tiempo.sleep(0.4)
+            ultimo = [m for m in mensajes if m["rol"] == "usuario"][-1]["texto"]
+            with candado:
+                orden.append(ultimo)
+            return _R(texto="Listo, dime más.")
+
+    tg, propuestas = TelegramFalso(), Propuestas()
+    servicio = ServicioLocal()
+    bot = bot_telegram.Bot(tg, servicio, lambda cuenta, chat: Motor(Lento(), Herramientas(lambda r, p: (200, {}), propuestas, cuenta["id"], lambda: HOY), lambda: HOY),
+                           propuestas, lambda p, c: (True, "ok"))
+    despachador = bot_telegram.Despachador(bot, carriles=4)
+    inicio = _tiempo.perf_counter()
+    futuros = [despachador.enviar(_msg(9300 + i, f"chat {i}")) for i in range(4)]
+    for f in futuros:
+        f.result(timeout=10)
+    en_paralelo = _tiempo.perf_counter() - inicio
+    assert en_paralelo < 1.2, f"cuatro chats con 0.4 s cada uno tardaron {en_paralelo:.2f} s: no se atendieron a la vez"
+    # Tres mensajes seguidos del mismo chat: siempre en el orden en que llegaron
+    orden.clear()
+    futuros = [despachador.enviar(_msg(9300, f"seguido {i}")) for i in range(3)]
+    for f in futuros:
+        f.result(timeout=10)
+    assert orden == ["seguido 0", "seguido 1", "seguido 2"], orden
+    # Una actualización que revienta no detiene al despachador
+    fallos = []
+    despachador2 = bot_telegram.Despachador(bot, carriles=2, al_fallar=fallos.append)
+    bot.crear_motor = lambda cuenta, chat: (_ for _ in ()).throw(KeyError("dato interno"))
+    despachador2.enviar(_msg(9301, "se rompe")).result(timeout=10)
+    assert fallos == ["KeyError"], fallos
+    despachador2.cerrar()
+    despachador.cerrar()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -708,6 +816,9 @@ if __name__ == "__main__":
             (test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot, lambda: test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client)),
             (test_un_vinculo_caducado_no_ocupa_el_chat, lambda: test_un_vinculo_caducado_no_ocupa_el_chat(client)),
             (test_las_imagenes_de_docker_no_llevan_bases_ni_secretos, lambda: test_las_imagenes_de_docker_no_llevan_bases_ni_secretos(client)),
+            (test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_dia, lambda: test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_dia(client)),
+            (test_los_eventos_del_bot_no_llevan_texto_importes_ni_ids_de_chat, lambda: test_los_eventos_del_bot_no_llevan_texto_importes_ni_ids_de_chat(client)),
+            (test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orden, lambda: test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orden(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_telegram")

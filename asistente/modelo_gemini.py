@@ -90,4 +90,5 @@ class ModeloGemini:
                 texto = respuesta.text or ""
             except Exception:
                 texto = ""
-        return Respuesta(texto=texto, llamadas=llamadas)
+        uso = getattr(respuesta, "usage_metadata", None)
+        return Respuesta(texto=texto, llamadas=llamadas, tokens=int(getattr(uso, "total_token_count", 0) or 0))
