@@ -38,6 +38,8 @@ import master_db  # noqa: E402
 import security  # noqa: E402
 from main import app  # noqa: E402
 from asistente import bot_telegram, medios, vinculos  # noqa: E402
+from asistente.cupo import Cupo  # noqa: E402
+from asistente.nucleo import Nucleo  # noqa: E402
 from asistente.api import ejecutar_propuesta, obtener_con_cliente, obtener_con_proveedor  # noqa: E402
 from asistente.herramientas import Herramientas  # noqa: E402
 from asistente.modelo_falso import ModeloFalso  # noqa: E402
@@ -646,7 +648,7 @@ def test_el_historial_es_por_chat_y_cuenta_los_topes_y_el_desvincular_cancela_pr
     visto = [m for m in bot.modelos[ub].llamadas[0]["mensajes"] if m["rol"] == "usuario"]
     assert [m["texto"] for m in visto] == ["hola otra vez"], visto
     # Tope global entre todos los chats
-    bot._global = [reloj.t] * (bot_telegram.MAX_MENSAJES_GLOBAL_POR_HORA)
+    bot.nucleo._global = [reloj.t] * (bot_telegram.MAX_MENSAJES_GLOBAL_POR_HORA)
     bot.procesar(_msg(9001, "otra"))
     assert "muchos mensajes seguidos" in tg.a(9001)[-1][1]
     # Adivinar códigos también tiene tope
@@ -765,8 +767,7 @@ def test_un_chat_sin_vinculo_no_descarga_nada_y_un_pie_con_comando_no_ejecuta_el
 def test_el_tope_diario_de_fotos_y_audios_no_frena_los_textos(client):
     uid, _ = _cuenta(client, "tg_medios_tope")
     _vincular(uid, 6603)
-    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Listo.")] * 10})
-    bot._max_medios_dia = 2
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Listo.")] * 10}, servicio=ServicioLocal(Cupo(max_medios=2)))
     tg.archivos["f"] = JPG
     for _ in range(2):
         bot.procesar(_medio_msg(6603, photo=[{"file_id": "f", "file_size": 10}]))
@@ -892,6 +893,111 @@ def test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_byt
     assert partes[0].inline_data.mime_type == "image/png" and partes[1].text == "(sin texto)"
 
 
+def test_el_tope_diario_es_uno_solo_para_todos_los_servicios_y_sobrevive_a_un_reinicio(client):
+    uid, _ = _cuenta(client, "tg_cupo_unico")
+    hoy = lambda: "2026-11-09"  # noqa: E731
+    a = ServicioLocal(Cupo(3, 0, 2, hoy))   # dos «servicios» (Telegram y web) con su propia memoria: comparten la tabla de la app
+    b = ServicioLocal(Cupo(3, 0, 2, hoy))
+    _vincular(uid, 6700)
+    assert [a.reservar_cupo(6700, uid), b.reservar_cupo(6700, uid), a.reservar_cupo(6700, uid)] == [None, None, None]
+    assert b.reservar_cupo(6700, uid) == "dia" and a.reservar_cupo(6700, uid) == "dia", "el cupo gastado por uno lo ve el otro"
+    reiniciado = ServicioLocal(Cupo(3, 0, 2, hoy))   # un reinicio no devuelve el cupo
+    assert reiniciado.reservar_cupo(6700, uid) == "dia"
+    assert ServicioLocal(Cupo(3, 0, 2, lambda: "2026-11-10")).reservar_cupo(6700, uid) is None, "al día siguiente se reinicia"
+    # Medios: tope aparte; lo rechazado no cuenta
+    otro, _ = _cuenta(client, "tg_cupo_unico_2")
+    _vincular(otro, 6701)
+    s = ServicioLocal(Cupo(50, 0, 2, hoy))
+    assert [s.reservar_cupo(6701, otro, True) for _ in range(3)] == [None, None, "medios"]
+    assert s.reservar_cupo(6701, otro, False) is None and Cupo(50, 0, 2, hoy).uso(otro) == {"mensajes": 3, "tokens": 0, "medios": 2}
+    s.sumar_tokens(6701, otro, 40)
+    s.sumar_tokens(6701, otro, -5)
+    assert Cupo(50, 0, 2, hoy).uso(otro)["tokens"] == 40
+    # Un chat solo toca el cupo de SU cuenta
+    for ajeno in (uid, 999999):
+        try:
+            s.reservar_cupo(6701, ajeno)
+        except SinVinculo:
+            pass
+        else:
+            raise AssertionError("un chat no gasta el cupo de otra cuenta")
+
+
+def test_el_cupo_es_atomico_con_muchos_hilos_a_la_vez(client):
+    import threading as _hilos
+    uid, _ = _cuenta(client, "tg_cupo_hilos")
+    cupo = Cupo(5, 0, 0, lambda: "2026-11-09")
+    resultados = []
+
+    def reservar():
+        resultados.append(cupo.reservar(uid))
+
+    hilos = [_hilos.Thread(target=reservar) for _ in range(25)]
+    [h.start() for h in hilos]
+    [h.join(timeout=30) for h in hilos]
+    assert resultados.count(None) == 5 and resultados.count("dia") == 20, resultados
+
+
+def test_la_api_interna_del_cupo_exige_secreto_y_solo_toca_la_cuenta_del_chat(client):
+    uid, _ = _cuenta(client, "tg_cupo_http")
+    otro, _ = _cuenta(client, "tg_cupo_http2")
+    servicio = _cliente_interno(client)
+    anterior = {k: os.environ.get(k) for k in ("ASISTENTE_MAX_MENSAJES_DIA", "ASISTENTE_MAX_MEDIOS_DIA")}
+    os.environ["ASISTENTE_MAX_MENSAJES_DIA"], os.environ["ASISTENTE_MAX_MEDIOS_DIA"] = "2", "1"
+    try:
+        _vincular(uid, 6710)
+        # Sin el secreto la ruta no se deja usar
+        malo = ServicioHTTP(client, "x" * 40)
+        assert malo._post("/cupo", {"chat_id": 6710, "cuenta_id": uid}).status_code in (401, 404)
+        for chat, cuenta in ((6711, uid), (6710, otro)):   # chat sin vínculo / cuenta que no es la del chat
+            try:
+                servicio.reservar_cupo(chat, cuenta)
+            except SinVinculo:
+                pass
+            else:
+                raise AssertionError("debe negarse")
+        assert servicio.reservar_cupo(6710, uid, True) is None and servicio.reservar_cupo(6710, uid, True) == "medios"
+        assert servicio.reservar_cupo(6710, uid) is None and servicio.reservar_cupo(6710, uid) == "dia"
+        servicio.sumar_tokens(6710, uid, 123)
+        assert Cupo().uso(uid)["tokens"] == 123
+        assert servicio._post("/uso", {"chat_id": 6710, "cuenta_id": uid, "tokens": -1}).status_code == 422
+    finally:
+        for k, v in anterior.items():
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+
+
+def test_el_nucleo_no_depende_de_telegram_y_cada_cuenta_solo_confirma_lo_suyo(client):
+    """La base de la burbuja web: otra «clave» de conversación, la cuenta puesta por quien llama, mismos topes y propuestas."""
+    uid, h = _cuenta(client, "tg_nucleo")
+    otro, _ = _cuenta(client, "tg_nucleo_2")
+    _con_fondos(client, h)
+    propuestas = Propuestas()
+    modelo = ModeloFalso([Respuesta(llamadas=[{"nombre": "registrar_movimiento", "args": {"tipo": "gasto", "monto": 31, "categoria": "Comida"}}]), Respuesta(texto="Pendiente de confirmación.")])
+    servicio = ServicioLocal()
+    eventos = []
+
+    def crear_motor(cuenta, clave):
+        return Motor(modelo, Herramientas(obtener_con_proveedor(client, lambda: servicio.token(6720)), propuestas, cuenta["id"], lambda: HOY), lambda: HOY)
+
+    class CupoWeb:   # el canal web reservará por cuenta (sin chat): el núcleo solo ve esta interfaz
+        def reservar(self, cuenta, clave, con_medio):
+            return Cupo().reservar(cuenta["id"], con_medio)
+
+        def sumar_tokens(self, cuenta, clave, tokens):
+            Cupo().sumar_tokens(cuenta["id"], tokens)
+
+    _vincular(uid, 6720)   # el vínculo solo le sirve a las herramientas de la prueba para obtener el token
+    ejecutados = []
+    nucleo = Nucleo(crear_motor, propuestas, lambda p, clave: ejecutados.append((p.user_id, clave)) or (True, "Hecho."), CupoWeb(), registrar=lambda n, **c: eventos.append((n, c)), canal="web")
+    r = nucleo.turno(("web", uid), {"id": uid}, "gasté 31 en comida")
+    assert r.estado == "ok" and len(r.propuestas) == 1 and "31.00" in r.propuestas[0][1], r
+    id_ = r.propuestas[0][0]
+    assert nucleo.confirmar(("web", otro), {"id": otro}, id_)[0] == "no_disponible" and not ejecutados, "otra cuenta no confirma lo ajeno"
+    assert nucleo.confirmar(("web", uid), {"id": uid}, id_)[0] == "confirmada" and ejecutados == [(uid, ("web", uid))]
+    assert nucleo.confirmar(("web", uid), {"id": uid}, id_)[0] == "no_disponible", "una sola vez"
+    assert all(c.get("canal") == "web" for n, c in eventos), eventos
+
+
 def test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client):
     uid, _ = _cuenta(client, "tg_lento")
     from asistente.motor import Motor as _Motor
@@ -938,8 +1044,8 @@ def test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_d
     _vincular(ub, 9202)
     hoy = {"dia": "2026-11-09"}
     eventos = []
-    bot, tg, _ = _bot(client, {ua: [Respuesta(texto="Dime más.")] * 50, ub: [Respuesta(texto="Dime más.")] * 50})
-    bot._max_mensajes_dia, bot._max_tokens_dia, bot._dia = 3, 0, (lambda: hoy["dia"])
+    bot, tg, _ = _bot(client, {ua: [Respuesta(texto="Dime más.")] * 50, ub: [Respuesta(texto="Dime más.")] * 50},
+                      servicio=ServicioLocal(Cupo(3, 0, 0, lambda: hoy["dia"])))
     bot._registrar = lambda nombre, **campos: eventos.append((nombre, campos))
     for i in range(3):
         bot.procesar(_msg(9201, f"mensaje {i}"))
@@ -949,13 +1055,12 @@ def test_el_tope_diario_por_cuenta_cuenta_mensajes_y_tokens_y_se_reinicia_cada_d
     assert "límite de mensajes de hoy" in tg.a(9201)[-1][1] and len(modelo.llamadas) == llamadas, "pasado el tope no se llama al modelo"
     bot.procesar(_msg(9202, "yo sí puedo"))
     assert tg.a(9202)[-1][1] == "Dime más.", "el tope es por cuenta: la otra no se afecta"
-    assert ("asistente_limite", {"tipo": "dia", "cuenta": ua}) in eventos
+    assert ("asistente_limite", {"tipo": "dia", "cuenta": ua, "canal": "telegram"}) in eventos
     hoy["dia"] = "2026-11-10"
     bot.procesar(_msg(9201, "ya es otro día"))
     assert tg.a(9201)[-1][1] == "Dime más.", "el tope se reinicia cada día"
     # Tokens: un turno que gasta mucho agota el presupuesto del día aunque queden mensajes
-    bot2, tg2, _ = _bot(client, {ua: [Respuesta(texto="Listo, dime más.", tokens=150)] * 10})
-    bot2._max_mensajes_dia, bot2._max_tokens_dia, bot2._dia = 0, 100, (lambda: "2026-11-09")
+    bot2, tg2, _ = _bot(client, {ua: [Respuesta(texto="Listo, dime más.", tokens=150)] * 10}, servicio=ServicioLocal(Cupo(0, 100, 0, lambda: "2026-11-09")))
     bot2.procesar(_msg(9201, "primero"))
     bot2.procesar(_msg(9201, "segundo"))
     assert "límite de mensajes de hoy" in tg2.a(9201)[-1][1] and len(bot2.modelos[ua].llamadas) == 1, "con el presupuesto de tokens gastado ya no se llama al modelo"
@@ -1032,7 +1137,7 @@ def test_varios_chats_se_atienden_a_la_vez_y_los_mensajes_de_un_chat_van_en_orde
     # Una actualización que revienta no detiene al despachador
     fallos = []
     despachador2 = bot_telegram.Despachador(bot, carriles=2, al_fallar=fallos.append)
-    bot.crear_motor = lambda cuenta, chat: (_ for _ in ()).throw(KeyError("dato interno"))
+    bot.nucleo.crear_motor = lambda cuenta, chat: (_ for _ in ()).throw(KeyError("dato interno"))
     despachador2.enviar(_msg(9301, "se rompe")).result(timeout=10)
     assert fallos == ["KeyError"], fallos
     despachador2.cerrar()
@@ -1044,20 +1149,21 @@ def test_la_basura_de_chats_sin_vinculo_y_los_rechazos_no_gastan_el_cupo_de_los_
     uid, _ = _cuenta(client, "tg_cupo")
     _vincular(uid, 9601)
     reloj = Reloj()
-    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Dime más.")] * 400}, reloj)
+    cupo = Cupo(max_mensajes=1000)
+    bot, tg, _ = _bot(client, {uid: [Respuesta(texto="Dime más.")] * 400}, reloj, servicio=ServicioLocal(cupo))
     # Muchos chats sin vínculo mandan basura: ni el tope de turnos ni el del chat legítimo se tocan
     for chat in range(9700, 9700 + 30):
         for i in range(bot_telegram.MAX_INTENTOS_VINCULO_POR_HORA + 3):
             bot.procesar(_msg(chat, f"/start {'x' * 20}{i}"))
-    assert bot._global == [] and len(bot._vinculos_global) <= bot_telegram.MAX_INTENTOS_VINCULO_GLOBAL, "los intentos de vincular tienen su propia cuenta"
+    assert bot.nucleo._global == [] and len(bot._vinculos_global) <= bot_telegram.MAX_INTENTOS_VINCULO_GLOBAL, "los intentos de vincular tienen su propia cuenta"
     bot.procesar(_msg(9601, "hola"))
     assert tg.a(9601)[-1][1] == "Dime más.", "el chat legítimo sigue atendido"
     # Un mensaje rechazado por el tope diario no gasta cupo de ritmo
-    bot._max_mensajes_dia = 1
-    antes = len(bot._mensajes.get(9601, []))
+    cupo._fijos = (1, None, None)
+    antes = len(bot.nucleo._mensajes.get(9601, []))
     for _ in range(5):
         bot.procesar(_msg(9601, "otro"))
-    assert len(bot._mensajes.get(9601, [])) == antes and len(bot._global) == 1, "lo rechazado por el día no cuenta como turno"
+    assert len(bot.nucleo._mensajes.get(9601, [])) == antes and len(bot.nucleo._global) == 1, "lo rechazado por el día no cuenta como turno"
     # Los topes de vinculación son aparte del de turnos, y se liberan con la hora
     reloj.t += 3601
     bot.procesar(_msg(9700, f"/start {'y' * 22}"))
@@ -1086,8 +1192,15 @@ def test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto(client):
     assert bot_telegram._entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", 100) == 250
     _os.environ.pop("ASISTENTE_MAX_MENSAJES_DIA", None)
     assert bot_telegram._entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", 100) == 100
-    fuente = open(bot_telegram.__file__, encoding="utf-8").read()
-    assert 'ASISTENTE_SIN_TOPES' in fuente and '"1"' in fuente, "apagar los topes exige una variable explícita"
+    from asistente import cupo as _cupo
+    anterior = os.environ.get("ASISTENTE_SIN_TOPES")
+    try:
+        os.environ["ASISTENTE_SIN_TOPES"] = "yes"
+        assert _cupo.Cupo().topes() == (100, 200_000, 20), "solo el valor exacto «1» apaga los topes"
+        os.environ["ASISTENTE_SIN_TOPES"] = "1"
+        assert _cupo.Cupo().topes() == (0, 0, 0), "apagar los topes exige una variable explícita"
+    finally:
+        os.environ.pop("ASISTENTE_SIN_TOPES", None) if anterior is None else os.environ.__setitem__("ASISTENTE_SIN_TOPES", anterior)
 
 
 def test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client):
@@ -1131,10 +1244,10 @@ def test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client):
     assert len(fallos) >= 5, fallos
     d2.cerrar()
     # Purga: miles de chats desconocidos no dejan la memoria creciendo
-    bot._mensajes = {i: [0.0] for i in range(bot_telegram.MAX_ESTADO_EN_MEMORIA + 500)}
-    bot._reloj = lambda: 10_000.0
-    bot._ritmo_excedido(9900)
-    assert len(bot._mensajes) <= 2, len(bot._mensajes)
+    bot.nucleo._mensajes = {i: [0.0] for i in range(bot_telegram.MAX_ESTADO_EN_MEMORIA + 500)}
+    bot.nucleo._reloj = lambda: 10_000.0
+    bot.nucleo.ritmo_excedido(9900)
+    assert len(bot.nucleo._mensajes) <= 2, len(bot.nucleo._mensajes)
 
 
 if __name__ == "__main__":
@@ -1174,6 +1287,10 @@ if __name__ == "__main__":
             (test_la_descarga_real_de_telegram_tiene_tope_de_tamano_y_nunca_lleva_el_token, lambda: test_la_descarga_real_de_telegram_tiene_tope_de_tamano_y_nunca_lleva_el_token(client)),
             (test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_bytes, lambda: test_el_modelo_recibe_los_archivos_como_partes_y_la_estimacion_no_cuenta_bytes(client)),
             (test_una_descarga_a_gotas_se_corta_por_el_plazo_total, lambda: test_una_descarga_a_gotas_se_corta_por_el_plazo_total(client)),
+            (test_el_tope_diario_es_uno_solo_para_todos_los_servicios_y_sobrevive_a_un_reinicio, lambda: test_el_tope_diario_es_uno_solo_para_todos_los_servicios_y_sobrevive_a_un_reinicio(client)),
+            (test_el_cupo_es_atomico_con_muchos_hilos_a_la_vez, lambda: test_el_cupo_es_atomico_con_muchos_hilos_a_la_vez(client)),
+            (test_la_api_interna_del_cupo_exige_secreto_y_solo_toca_la_cuenta_del_chat, lambda: test_la_api_interna_del_cupo_exige_secreto_y_solo_toca_la_cuenta_del_chat(client)),
+            (test_el_nucleo_no_depende_de_telegram_y_cada_cuenta_solo_confirma_lo_suyo, lambda: test_el_nucleo_no_depende_de_telegram_y_cada_cuenta_solo_confirma_lo_suyo(client)),
             (test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot, lambda: test_un_turno_demasiado_lento_se_corta_sin_bloquear_al_bot(client)),
             (test_un_vinculo_caducado_no_ocupa_el_chat, lambda: test_un_vinculo_caducado_no_ocupa_el_chat(client)),
             (test_las_imagenes_de_docker_no_llevan_bases_ni_secretos, lambda: test_las_imagenes_de_docker_no_llevan_bases_ni_secretos(client)),

@@ -24,19 +24,15 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from asistente import medios
+from asistente.cupo import MAX_MEDIOS_DIA, MAX_MENSAJES_DIA, MAX_TOKENS_DIA, entero_de_entorno as _entero_de_entorno  # noqa: F401
+from asistente.nucleo import MAX_ESTADO_EN_MEMORIA, MAX_MENSAJES_GLOBAL_POR_HORA, MAX_MENSAJES_POR_HORA, TTL_CONVERSACION, Nucleo  # noqa: F401
+from asistente.servicio import SinVinculo
 
-TTL_CONVERSACION = 1800          # segundos sin hablar para olvidar la conversación
-MAX_MENSAJES_POR_HORA = 40       # por chat
-MAX_MENSAJES_GLOBAL_POR_HORA = 300   # entre todos los chats: tope de costo del modelo
-MAX_MENSAJES_DIA = 100           # por cuenta y por día (configurable: ASISTENTE_MAX_MENSAJES_DIA)
-MAX_TOKENS_DIA = 200_000         # por cuenta y por día (configurable: ASISTENTE_MAX_TOKENS_DIA); 0 = sin tope
 TRABAJADORES = 8                 # carriles: chats que se atienden a la vez
 MAX_INTENTOS_VINCULO_POR_HORA = 10   # por chat: adivinar códigos de vinculación
 MAX_INTENTOS_VINCULO_GLOBAL = 200    # entre todos los chats; cuenta aparte, para que la basura no gaste el cupo de los turnos reales
 MAX_PENDIENTES_POR_CHAT = 3      # actualizaciones en cola de un mismo chat (las demás se descartan)
 MAX_PENDIENTES_POR_CARRIL = 50   # cola máxima de un carril
-MAX_ESTADO_EN_MEMORIA = 2000     # entradas por diccionario antes de purgar las caducadas
-MAX_MEDIOS_DIA = 20             # fotos y audios por cuenta y por día (configurable: ASISTENTE_MAX_MEDIOS_DIA); cuestan más que un texto
 MAX_TEXTO_TELEGRAM = 3500        # el límite de Telegram es 4096
 PLAZO_DESCARGA_SEG = 30           # tiempo total para bajar un archivo de Telegram
 AVISO_ESCRIBIENDO_SEG = 4        # Telegram apaga «escribiendo…» a los 5 s
@@ -54,36 +50,42 @@ def _recortar(texto):
     return texto if len(texto) <= MAX_TEXTO_TELEGRAM else texto[:MAX_TEXTO_TELEGRAM].rstrip() + "…"
 
 
+class _CupoDeChat:
+    """El tope diario vive en la app: el bot lo pide por el servicio, indicando el chat (que debe ser de esa cuenta)."""
+
+    def __init__(self, servicio):
+        self._servicio = servicio
+
+    def reservar(self, cuenta, chat_id, con_medio):
+        return self._servicio.reservar_cupo(chat_id, cuenta["id"], con_medio)
+
+    def sumar_tokens(self, cuenta, chat_id, tokens):
+        self._servicio.sumar_tokens(chat_id, cuenta["id"], tokens)
+
+
 class Bot:
-    def __init__(self, telegram, servicio, crear_motor, propuestas, ejecutar, reloj=time.monotonic, registrar=None,
-                 max_mensajes_dia=MAX_MENSAJES_DIA, max_tokens_dia=MAX_TOKENS_DIA, dia=None, max_medios_dia=MAX_MEDIOS_DIA):
-        """`servicio` responde de qué cuenta es un chat y vincula/desvincula (`asistente/servicio.py`);
+    """El canal de Telegram: lee las actualizaciones, vincula chats, baja archivos y muestra las respuestas. La conversación, el ritmo,
+    el tope diario y las propuestas son del `Nucleo` (`self.nucleo`), que la web usa igual."""
+
+    def __init__(self, telegram, servicio, crear_motor, propuestas, ejecutar, reloj=time.monotonic, registrar=None):
+        """`servicio` responde de qué cuenta es un chat, vincula/desvincula y reserva el tope diario (`asistente/servicio.py`);
         `crear_motor(cuenta, chat_id) -> Motor`; `propuestas` es el `Propuestas` que comparten las herramientas;
         `ejecutar(propuesta, chat_id) -> (ok, texto)` ejecuta una propuesta ya confirmada.
         `registrar(evento, **campos)` recibe los eventos del bot: solo tipos, conteos y el id numérico de la cuenta; nunca texto,
-        importes ni ids de chat. `dia()` da la fecha que reinicia los topes diarios."""
+        importes ni ids de chat."""
         self.tg = telegram
         self.servicio = servicio
-        self.crear_motor = crear_motor
         self.propuestas = propuestas
-        self.ejecutar = ejecutar
         self._reloj = reloj
         self._registrar = registrar
-        self._max_mensajes_dia = max_mensajes_dia
-        self._max_tokens_dia = max_tokens_dia
-        self._max_medios_dia = max_medios_dia
-        self._dia = dia or (lambda: time.strftime("%Y-%m-%d"))
+        self.nucleo = Nucleo(crear_motor, propuestas, ejecutar, _CupoDeChat(servicio), reloj, lambda n, **c: self._evento(n, **c), canal="telegram")
         self._candado = threading.RLock()   # protege los diccionarios compartidos entre chats que se atienden a la vez
         self._candados_chat = {}            # chat_id -> Lock: los mensajes de un mismo chat se atienden en orden
-        self._conversaciones = {}   # chat_id -> {"historial": [...], "ultimo": t, "user_id": id}
-        self._mensajes = {}         # chat_id -> [t, ...] de la última hora
-        self._global = []           # [t, ...] de la última hora, todos los chats
-        self._uso_dia = {}          # user_id -> {"dia": fecha, "mensajes": n, "tokens": n}
         self._vinculos = {}         # chat_id -> [t, ...] de la última hora: intentos de vincular
         self._vinculos_global = []  # [t, ...] de la última hora, todos los chats
 
     def _evento(self, nombre, **campos):
-        if self._registrar:
+        if self._registrar:   # se lee en cada llamada: un registro puesto después de crear el bot también se usa
             try:
                 self._registrar(nombre, **campos)
             except Exception:
@@ -147,43 +149,26 @@ class Bot:
         if not cuenta:
             self.tg.enviar(chat_id, EXPLICACION)
             return
-        # Primero se comprueba todo sin gastar cupo; solo un mensaje que llega al modelo cuenta contra los topes
-        if self._ritmo_excedido(chat_id):
-            self._evento("asistente_limite", tipo="ritmo", cuenta=cuenta["id"])
-            self.tg.enviar(chat_id, "Has escrito muchos mensajes seguidos. Intenta de nuevo en un rato.")
-            return
-        limite = self._anotar_dia(cuenta["id"], bool(medio))
-        if limite == "medios":
-            self._evento("asistente_limite", tipo="medios", cuenta=cuenta["id"])
-            self.tg.enviar(chat_id, "Llegaste al límite de fotos y audios de hoy. Puedes seguir escribiendo; mañana vuelves a poder mandarlos.")
-            return
-        if limite:
-            self._evento("asistente_limite", tipo="dia", cuenta=cuenta["id"])
-            self.tg.enviar(chat_id, "Llegaste al límite de mensajes de hoy con el asistente. Mañana puedes seguir; mientras tanto, la app sigue disponible.")
-            return
-        self._anotar_ritmo(chat_id)
-        historial = self._historial(chat_id, cuenta["id"])
-        inicio = time.perf_counter()
-        turno = None
+        self._purgar(self._reloj())
         try:
-            with self._escribiendo(chat_id):
-                adjuntos = [self._descargar(medio)] if medio else []
-                turno = self.crear_motor(cuenta, chat_id).responder(historial, texto, adjuntos)
+            resultado = self.nucleo.turno(chat_id, cuenta, texto, (lambda: [self._descargar(medio)]) if medio else None,
+                                          medio["tipo"] if medio else "", lambda: self._escribiendo(chat_id))
         except medios.Rechazo as rechazo:
             self.tg.enviar(chat_id, str(rechazo))
             return
-        finally:
-            if turno is not None:
-                self._sumar_tokens(cuenta["id"], turno.tokens)
-        self._evento("asistente_turno", cuenta=cuenta["id"], duracion_ms=round((time.perf_counter() - inicio) * 1000),
-                     herramientas=turno.herramientas_usadas, propuestas=len(turno.propuestas), tokens=turno.tokens, error=turno.error,
-                     medio=medio["tipo"] if medio else "")
-        self.tg.enviar(chat_id, _recortar(turno.texto))
-        for id_ in turno.propuestas:
-            propuesta = self.propuestas.obtener(id_, cuenta["id"])
-            if propuesta:
-                self.tg.enviar(chat_id, "Confirma esta operación:\n" + propuesta.resumen,
-                               botones=[[("Confirmar", f"c:{id_}"), ("Cancelar", f"x:{id_}")]])
+        except SinVinculo:   # el chat se desvinculó entre la comprobación y el turno
+            self.tg.enviar(chat_id, EXPLICACION)
+            return
+        if resultado.estado == "ritmo":
+            self.tg.enviar(chat_id, "Has escrito muchos mensajes seguidos. Intenta de nuevo en un rato.")
+        elif resultado.estado == "medios":
+            self.tg.enviar(chat_id, "Llegaste al límite de fotos y audios de hoy. Puedes seguir escribiendo; mañana vuelves a poder mandarlos.")
+        elif resultado.estado == "dia":
+            self.tg.enviar(chat_id, "Llegaste al límite de mensajes de hoy con el asistente. Mañana puedes seguir; mientras tanto, la app sigue disponible.")
+        else:
+            self.tg.enviar(chat_id, _recortar(resultado.texto))
+            for id_, resumen in resultado.propuestas:
+                self.tg.enviar(chat_id, "Confirma esta operación:\n" + resumen, botones=[[("Confirmar", f"c:{id_}"), ("Cancelar", f"x:{id_}")]])
 
     @contextlib.contextmanager
     def _escribiendo(self, chat_id):
@@ -216,8 +201,7 @@ class Bot:
             cuenta = self.servicio.usuario_de_chat(chat_id)
             if self.servicio.desvincular_chat(chat_id):
                 self._evento("asistente_vinculo", resultado="desvinculado", cuenta=cuenta["id"] if cuenta else None)
-                with self._candado:
-                    self._conversaciones.pop(chat_id, None)
+                self.nucleo.olvidar(chat_id)
                 if cuenta:
                     self.propuestas.cancelar_de_cuenta(cuenta["id"])
                 self.tg.enviar(chat_id, "Listo: este chat ya no está vinculado a tu cuenta.")
@@ -225,8 +209,7 @@ class Bot:
                 self.tg.enviar(chat_id, "Este chat no está vinculado a ninguna cuenta.")
         elif comando == "/olvidar":
             if self.servicio.usuario_de_chat(chat_id):
-                with self._candado:
-                    self._conversaciones.pop(chat_id, None)
+                self.nucleo.olvidar(chat_id)
                 self.tg.enviar(chat_id, "Listo, olvidé lo que hablamos.")
             else:
                 self.tg.enviar(chat_id, EXPLICACION)
@@ -243,8 +226,7 @@ class Bot:
         estado = resultado.get("estado")
         self._evento("asistente_vinculo", resultado=estado if estado in ("ok", "chat_ocupado") else "invalido")
         if estado == "ok":
-            with self._candado:
-                self._conversaciones.pop(chat_id, None)
+            self.nucleo.olvidar(chat_id)
             self.tg.enviar(chat_id, f"Listo: este chat quedó vinculado a la cuenta «{resultado.get('cuenta')}». Pregúntame por tu saldo, tus gastos o tus metas. "
                                     "Si no reconoces esa cuenta, escribe /desvincular.")
             if resultado.get("chat_anterior") is not None:
@@ -276,14 +258,7 @@ class Bot:
         if accion not in ("c", "x") or not _ID_PROPUESTA.match(id_):
             self.tg.responder_callback(id_consulta, "Esa opción no es válida.")
             return
-        if accion == "c":
-            ok, texto = self.propuestas.confirmar(id_, cuenta["id"], lambda p: self.ejecutar(p, chat_id))
-            resultado = "confirmada" if ok else ("incierta" if texto.startswith("No pude confirmar") else "rechazada" if texto.startswith("No se pudo") else "no_disponible")
-        else:
-            cancelada = self.propuestas.cancelar(id_, cuenta["id"])
-            texto = "Cancelada." if cancelada else "Esa propuesta ya no está disponible."
-            resultado = "cancelada" if cancelada else "no_disponible"
-        self._evento("asistente_escritura", resultado=resultado, cuenta=cuenta["id"])
+        _, texto = self.nucleo.confirmar(chat_id, cuenta, id_) if accion == "c" else self.nucleo.cancelar(cuenta, id_)
         self.tg.responder_callback(id_consulta, "")
         if mensaje.get("message_id") is not None:
             try:
@@ -292,45 +267,13 @@ class Bot:
                 pass
         self.tg.enviar(chat_id, _recortar(texto))
 
-    # --- estado por chat -------------------------------------------------------------------------------------------
-    def _historial(self, chat_id, user_id):
-        with self._candado:
-            ahora = self._reloj()
-            conv = self._conversaciones.get(chat_id)
-            if not conv or ahora - conv["ultimo"] > TTL_CONVERSACION or conv["user_id"] != user_id:
-                conv = self._conversaciones[chat_id] = {"historial": [], "ultimo": ahora, "user_id": user_id}
-            conv["ultimo"] = ahora
-            return conv["historial"]
-
+    # --- estado propio de Telegram ---------------------------------------------------------------------------------
     def _purgar(self, ahora):
         """Olvida lo caducado cuando un diccionario crece de más (un atacante con muchas cuentas de Telegram no llena la memoria)."""
-        if len(self._mensajes) > MAX_ESTADO_EN_MEMORIA:
-            self._mensajes = {c: v for c, v in ((c, [x for x in v if ahora - x < 3600]) for c, v in self._mensajes.items()) if v}
         if len(self._vinculos) > MAX_ESTADO_EN_MEMORIA:
             self._vinculos = {c: v for c, v in ((c, [x for x in v if ahora - x < 3600]) for c, v in self._vinculos.items()) if v}
-        if len(self._conversaciones) > MAX_ESTADO_EN_MEMORIA:
-            self._conversaciones = {c: v for c, v in self._conversaciones.items() if ahora - v["ultimo"] <= TTL_CONVERSACION}
-        if len(self._uso_dia) > MAX_ESTADO_EN_MEMORIA:
-            dia = self._dia()
-            self._uso_dia = {u: v for u, v in self._uso_dia.items() if v["dia"] == dia}
         if len(self._candados_chat) > MAX_ESTADO_EN_MEMORIA:
             self._candados_chat = {c: k for c, k in self._candados_chat.items() if k.locked()}
-
-    def _ritmo_excedido(self, chat_id):
-        """¿Ya no caben más turnos de este chat (o de todos) en la última hora? No anota nada."""
-        with self._candado:
-            ahora = self._reloj()
-            self._purgar(ahora)
-            self._global = [x for x in self._global if ahora - x < 3600]
-            recientes = [x for x in self._mensajes.get(chat_id, []) if ahora - x < 3600]
-            self._mensajes[chat_id] = recientes
-            return len(recientes) >= MAX_MENSAJES_POR_HORA or len(self._global) >= MAX_MENSAJES_GLOBAL_POR_HORA
-
-    def _anotar_ritmo(self, chat_id):
-        with self._candado:
-            ahora = self._reloj()
-            self._mensajes.setdefault(chat_id, []).append(ahora)
-            self._global.append(ahora)
 
     def _vinculo_excedido(self, chat_id):
         """Anota un intento de vincular y dice si ya pasó el tope (del chat o global). Cuenta aparte de los turnos."""
@@ -345,27 +288,6 @@ class Bot:
             self._vinculos[chat_id] = recientes
             self._vinculos_global.append(ahora)
             return False
-
-    def _uso_de(self, user_id):
-        dia = self._dia()
-        uso = self._uso_dia.get(user_id)
-        if not uso or uso["dia"] != dia:
-            uso = self._uso_dia[user_id] = {"dia": dia, "mensajes": 0, "tokens": 0, "medios": 0}
-        return uso
-
-    def _anotar_dia(self, user_id, con_medio=False):
-        """Cuenta el mensaje contra el tope diario de la cuenta (mensajes, tokens y, si trae foto o audio, medios).
-        None si cabe; si no, el motivo («dia» o «medios») y entonces no cuenta nada."""
-        with self._candado:
-            uso = self._uso_de(user_id)
-            if (self._max_mensajes_dia and uso["mensajes"] >= self._max_mensajes_dia) or (self._max_tokens_dia and uso["tokens"] >= self._max_tokens_dia):
-                return "dia"
-            if con_medio and self._max_medios_dia and uso["medios"] >= self._max_medios_dia:
-                return "medios"
-            uso["mensajes"] += 1
-            if con_medio:
-                uso["medios"] += 1
-            return None
 
     def _descargar(self, medio):
         """Baja el archivo de Telegram y lo identifica por sus bytes. Lanza `Rechazo` con un texto para la persona."""
@@ -382,9 +304,6 @@ class Bot:
             raise medios.Rechazo("Ese audio pesa demasiado (máximo 3 MB).")
         return {"mime": real[1], "datos": datos}
 
-    def _sumar_tokens(self, user_id, tokens):
-        with self._candado:
-            self._uso_de(user_id)["tokens"] += max(0, int(tokens or 0))
 
 
 class Despachador:
@@ -538,16 +457,11 @@ def main():
         return ejecutar_propuesta(app, propuesta, lambda: servicio.token(chat_id, escritura=True, cuenta_id=propuesta.user_id))
 
     telegram = TelegramHTTP(token)
-    sin_topes = os.environ.get("ASISTENTE_SIN_TOPES", "").strip() == "1"   # único modo de apagar los topes diarios: explícito
-    max_mensajes = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_MENSAJES_DIA", MAX_MENSAJES_DIA)
-    max_tokens = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_TOKENS_DIA", MAX_TOKENS_DIA)
-    max_medios = 0 if sin_topes else _entero_de_entorno("ASISTENTE_MAX_MEDIOS_DIA", MAX_MEDIOS_DIA)
-    bot = Bot(telegram, servicio, crear_motor, propuestas, ejecutar, registrar=_evento, max_mensajes_dia=max_mensajes,
-              max_tokens_dia=max_tokens, max_medios_dia=max_medios, dia=lambda: ahora_local().date().isoformat())
+    bot = Bot(telegram, servicio, crear_motor, propuestas, ejecutar, registrar=_evento)   # los topes diarios los lleva la app (asistente/cupo.py)
     despachador = Despachador(bot, TRABAJADORES, al_fallar=lambda tipo: _evento("bot_error", tipo=tipo),
                               al_descartar=lambda: _evento("bot_cola_llena"))
     offset, espera = 0, 1
-    _evento("bot_iniciado", trabajadores=TRABAJADORES, max_mensajes_dia=max_mensajes, max_tokens_dia=max_tokens, max_medios_dia=max_medios, sin_topes=sin_topes)
+    _evento("bot_iniciado", trabajadores=TRABAJADORES)
     try:
         while True:
             try:
@@ -563,15 +477,6 @@ def main():
                 espera = min(espera * 2, 60)
     finally:
         despachador.cerrar()
-
-
-def _entero_de_entorno(nombre, defecto):
-    """Entero positivo de una variable de entorno. Un valor vacío, mal escrito, 0 o negativo no apaga el tope: se usa el valor por defecto."""
-    try:
-        valor = int(os.environ.get(nombre, "").strip() or defecto)
-    except ValueError:
-        return defecto
-    return valor if valor > 0 else defecto
 
 
 if __name__ == "__main__":

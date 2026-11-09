@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from asistente import vinculos
+from asistente import cupo, vinculos
 from asistente.tokens import emitir_token
 from security import clave_bloqueada, obtener_ip_cliente, reservar_intento_login
 
@@ -37,6 +37,16 @@ class VincularRequest(ChatRequest):
 class TokenRequest(ChatRequest):
     escritura: bool = False
     cuenta_id: Optional[int] = Field(None, ge=1, description="Cuenta que el bot espera: si el chat ya no es de ella, no hay token")
+
+
+class CupoRequest(ChatRequest):
+    cuenta_id: int = Field(..., ge=1)
+    con_medio: bool = False
+
+
+class UsoRequest(ChatRequest):
+    cuenta_id: int = Field(..., ge=1)
+    tokens: int = Field(..., ge=0, le=10_000_000)
 
 
 def exigir_secreto_interno(request: Request) -> None:
@@ -77,3 +87,21 @@ def token_del_chat(cuerpo: TokenRequest):
     if not cuenta or (cuerpo.cuenta_id is not None and cuerpo.cuenta_id != cuenta["id"]):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat sin vínculo.")
     return {"token": emitir_token(cuenta["id"], escritura=cuerpo.escritura)}
+
+
+@router.post("/cupo", dependencies=[Depends(exigir_secreto_interno)])
+def reservar_cupo(cuerpo: CupoRequest):
+    """Cuenta un mensaje contra el tope diario de la cuenta de ESE chat. `limite` es null si cabe, o «dia» / «medios»."""
+    cuenta = vinculos.usuario_de_chat(cuerpo.chat_id)
+    if not cuenta or cuenta["id"] != cuerpo.cuenta_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat sin vínculo.")
+    return {"limite": cupo.por_defecto.reservar(cuenta["id"], cuerpo.con_medio)}
+
+
+@router.post("/uso", dependencies=[Depends(exigir_secreto_interno)])
+def sumar_uso(cuerpo: UsoRequest):
+    cuenta = vinculos.usuario_de_chat(cuerpo.chat_id)
+    if not cuenta or cuenta["id"] != cuerpo.cuenta_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat sin vínculo.")
+    cupo.por_defecto.sumar_tokens(cuenta["id"], cuerpo.tokens)
+    return {"ok": True}

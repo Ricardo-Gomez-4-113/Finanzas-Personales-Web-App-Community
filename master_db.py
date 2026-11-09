@@ -189,6 +189,19 @@ def init_master_db() -> None:
             )
         """)
 
+        # Uso diario del asistente por cuenta (mensajes, tokens, fotos/audios): un solo cupo para todos los canales y servicios
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS asistente_uso (
+                user_id INTEGER NOT NULL,
+                dia TEXT NOT NULL,
+                mensajes INTEGER NOT NULL DEFAULT 0,
+                tokens INTEGER NOT NULL DEFAULT 0,
+                medios INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, dia),
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
         # Índices optimizados
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -553,6 +566,7 @@ def delete_user_and_tenant(user_id: int) -> bool:
         cursor.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM telegram_vinculos WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM telegram_codigos WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM asistente_uso WHERE user_id = ?", (user_id,))
         cursor.execute("UPDATE comentarios SET user_id = NULL WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()

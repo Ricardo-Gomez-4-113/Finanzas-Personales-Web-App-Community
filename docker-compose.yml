@@ -38,11 +38,6 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_MODEL_RESPALDO: ${GEMINI_MODEL_RESPALDO:-}
       ASISTENTE_SECRETO_INTERNO: ${ASISTENTE_SECRETO_INTERNO}
-      # Topes diarios por cuenta (vacío = valor por defecto del bot)
-      ASISTENTE_MAX_MENSAJES_DIA: ${ASISTENTE_MAX_MENSAJES_DIA:-}
-      ASISTENTE_MAX_TOKENS_DIA: ${ASISTENTE_MAX_TOKENS_DIA:-}
-      ASISTENTE_MAX_MEDIOS_DIA: ${ASISTENTE_MAX_MEDIOS_DIA:-}
-      ASISTENTE_SIN_TOPES: ${ASISTENTE_SIN_TOPES:-}
       # Los módulos de la app que importa exigen una clave JWT para arrancar. Esta es de relleno y NO es la real: el bot no puede firmar nada válido.
       JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
     read_only: true
