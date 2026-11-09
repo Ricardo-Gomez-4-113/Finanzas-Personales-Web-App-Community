@@ -119,11 +119,12 @@ Un cambio está terminado cuando:
 - **Prueba intermitente:** `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px` falló una vez esperando filas;
   no se pudo reproducir (12 corridas seguidas en verde, tres a la vez con la máquina cargada). Si vuelve a fallar en la
   batería completa, guardar la captura y el log de ese momento antes de repetirla.
-- **Visual, consolidar las hojas de estilo (tramo 1 hecho):** `scripts/css_muerto.py static/css [--aplicar]` quita las
+- **Visual, hojas de estilo (consolidación cerrada):** `scripts/css_muerto.py static/css [--aplicar]` quita las
   declaraciones que una regla posterior (mismo selector, o con `:root ` delante, y mismo `@media`) ya sobrescribe siempre;
   no toca los respaldos de una misma regla ni los selectores que pueden ser `<html>`. Quitó 465 declaraciones (197 KB a
-  182 KB) con 0 diferencias en el volcado de `~/bin/regresion-visual` (206 118 elementos, 110 pantallas). Quedan 144
-  selectores definidos en más de una hoja: son sobrescrituras vivas (`tema.css` cambia un valor de `componentes.css`
-  o `vistas.css`); fusionarlas es el tramo 2 y se hace por pares de hojas, con el volcado antes y después de cada una.
+  182 KB) con 0 diferencias en el volcado de `~/bin/regresion-visual` (206 118 elementos, 110 pantallas). Lo que queda no
+  se fusiona: de los 144 selectores en más de una hoja, 134 son el par `X` / `:root X`, donde `tema.css` sube la
+  especificidad a propósito (fundirlos cambia la cascada), solo 6 son el mismo selector exacto (206 bytes) y los 40
+  repetidos dentro de una hoja suman 1 KB. No compensa el riesgo.
 - **Respaldo nocturno automático:** quitado de Community; pendiente para producción con permisos correctos en `data/backups`.
 - **Seguridad, límite conocido:** una IP puede probar 20 cuentas por ventana de 5 min; una botnet no queda frenada.
