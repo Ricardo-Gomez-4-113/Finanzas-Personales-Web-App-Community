@@ -67,6 +67,10 @@ class Oraculo:
             "SELECT recurrente_id, fecha FROM transacciones WHERE recurrente_id IS NOT NULL AND fecha > ?", (fecha,)
         ))
 
+    def fijos_a_meta(self):
+        """(id del fijo, id de la meta, activo) de los fijos que aportan a una meta."""
+        return tuple(self._leer("SELECT id, apartado_id, activo FROM recurrentes WHERE apartado_id IS NOT NULL ORDER BY id"))
+
     def cuotas_de(self, recurrente_id):
         return self._leer("SELECT COUNT(*) FROM transacciones WHERE recurrente_id = ?", (recurrente_id,))[0][0]
 
