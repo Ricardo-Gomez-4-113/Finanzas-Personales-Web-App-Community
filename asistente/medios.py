@@ -50,6 +50,43 @@ def elegir(mensaje):
     return None
 
 
+FORMATO_NO_RECONOCIDO = "No reconozco ese formato. Acepto fotos (JPG, PNG, WEBP) y audios (OGG, MP3, WAV, FLAC)."
+
+
+def clasificar(datos):
+    """`("foto"|"audio", mime)` de unos bytes ya descargados, comprobando formato y tamaño. Lanza `Rechazo` con un texto para la persona."""
+    real = tipo_real(datos) if isinstance(datos, (bytes, bytearray)) else None
+    if real is None:
+        raise Rechazo(FORMATO_NO_RECONOCIDO)
+    if real[0] == "audio" and len(datos) > MAX_BYTES_AUDIO:
+        raise Rechazo("Ese audio pesa demasiado (máximo 3 MB).")
+    if real[1] == "audio/wav":
+        _revisar_wav(datos)
+    if real[0] == "foto" and len(datos) > MAX_BYTES:
+        raise Rechazo("Esa foto es demasiado grande. Mándala más pequeña (máximo 5 MB).")
+    return real
+
+
+def _revisar_wav(datos):
+    """Un WAV de 90 s o menos, sin comprimir (PCM). Los otros formatos se acotan por peso; aquí la cabecera dice cuánto dura de verdad,
+    así que no se acepta una que mienta (ni tasas o profundidades que metan horas de audio en 3 MB)."""
+    import struct
+    pos, tasa, canales, bits, formato = 12, 0, 0, 0, 0
+    while pos + 8 <= len(datos):
+        trozo, largo = datos[pos:pos + 4], struct.unpack("<I", datos[pos + 4:pos + 8])[0]
+        if trozo == b"fmt " and largo >= 16 and pos + 24 <= len(datos):
+            formato, canales, tasa, _, _, bits = struct.unpack("<HHIIHH", datos[pos + 8:pos + 24])
+        elif trozo == b"data":
+            if formato != 1 or not canales or not tasa or bits not in (8, 16, 24, 32):
+                break
+            muestras = min(largo, len(datos) - pos - 8) // (canales * bits // 8)
+            if muestras / tasa > MAX_AUDIO_SEG + 1:
+                raise Rechazo(f"Ese audio es muy largo. Mándalo de máximo {MAX_AUDIO_SEG} segundos.")
+            return
+        pos += 8 + largo + (largo & 1)
+    raise Rechazo(FORMATO_NO_RECONOCIDO)
+
+
 def tipo_real(datos):
     """(`"foto"` o `"audio"`, mime) según los primeros bytes, o None si no es un formato que se acepte."""
     if datos[:3] == b"\xff\xd8\xff":

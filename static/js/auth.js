@@ -154,6 +154,8 @@ export function establecerSesionActiva(user, token) {
     if (user.role === 'admin') {
         cargarDatosAdmin();
     }
+
+    document.dispatchEvent(new CustomEvent('sesion-activa'));   // la burbuja del asistente se monta si el servidor dice que está disponible
 }
 
 
@@ -267,6 +269,8 @@ export function cerrarSesionLimpia(errorMsg = '') {
     const btnTabAdmin = document.getElementById('btn-tab-admin');
     if (btnTabAdmin) btnTabAdmin.classList.add('hidden');
     cambiarPestana('tab-dashboard');
+
+    document.dispatchEvent(new CustomEvent('sesion-cerrada'));   // la burbuja del asistente desaparece con la sesión
 
     // 4. Mostrar pantalla de login
     mostrarVistaLogin(errorMsg);

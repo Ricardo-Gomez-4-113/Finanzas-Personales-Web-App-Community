@@ -6,6 +6,7 @@ ni recibe tokens del asistente. Para confirmar una propuesta la app emite el tok
 Sin `ASISTENTE_WEB_URL` o sin `ASISTENTE_WEB_SECRETO` (otro valor que el secreto del bot de Telegram) el asistente web no existe y la burbuja no aparece.
 """
 
+import base64
 import json
 import os
 import re
@@ -15,11 +16,11 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 import master_db
-from asistente import pase
+from asistente import medios, pase
 from asistente.servicio import HEADER_SECRETO
 from asistente.tokens import AsistenteDesactivado, emitir_token
 from security import verify_token
@@ -153,8 +154,26 @@ def estado(usuario: Dict[str, Any] = Depends(verify_token)):
 def mensaje(cuerpo: MensajeRequest, usuario: Dict[str, Any] = Depends(verify_token)):
     user = _cuenta_con_asistente(usuario)
     datos = _reenviar(user, "/web/mensaje", {"texto": cuerpo.texto})
+    return _respuesta_de_mensaje(datos)
+
+
+def _respuesta_de_mensaje(datos: dict) -> dict:
     estado_ = datos.get("estado")
-    return {"estado": estado_ if estado_ in ("ok", "ritmo", "dia", "medios") else "error", "texto": _texto(datos.get("texto")), "propuestas": _propuestas(datos)}
+    return {"estado": estado_ if estado_ in ("ok", "ritmo", "dia", "medios", "archivo") else "error", "texto": _texto(datos.get("texto")), "propuestas": _propuestas(datos)}
+
+
+@router.post("/mensaje-archivo", summary="Un mensaje con una foto o una nota de voz")
+def mensaje_con_archivo(texto: str = Form("", max_length=2000), archivo: UploadFile = File(...), usuario: Dict[str, Any] = Depends(verify_token)):
+    """Multipart: `texto` (opcional, como pie) y `archivo`. La app revisa los bytes (formato y tamaño) antes de reenviarlos; el servicio los revisa otra vez."""
+    user = _cuenta_con_asistente(usuario)
+    datos = archivo.file.read(medios.MAX_BYTES + 1)
+    if not datos:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo está vacío.")
+    try:
+        medios.clasificar(datos)
+    except medios.Rechazo as rechazo:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(rechazo))
+    return _respuesta_de_mensaje(_reenviar(user, "/web/mensaje", {"texto": texto, "adjunto": {"datos_b64": base64.b64encode(datos).decode("ascii")}}))
 
 
 def _id_valido(id_: str) -> str:

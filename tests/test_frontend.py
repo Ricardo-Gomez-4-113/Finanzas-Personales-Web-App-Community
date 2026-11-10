@@ -63,12 +63,12 @@ uvicorn.run("main:app", host="127.0.0.1", port=int(sys.argv[1]))
 """
 
 
-def _arrancar_servidor():
+def _arrancar_servidor(extra_env=None):
     puerto = _puerto_libre()
     proc = subprocess.Popen(
         [sys.executable, "-c", LANZADOR, str(puerto)],
         cwd=TMP, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-        env={**os.environ, "FINANZAS_LOG_DIR": LOGS},
+        env={**os.environ, "FINANZAS_LOG_DIR": LOGS, **(extra_env or {})},
     )
     base = f"http://127.0.0.1:{puerto}"
     for _ in range(60):
@@ -2345,17 +2345,342 @@ def test_asistente_telegram_sin_bot_en_el_servidor_lo_dice(navegador, base):
         ctx.close()
 
 
+# --- La burbuja del asistente: un servicio falso en lugar del de verdad (sin Gemini) y un segundo servidor que lo conoce -----------------
+SECRETO_WEB = "w" * 40
+
+
+def _png_valido(lado=8):
+    """PNG real (rojo liso) sin librerías: el navegador tiene que poder decodificarlo para reducirlo."""
+    import struct
+    import zlib
+
+    def trozo(tipo, datos):
+        cuerpo = tipo + datos
+        return struct.pack(">I", len(datos)) + cuerpo + struct.pack(">I", zlib.crc32(cuerpo))
+    filas = b"".join(b"\x00" + b"\xc8\x32\x32" * lado for _ in range(lado))
+    return b"\x89PNG\r\n\x1a\n" + trozo(b"IHDR", struct.pack(">IIBBBBB", lado, lado, 8, 2, 0, 0, 0)) + trozo(b"IDAT", zlib.compress(filas)) + trozo(b"IEND", b"")
+
+
+class _ServicioFalso:
+    """Hace de `finanzas-asistente`: responde lo que la prueba espera y, al confirmar, usa el token de escritura que le da la app para
+    registrar de verdad el gasto (así la prueba cubre el camino completo: navegador, app, servicio y API)."""
+
+    def __init__(self, base_app, categoria_id):
+        import base64
+        import http.server
+        import threading
+        self.recibidos = []
+        self.categoria_id = categoria_id
+        self.base_app = base_app
+        servicio = self
+
+        class Manejador(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _enviar(self, codigo, datos):
+                cuerpo = json.dumps(datos).encode()
+                self.send_response(codigo)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(cuerpo)))
+                self.end_headers()
+                self.wfile.write(cuerpo)
+
+            def do_GET(self):
+                self._enviar(200, {"ok": True})
+
+            def do_POST(self):
+                try:
+                    self._post()
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    raise
+
+            def _post(self):
+                if self.headers.get("X-Asistente-Secreto") != SECRETO_WEB:
+                    return self._enviar(401, {})
+                cuerpo = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                servicio.recibidos.append((self.path, cuerpo))
+                texto = cuerpo.get("texto") or ""
+                if self.path == "/web/mensaje":
+                    adjunto = cuerpo.get("adjunto")
+                    if adjunto:
+                        from asistente import medios
+                        datos = base64.b64decode(adjunto["datos_b64"])
+                        tipo, mime = medios.clasificar(datos)
+                        return self._enviar(200, {"estado": "ok", "texto": f"Recibí tu {tipo} ({mime}, {len(datos)} bytes). {texto}", "propuestas": []})
+                    if "gasté" in texto:
+                        return self._enviar(200, {"estado": "ok", "texto": "Quedó pendiente de confirmación.", "propuestas": [{"id": "prop" + str(len(servicio.recibidos)).zfill(8), "resumen": "Gasto de $31.00 MXN en «Alimentos», el 2026-11-09: «Súper»"}]})
+                    if "xss" in texto:
+                        return self._enviar(200, {"estado": "ok", "texto": "<img src=x onerror=\"window.__xss=1\"><b>negrita</b>", "propuestas": [{"id": "propxss00001", "resumen": "<img src=x onerror=\"window.__xss=2\">"}]})
+                    if "lento" in texto:
+                        import time as _t
+                        _t.sleep(1.5)
+                    return self._enviar(200, {"estado": "ok", "texto": f"Dijiste: {texto}", "propuestas": []})
+                if self.path == "/web/confirmar":
+                    cuerpo_gasto = json.dumps({"fecha": escenario.HOY_ISO[:10], "monto": 31, "tipo": "gasto", "categoria_id": servicio.categoria_id, "descripcion": "Súper (asistente)"}).encode()
+                    r = urllib.request.Request(servicio.base_app + "/api/transacciones", data=cuerpo_gasto, method="POST",
+                                               headers={"Content-Type": "application/json", "Authorization": "Bearer " + cuerpo["token_escritura"]})
+                    try:
+                        urllib.request.urlopen(r, timeout=10)
+                        return self._enviar(200, {"resultado": "confirmada", "texto": "Listo: Gasto de $31.00 MXN."})
+                    except urllib.error.HTTPError as e:
+                        return self._enviar(200, {"resultado": "rechazada", "texto": f"No se pudo: {e.code}"})
+                if self.path == "/web/cancelar":
+                    return self._enviar(200, {"resultado": "cancelada", "texto": "Cancelada."})
+                return self._enviar(200, {"ok": True})
+
+        self.http = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        self.url = f"http://127.0.0.1:{self.http.server_address[1]}"
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+
+    def cerrar(self):
+        self.http.shutdown()
+        self.http.server_close()
+
+
+def _sesion_api(base, usuario, clave):
+    r = urllib.request.Request(base + "/auth/login", data=json.dumps({"username": usuario, "password": clave}).encode(), headers={"Content-Type": "application/json"}, method="POST")
+    return {"Authorization": "Bearer " + json.load(urllib.request.urlopen(r, timeout=10))["access_token"]}
+
+
+def _api_get(base, ruta, cabeceras):
+    return json.load(urllib.request.urlopen(urllib.request.Request(base + ruta, headers=cabeceras), timeout=10))
+
+
+def _montar_servicio_falso(base_normal, usuario):
+    """Servicio falso + segundo servidor (con el asistente web configurado) sobre las mismas bases de datos."""
+    cab = _sesion_api(base_normal, usuario, CLAVE)
+    categorias = [c for c in _api_get(base_normal, "/api/categorias", cab) if c["tipo"] == "gasto"]
+    falso = _ServicioFalso("", categorias[0]["id"])
+    proc, base = _arrancar_servidor({"ASISTENTE_WEB_URL": falso.url, "ASISTENTE_WEB_SECRETO": SECRETO_WEB})
+    falso.base_app = base
+    return falso, proc, base
+
+
+def test_la_burbuja_no_existe_sin_servicio_y_aparece_abajo_a_la_derecha_con_el(navegador, base, base_con_asistente):
+    usuario = "burbuja_forma"
+    master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    # Sin servicio del asistente: ni burbuja ni nada que sobre
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario)
+        page.wait_for_timeout(800)
+        assert page.locator("#asistente-web").count() == 0 and "con-asistente" not in (page.get_attribute("body", "class") or "")
+        assert not errores, errores
+    finally:
+        ctx.close()
+    for nombre in ("laptop", "movil"):
+        ctx, page, errores = _contexto(navegador, VIEWPORTS[nombre])
+        try:
+            ctx.grant_permissions(["microphone"], origin=base_con_asistente)
+            _entrar(page, base_con_asistente, usuario)
+            page.wait_for_selector("#asistente-burbuja", timeout=10000)
+            caja = page.locator("#asistente-burbuja").bounding_box()
+            vp = VIEWPORTS[nombre]
+            assert caja["width"] >= 44 and caja["height"] >= 44, caja
+            assert abs((vp["width"] - (caja["x"] + caja["width"])) - (16 if nombre == "laptop" else 12)) <= 2, ("a la derecha", caja)
+            assert abs((vp["height"] - (caja["y"] + caja["height"])) - (16 if nombre == "laptop" else 12)) <= 2, ("abajo", caja)
+            assert page.get_attribute("#asistente-burbuja", "aria-label") == "Abrir el asistente" and page.get_attribute("#asistente-burbuja", "aria-expanded") == "false"
+            page.click("#asistente-burbuja")
+            page.wait_for_selector("#asistente-panel:not(.hidden)")
+            panel = page.locator("#asistente-panel").bounding_box()
+            assert panel["x"] >= 0 and panel["y"] >= 0 and panel["x"] + panel["width"] <= vp["width"] + 1 and panel["y"] + panel["height"] <= vp["height"] + 1, ("dentro de la pantalla", panel)
+            if nombre == "movil":
+                assert panel["width"] >= vp["width"] - 1 and panel["height"] >= vp["height"] - 1, ("a pantalla completa en el móvil", panel)
+            assert page.evaluate("document.activeElement.id") == "asistente-texto", "al abrir, el foco va al campo"
+            assert "Hola, soy tu asistente" in page.inner_text("#asistente-mensajes")
+            ancho = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
+            assert ancho[0] <= ancho[1], f"scroll horizontal con el panel abierto en {nombre}"
+            for sel in ("#asistente-enviar", "#asistente-mic", ".asistente-cabecera button"):
+                for caja in [b.bounding_box() for b in page.locator(sel).all() if b.is_visible()]:
+                    assert caja["width"] >= 43.5 and caja["height"] >= 43.5, (sel, caja)
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#asistente-panel.hidden", state="attached")
+            assert page.evaluate("document.activeElement.id") == "asistente-burbuja", "al cerrar, el foco vuelve a la burbuja"
+            assert not errores, errores
+        finally:
+            ctx.close()
+
+
+def test_el_asistente_web_conversa_muestra_el_texto_sin_interpretarlo_y_confirma_una_sola_vez(navegador, base_con_asistente, servicio_falso):
+    usuario = "burbuja_chat"
+    fila = master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base_con_asistente, usuario)
+        page.click("#asistente-burbuja")
+        # Enter envía; Shift+Enter hace salto de línea
+        page.fill("#asistente-texto", "hola")
+        page.press("#asistente-texto", "Shift+Enter")
+        assert page.input_value("#asistente-texto") == "hola\n"
+        page.fill("#asistente-texto", "lento")
+        page.press("#asistente-texto", "Enter")
+        page.wait_for_selector(".asistente-escribiendo")
+        assert page.is_disabled("#asistente-enviar") and page.is_disabled("#asistente-texto"), "mientras contesta no se envía otra cosa"
+        page.wait_for_selector(".asistente-msg-asistente:has-text('Dijiste: lento')", timeout=10000)
+        assert page.locator(".asistente-escribiendo").count() == 0 and page.is_enabled("#asistente-enviar")
+        assert page.locator(".asistente-msg-persona").last.inner_text() == "lento"
+        # Lo que escribe el asistente es texto: ni etiquetas ni scripts
+        page.fill("#asistente-texto", "xss")
+        page.press("#asistente-texto", "Enter")
+        page.wait_for_selector(".asistente-propuesta")
+        assert page.evaluate("window.__xss") is None, "no se ejecutó nada"
+        assert page.locator("#asistente-mensajes img").count() == 0 and page.locator("#asistente-mensajes b").count() == 0
+        assert "<b>negrita</b>" in page.inner_text("#asistente-mensajes") and "<img" in page.inner_text(".asistente-propuesta-resumen")
+        page.click(".asistente-propuesta .asistente-btn:has-text('Cancelar')")
+        page.wait_for_selector(".asistente-propuesta-resultado:not(.hidden)")
+        # Una propuesta de verdad: nada se registra hasta confirmar, y confirmar dos veces seguidas registra una sola
+        cab = _sesion_api(base_con_asistente, usuario, CLAVE)
+        categorias = _api_get(base_con_asistente, "/api/categorias", cab)
+        servicio_falso.categoria_id = next(c["id"] for c in categorias if c["tipo"] == "gasto")   # el servicio falso registra en una categoría de ESTA cuenta
+        req = urllib.request.Request(base_con_asistente + "/api/transacciones", method="POST", headers={**cab, "Content-Type": "application/json"},
+                                     data=json.dumps({"fecha": "2026-10-01", "monto": 5000, "tipo": "ingreso", "categoria_id": next(c["id"] for c in categorias if c["tipo"] == "ingreso"), "descripcion": "Fondeo"}).encode())
+        urllib.request.urlopen(req, timeout=10)   # sin saldo no se puede registrar un gasto
+        antes = len([m for m in _api_get(base_con_asistente, "/api/transacciones", cab) if m["tipo"] == "gasto"])
+        page.fill("#asistente-texto", "gasté 31 en el súper")
+        page.press("#asistente-texto", "Enter")
+        page.wait_for_selector(".asistente-propuesta:has-text('Gasto de $31.00')")
+        assert len([m for m in _api_get(base_con_asistente, "/api/transacciones", cab) if m["tipo"] == "gasto"]) == antes, "proponer no escribe"
+        boton = page.locator(".asistente-propuesta:has-text('Gasto de $31.00') .asistente-btn-principal")
+        boton.dblclick()
+        page.wait_for_selector(".asistente-propuesta-resultado:has-text('Listo')", timeout=10000)
+        assert len([m for m in _api_get(base_con_asistente, "/api/transacciones", cab) if m["tipo"] == "gasto"]) == antes + 1, "una sola vez"
+        assert sum(1 for ruta, _ in servicio_falso.recibidos if ruta == "/web/confirmar") == 1
+        # La pantalla de movimientos se actualiza sin recargar la página
+        _ir(page, "tab-movimientos")
+        _esperar(page, "document.getElementById('tabla-movimientos').innerText.includes('Súper (asistente)')")
+        # Nueva conversación limpia la lista
+        page.click("#asistente-panel [aria-label='Nueva conversación']")
+        assert page.locator(".asistente-msg-persona").count() == 0 and "Hola, soy tu asistente" in page.inner_text("#asistente-mensajes")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_el_asistente_web_lee_fotos_y_notas_de_voz(navegador, base_con_asistente, servicio_falso, tmp_path_str):
+    usuario = "burbuja_medios"
+    master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        ctx.grant_permissions(["microphone"], origin=base_con_asistente)
+        _entrar(page, base_con_asistente, usuario)
+        page.click("#asistente-burbuja")
+        # Foto: se reduce a JPEG en el navegador y viaja como archivo
+        ruta = os.path.join(tmp_path_str, "ticket.png")
+        with open(ruta, "wb") as f:
+            f.write(_png_valido(40))
+        page.set_input_files("#asistente-archivo", ruta)
+        page.wait_for_selector("#asistente-adjunto:not(.hidden)")
+        assert page.inner_text(".asistente-adjunto-texto") == "Foto" and page.get_attribute(".asistente-adjunto-vista", "src").startswith("data:image/")
+        page.fill("#asistente-texto", "el súper")
+        page.press("#asistente-texto", "Enter")
+        page.wait_for_selector(".asistente-msg-asistente:has-text('Recibí tu foto (image/jpeg')", timeout=10000)
+        assert page.locator("#asistente-adjunto.hidden").count() == 1, "el adjunto se limpia al enviar"
+        assert page.locator(".asistente-msg-persona").last.inner_text() == "[Foto] el súper"
+        # Un archivo que no es imagen no se adjunta
+        feo = os.path.join(tmp_path_str, "nota.txt")
+        with open(feo, "wb") as f:
+            f.write(b"esto no es una imagen")
+        page.set_input_files("#asistente-archivo", feo)
+        page.wait_for_selector(".toast-error")
+        assert page.locator("#asistente-adjunto:not(.hidden)").count() == 0
+        # Nota de voz: se graba como WAV de 16 kHz en el navegador (micrófono falso de Chromium)
+        page.click("#asistente-mic")
+        page.wait_for_selector("#asistente-mic.grabando")
+        assert page.get_attribute("#asistente-mic", "aria-label") == "Detener la grabación"
+        page.wait_for_timeout(1500)
+        page.click("#asistente-mic")
+        page.wait_for_selector("#asistente-adjunto:not(.hidden)")
+        assert page.inner_text(".asistente-adjunto-texto").startswith("Nota de voz")
+        page.click("#asistente-adjunto button")   # quitar la nota
+        # Cerrar el panel (o Escape) corta la grabación: el micrófono no sigue abierto sin que se vea
+        page.click("#asistente-mic")
+        page.wait_for_selector("#asistente-mic.grabando")
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#asistente-panel.hidden", state="attached")
+        assert page.locator("#asistente-mic.grabando").count() == 0 and page.locator("#asistente-adjunto:not(.hidden)").count() == 0, "al cerrar no queda grabación ni adjunto"
+        page.click("#asistente-burbuja")
+        # Dos clics seguidos en el micrófono no abren dos grabaciones
+        page.dblclick("#asistente-mic")
+        page.wait_for_timeout(1200)
+        if page.locator("#asistente-mic.grabando").count():
+            page.click("#asistente-mic")
+        page.wait_for_selector("#asistente-adjunto:not(.hidden)")
+        assert page.inner_text(".asistente-adjunto-texto").startswith("Nota de voz")
+        page.click("#asistente-enviar")
+        page.wait_for_selector(".asistente-msg-asistente:has-text('Recibí tu audio (audio/wav')", timeout=10000)
+        enviado = [c for r, c in servicio_falso.recibidos if r == "/web/mensaje" and c.get("adjunto")][-1]
+        import base64
+        wav = base64.b64decode(enviado["adjunto"]["datos_b64"])
+        assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE" and 16000 * 2 * 1 <= len(wav) <= 16000 * 2 * 4, len(wav)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_si_el_administrador_apaga_el_asistente_la_burbuja_desaparece(navegador, base_con_asistente, servicio_falso):
+    usuario = "burbuja_apagada"
+    fila = master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base_con_asistente, usuario)
+        page.click("#asistente-burbuja")
+        master_db.set_asistente_activo(fila["id"], False)
+        page.fill("#asistente-texto", "hola")
+        page.press("#asistente-texto", "Enter")
+        page.wait_for_selector(".toast-error:has-text('desactivó el asistente')", timeout=10000)
+        _esperar(page, "document.getElementById('asistente-web') === null")
+        assert page.is_visible("#vista-app"), "la app sigue abierta: apagar el asistente no cierra la sesión"
+        page.reload()
+        page.wait_for_selector("#vista-app:not(.hidden)")
+        page.wait_for_timeout(800)
+        assert page.locator("#asistente-web").count() == 0, "con el asistente apagado la burbuja no vuelve a salir"
+        master_db.set_asistente_activo(fila["id"], True)
+        page.reload()
+        page.wait_for_selector("#asistente-burbuja", timeout=10000)
+        # Al cerrar la sesión la burbuja se va
+        page.evaluate("document.querySelector('[data-on-click*=\"logoutUsuario\"]')?.click()")
+        page.wait_for_selector("#modal-confirmar:not(.hidden)")
+        page.click("#btn-confirmar-aceptar")   # sin esperar a que el modal se oculte: según la edición, al salir se pasa a otra vista
+        _esperar(page, "document.getElementById('asistente-web') === null")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_los_avisos_no_se_tapan_con_la_burbuja(navegador, base_con_asistente, servicio_falso):
+    usuario = "burbuja_avisos"
+    master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base_con_asistente, usuario)
+        page.wait_for_selector("#asistente-burbuja")
+        page.evaluate("document.querySelector('#toast-root').innerHTML = '<div class=\"toast toast-ok\" id=\"t-prueba\">Aviso de prueba</div>'")
+        aviso = page.locator("#t-prueba").bounding_box()
+        burbuja = page.locator("#asistente-burbuja").bounding_box()
+        assert aviso["y"] + aviso["height"] <= burbuja["y"] + 1, ("el aviso queda por encima de la burbuja", aviso, burbuja)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
     from ejecutor import ejecutar, verificar_cobertura
     escenario.activar_modo_prueba()  # el servidor hereda el reloj fijo del escenario
     proc, base = _arrancar_servidor()
+    proc2 = falso = None
     try:
         # Tras el arranque: el servidor ya creó la base maestra en TMP/data.
         master_db.create_user_entry(USUARIO, security.hash_password(CLAVE), email=f"{USUARIO}@test.local")
         _sembrar_escenario(base)
+        falso, proc2, base_con_asistente = _montar_servicio_falso(base, USUARIO)
+        carpeta_archivos = tempfile.mkdtemp(prefix="finanzas_archivos_")
         with sync_playwright() as p:
-            navegador = p.chromium.launch()
+            # Micrófono falso: Chromium «graba» un tono sin pedir permiso ni necesitar un dispositivo (la prueba de la nota de voz)
+            navegador = p.chromium.launch(args=["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"])
             registradas = [
                 (test_login_incorrecto_muestra_error, lambda: test_login_incorrecto_muestra_error(navegador, base)),
                 (test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena, lambda: test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base)),
@@ -2385,6 +2710,11 @@ if __name__ == "__main__":
                 (test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo, lambda: test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(navegador, base)),
                 (test_admin_busca_filtra_y_pide_el_nombre_para_eliminar, lambda: test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base)),
                 (test_admin_apaga_y_enciende_el_asistente_de_una_cuenta_desde_el_menu, lambda: test_admin_apaga_y_enciende_el_asistente_de_una_cuenta_desde_el_menu(navegador, base)),
+                (test_la_burbuja_no_existe_sin_servicio_y_aparece_abajo_a_la_derecha_con_el, lambda: test_la_burbuja_no_existe_sin_servicio_y_aparece_abajo_a_la_derecha_con_el(navegador, base, base_con_asistente)),
+                (test_el_asistente_web_conversa_muestra_el_texto_sin_interpretarlo_y_confirma_una_sola_vez, lambda: test_el_asistente_web_conversa_muestra_el_texto_sin_interpretarlo_y_confirma_una_sola_vez(navegador, base_con_asistente, falso)),
+                (test_el_asistente_web_lee_fotos_y_notas_de_voz, lambda: test_el_asistente_web_lee_fotos_y_notas_de_voz(navegador, base_con_asistente, falso, carpeta_archivos)),
+                (test_si_el_administrador_apaga_el_asistente_la_burbuja_desaparece, lambda: test_si_el_administrador_apaga_el_asistente_la_burbuja_desaparece(navegador, base_con_asistente, falso)),
+                (test_los_avisos_no_se_tapan_con_la_burbuja, lambda: test_los_avisos_no_se_tapan_con_la_burbuja(navegador, base_con_asistente, falso)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),
@@ -2447,6 +2777,10 @@ if __name__ == "__main__":
             navegador.close()
     finally:
         proc.terminate()
+        if proc2:
+            proc2.terminate()
+        if falso:
+            falso.cerrar()
         shutil.rmtree(TMP, ignore_errors=True)
         shutil.rmtree(LOGS, ignore_errors=True)
     sys.exit(codigo)

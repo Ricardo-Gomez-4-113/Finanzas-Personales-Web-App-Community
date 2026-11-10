@@ -176,7 +176,7 @@ def _aplicar_cabeceras(response, path: str, es_https: bool):
     if es_https:
         # HSTS solo tiene sentido sobre HTTPS: en HTTP local fijaría la política en el navegador sin efecto
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=(), payment=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' https://cdn.jsdelivr.net; "

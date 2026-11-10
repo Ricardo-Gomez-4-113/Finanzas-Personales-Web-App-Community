@@ -11,6 +11,8 @@ ese momento y lo entrega junto con la orden de confirmar; este servicio no puede
 Rutas (POST, JSON): /web/mensaje, /web/confirmar, /web/cancelar, /web/olvidar. GET /health.
 """
 
+import base64
+import binascii
 import hmac
 import json
 import os
@@ -20,11 +22,13 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from asistente import medios
 from asistente.nucleo import MAX_ESTADO_EN_MEMORIA, OK, TEXTO_DE_LIMITE, Nucleo
 from asistente.servicio import AsistenteDesactivado, HEADER_SECRETO, SinVinculo
 
 PUERTO = 8100
 MAX_CUERPO = 16 * 1024          # un mensaje de 2000 caracteres ocupa ~8 KB como mucho
+MAX_CUERPO_ARCHIVO = 8 * 1024 * 1024   # solo /web/mensaje con un archivo: 5 MB en base64 ≈ 6.7 MB
 PLAZO_DE_LECTURA_SEG = 10       # tiempo total para recibir cabeceras y cuerpo
 MAX_CONEXIONES = 64             # hilos vivos; más allá se cierra la conexión sin atenderla
 MAX_TEXTO = 2000
@@ -112,7 +116,7 @@ class Servidor:
         with self._candado_de(user_id):   # los mensajes de una misma cuenta van en orden aunque haya dos pestañas
             try:
                 if ruta == "/web/mensaje":
-                    return self._mensaje(clave, cuenta, cuerpo.get("texto"))
+                    return self._mensaje(clave, cuenta, cuerpo.get("texto"), cuerpo.get("adjunto"))
                 if ruta == "/web/confirmar":
                     return self._confirmar(clave, cuenta, cuerpo.get("id"), cuerpo.get("token_escritura"))
                 if ruta == "/web/cancelar":
@@ -131,10 +135,20 @@ class Servidor:
                 self._candados_cuenta = {u: k for u, k in self._candados_cuenta.items() if k.locked()}
             return self._candados_cuenta.setdefault(user_id, threading.Lock())
 
-    def _mensaje(self, clave, cuenta, texto):
-        if not isinstance(texto, str) or not texto.strip() or len(texto) > MAX_TEXTO:
+    def _mensaje(self, clave, cuenta, texto, adjunto=None):
+        archivos, tipo = None, ""
+        if adjunto is not None:
+            try:
+                datos = base64.b64decode(adjunto.get("datos_b64") if isinstance(adjunto, dict) else None, validate=True)
+                tipo, mime = medios.clasificar(datos)   # el servicio revisa los bytes por su cuenta: es quien los pasa al modelo
+            except (binascii.Error, TypeError, ValueError):
+                return 400, {"detail": "Archivo inválido."}
+            except medios.Rechazo as rechazo:
+                return 200, {"estado": "archivo", "texto": str(rechazo), "propuestas": []}
+            archivos = [{"mime": mime, "datos": datos}]
+        if not isinstance(texto, str) or len(texto) > MAX_TEXTO or (not texto.strip() and not archivos):
             return 400, {"detail": "El mensaje debe tener entre 1 y 2000 caracteres."}
-        resultado = self.nucleo.turno(clave, cuenta, texto)
+        resultado = self.nucleo.turno(clave, cuenta, texto, archivos, tipo)
         if resultado.estado != OK:
             return 200, {"estado": resultado.estado, "texto": TEXTO_DE_LIMITE[resultado.estado], "propuestas": []}
         return 200, {"estado": OK, "texto": resultado.texto, "propuestas": [{"id": i, "resumen": r} for i, r in resultado.propuestas]}
@@ -176,7 +190,7 @@ def _manejador(servidor, libres):
 
         def _leer(self, largo):
             """El cuerpo, con un plazo total: quien lo manda a gotas no retiene el hilo."""
-            limite, partes, faltan = time.monotonic() + PLAZO_DE_LECTURA_SEG, [], largo
+            limite, partes, faltan = time.monotonic() + PLAZO_DE_LECTURA_SEG * (1 + largo // MAX_CUERPO // 64), [], largo   # un archivo grande tiene más plazo
             while faltan > 0:
                 if time.monotonic() > limite:
                     raise TimeoutError()
@@ -199,7 +213,8 @@ def _manejador(servidor, libres):
                     largo = int(self.headers.get("Content-Length") or 0)
                 except ValueError:
                     return self._responder(400, {"detail": "Petición inválida."})
-                if largo < 0 or largo > MAX_CUERPO:
+                con_archivo = metodo == "POST" and self.path.split("?")[0] == "/web/mensaje"   # ya autenticado: solo esta ruta admite un cuerpo grande
+                if largo < 0 or largo > (MAX_CUERPO_ARCHIVO if con_archivo else MAX_CUERPO):
                     return self._responder(413, {"detail": "Cuerpo demasiado grande."})
                 try:
                     crudo = self._leer(largo) if largo else b""

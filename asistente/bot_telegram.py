@@ -298,13 +298,9 @@ class Bot:
             datos = self.tg.descargar(medio["file_id"], medios.MAX_BYTES_AUDIO if medio["tipo"] == "audio" else medios.MAX_BYTES)
         except Exception:
             raise medios.Rechazo("No pude descargar ese archivo. Intenta de nuevo.") from None
-        real = medios.tipo_real(datos) if isinstance(datos, (bytes, bytearray)) else None
-        if real is None:
-            raise medios.Rechazo("No reconozco ese formato. Acepto fotos (JPG, PNG, WEBP) y audios (OGG, MP3, WAV, FLAC).")
+        real = medios.clasificar(datos)
         if real[0] != medio["tipo"]:   # lo que Telegram dice que es y lo que son los bytes deben coincidir: así los topes de cada tipo no se esquivan
-            raise medios.Rechazo("No reconozco ese formato. Acepto fotos (JPG, PNG, WEBP) y audios (OGG, MP3, WAV, FLAC).")
-        if real[0] == "audio" and len(datos) > medios.MAX_BYTES_AUDIO:
-            raise medios.Rechazo("Ese audio pesa demasiado (máximo 3 MB).")
+            raise medios.Rechazo(medios.FORMATO_NO_RECONOCIDO)
         return {"mime": real[1], "datos": datos}
 
 

@@ -66,6 +66,8 @@ services:
       context: .
       dockerfile: Dockerfile.bot
     container_name: finanzas-asistente
+    mem_limit: 768m   # 16 peticiones a la vez con archivos de hasta 8 MB: un tope duro para que un exceso no afecte al resto del servidor
+    pids_limit: 128
     networks:
       - asistente_web   # solo ve a la app; no alcanza al bot
     command: ["python3", "-m", "asistente.servidor_web"]

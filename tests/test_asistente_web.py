@@ -428,6 +428,90 @@ def test_el_servicio_del_asistente_web_valida_secreto_ruta_y_cuerpo_y_no_filtra_
     assert srv.manejar("POST", "/web/olvidar", ok, {"user_id": uid})[0] == 200
 
 
+def _wav(segundos=1, tasa=16000):
+    import struct
+    n = segundos * tasa
+    return b"RIFF" + struct.pack("<I", 36 + n * 2) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, tasa, tasa * 2, 2, 16) + b"data" + struct.pack("<I", n * 2) + b"\x00\x00" * n
+
+
+JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+
+
+def test_las_fotos_y_notas_de_voz_web_se_revisan_en_la_app_y_en_el_servicio_y_llegan_al_modelo(client):
+    uid, h = _cuenta(client, "web_medios")
+    srv = _montar(client, {uid: [Respuesta(texto="Veo tu archivo.")] * 20})
+    url = "/api/asistente/web/mensaje-archivo"
+
+    def subir(nombre, datos, texto="", tipo="application/octet-stream", cab=h):
+        return client.post(url, data={"texto": texto}, files={"archivo": (nombre, datos, tipo)}, headers=cab)
+
+    r = subir("ticket.jpg", JPG, "el súper")
+    assert r.status_code == 200 and r.json()["estado"] == "ok" and r.json()["texto"] == "Veo tu archivo.", r.text
+    ultimo = [m for m in srv.modelos[uid].llamadas[-1]["mensajes"] if m["rol"] == "usuario"][-1]
+    assert ultimo["adjuntos"] == [{"mime": "image/jpeg", "datos": JPG}] and ultimo["texto"] == "[foto] el súper", ultimo
+    r = subir("nota.wav", _wav())   # una nota sin texto
+    assert r.status_code == 200 and [m for m in srv.modelos[uid].llamadas[-1]["mensajes"] if m["rol"] == "usuario"][-1]["texto"] == "[nota de voz]"
+    # El tipo lo dicen los bytes, no el nombre ni el Content-Type
+    assert subir("foto.jpg", b"%PDF-1.7 " + b"\x00" * 20, tipo="image/jpeg").status_code == 422
+    assert "No reconozco" in subir("foto.jpg", b"%PDF-1.7 " + b"\x00" * 20).json()["detail"]
+    assert subir("a.jpg", b"").status_code == 400
+    assert subir("a.wav", _wav(100)).status_code == 422 and "pesa demasiado" in subir("a.wav", _wav(100)).json()["detail"], "un audio de 3 MB o más no pasa"
+    assert subir("a.jpg", JPG + b"\x00" * (5 * 1024 * 1024 + 10)).status_code in (413, 422), "una foto de más de 5 MB no pasa"
+    assert subir("a.jpg", JPG, "x" * 2001).status_code == 422
+    assert subir("a.jpg", JPG, cab={}).status_code == 401
+    assert subir("a.jpg", JPG, cab={"Authorization": f"Bearer {emitir_token(uid)}"}).status_code == 403, "el asistente no se llama a sí mismo"
+    # WAV: la cabecera dice cuánto dura de verdad. 8 kHz y 8 bits meten 6 minutos en 3 MB: no pasa; tampoco un formato comprimido
+    import struct
+
+    def wav(tasa, bits, canales, segundos, formato=1):
+        n = int(tasa * segundos) * canales * bits // 8
+        return b"RIFF" + struct.pack("<I", 36 + n) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, formato, canales, tasa, tasa * canales * bits // 8, canales * bits // 8, bits) + b"data" + struct.pack("<I", n) + b"\x00" * n
+    assert subir("a.wav", wav(16000, 16, 1, 30)).status_code == 200 and subir("a.wav", wav(44100, 16, 2, 10)).status_code == 200
+    largo = subir("a.wav", wav(8000, 8, 1, 360))
+    assert largo.status_code == 422 and "muy largo" in largo.json()["detail"], largo.text
+    assert subir("a.wav", wav(16000, 16, 1, 5, formato=85)).status_code == 422, "no se aceptan formatos comprimidos (el peso no dice la duración)"
+    sin_data = b"RIFF" + struct.pack("<I", 4) + b"WAVE" + b"\x00" * 40
+    assert subir("a.wav", sin_data).status_code == 422
+    # Sin una sesión con firma válida no se lee una subida grande: FastAPI parsearía el multipart antes de autenticar
+    grande = b"--b\r\nContent-Disposition: form-data; name=\"archivo\"; filename=\"a.jpg\"\r\n\r\n" + JPG + b"\x00" * (2 * 1024 * 1024) + b"\r\n--b--\r\n"
+    tipo = {"Content-Type": "multipart/form-data; boundary=b"}
+    for cab in ({}, {"Authorization": "Bearer basura"}, {"Authorization": "Bearer " + "a.b.c"}, {"Authorization": "Basic abc"}):
+        assert client.post(url, content=grande, headers={**cab, **tipo}).status_code == 413, cab
+    assert client.post(url, content=grande, headers={**h, **tipo}).status_code == 200, "con sesión válida sí pasa"
+    # La ruta grande no abre la puerta a cuerpos grandes en las demás
+    assert client.post("/api/asistente/web/mensaje", content=b"{" + b" " * (300 * 1024) + b"}", headers={**h, "Content-Type": "application/json"}).status_code == 413
+    # El servicio no se fía de la app: revisa los bytes por su cuenta y no se queda con un archivo inválido
+    import base64
+    ok = {"x-asistente-secreto": SECRETO}
+    cuerpo = {"user_id": uid, "username": "u", "pase": pase.crear(uid), "texto": ""}
+    pdf = {"datos_b64": base64.b64encode(b"%PDF-1.7 " + b"\x00" * 20).decode()}
+    assert srv.manejar("POST", "/web/mensaje", ok, {**cuerpo, "adjunto": pdf})[1]["estado"] == "archivo"
+    for malo in ({"datos_b64": "***no es base64***"}, {"datos_b64": 5}, "texto", {"otra": 1}, {"datos_b64": None}):
+        assert srv.manejar("POST", "/web/mensaje", ok, {**cuerpo, "adjunto": malo})[0] == 400, malo
+    assert srv.manejar("POST", "/web/mensaje", ok, {**cuerpo, "texto": ""})[0] == 400, "sin archivo el texto no puede ir vacío"
+    # Tope diario de fotos y audios, aparte del de mensajes
+    from asistente.cupo import Cupo
+    otro, ho = _cuenta(client, "web_medios_tope")
+    _montar(client, {otro: [Respuesta(texto="Listo.")] * 20})
+    anterior = os.environ.get("ASISTENTE_MAX_MEDIOS_DIA")
+    os.environ["ASISTENTE_MAX_MEDIOS_DIA"] = "2"
+    try:
+        assert [subir("a.jpg", JPG, cab=ho).json()["estado"] for _ in range(3)] == ["ok", "ok", "medios"]
+        assert client.post("/api/asistente/web/mensaje", json={"texto": "pero el texto sigue"}, headers=ho).json()["estado"] == "ok"
+        assert Cupo().uso(otro)["medios"] == 2
+    finally:
+        os.environ.pop("ASISTENTE_MAX_MEDIOS_DIA", None) if anterior is None else os.environ.__setitem__("ASISTENTE_MAX_MEDIOS_DIA", anterior)
+    # Con el asistente apagado no se sube nada
+    master_db.set_asistente_activo(otro, False)
+    assert subir("a.jpg", JPG, cab=ho).status_code == 403
+    master_db.set_asistente_activo(otro, True)
+
+
+def test_la_politica_de_permisos_deja_el_microfono_solo_a_la_propia_app(client):
+    cabecera = client.get("/health").headers["permissions-policy"]
+    assert "microphone=(self)" in cabecera and "camera=()" in cabecera and "geolocation=()" in cabecera, cabecera
+
+
 def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(client):
     import socket
     from asistente import servidor_web
@@ -454,7 +538,12 @@ def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(c
         cuerpo = json.dumps({"user_id": uid, "username": "u", "pase": pase.crear(uid), "texto": "hola"}).encode()
         codigo, datos = pedir("/web/mensaje", cuerpo, cab)
         assert codigo == 200 and datos["estado"] == "ok" and datos["texto"] == "Dime más.", (codigo, datos)
-        assert pedir("/web/mensaje", b"x" * 20_000, cab)[0] == 413
+        assert pedir("/web/confirmar", b"x" * 20_000, cab)[0] == 413, "las rutas sin archivo admiten 16 KB"
+        grande = socket.create_connection(("127.0.0.1", http.server_address[1]), timeout=10)   # solo se mandan las cabeceras: el servidor rechaza sin leer el cuerpo
+        grande.sendall(b"POST /web/mensaje HTTP/1.0\r\nX-Asistente-Secreto: " + SECRETO.encode() + b"\r\nContent-Length: " + str(servidor_web.MAX_CUERPO_ARCHIVO + 10).encode() + b"\r\n\r\n")
+        assert b" 413 " in grande.recv(4096).split(b"\r\n")[0], "y /web/mensaje, 8 MB como máximo"
+        grande.close()
+        assert pedir("/web/mensaje", b"x" * 20_000, cab)[0] == 400, "con un archivo (base64) 20 KB sí se leen, y aquí es un JSON inválido"
         assert pedir("/web/mensaje", b"x" * 20_000, {"Content-Type": "application/json"})[0] == 401, "sin el secreto no se llega ni a mirar el tamaño"
         assert pedir("/web/mensaje", b"{no es json", cab)[0] == 400
         assert pedir("/web/mensaje", cuerpo, {"Content-Type": "application/json"})[0] == 401
@@ -525,6 +614,8 @@ if __name__ == "__main__":
             test_la_respuesta_del_servicio_no_es_de_fiar_y_se_acota_antes_de_llegar_al_navegador,
             test_una_redireccion_del_servicio_no_se_sigue,
             test_el_servicio_del_asistente_web_valida_secreto_ruta_y_cuerpo_y_no_filtra_errores,
+            test_las_fotos_y_notas_de_voz_web_se_revisan_en_la_app_y_en_el_servicio_y_llegan_al_modelo,
+            test_la_politica_de_permisos_deja_el_microfono_solo_a_la_propia_app,
             test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope,
             test_las_imagenes_y_el_compose_aislan_el_servicio_web_igual_que_el_bot,
         )]
