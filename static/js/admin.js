@@ -105,6 +105,28 @@ export async function cambiarEstadoUsuario(userId, nuevoEstado) {
 
 
 /**
+ * Enciende o apaga el asistente (Telegram y burbuja web) de una cuenta.
+ */
+export async function cambiarAsistenteUsuario(userId, activo) {
+    try {
+        const res = await apiFetch(`/admin/users/${userId}/asistente`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activo })
+        });
+        if (res.ok) {
+            toast(activo ? 'Asistente activado para esa cuenta.' : 'Asistente desactivado para esa cuenta.', 'ok');
+            cargarDatosAdmin();
+        } else {
+            const err = await res.json();
+            toast(err.detail || 'No se pudo cambiar el asistente de la cuenta.', 'error');
+        }
+    } catch (e) {
+        toast('Error de red al cambiar el asistente.', 'error');
+    }
+}
+
+/**
  * Elimina un usuario tenant y borra su archivo de base de datos físico.
  */
 export function abrirModalCrearUsuario() {
@@ -508,6 +530,7 @@ function filaUsuarioAdmin(u) {
     const estadoHtml = u.is_active
         ? '<span class="admin-estado admin-estado-activo"><span class="admin-punto" aria-hidden="true"></span>Activo</span>'
         : '<span class="admin-estado admin-estado-suspendido"><span class="admin-punto" aria-hidden="true"></span>Suspendido</span>';
+    const sinAsistente = u.asistente_activo === 0 ? '<span class="admin-sin-asistente" title="El administrador desactivó el asistente de esta cuenta">Sin asistente</span>' : '';
     const rol = `<span class="badge-role ${u.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}">${escapeHTML(u.role)}</span>`;
     const accesoTxt = u.last_login ? formatoTiempoRelativo(u.last_login) : 'Nunca';
 
@@ -516,6 +539,10 @@ function filaUsuarioAdmin(u) {
     const itemsMenu = [];
     if (!esMismoAdmin && !esPrincipal && !(esOtroAdmin && u.is_active)) {
         itemsMenu.push(`<button type="button" class="admin-menu-item" role="menuitem" data-on-click='${accionDelegada(["cambiarEstadoUsuario", u.id, !u.is_active])}'>${u.is_active ? 'Suspender acceso' : 'Activar acceso'}</button>`);
+    }
+    if (!esMismoAdmin) {
+        const conAsistente = u.asistente_activo !== 0;
+        itemsMenu.push(`<button type="button" class="admin-menu-item" role="menuitem" data-on-click='${accionDelegada(["cambiarAsistenteUsuario", u.id, !conAsistente])}'>${conAsistente ? 'Desactivar asistente' : 'Activar asistente'}</button>`);
     }
     if (esPrincipal && !esMismoAdmin) {
         itemsMenu.push(`<p class="admin-menu-nota">La cuenta principal no se puede eliminar</p>`);
@@ -540,7 +567,7 @@ function filaUsuarioAdmin(u) {
                 ${correo}
             </td>
             <td data-label="Rol">${rol}</td>
-            <td data-label="Estado">${estadoHtml}</td>
+            <td data-label="Estado">${estadoHtml}${sinAsistente}</td>
             <td class="admin-celda-acceso" data-label="Último acceso">
                 <span class="admin-acceso-txt">${escapeHTML(accesoTxt)}</span>
                 ${trazaAcceso(u.last_login)}
@@ -709,6 +736,7 @@ Object.assign(window, {
     abrirModalEditarUsuario,
     abrirModalEditarUsuarioPorId,
     cambiarEstadoUsuario,
+    cambiarAsistenteUsuario,
     cerrarModalCrearUsuario,
     cerrarModalEditarUsuario,
     eliminarUsuarioTenant,

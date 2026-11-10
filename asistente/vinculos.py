@@ -97,7 +97,7 @@ def usuario_de_chat(chat_id, ahora=None):
     ahora = ahora or _ahora()
     conn = master_db.get_master_conn()
     try:
-        fila = conn.execute("SELECT u.id, u.username, u.password_hash, u.is_active, u.subscription_status, v.huella_clave FROM telegram_vinculos v "
+        fila = conn.execute("SELECT u.id, u.username, u.password_hash, u.is_active, u.subscription_status, u.asistente_activo, v.huella_clave FROM telegram_vinculos v "
                             "JOIN users u ON u.id = v.user_id WHERE v.chat_id = ?", (int(chat_id),)).fetchone()
         if not fila:
             return None
@@ -108,7 +108,7 @@ def usuario_de_chat(chat_id, ahora=None):
             return None
         conn.execute("UPDATE telegram_vinculos SET ultimo_uso = ? WHERE chat_id = ?", (_texto(ahora), int(chat_id)))
         conn.commit()
-        return {"id": fila["id"], "username": fila["username"]}
+        return {"id": fila["id"], "username": fila["username"], "asistente": bool(fila["asistente_activo"])}
     finally:
         conn.close()
 

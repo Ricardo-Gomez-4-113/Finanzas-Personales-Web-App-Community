@@ -19,6 +19,13 @@ MAX_ESTADO_EN_MEMORIA = 2000     # entradas por diccionario antes de purgar las 
 
 RITMO, DIA, MEDIOS, OK = "ritmo", "dia", "medios", "ok"
 
+# Lo que se le dice a la persona cuando un turno no se atiende (cada canal lo muestra a su manera)
+TEXTO_DE_LIMITE = {
+    RITMO: "Has escrito muchos mensajes seguidos. Intenta de nuevo en un rato.",
+    MEDIOS: "Llegaste al límite de fotos y audios de hoy. Puedes seguir escribiendo; mañana vuelves a poder mandarlos.",
+    DIA: "Llegaste al límite de mensajes de hoy con el asistente. Mañana puedes seguir; mientras tanto, la app sigue disponible.",
+}
+
 
 @dataclass
 class Resultado:

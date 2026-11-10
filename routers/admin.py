@@ -118,6 +118,26 @@ def admin_cambiar_estado(user_id: int, req: UserStatusRequest, admin: Dict[str, 
     estado_str = "activado" if req.is_active else "suspendido"
     return {"mensaje": f"El usuario '{user['username']}' ha sido {estado_str}.", "is_active": req.is_active}
 
+class AsistenteRequest(BaseModel):
+    activo: bool
+
+
+@router.patch("/admin/users/{user_id}/asistente", summary="Encender o apagar el asistente de una cuenta")
+def admin_cambiar_asistente(user_id: int, req: AsistenteRequest, admin: Dict[str, Any] = Depends(verify_admin)):
+    """
+    Apagar el asistente corta Telegram y la burbuja web de esa cuenta: la app deja de emitirle tokens y de reenviarle mensajes, y los que ya
+    tenía vencen en un minuto como máximo. El vínculo de Telegram se conserva: al volver a encenderlo funciona sin escanear de nuevo.
+    """
+    user = master_db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+    master_db.set_asistente_activo(user_id, req.activo)
+    if not req.activo:
+        from routers.asistente_web import olvidar_cuenta   # las propuestas pendientes de la web no sobreviven al apagado
+        olvidar_cuenta(user_id)
+    return {"mensaje": f"Asistente {'activado' if req.activo else 'desactivado'} para '{user['username']}'.", "asistente_activo": req.activo}
+
+
 @router.patch("/admin/users/{user_id}", summary="Editar usuario (nombre, contraseña y rol)")
 def admin_editar_usuario(user_id: int, req: UserUpdateRequest, admin: Dict[str, Any] = Depends(verify_admin)):
     """

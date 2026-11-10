@@ -1727,6 +1727,7 @@
 
 :root .admin-estado-suspendido { color: var(--danger-text); }
 :root .admin-estado-suspendido .admin-punto { background: var(--danger-color); }
+:root .admin-sin-asistente { display: block; margin-top: 2px; font-size: 0.75rem; color: var(--text-muted); }
 
 :root .admin-celda-acceso { min-width: 170px; }
 :root .admin-acceso-txt { display: block; font-size: var(--fs-sm); color: var(--text-color); }

@@ -13,6 +13,13 @@ services:
       - "127.0.0.1:8002:8001"
     env_file:
       - .env
+    networks:
+      - default
+      - asistente_telegram
+      - asistente_web
+    environment:
+      # Dónde está el servicio del asistente web (perfil `asistente`). Sin él arriba la burbuja simplemente no aparece.
+      ASISTENTE_WEB_URL: http://finanzas-asistente:8100
     volumes:
       # Solo los datos persisten fuera del contenedor (el código va dentro de la imagen)
       - ./data:/app/data
@@ -29,6 +36,8 @@ services:
       dockerfile: Dockerfile.bot
     container_name: finanzas-bot
     restart: unless-stopped
+    networks:
+      - asistente_telegram   # solo ve a la app; no alcanza al servicio del asistente web
     depends_on:
       - finanzas-community
     environment:
@@ -47,3 +56,44 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  # Asistente de la burbuja web: la misma imagen y el mismo código que el bot, otro canal y otro servicio (se levanta, se reinicia y se apaga por
+  # separado). Solo lo llama la app por la red interna (no publica puertos). Mismo aislamiento que el bot: sin .env completo, sin base de datos,
+  # sin la clave JWT real, sin root. Necesita en .env: GEMINI_API_KEY y ASISTENTE_SECRETO_INTERNO.
+  finanzas-asistente:
+    profiles: ["asistente"]
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: finanzas-asistente
+    networks:
+      - asistente_web   # solo ve a la app; no alcanza al bot
+    command: ["python3", "-m", "asistente.servidor_web"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      - finanzas-community
+    environment:
+      APP_URL: http://finanzas-community:8001
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_MODEL_RESPALDO: ${GEMINI_MODEL_RESPALDO:-}
+      ASISTENTE_WEB_SECRETO: ${ASISTENTE_WEB_SECRETO}   # otro valor que el del bot: este servicio no tiene el secreto de Telegram
+      JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+# Redes separadas: el bot de Telegram y el servicio del asistente web solo comparten con la app, nunca entre ellos
+networks:
+  asistente_telegram:
+  asistente_web:

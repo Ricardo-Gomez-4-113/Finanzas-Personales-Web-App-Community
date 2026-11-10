@@ -297,6 +297,34 @@ def test_ninguna_ruta_con_sesion_fuera_de_la_lista_acepta_el_token_del_asistente
     assert client.options("/api/resumen", headers=h).status_code in (403, 405)
 
 
+def test_el_asistente_hereda_el_rol_y_nunca_puede_mas_que_la_persona_de_atras(client):
+    """Poder del asistente = lo que permite el rol ∩ lo que permite su lista. Se prueba con cada rol que existe."""
+    for rol in ("user", "admin"):
+        fila = master_db.create_user_entry(f"asist_rol_{rol}", security.hash_password(PASS), email=f"asist_rol_{rol}@test.local")
+        if rol == "admin":
+            master_db.update_user(fila["id"], role="admin")
+        uid = fila["id"]
+        sesion = {"Authorization": f"Bearer {client.post('/auth/login', json={'username': f'asist_rol_{rol}', 'password': PASS}).json()['access_token']}"}
+        lectura, escritura = _cabecera_asistente(uid), _cabecera_asistente(uid, escritura=True)
+        # Paridad: con el token del asistente cada ruta permitida responde lo mismo que con la sesión de esa cuenta
+        for metodo, ruta in sorted(RUTAS_LECTURA):
+            assert client.request(metodo, ruta, headers=lectura).status_code == client.request(metodo, ruta, headers=sesion).status_code, (rol, ruta)
+        casos = [("POST", "/api/transacciones", {}), ("POST", "/api/apartados/999999/movimiento", {"monto": 1, "accion": "depositar"}),
+                 ("POST", "/api/recurrentes/999999/saltar", None)]
+        for metodo, ruta, cuerpo in casos:
+            llamada = (metodo, re.sub(r"\{[^}]+\}", "999999", ruta))
+            assert client.request(*llamada, json=cuerpo, headers=_cabecera_asistente(uid, escritura=True)).status_code == client.request(*llamada, json=cuerpo, headers=sesion).status_code, (rol, ruta)
+        # Ni siquiera la cuenta de un administrador le da al asistente rutas de administración, respaldo o perfil
+        assert client.get("/admin/users", headers=sesion).status_code == (200 if rol == "admin" else 403)
+        assert client.get("/admin/users", headers=lectura).status_code == 403 and client.get("/api/backup", headers=lectura).status_code == 403
+        assert client.patch(f"/admin/users/{uid}/asistente", json={"activo": True}, headers=escritura).status_code == 403
+        assert _barrer_rutas(client, lectura, RUTAS_LECTURA) >= 40 and _barrer_rutas(client, escritura, RUTAS_ESCRITURA) >= 40, rol
+        # El rol y la cuenta salen de la base al emitir, no de lo que alguien escriba: el token de la cuenta 1 no es de la 2
+        import jwt as _jwt
+        claims = _jwt.decode(lectura["Authorization"].split()[1], options={"verify_signature": False})
+        assert claims["role"] == rol and claims["sub"] == str(uid)
+
+
 def test_una_marca_de_uso_desconocida_no_vale_como_sesion_completa(client):
     uid, _ = _cuenta(client, "asist_uso_raro")
     for valor in ("Asistente", "bot", "", "sesion", "asistente_escritura "):
@@ -388,8 +416,18 @@ def test_el_token_de_escritura_solo_abre_las_tres_rutas_de_ejecucion(client):
     h = _cabecera_asistente(uid, escritura=True)
     cuerpo = {"fecha": "2026-11-05", "monto": 10, "tipo": "gasto", "categoria_id": _categoria(client, sesion), "descripcion": "x"}
     assert client.post("/api/transacciones", json=cuerpo, headers=h).status_code == 200
-    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 10, "accion": "depositar"}, headers=h).status_code == 200
-    assert client.post(f"/api/recurrentes/{gym}/saltar", json={"contabilizar_cuota": False}, headers=h).status_code == 200
+    # Cada token de escritura sirve para UNA petición: repetirlo (o usarlo en otra de las tres rutas) ya no abre nada
+    assert client.post("/api/transacciones", json=cuerpo, headers=h).status_code == 403, "el mismo token no se usa dos veces"
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 10, "accion": "depositar"}, headers=h).status_code == 403
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 10, "accion": "depositar"}, headers=_cabecera_asistente(uid, escritura=True)).status_code == 200
+    assert client.post(f"/api/recurrentes/{gym}/saltar", json={"contabilizar_cuota": False}, headers=_cabecera_asistente(uid, escritura=True)).status_code == 200
+    # Sin identificador (un token de escritura viejo o armado a mano) tampoco entra
+    import jwt as _jwt
+    claims = _jwt.decode(h["Authorization"].split()[1], options={"verify_signature": False})
+    for sin in ({k: v for k, v in claims.items() if k != "jti"}, {**claims, "jti": ""}, {**claims, "jti": 5}):
+        falso = {"Authorization": "Bearer " + _jwt.encode(sin, security.SECRET_KEY, algorithm=security.ALGORITHM)}
+        assert client.post("/api/transacciones", json=cuerpo, headers=falso).status_code in (401, 403), sin
+    h = _cabecera_asistente(uid, escritura=True)
     for metodo, ruta in (("GET", "/api/resumen"), ("GET", "/api/transacciones"), ("GET", "/auth/me"), ("DELETE", "/api/transacciones/1"), ("PUT", "/api/transacciones/1")):
         assert client.request(metodo, ruta, headers=h).status_code == 403, (metodo, ruta)
     # y el token de lectura no abre esas tres
@@ -603,6 +641,7 @@ if __name__ == "__main__":
             (test_una_orden_escondida_en_un_movimiento_es_un_dato_y_no_cambia_nada, lambda: test_una_orden_escondida_en_un_movimiento_es_un_dato_y_no_cambia_nada(client)),
             (test_el_historial_se_acota_y_cada_turno_agrega_dos_mensajes, lambda: test_el_historial_se_acota_y_cada_turno_agrega_dos_mensajes(client)),
             (test_ninguna_ruta_con_sesion_fuera_de_la_lista_acepta_el_token_del_asistente, lambda: test_ninguna_ruta_con_sesion_fuera_de_la_lista_acepta_el_token_del_asistente(client)),
+            (test_el_asistente_hereda_el_rol_y_nunca_puede_mas_que_la_persona_de_atras, lambda: test_el_asistente_hereda_el_rol_y_nunca_puede_mas_que_la_persona_de_atras(client)),
             (test_una_marca_de_uso_desconocida_no_vale_como_sesion_completa, lambda: test_una_marca_de_uso_desconocida_no_vale_como_sesion_completa(client)),
             (test_un_modelo_no_puede_pedir_cientos_de_llamadas_en_una_respuesta, lambda: test_un_modelo_no_puede_pedir_cientos_de_llamadas_en_una_respuesta(client)),
             (test_argumentos_de_tipo_equivocado_vuelven_como_error_y_no_tumban_el_turno, lambda: test_argumentos_de_tipo_equivocado_vuelven_como_error_y_no_tumban_el_turno(client)),

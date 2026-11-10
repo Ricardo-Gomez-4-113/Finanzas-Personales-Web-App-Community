@@ -566,7 +566,7 @@ def test_la_api_interna_solo_da_tokens_de_chats_vinculados(client):
         r = servicio.consumir_codigo(codigo, 8801, "yo")
         assert r == {"estado": "ok", "chat_anterior": None, "cuenta": "tg_interno_token"}, r
         assert servicio.consumir_codigo(codigo, 8802, "otro")["estado"] == "invalido"
-        assert servicio.usuario_de_chat(8801) == {"id": uid, "username": "tg_interno_token"}
+        assert servicio.usuario_de_chat(8801) == {"id": uid, "username": "tg_interno_token", "asistente": True}
         # El token es de ESA cuenta, de lectura, y no abre nada fuera de la lista
         lectura = {"Authorization": f"Bearer {servicio.token(8801)}"}
         assert client.get("/api/resumen", headers=lectura).status_code == 200

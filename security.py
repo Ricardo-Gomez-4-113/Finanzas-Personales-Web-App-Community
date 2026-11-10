@@ -24,7 +24,7 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from database import get_tenant_conn
 import master_db
-from asistente.permisos import permitido
+from asistente.permisos import USO_ESCRITURA, permitido
 
 # Cargar variables de entorno desde .env si existe en el directorio base
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -179,6 +179,9 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
     if uso is not None and not permitido(uso, request.method, getattr(request.scope.get("route"), "path", None)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token solo sirve para las consultas del asistente.")
 
+    if uso == USO_ESCRITURA and not master_db.consumir_jti(payload.get("jti"), payload.get("exp")):   # ya pasó la lista blanca: una petición por token
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token de escritura ya se usó.")
+
     user_id = payload.get("sub")
     if not user_id:
         raise cred_exception
@@ -201,6 +204,8 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu cuenta ha sido desactivada por el administrador."
         )
+    if uso is not None and not user.get("asistente_activo", 1):   # apagar el asistente mata también los tokens que ya se emitieron
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
 
     sub_status = user.get("subscription_status", "active")
     if sub_status in ("suspended", "cancelled"):

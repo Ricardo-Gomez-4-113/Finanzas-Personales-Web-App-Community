@@ -25,8 +25,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from asistente import medios
 from asistente.cupo import MAX_MEDIOS_DIA, MAX_MENSAJES_DIA, MAX_TOKENS_DIA, entero_de_entorno as _entero_de_entorno  # noqa: F401
-from asistente.nucleo import MAX_ESTADO_EN_MEMORIA, MAX_MENSAJES_GLOBAL_POR_HORA, MAX_MENSAJES_POR_HORA, TTL_CONVERSACION, Nucleo  # noqa: F401
-from asistente.servicio import SinVinculo
+from asistente.nucleo import MAX_ESTADO_EN_MEMORIA, MAX_MENSAJES_GLOBAL_POR_HORA, MAX_MENSAJES_POR_HORA, TEXTO_DE_LIMITE, TTL_CONVERSACION, Nucleo  # noqa: F401
+from asistente.servicio import AsistenteDesactivado, SinVinculo
 
 TRABAJADORES = 8                 # carriles: chats que se atienden a la vez
 MAX_INTENTOS_VINCULO_POR_HORA = 10   # por chat: adivinar códigos de vinculación
@@ -40,6 +40,7 @@ _ID_PROPUESTA = re.compile(r"^[A-Za-z0-9_-]{6,24}$")
 
 EXPLICACION = ("Soy el asistente de tus finanzas. Para usarme, vincula este chat con tu cuenta: abre la app, entra a Mi perfil, "
                "elige «Asistente en Telegram» y escanea el código QR con el teléfono.")
+APAGADO = "El administrador desactivó el asistente para tu cuenta. La app sigue disponible."
 AYUDA = ("Pregúntame por tu saldo, tus gastos, tus metas, tus fijos o tus inversiones. También puedo preparar un gasto, un ingreso, "
          "un depósito en una meta o saltar un fijo: siempre te pido confirmar con un botón. Puedes escribirme, mandarme una nota de voz o la foto de un ticket.\n\n"
          "/olvidar borra lo que hablamos. /desvincular quita este chat de tu cuenta.")
@@ -149,6 +150,9 @@ class Bot:
         if not cuenta:
             self.tg.enviar(chat_id, EXPLICACION)
             return
+        if not cuenta.get("asistente", True):
+            self.tg.enviar(chat_id, APAGADO)
+            return
         self._purgar(self._reloj())
         try:
             resultado = self.nucleo.turno(chat_id, cuenta, texto, (lambda: [self._descargar(medio)]) if medio else None,
@@ -159,12 +163,11 @@ class Bot:
         except SinVinculo:   # el chat se desvinculó entre la comprobación y el turno
             self.tg.enviar(chat_id, EXPLICACION)
             return
-        if resultado.estado == "ritmo":
-            self.tg.enviar(chat_id, "Has escrito muchos mensajes seguidos. Intenta de nuevo en un rato.")
-        elif resultado.estado == "medios":
-            self.tg.enviar(chat_id, "Llegaste al límite de fotos y audios de hoy. Puedes seguir escribiendo; mañana vuelves a poder mandarlos.")
-        elif resultado.estado == "dia":
-            self.tg.enviar(chat_id, "Llegaste al límite de mensajes de hoy con el asistente. Mañana puedes seguir; mientras tanto, la app sigue disponible.")
+        except AsistenteDesactivado:   # el administrador lo apagó en este momento
+            self.tg.enviar(chat_id, APAGADO)
+            return
+        if resultado.estado in TEXTO_DE_LIMITE:
+            self.tg.enviar(chat_id, TEXTO_DE_LIMITE[resultado.estado])
         else:
             self.tg.enviar(chat_id, _recortar(resultado.texto))
             for id_, resumen in resultado.propuestas:

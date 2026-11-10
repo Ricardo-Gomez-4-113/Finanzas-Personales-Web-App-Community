@@ -894,6 +894,33 @@ def test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base):
         ctx.close()
 
 
+def test_admin_apaga_y_enciende_el_asistente_de_una_cuenta_desde_el_menu(navegador, base):
+    admin, otro = "admasist", "anaasist"
+    master_db.create_user_entry(admin, security.hash_password(CLAVE), role="admin", email=f"{admin}@test.local")
+    fila_otro = master_db.create_user_entry(otro, security.hash_password(CLAVE), role="user", email=f"{otro}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, admin, CLAVE)
+        _ir(page, "tab-admin")
+        page.wait_for_selector("#tabla-usuarios-admin tr[data-usuario]")
+        fila = page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=otro)
+        assert fila.locator(".admin-sin-asistente").count() == 0, "con el asistente encendido no hay marca"
+        fila.locator("button[aria-haspopup='menu']").click()
+        page.locator(".admin-menu:not([hidden]) .admin-menu-item", has_text="Desactivar asistente").click()
+        fila.locator(".admin-sin-asistente").wait_for(timeout=10000)
+        assert master_db.get_user_by_id(fila_otro["id"])["asistente_activo"] == 0
+        fila.locator("button[aria-haspopup='menu']").click()
+        page.locator(".admin-menu:not([hidden]) .admin-menu-item", has_text="Activar asistente").click()
+        _esperar(page, "document.querySelectorAll('.admin-sin-asistente').length === 0")
+        assert master_db.get_user_by_id(fila_otro["id"])["asistente_activo"] == 1
+        # Tu propia fila no lleva el menú: el asistente de tu cuenta no lo apagas tú aquí
+        propia = page.locator("#tabla-usuarios-admin tr[data-usuario]", has_text=admin)
+        assert propia.locator("button[aria-haspopup='menu']").count() == 0
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base):
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
@@ -2357,6 +2384,7 @@ if __name__ == "__main__":
                 (test_cinta_periodos_pinta_libre_y_selecciona, lambda: test_cinta_periodos_pinta_libre_y_selecciona(navegador, base)),
                 (test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo, lambda: test_inicio_cinta_muestra_el_flujo_de_cada_periodo_y_el_hero_el_efectivo(navegador, base)),
                 (test_admin_busca_filtra_y_pide_el_nombre_para_eliminar, lambda: test_admin_busca_filtra_y_pide_el_nombre_para_eliminar(navegador, base)),
+                (test_admin_apaga_y_enciende_el_asistente_de_una_cuenta_desde_el_menu, lambda: test_admin_apaga_y_enciende_el_asistente_de_una_cuenta_desde_el_menu(navegador, base)),
                 (test_tema_y_modo_discrecion_cambian_sin_perder_datos, lambda: test_tema_y_modo_discrecion_cambian_sin_perder_datos(navegador, base)),
                 (test_movimiento_crear_editar_y_borrar, lambda: test_movimiento_crear_editar_y_borrar(navegador, base)),
                 (test_meta_depositar_y_retirar, lambda: test_meta_depositar_y_retirar(navegador, base)),

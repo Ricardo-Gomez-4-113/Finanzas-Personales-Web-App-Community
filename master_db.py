@@ -14,6 +14,7 @@ import os
 import shutil
 import hmac
 import sqlite3
+import time
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from database import (
@@ -120,6 +121,13 @@ def init_master_db() -> None:
         except sqlite3.OperationalError:
             pass
 
+        # Interruptor del administrador: 1 = la cuenta puede usar el asistente (Telegram y web), 0 = no
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN asistente_activo INTEGER NOT NULL DEFAULT 1;")
+        except sqlite3.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL;")
         except sqlite3.OperationalError:
@@ -199,6 +207,14 @@ def init_master_db() -> None:
                 medios INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, dia),
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Tokens de escritura del asistente ya usados: cada uno sirve para UNA petición (aunque un servicio comprometido lo tenga 20 s)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS asistente_jti (
+                jti TEXT PRIMARY KEY,
+                vence INTEGER NOT NULL
             )
         """)
 
@@ -417,6 +433,31 @@ def update_login_activity(user_id: int, timestamp_str: str) -> None:
     finally:
         conn.close()
 
+def consumir_jti(jti: Any, vence: Any) -> bool:
+    """Marca como usado el token de escritura `jti`. True la primera vez; False si ya se usó (o no trae identificador válido)."""
+    if not isinstance(jti, str) or not 8 <= len(jti) <= 64 or not isinstance(vence, int):
+        return False
+    conn = get_master_conn()
+    try:
+        ahora = int(time.time())
+        conn.execute("DELETE FROM asistente_jti WHERE vence < ?", (ahora - 60,))
+        cursor = conn.execute("INSERT OR IGNORE INTO asistente_jti (jti, vence) VALUES (?, ?)", (jti, vence))
+        conn.commit()
+        return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
+def set_asistente_activo(user_id: int, activo: bool) -> None:
+    """Enciende o apaga el asistente de una cuenta. Apagarlo corta los dos canales: sin esto la app no emite tokens del asistente."""
+    conn = get_master_conn()
+    try:
+        conn.execute("UPDATE users SET asistente_activo = ? WHERE id = ?", (1 if activo else 0, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def set_user_status(user_id: int, is_active: int) -> None:
     """Activa o suspende el acceso de un usuario al sistema."""
     conn = get_master_conn()
@@ -612,7 +653,7 @@ def list_users_with_metrics() -> List[Dict[str, Any]]:
         cursor = conn.cursor()
         rows = cursor.execute(
             """
-            SELECT id, username, email, role, is_active, subscription_status, db_name, db_path, created_at, last_login, login_count 
+            SELECT id, username, email, role, is_active, subscription_status, asistente_activo, db_name, db_path, created_at, last_login, login_count 
             FROM users 
             ORDER BY id ASC
             """
