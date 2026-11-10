@@ -7,11 +7,17 @@ cadena de modelos (`asistente/modelos.py`) puede pasárselo al de respaldo.
 Configuración (variables de entorno): `OLLAMA_URL` (con o sin `/api` o `/v1` al final), `OLLAMA_MODEL` (por defecto `qwen2.5:7b`),
 `OLLAMA_NUM_CTX` (ventana de contexto; las instrucciones y las herramientas ocupan ~4 000 tokens y el valor por defecto de Ollama puede
 cortarlas), `OLLAMA_TIMEOUT` (segundos) y `OLLAMA_API_KEY` (solo si hay un proxy que la pida; Ollama no la necesita).
+
+Cifrado: las preguntas y los datos de la cuenta viajan a ese servidor. Con `https://` siempre; con `http://` solo si el destino es la propia
+máquina, una red privada o Tailscale (100.64.0.0/10, que ya va cifrado por WireGuard) o un nombre de red interna (`.ts.net`, `.local`, `.lan`,
+`.internal` o sin puntos). Un `http://` hacia una dirección pública se rechaza al arrancar, salvo `OLLAMA_PERMITIR_HTTP=1`.
 """
 
+import ipaddress
 import json
 import os
 import re
+from urllib.parse import urlsplit
 
 from asistente.motor import Respuesta
 
@@ -38,6 +44,27 @@ def normalizar_url(url):
     if not url.lower().startswith(("http://", "https://")):
         raise ValueError("OLLAMA_URL debe empezar por http:// o https://")
     return url
+
+
+_TAILSCALE = ipaddress.ip_network("100.64.0.0/10")
+_SUFIJOS_INTERNOS = (".ts.net", ".local", ".lan", ".internal", ".home.arpa")
+
+
+def _destino_protegido(url):
+    """True si hablar por http con este destino no sale a una red pública."""
+    host = (urlsplit(url).hostname or "").lower()
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return "." not in host or host.endswith(_SUFIJOS_INTERNOS)
+    return ip.is_loopback or ip.is_private or ip.is_link_local or ip in _TAILSCALE
+
+
+def revisar_cifrado(url):
+    if url.lower().startswith("https://") or _destino_protegido(url) or os.environ.get("OLLAMA_PERMITIR_HTTP", "").strip() == "1":
+        return
+    raise ValueError("OLLAMA_URL usa http:// hacia una dirección pública: el contenido de las conversaciones viajaría sin cifrar. "
+                     "Usa https://, una red privada o Tailscale (o, bajo tu responsabilidad, OLLAMA_PERMITIR_HTTP=1)")
 
 
 def _entero(nombre, defecto):
@@ -69,6 +96,7 @@ def _llamada_en_texto(texto, conocidas):
 class ModeloOllama:
     def __init__(self, url=None, modelo=None, cliente=None):
         self._base = normalizar_url(url or os.environ.get("OLLAMA_URL", ""))
+        revisar_cifrado(self._base)
         self.modelo = modelo or os.environ.get("OLLAMA_MODEL", "").strip() or MODELO_POR_DEFECTO
         self._num_ctx = _entero("OLLAMA_NUM_CTX", NUM_CTX_POR_DEFECTO)
         segundos = _entero("OLLAMA_TIMEOUT", SEGUNDOS_POR_DEFECTO)

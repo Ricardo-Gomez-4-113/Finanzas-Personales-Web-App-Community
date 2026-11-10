@@ -26,7 +26,7 @@ sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 
 from asistente.herramientas import Herramientas  # noqa: E402
-from asistente.modelo_ollama import RECORDATORIO, ErrorDeOllama, ModeloOllama, SinSoporte, normalizar_url  # noqa: E402
+from asistente.modelo_ollama import RECORDATORIO, ErrorDeOllama, ModeloOllama, SinSoporte, normalizar_url, revisar_cifrado  # noqa: E402
 from asistente.modelo_falso import ModeloFalso  # noqa: E402
 from asistente.modelos import ModeloConRespaldo, crear_modelo  # noqa: E402
 from asistente.motor import INSTRUCCIONES, Motor, Respuesta  # noqa: E402
@@ -84,6 +84,30 @@ def test_las_urls_de_la_documentacion_se_normalizan():
             pass
         else:
             raise AssertionError(f"debe rechazar {mala!r}")
+
+
+def test_http_solo_hacia_destinos_privados_o_cifrados():
+    for bien in ("https://ollama.ejemplo.com", "http://127.0.0.1:11435", "http://192.168.100.17:11435", "http://10.0.0.5", "http://172.20.1.2",
+                 "http://100.93.94.85:11435", "http://ollama:11435", "http://pi.tail1234.ts.net:11435", "http://servidor.local", "http://[::1]:11435"):
+        revisar_cifrado(bien)
+    for mal in ("http://8.8.8.8:11435", "http://ollama.ejemplo.com", "http://100.128.0.1", "http://172.32.0.1", "http://[2606:4700::1111]"):
+        try:
+            revisar_cifrado(mal)
+        except ValueError as error:
+            assert "sin cifrar" in str(error) and mal not in str(error), mal
+        else:
+            raise AssertionError(f"debe rechazar {mal}")
+    os.environ["OLLAMA_PERMITIR_HTTP"] = "1"
+    try:
+        revisar_cifrado("http://8.8.8.8:11435")
+    finally:
+        del os.environ["OLLAMA_PERMITIR_HTTP"]
+    try:
+        ModeloOllama(url="http://8.8.8.8:11435")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("el constructor también debe rechazarlo")
 
 
 def test_ollama_manda_instrucciones_herramientas_y_ventana_y_lee_texto_y_tokens():
