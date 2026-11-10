@@ -9,8 +9,8 @@ Reglas que se comprueban además de las de Fijos y Metas:
 - Ningún fijo aporta dos veces en la misma fecha ni con fecha futura; saltar un ciclo avanza la fecha; cancelar una aportación la saca de la meta.
 - El saldo de la cuenta no baja de cero en ninguna fecha. [F1: la aportación automática no valida saldo; decidido: sin saldo no se aporta]
 - Un fijo que aporta a una meta ya alcanzada deja de existir. [F2: hoy sigue aportando; decidido: se quita al cumplirse]
-- Borrar una meta con un fijo ligado exige confirmar. [F3: hoy se borra y el fijo sigue como gasto normal]
-Los tres últimos se marcan con su etiqueta (F1, F2, F3) del plan-auditoria-asistente-y-core.md y siguen fallando hasta que se arreglen.
+- Borrar una meta con un fijo ligado exige confirmar; confirmado, se van los dos, el historial se queda y nada sigue cobrándose. [F3]
+Los tres últimos se marcan con su etiqueta (F1, F2, F3) del plan-auditoria-asistente-y-core.md. Ya se cumplen: si vuelven a fallar, es una regresión.
 - Un rechazo no cambia nada.
 """
 
@@ -23,7 +23,7 @@ import metas
 
 PESOS_ACCION = (
     ("alta_ingreso_fijo", 6), ("alta_aporte", 16), ("crear_meta", 6), ("ingreso", 10), ("avanzar_dia", 24),
-    ("saltar_aporte", 7), ("cancelar_aportacion", 9), ("eliminar_meta", 8), ("eliminar_fijo", 6), ("depositar", 8),
+    ("saltar_aporte", 7), ("cancelar_aportacion", 9), ("eliminar_meta", 5), ("eliminar_meta_confirmando", 5), ("eliminar_fijo", 6), ("depositar", 8),
     ("gastar_casi_todo", 6),
 )
 SALTOS_DE_DIAS = (1, 2, 7, 15, 30, 60)
@@ -145,6 +145,20 @@ def eliminar_meta(ctx):
             "accion": "eliminar_meta", "objetivo": meta["id"]}
 
 
+def eliminar_meta_confirmando(ctx):
+    """Confirma que también se va el fijo ligado (lo que hace la interfaz tras advertir). Con saldo en la meta la app sigue rechazándolo."""
+    lista = metas._metas_api(ctx)
+    if not lista:
+        return None
+    con_fijo = {r[1] for r in ctx.oraculo.fijos_a_meta()}
+    candidatas = [m for m in lista if m["id"] in con_fijo] or lista
+    meta = ctx.rng.choice(candidatas)
+    pre = _estado(ctx.oraculo)
+    respuesta = ctx.api("DELETE", f"/api/apartados/{meta['id']}?confirmar_fijos=true")
+    return {"entrada": {"id": meta["id"], "nombre": meta["nombre"]}, "respuesta": respuesta, "pre": pre,
+            "accion": "eliminar_meta_confirmando", "objetivo": meta["id"]}
+
+
 def eliminar_fijo(ctx):
     lista = _aportes(ctx)
     if not lista:
@@ -158,7 +172,7 @@ def eliminar_fijo(ctx):
 FUNCIONES = {
     "alta_ingreso_fijo": alta_ingreso_fijo, "alta_aporte": alta_aporte, "crear_meta": crear_meta, "ingreso": ingreso,
     "avanzar_dia": avanzar_dia, "gastar_casi_todo": gastar_casi_todo, "saltar_aporte": saltar_aporte, "cancelar_aportacion": cancelar_aportacion,
-    "eliminar_meta": eliminar_meta, "eliminar_fijo": eliminar_fijo, "depositar": depositar,
+    "eliminar_meta": eliminar_meta, "eliminar_meta_confirmando": eliminar_meta_confirmando, "eliminar_fijo": eliminar_fijo, "depositar": depositar,
 }
 
 
@@ -238,16 +252,21 @@ def verificar(nombre, res, oraculo, saldo_api):
             problemas.append("el fijo eliminado sigue en la base")
         if nombre == "cancelar_aportacion" and any(f[0] == res["objetivo"] for f in post["mov"]):
             problemas.append("la aportación cancelada sigue en la base")
-        if nombre == "eliminar_meta":
+        if nombre in ("eliminar_meta", "eliminar_meta_confirmando"):
             guardado = next((a[3] for a in pre["apartados"] if a[0] == res["objetivo"]), 0)
             if guardado > 0:
                 problemas.append(f"se eliminó una meta con {guardado / 100} guardados")
-            if any(l[1] == res["objetivo"] for l in pre["ligados"]):
+            ligados_antes = [l for l in pre["ligados"] if l[1] == res["objetivo"]]
+            if ligados_antes and nombre == "eliminar_meta":
                 problemas.append("F3: se borró la meta sin confirmar y su fijo siguió como gasto normal")
+            if any(l[1] == res["objetivo"] for l in post["ligados"]) or any(r[0] == l[0] for l in ligados_antes for r in post["rec"]):
+                problemas.append("F3: tras borrar la meta confirmando, su fijo sigue en la base")
+            if len(post["mov"]) != len(pre["mov"]):
+                problemas.append("borrar una meta cambió la cantidad de movimientos: el historial debe conservarse")
         return problemas
 
     # Rechazo: nada debe cambiar en la base
-    if codigo == 404 and nombre in ("saltar_aporte", "eliminar_fijo", "cancelar_aportacion", "eliminar_meta"):
+    if codigo == 404 and nombre in ("saltar_aporte", "eliminar_fijo", "cancelar_aportacion", "eliminar_meta", "eliminar_meta_confirmando"):
         problemas.append("la lista muestra un elemento que el servidor no encuentra (404)")
     # Las acciones tomadas de Fijos y Metas guardan un «antes» con otras llaves: se comparan solo las que ambos tienen
     if nombre != "avanzar_dia" and any(pre[k] != post[k] for k in ("rec", "mov", "saldo", "apartados") if k in pre):

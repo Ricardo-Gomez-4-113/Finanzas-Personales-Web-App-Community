@@ -2,10 +2,8 @@
 
 Sin red ni navegador: bases SQLite en memoria con las migraciones reales. El oráculo es el SQL de los movimientos, no el saldo guardado de la meta.
 
-Tres reglas de producto están decididas (plan-auditoria-asistente-y-core.md, sección 6). Dos ya se cumplen (sin saldo no se aporta, y al cumplirse
-la meta se quita el fijo); la tercera (borrar una meta con fijo ligado) aún no y queda escrita como
-`brecha_*` (sin prefijo test_, no rompen la corrida) y `test_las_brechas_siguen_abiertas` exige que cada una siga fallando: el día que
-se arregle una, esa prueba lo avisa y se le quita el prefijo `brecha_` para que pase a ser una prueba normal.
+Las tres reglas de producto decididas (plan-auditoria-asistente-y-core.md, sección 6) ya se cumplen y están aquí como pruebas normales: sin saldo no se
+aporta, al cumplirse la meta se quita el fijo y borrar una meta con fijo ligado exige confirmar.
 """
 
 import os
@@ -413,34 +411,61 @@ def test_el_aviso_no_deja_pasar_saltos_de_linea_ni_nombres_enormes():
     assert "\n" not in texto and "x" * 61 not in texto, texto
 
 
-def brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar():
-    """Decisión 3: sin confirmación explícita se rechaza y no se toca ni la meta ni el fijo."""
+def test_borrar_una_meta_con_fijo_ligado_exige_confirmar_y_no_toca_nada_antes():
+    """Decisión 3: sin confirmación explícita se rechaza (409, con el nombre del fijo) y no se toca ni la meta ni el fijo."""
     conn = _bd()
     _ingreso(conn, 100000)
     meta = _meta(conn, 1000)
     _fijo(conn, meta, 400)
     try:
-        eliminar_apartado(meta, conn)
-    except HTTPException:
-        pass
+        eliminar_apartado(meta, False, conn)
+    except HTTPException as error:
+        assert error.status_code == 409 and "Ahorro" in error.detail and "también se eliminará" in error.detail, error.detail
     else:
         raise AssertionError("borró la meta y el fijo siguió cobrándose como gasto normal")
     assert _filas(conn, "SELECT COUNT(*) AS n FROM apartados")[0]["n"] == 1
     assert _filas(conn, "SELECT apartado_id FROM recurrentes")[0]["apartado_id"] == meta
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones")[0]["n"] == 0
 
 
-BRECHAS = [brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar]
+def test_confirmado_se_van_la_meta_y_su_fijo_se_conserva_lo_aportado_y_se_avisa():
+    from routers.apartados import MovimientoApartado, movimiento_apartado
+    conn = _bd()
+    _ingreso(conn, 100000)
+    meta = _meta(conn, 1000)
+    _fijo(conn, meta, 400)
+    materializar_recurrentes(conn, date(2026, 2, 15))   # un aporte de 400
+    movimiento_apartado(meta, MovimientoApartado(monto=400, accion="retirar"), conn)   # la meta queda en cero: ya se puede borrar
+    antes = _filas(conn, "SELECT COUNT(*) AS n FROM transacciones")[0]["n"]
+    assert eliminar_apartado(meta, True, conn)["fijos_eliminados"] == 1
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM apartados")[0]["n"] == 0 and _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 0
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM transacciones")[0]["n"] == antes   # el historial no se pierde
+    assert materializar_recurrentes(conn, date(2026, 6, 15)) == 0   # y nada sigue cobrándose
+    avisos = _filas(conn, "SELECT tipo, texto FROM notificaciones")
+    assert [a["tipo"] for a in avisos] == ["fijo_retirado"] and "Emergencia" in avisos[0]["texto"] and "Ahorro" in avisos[0]["texto"], [dict(a) for a in avisos]
 
 
-def test_las_brechas_siguen_abiertas():
-    arregladas = []
-    for brecha in BRECHAS:
-        try:
-            brecha()
-        except (AssertionError, HTTPException):
-            continue
-        arregladas.append(brecha.__name__)
-    assert not arregladas, f"ya se cumplen: quítales el prefijo brecha_ y pásalas a pruebas normales: {', '.join(arregladas)}"
+def test_borrar_una_meta_sin_fijos_ligados_no_pide_confirmacion():
+    conn = _bd()
+    meta = _meta(conn, 1000)
+    assert eliminar_apartado(meta, False, conn)["fijos_eliminados"] == 0
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM apartados")[0]["n"] == 0
+
+
+def test_con_dos_fijos_ligados_el_mensaje_los_nombra_a_los_dos():
+    conn = _bd()
+    _ingreso(conn, 100000)
+    meta = _meta(conn, 1000)
+    _fijo(conn, meta, 400)
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo) "
+                 "VALUES ('Otro aporte', 'gasto', ?, 'mensual', 1, '2026-02-01', 1, ?, 1)", (a_centavos(50), meta))
+    conn.commit()
+    try:
+        eliminar_apartado(meta, False, conn)
+    except HTTPException as error:
+        assert "varios gastos fijos" in error.detail and "Ahorro" in error.detail and "Otro aporte" in error.detail, error.detail
+    else:
+        raise AssertionError("debía pedir confirmación")
 
 
 if __name__ == "__main__":

@@ -1,13 +1,15 @@
 """routers/apartados.py - Sobres virtuales y metas de ahorro."""
 
 from fastapi import APIRouter
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, Query, status, Depends
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import sqlite3
 
 from dinero import a_centavos
-from finanzas_core import ahora_local, balance_disponible_a_fecha, cerrar_meta_si_cumplida, clase_movimiento
+from finanzas_core import (
+    ahora_local, avisar, balance_disponible_a_fecha, cerrar_meta_si_cumplida, clase_movimiento, nombre_en_aviso, pesos_en_mensaje,
+)
 from security import (
     get_tenant_db
 )
@@ -67,7 +69,11 @@ def listar_apartados(conn: sqlite3.Connection = Depends(get_tenant_db)):
     return resultado
 
 @router.delete("/api/apartados/{apartado_id}", summary="Eliminar apartado")
-def eliminar_apartado(apartado_id: int, conn: sqlite3.Connection = Depends(get_tenant_db)):
+def eliminar_apartado(
+    apartado_id: int,
+    confirmar_fijos: bool = Query(False, description="Confirma que también se eliminan los gastos fijos que le aportan"),
+    conn: sqlite3.Connection = Depends(get_tenant_db),
+):
     cursor = conn.cursor()
     apartado = cursor.execute('SELECT * FROM apartados WHERE id = ?', (apartado_id,)).fetchone()
     if not apartado:
@@ -80,9 +86,23 @@ def eliminar_apartado(apartado_id: int, conn: sqlite3.Connection = Depends(get_t
             detail=f"No puedes eliminar un apartado con saldo disponible (${saldo_actual:.2f} MXN). Retira los fondos al balance disponible primero."
         )
         
+    # Un gasto fijo que aporta a esta meta no puede quedarse suelto: seguiría cobrándose como gasto normal. Se elimina con la meta, y solo si la
+    # persona lo confirma (la interfaz le muestra cuáles son antes de pedir la confirmación).
+    fijos = cursor.execute("SELECT id, descripcion, monto FROM recurrentes WHERE apartado_id = ? ORDER BY id", (apartado_id,)).fetchall()
+    if fijos and not confirmar_fijos:
+        lista = ", ".join(f"«{nombre_en_aviso(f['descripcion'])}» ({pesos_en_mensaje(float(f['monto']))})" for f in fijos)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta meta recibe aportes de {'un gasto fijo' if len(fijos) == 1 else 'varios gastos fijos'}: {lista}. "
+                   f"Si la eliminas, {'ese gasto fijo' if len(fijos) == 1 else 'esos gastos fijos'} también se eliminará. Confirma para continuar.",
+        )
+    for f in fijos:
+        cursor.execute("DELETE FROM recurrentes WHERE id = ?", (f["id"],))   # lo ya aportado se conserva en los movimientos
+        avisar(cursor, "fijo_retirado", f"fijo_retirado:{f['id']}", "Quité un gasto fijo",
+               f"Eliminaste la meta «{nombre_en_aviso(apartado['nombre'])}», así que también quité el gasto fijo «{nombre_en_aviso(f['descripcion'])}» que le aportaba.")
     cursor.execute('DELETE FROM apartados WHERE id = ?', (apartado_id,))
     conn.commit()
-    return {"status": "ok", "mensaje": "Apartado eliminado"}
+    return {"status": "ok", "mensaje": "Apartado eliminado", "fijos_eliminados": len(fijos)}
 
 @router.post("/api/apartados/{apartado_id}/movimiento", summary="Depositar o retirar en un apartado")
 def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3.Connection = Depends(get_tenant_db)):

@@ -192,7 +192,10 @@ def ancla_al_editar_proximo_cargo(dia_guardado: Optional[int], nueva_fecha: date
     return nueva_fecha.day
 
 
-def _nombre_en_aviso(texto) -> str:
+MAX_AVISOS_GUARDADOS = 500
+
+
+def nombre_en_aviso(texto) -> str:
     """El nombre de una meta o de un fijo dentro de un aviso: lo escribe la persona, así que sin saltos ni caracteres de control y acotado."""
     limpio = "".join(c if c.isprintable() else " " for c in str(texto or ""))
     return " ".join(limpio.split())[:60]
@@ -204,7 +207,10 @@ def avisar(cursor: sqlite3.Cursor, tipo: str, clave: str, titulo: str, texto: st
         "INSERT OR IGNORE INTO notificaciones (tipo, clave, titulo, texto, creada_en) VALUES (?, ?, ?, ?, ?)",
         (tipo, clave, titulo, texto, ahora_local().strftime("%Y-%m-%d %H:%M:%S")),
     )
-    return cursor.rowcount == 1
+    nuevo = cursor.rowcount == 1
+    if nuevo:   # la bandeja no crece sin fin: se queda con los últimos
+        cursor.execute("DELETE FROM notificaciones WHERE id NOT IN (SELECT id FROM notificaciones ORDER BY id DESC LIMIT ?)", (MAX_AVISOS_GUARDADOS,))
+    return nuevo
 
 
 def cerrar_meta_si_cumplida(cursor: sqlite3.Cursor, apartado_id: int, fecha: str) -> bool:
@@ -216,10 +222,10 @@ def cerrar_meta_si_cumplida(cursor: sqlite3.Cursor, apartado_id: int, fecha: str
     fijos = cursor.execute("SELECT id, descripcion FROM recurrentes WHERE apartado_id = ?", (apartado_id,)).fetchall()
     for fijo in fijos:
         cursor.execute("DELETE FROM recurrentes WHERE id = ?", (fijo["id"],))
-    nombre = _nombre_en_aviso(meta["nombre"])
+    nombre = nombre_en_aviso(meta["nombre"])
     texto = f"Completaste tu meta «{nombre}»: llegaste a {pesos_en_mensaje(float(meta['meta_monto']))}. ¡Felicidades!"
     if fijos:
-        quitados = ", ".join(f"«{_nombre_en_aviso(f['descripcion'])}»" for f in fijos)
+        quitados = ", ".join(f"«{nombre_en_aviso(f['descripcion'])}»" for f in fijos)
         texto += f" Quité {'el gasto fijo' if len(fijos) == 1 else 'los gastos fijos'} {quitados} que le aportaba{'' if len(fijos) == 1 else 'n'}; lo ya aportado se queda."
     avisar(cursor, "meta_cumplida", f"meta_cumplida:{apartado_id}:{fecha}", "¡Meta cumplida!", texto)
     return True
@@ -285,10 +291,10 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
                 try:
                     validar_saldo_disponible_fecha(cursor, prox.isoformat(), monto_cuota, 'gasto')
                 except ValueError:
-                    nombre_meta = _nombre_en_aviso(meta["nombre"] if meta is not None else "")
+                    nombre_meta = nombre_en_aviso(meta["nombre"] if meta is not None else "")
                     avisar(cursor, "aporte_omitido", f"aporte_omitido:{fila['id']}:{prox.isoformat()}", "No pude aportar a tu meta",
                            f"El {fecha_corta(prox.isoformat())} no había saldo para aportar {pesos_en_mensaje(monto_cuota)} a «{nombre_meta}» "
-                           f"desde «{_nombre_en_aviso(fila['descripcion'])}». Omití ese aporte; puedes depositarlo a mano cuando tengas saldo.")
+                           f"desde «{nombre_en_aviso(fila['descripcion'])}». Omití ese aporte; puedes depositarlo a mano cuando tengas saldo.")
                     generadas += 1
                     prox = siguiente_fecha(prox, fila["frecuencia"], dia)
                     continue

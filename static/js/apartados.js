@@ -2,7 +2,7 @@
  * static/js/apartados.js - Apartados y metas de ahorro.
  */
 
-import { apiFetch, escapeHTML, fmt, montoHTML, montoMxnHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 
@@ -201,8 +201,26 @@ export async function realizarMovimiento(id, accion) {
 }
 
 
+/** Gastos fijos que aportan a una meta: borrar la meta los borra también, y la persona debe saberlo antes de confirmar. */
+async function fijosQueAportan(id) {
+    try {
+        const res = await apiFetch('/api/recurrentes');
+        if (!res.ok) return [];
+        return (await leerJson(res)).filter(r => r.apartado_id === id);
+    } catch (error) {
+        return [];   // si no se pudo consultar, el servidor igual exige la confirmación (409) y el mensaje lo dice
+    }
+}
+
 export async function eliminarApartado(id) {
-    if (!await confirmar({ titulo: 'Eliminar apartado', mensaje: '¿Seguro que deseas eliminar este apartado? Se perderá el registro de este sobre.', aceptar: 'Eliminar', peligro: true })) return;
+    const fijos = await fijosQueAportan(id);
+    let mensaje = '¿Seguro que deseas eliminar este apartado? Se perderá el registro de este sobre.';
+    if (fijos.length) {
+        const lista = fijos.map(f => `• ${f.descripcion} (${fmtMXN(f.monto)})`).join('\n');
+        mensaje = `Esta meta recibe aportes de ${fijos.length === 1 ? 'este gasto fijo' : 'estos gastos fijos'}:\n${lista}\n\n` +
+            `Si la eliminas, ${fijos.length === 1 ? 'ese gasto fijo' : 'esos gastos fijos'} también se eliminará. Lo que ya aportó se conserva en tus movimientos.`;
+    }
+    if (!await confirmar({ titulo: 'Eliminar apartado', mensaje, aceptar: fijos.length ? 'Eliminar meta y fijo' : 'Eliminar', peligro: true })) return;
     
     // Feedback visual inmediato en la tarjeta
     const btnEliminar = document.querySelector(`.card-apartado button[onclick*="eliminarApartado(${id})"]`);
@@ -214,7 +232,7 @@ export async function eliminarApartado(id) {
     }
 
     try {
-        const res = await apiFetch(`/api/apartados/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/apartados/${id}${fijos.length ? '?confirmar_fijos=true' : ''}`, { method: 'DELETE' });
         if (res.ok) {
             if (card) card.remove();
             await cargarApartados();

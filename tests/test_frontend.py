@@ -1623,6 +1623,118 @@ def test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base):
     finally:
         ctx.close()
 
+def test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo(navegador, base):
+    """El diálogo nombra el gasto fijo que aporta a la meta; cancelar no toca nada y confirmar elimina meta y fijo."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        meta = page.evaluate("() => fetch('/api/apartados', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},"
+                             " body: JSON.stringify({nombre: 'Meta con fijo', tipo: 'meta', meta_monto: 5000})}).then(r => r.json())")["id"]
+        creado = page.evaluate("(meta) => fetch('/api/recurrentes', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},"
+                               " body: JSON.stringify({descripcion: 'Ahorro de la prueba', tipo: 'gasto', monto: 120, frecuencia: 'mensual', fecha_inicio: '2026-11-25', categoria_id: 7, apartado_id: meta})})"
+                               ".then(r => r.status)", meta)
+        assert creado == 201, creado
+        page.reload()
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        _ir(page, "tab-apartados")
+        tarjeta = page.locator(".card-apartado", has_text="Meta con fijo")
+        tarjeta.wait_for()
+
+        tarjeta.locator(".btn-eliminar-apartado").click()
+        visto = _responder_confirmacion(page, aceptar=False)
+        assert "Ahorro de la prueba" in visto["mensaje"] and "también se eliminará" in visto["mensaje"] and "$120.00" in visto["mensaje"], visto
+        quedan = page.evaluate("() => fetch('/api/recurrentes', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}}).then(r => r.json())")
+        assert any(r["descripcion"] == "Ahorro de la prueba" for r in quedan), "cancelar no debe borrar el fijo"
+        assert tarjeta.count() == 1
+
+        tarjeta.locator(".btn-eliminar-apartado").click()
+        _responder_confirmacion(page, aceptar=True)
+        tarjeta.wait_for(state="detached")
+        quedan = page.evaluate("() => fetch('/api/recurrentes', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}}).then(r => r.json())")
+        assert not any(r["descripcion"] == "Ahorro de la prueba" for r in quedan), "confirmar debe llevarse también el fijo"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+def _api_desde_la_pagina(page, metodo, ruta, cuerpo=None):
+    return page.evaluate(
+        """([metodo, ruta, cuerpo]) => fetch(ruta, {method: metodo, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('jwt_token')},
+           body: cuerpo ? JSON.stringify(cuerpo) : undefined}).then(async r => ({status: r.status, cuerpo: await r.json().catch(() => null)}))""",
+        [metodo, ruta, cuerpo])
+
+
+def test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto(navegador, base):
+    usuario = "campana_avisos"
+    master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario)
+        assert page.locator("#notif-contador.hidden").count() == 1, "sin avisos no hay contador"
+        _api_desde_la_pagina(page, "POST", "/api/transacciones", {"fecha": "2026-09-01", "monto": 5000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "Fondeo"})
+        meta = _api_desde_la_pagina(page, "POST", "/api/apartados", {"nombre": "<img src=x onerror=window.__xss=1>", "tipo": "meta", "meta_monto": 100})["cuerpo"]["id"]
+        assert _api_desde_la_pagina(page, "POST", f"/api/apartados/{meta}/movimiento", {"monto": 100, "accion": "depositar"})["status"] == 200
+        page.reload()
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        page.wait_for_selector("#notif-contador:not(.hidden)")
+        assert page.inner_text("#notif-contador") == "1"
+        assert page.get_attribute("#btn-notificaciones", "aria-label") == "Avisos, 1 sin leer"
+
+        page.click("#btn-notificaciones")
+        page.wait_for_selector("#panel-notificaciones:not(.hidden)")
+        assert page.get_attribute("#btn-notificaciones", "aria-expanded") == "true"
+        texto = page.inner_text("#notif-lista")
+        assert "Meta cumplida" in texto and "<img src=x" in texto, texto
+        assert page.locator("#notif-lista img").count() == 0, "el nombre de la meta se muestra como texto, no como HTML"
+        assert page.evaluate("window.__xss") is None
+        assert page.locator("#notif-vacio.hidden").count() == 1
+
+        page.click("#notif-lista .notif-accion:has-text('Marcar como leído')")
+        page.wait_for_selector("#notif-contador.hidden", state="attached")
+        assert page.get_attribute("#btn-notificaciones", "aria-label") == "Avisos"
+        assert page.locator("#notif-lista .notif-item.no-leida").count() == 0
+
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#panel-notificaciones.hidden", state="attached")
+        assert page.evaluate("document.activeElement && document.activeElement.id") == "btn-notificaciones"
+
+        page.click("#btn-notificaciones")
+        page.click("#notif-borrar-leidas")
+        page.wait_for_selector("#notif-vacio:not(.hidden)")
+        assert page.locator("#notif-lista .notif-item").count() == 0
+        page.click("h2#topbar-section-title")   # un clic fuera cierra el panel
+        page.wait_for_selector("#panel-notificaciones.hidden", state="attached")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion(navegador, base):
+    usuario = "campana_movil"
+    master_db.create_user_entry(usuario, security.hash_password(CLAVE), email=f"{usuario}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["movil"])
+    try:
+        _entrar(page, base, usuario)
+        _api_desde_la_pagina(page, "POST", "/api/transacciones", {"fecha": "2026-09-01", "monto": 5000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "Fondeo"})
+        meta = _api_desde_la_pagina(page, "POST", "/api/apartados", {"nombre": "Una meta con un nombre bastante largo para probar el ajuste de línea", "tipo": "meta", "meta_monto": 100})["cuerpo"]["id"]
+        _api_desde_la_pagina(page, "POST", f"/api/apartados/{meta}/movimiento", {"monto": 100, "accion": "depositar"})
+        page.reload()
+        page.wait_for_selector("#vista-app:not(.hidden)", timeout=15000)
+        page.wait_for_selector("#notif-contador:not(.hidden)")
+        page.click("#btn-notificaciones")
+        page.wait_for_selector("#panel-notificaciones:not(.hidden)")
+        caja = page.evaluate("(() => { const r = document.getElementById('panel-notificaciones').getBoundingClientRect(); return [r.left, r.right, document.documentElement.scrollWidth, window.innerWidth]; })()")
+        assert caja[0] >= 0 and caja[1] <= caja[3] and caja[2] <= caja[3], f"el panel se sale de la pantalla: {caja}"
+        alto = page.evaluate("Math.min(...[...document.querySelectorAll('#panel-notificaciones .notif-accion:not(.hidden)')].map(b => b.getBoundingClientRect().height))")
+        assert alto >= 44, f"los botones del panel deben tener 44 px de alto: {alto}"
+        # Al cerrar la sesión la campana queda limpia: nada de la cuenta se queda a la vista
+        page.evaluate("document.querySelector('[data-on-click*=\"logoutUsuario\"]')?.click()")
+        page.wait_for_selector("#modal-confirmar:not(.hidden)")
+        page.click("#btn-confirmar-aceptar")
+        _esperar(page, "document.getElementById('notif-lista').children.length === 0 && document.getElementById('panel-notificaciones').classList.contains('hidden')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base):
     """Inversiones: el título es «Portafolio», la tasa no se repite en el bloque, las cifras no llevan
     la moneda pegada (va en la etiqueta), el botón de cotizaciones es secundario y en celular la
@@ -2745,6 +2857,9 @@ if __name__ == "__main__":
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
+                (test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo, lambda: test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo(navegador, base)),
+                (test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto, lambda: test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto(navegador, base)),
+                (test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion, lambda: test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion(navegador, base)),
                 (test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario, lambda: test_inversiones_moneda_una_vez_sin_tasa_repetida_y_boton_secundario(navegador, base)),
                 (test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono, lambda: test_calculadora_rf_textos_sencillos_y_sin_tarjetas_con_ícono(navegador, base)),
                 (test_pasada_final_encabezados_franjas_y_deshabilitados, lambda: test_pasada_final_encabezados_franjas_y_deshabilitados(navegador, base)),
