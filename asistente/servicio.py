@@ -102,6 +102,16 @@ class ServicioHTTP:
         r = self._post("/uso", {"chat_id": chat_id, "cuenta_id": cuenta_id, "tokens": max(0, int(tokens or 0))})
         self._revisar(r)
 
+    def avisos_pendientes(self):
+        r = self._post("/avisos/pendientes", {})
+        r.raise_for_status()
+        return r.json().get("avisos", [])
+
+    def aviso_resultado(self, chat_id, aviso_id, entregado):
+        r = self._post("/avisos/resultado", {"chat_id": chat_id, "aviso_id": aviso_id, "entregado": bool(entregado)})
+        r.raise_for_status()
+        return bool(r.json().get("registrado"))
+
     def desvincular_chat(self, chat_id):
         r = self._post("/desvincular", {"chat_id": chat_id})
         r.raise_for_status()

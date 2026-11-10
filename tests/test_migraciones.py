@@ -389,6 +389,28 @@ def test_v23_crea_la_tabla_de_avisos_sin_tocar_nada_y_es_idempotente():
         assert _version(conn) == 23 and _conteos(conn) == {**conteos, "notificaciones": 0}
 
 
+def test_v24_agrega_las_columnas_de_entrega_por_telegram_sin_tocar_los_avisos_y_es_idempotente():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 23)
+        conn.execute("INSERT INTO notificaciones (tipo, clave, titulo, texto, creada_en) VALUES ('meta_cumplida', 'k1', 'T', 'x', '2026-10-01 10:00:00')")
+        conn.commit()
+        conteos = _conteos(conn)
+
+        _migrar_hasta(conn, 24)
+        assert _version(conn) == 24 and _conteos(conn) == conteos
+        columnas = {r[1]: (r[2], r[4]) for r in conn.execute("PRAGMA table_info(notificaciones)")}
+        assert columnas["entrega_telegram"] == ("INTEGER", "0") and columnas["intentos_telegram"] == ("INTEGER", "0") and "reclamado_en" in columnas, columnas
+        fila = conn.execute("SELECT entrega_telegram, intentos_telegram, reclamado_en, titulo FROM notificaciones").fetchone()
+        assert tuple(fila) == (0, 0, None, "T"), "los avisos que ya había quedan pendientes de entregar y lo demás intacto"
+
+        _migrar_hasta(conn, 24)   # volver a correrla no falla ni cambia nada
+        assert _version(conn) == 24 and _conteos(conn) == conteos
+        conn.execute("PRAGMA user_version = 23")   # una base a medio migrar (las columnas ya están) tampoco falla
+        conn.commit()
+        _migrar_hasta(conn, 24)
+        assert _version(conn) == 24
+
+
 def test_un_alter_que_falla_por_otra_causa_no_marca_la_migracion_como_hecha():
     """El ALTER TABLE ADD COLUMN solo se tolera si la columna ya existe; cualquier otro error del SQL debe salir."""
     with tempfile.TemporaryDirectory() as tmp:

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 import master_db
-from asistente import cupo, pase, vinculos
+from asistente import avisos, cupo, pase, vinculos
 from asistente.tokens import AsistenteDesactivado, emitir_token
 from security import clave_bloqueada, obtener_ip_cliente, reservar_intento_login
 
@@ -49,6 +49,11 @@ class CupoRequest(ChatRequest):
 class UsoRequest(ChatRequest):
     cuenta_id: int = Field(..., ge=1)
     tokens: int = Field(..., ge=0, le=MAX_TOKENS_POR_LLAMADA)
+
+
+class ResultadoAvisoRequest(ChatRequest):
+    aviso_id: int = Field(..., ge=1, le=2 ** 31)
+    entregado: bool
 
 
 class PaseRequest(BaseModel):
@@ -103,6 +108,17 @@ def cuenta_del_chat(cuerpo: ChatRequest):
 @router.post("/desvincular", dependencies=[Depends(exigir_secreto_interno)])
 def desvincular(cuerpo: ChatRequest):
     return {"desvinculado": vinculos.desvincular_chat(cuerpo.chat_id) is not None}
+
+
+@router.post("/avisos/pendientes", dependencies=[Depends(exigir_secreto_interno)])
+def avisos_pendientes():
+    """Avisos de la app por entregar en Telegram, ya reclamados para el bot. No pasan por el modelo ni gastan cupo."""
+    return {"avisos": avisos.reclamar()}
+
+
+@router.post("/avisos/resultado", dependencies=[Depends(exigir_secreto_interno)])
+def aviso_resultado(cuerpo: ResultadoAvisoRequest):
+    return {"registrado": avisos.resultado(cuerpo.chat_id, cuerpo.aviso_id, cuerpo.entregado)}
 
 
 @router.post("/token", dependencies=[Depends(exigir_secreto_interno)])

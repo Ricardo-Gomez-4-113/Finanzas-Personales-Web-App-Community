@@ -91,9 +91,10 @@ def consumir_codigo(codigo, chat_id, username=None, ahora=None):
         conn.close()
 
 
-def usuario_de_chat(chat_id, ahora=None):
+def usuario_de_chat(chat_id, ahora=None, tocar=True):
     """La cuenta ACTIVA vinculada a ese chat, o None. Es lo único que decide a nombre de quién se actúa.
-    Si la cuenta se desactivó o suspendió, o su contraseña cambió desde que se vinculó, el vínculo se borra."""
+    Si la cuenta se desactivó o suspendió, o su contraseña cambió desde que se vinculó, el vínculo se borra.
+    Con `tocar=False` no se marca el chat como usado (lo consulta el reparto de avisos, que no es una persona escribiendo)."""
     ahora = ahora or _ahora()
     conn = master_db.get_master_conn()
     try:
@@ -106,8 +107,9 @@ def usuario_de_chat(chat_id, ahora=None):
             conn.execute("DELETE FROM telegram_vinculos WHERE chat_id = ?", (int(chat_id),))
             conn.commit()
             return None
-        conn.execute("UPDATE telegram_vinculos SET ultimo_uso = ? WHERE chat_id = ?", (_texto(ahora), int(chat_id)))
-        conn.commit()
+        if tocar:
+            conn.execute("UPDATE telegram_vinculos SET ultimo_uso = ? WHERE chat_id = ?", (_texto(ahora), int(chat_id)))
+            conn.commit()
         return {"id": fila["id"], "username": fila["username"], "asistente": bool(fila["asistente_activo"])}
     finally:
         conn.close()

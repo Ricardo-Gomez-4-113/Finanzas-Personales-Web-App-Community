@@ -34,6 +34,7 @@ MAX_INTENTOS_VINCULO_GLOBAL = 200    # entre todos los chats; cuenta aparte, par
 MAX_PENDIENTES_POR_CHAT = 3      # actualizaciones en cola de un mismo chat (las demás se descartan)
 MAX_PENDIENTES_POR_CARRIL = 50   # cola máxima de un carril
 MAX_TEXTO_TELEGRAM = 3500        # el límite de Telegram es 4096
+SEGUNDOS_ENTRE_AVISOS = 60            # cada cuánto pregunta a la app por avisos pendientes
 PLAZO_DESCARGA_SEG = 30           # tiempo total para bajar un archivo de Telegram
 AVISO_ESCRIBIENDO_SEG = 4        # Telegram apaga «escribiendo…» a los 5 s
 _ID_PROPUESTA = re.compile(r"^[A-Za-z0-9_-]{6,24}$")
@@ -238,6 +239,30 @@ class Bot:
             self.tg.enviar(chat_id, "Este chat ya está vinculado a otra cuenta. Escribe /desvincular y vuelve a escanear el código.")
         else:
             self.tg.enviar(chat_id, "Ese código no sirve: ya se usó o venció. Genera uno nuevo en Mi perfil.")
+
+    def entregar_avisos(self):
+        """Manda por Telegram los avisos de la app que esperan (aporte omitido, meta cumplida...). Lo llama el ciclo del bot cada minuto, sin que nadie escriba.
+        No pasa por el modelo ni gasta cupo. La app reclama cada aviso para este envío; aquí se le dice si salió, y un fallo se reintenta después. Devuelve
+        cuántos entregó. Nunca lanza: un fallo de la app o de Telegram no debe parar al bot."""
+        try:
+            pendientes = self.servicio.avisos_pendientes()
+        except Exception as error:
+            self._evento("avisos_sin_app", tipo=type(error).__name__)
+            return 0
+        entregados = 0
+        for aviso in pendientes:
+            try:
+                self.tg.enviar(aviso["chat_id"], _recortar(f"{aviso['titulo']}\n\n{aviso['texto']}"))
+                salio = True
+            except Exception:
+                salio = False   # el chat pudo bloquear al bot o Telegram no contestó
+            try:
+                self.servicio.aviso_resultado(aviso["chat_id"], aviso["id"], salio)
+            except Exception as error:
+                self._evento("avisos_sin_app", tipo=type(error).__name__)
+            entregados += salio
+            self._evento("aviso_entregado" if salio else "aviso_fallido")
+        return entregados
 
     def _avisar(self, chat_id, texto):
         try:
@@ -459,7 +484,7 @@ def main():
     bot = Bot(telegram, servicio, crear_motor, propuestas, ejecutar, registrar=_evento)   # los topes diarios los lleva la app (asistente/cupo.py)
     despachador = Despachador(bot, TRABAJADORES, al_fallar=lambda tipo: _evento("bot_error", tipo=tipo),
                               al_descartar=lambda: _evento("bot_cola_llena"))
-    offset, espera = 0, 1
+    offset, espera, proximo_reparto = 0, 1, 0.0
     _evento("bot_iniciado", trabajadores=TRABAJADORES)
     try:
         while True:
@@ -467,6 +492,9 @@ def main():
                 for actualizacion in telegram.obtener_actualizaciones(offset):
                     offset = actualizacion["update_id"] + 1
                     despachador.enviar(actualizacion)
+                if time.monotonic() >= proximo_reparto:   # los avisos de la app salen aunque nadie escriba; el ciclo de espera dura a lo más 25 s
+                    proximo_reparto = time.monotonic() + SEGUNDOS_ENTRE_AVISOS
+                    bot.entregar_avisos()
                 espera = 1
             except KeyboardInterrupt:
                 break

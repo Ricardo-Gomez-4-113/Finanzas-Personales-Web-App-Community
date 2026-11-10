@@ -32,7 +32,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 23
+CURRENT_TENANT_SCHEMA_VERSION = 24
 
 
 # =============================================================================
@@ -656,6 +656,16 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificaciones_leida ON notificaciones(leida, id);")
         cursor.execute("PRAGMA user_version = 23;")
         current_version = 23
+
+    if current_version < 24 and CURRENT_TENANT_SCHEMA_VERSION >= 24:
+        # Entrega de cada aviso por Telegram: 0 pendiente, 1 reclamado por el bot (con su hora), 2 entregado. Los fallos se cuentan para no reintentar sin fin.
+        for columna in ("entrega_telegram INTEGER NOT NULL DEFAULT 0", "intentos_telegram INTEGER NOT NULL DEFAULT 0", "reclamado_en TEXT"):
+            try:
+                cursor.execute(f"ALTER TABLE notificaciones ADD COLUMN {columna};")
+            except sqlite3.OperationalError as error:
+                _tolerar_columna_existente(error)
+        cursor.execute("PRAGMA user_version = 24;")
+        current_version = 24
 
     conn.commit()
 

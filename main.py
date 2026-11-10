@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import asyncio
 import os
 import secrets
 import sqlite3
@@ -26,6 +27,7 @@ from database import (
 )
 import master_db
 import observabilidad
+import tarea_programada
 from security import (
     hash_password,
     clave_cabe_en_bcrypt
@@ -69,7 +71,19 @@ async def lifespan(app: FastAPI):
         print("[EMAIL] Servicio de correo transaccional (API / SMTP) configurado y activo.")
     else:
         print("[EMAIL ADVERTENCIA] El servicio de envío de correos NO está configurado en .env. La recuperación de contraseñas por correo permanecerá inactiva hasta definir RESEND_API_KEY o credenciales SMTP.")
-    yield
+    tarea = None
+    if tarea_programada.activa():   # fijos y avisos también con la app cerrada (NOTIFICACIONES_TAREA=1)
+        tarea = asyncio.create_task(tarea_programada.bucle())
+        print(f"[STARTUP] Tarea programada de fijos y avisos activa (cada {tarea_programada.periodo_seg() // 60} min).")
+    try:
+        yield
+    finally:
+        if tarea is not None:
+            tarea.cancel()
+            try:
+                await tarea
+            except asyncio.CancelledError:
+                pass
 
 # Registro de fallos en data/logs/app.log (o FINANZAS_LOG_DIR). Antes de crear la app, para registrar también el arranque.
 observabilidad.configurar(observabilidad.directorio_por_defecto())

@@ -28,12 +28,13 @@ Convenciones:
 ## Estructura relevante
 
 - `main.py`: servidor FastAPI, middleware de seguridad y rutas SPA.
-- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 23 (`CURRENT_TENANT_SCHEMA_VERSION`; la 23 añade `notificaciones`, los avisos del core: aporte omitido por falta de saldo y meta cumplida).
+- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 24 (`CURRENT_TENANT_SCHEMA_VERSION`; la 23 añade `notificaciones`, los avisos del core, y la 24 su estado de entrega por Telegram).
 - `dinero.py`: el dinero se guarda en centavos enteros. `a_centavos` convierte al escribir y `fabrica_filas` (el `row_factory` de los tenants) devuelve pesos al leer las columnas de dinero. Un total en SQL (`SUM`, `CASE`) se divide entre `100.0` en la consulta; `verificar_reglas.sh` lo vigila.
 - `finanzas_core.py`: cálculo financiero puro (conversiones, rendimientos, frecuencias, sub-periodos, reparto en centavos).
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.
 - `mercado.py`: tipos de cambio y precios, con caché y valores de respaldo.
-- `routers/`: `auth`, `admin`, `movimientos`, `apartados`, `inversiones`, `recurrentes`, `respaldo`, `presupuesto`.
+- `routers/`: `auth`, `admin`, `movimientos`, `apartados`, `inversiones`, `recurrentes`, `respaldo`, `presupuesto`, `notificaciones`.
+- Avisos: el core los genera con plantillas (`finanzas_core.avisar`, una vez por hecho; aporte omitido por falta de saldo, meta cumplida, fijo retirado al borrar su meta) y se leen en la campana de la barra superior (`static/js/notificaciones.js`, `routers/notificaciones.py`). Con `NOTIFICACIONES_TAREA=1` (el compose la enciende) `tarea_programada.py` materializa los fijos de todas las cuentas cada `NOTIFICACIONES_PERIODO_MIN` minutos aunque nadie abra la app (candado en `tareas_programadas` de la base maestra; una cuenta que falla no frena a las demás y su error se registra solo por tipo). Si la cuenta tiene Telegram vinculado y el asistente activo, el bot los pide cada minuto a `/internal/asistente/avisos/*` (`asistente/avisos.py`: se reclaman de forma atómica, se reintentan hasta 5 veces, solo los de las últimas 24 h) y los manda sin pasar por el modelo ni gastar cupo; sin bot solo quedan en la campana. Reglas de metas: un fijo ligado no aporta sin saldo (se omite y avisa), la última aportación se recorta al objetivo, al cumplirse la meta se quita el fijo, no se crea un aporte hacia una meta cumplida y borrar una meta con fijo ligado exige `?confirmar_fijos=true` (409 si no).
 - `asistente/`: asistente con LLM (Gemini). El motor no conoce el canal; las herramientas llaman a la API con un token de 60 s
   (`uso = "asistente"`, lectura) que `security.verify_token` solo deja pasar por `asistente/permisos.py`. El modelo solo *propone* escrituras
   (`asistente/propuestas.py`); ejecutarlas exige la confirmación de la persona y un segundo token de 20 s (`asistente_escritura`). Probar con

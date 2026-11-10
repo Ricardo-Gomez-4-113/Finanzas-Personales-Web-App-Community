@@ -1250,6 +1250,181 @@ def test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client):
     assert len(bot.nucleo._mensajes) <= 2, len(bot.nucleo._mensajes)
 
 
+def _con_un_aviso(client, h, nombre="Moto"):
+    """Deja un aviso de «meta cumplida» en la bandeja de la cuenta: una meta de 100 depositada completa."""
+    cat = client.get("/api/categorias", headers=h).json()[0]["id"]
+    assert client.post("/api/transacciones", json={"fecha": "2026-09-01", "monto": 5000, "tipo": "ingreso", "categoria_id": cat, "descripcion": "Fondeo"}, headers=h).status_code == 200
+    meta = client.post("/api/apartados", json={"nombre": nombre, "tipo": "meta", "meta_monto": 100}, headers=h).json()["id"]
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 100, "accion": "depositar"}, headers=h).status_code == 200
+
+
+def _entrega(uid, consulta="SELECT entrega_telegram, intentos_telegram FROM notificaciones ORDER BY id"):
+    from database import get_tenant_conn
+    conn = get_tenant_conn(master_db.get_user_by_id(uid)["db_name"])
+    try:
+        return [tuple(f) for f in conn.execute(consulta).fetchall()]
+    finally:
+        conn.close()
+
+
+def test_un_aviso_de_la_app_llega_por_telegram_una_sola_vez_sin_gastar_cupo_y_sigue_en_la_campana(client):
+    uid, h = _cuenta(client, "tg_aviso")
+    _vincular(uid, 8101)
+    _con_un_aviso(client, h)
+    bot, tg, _ = _bot(client, servicio=_cliente_interno(client))
+    assert bot.entregar_avisos() == 1
+    enviados = tg.a(8101)
+    assert len(enviados) == 1 and "Meta cumplida" in enviados[0][1] and "Moto" in enviados[0][1] and enviados[0][2] is None, enviados
+    assert _entrega(uid) == [(2, 0)]
+    assert bot.entregar_avisos() == 0 and len(tg.a(8101)) == 1, "un aviso ya entregado no se manda otra vez"
+    assert client.get("/api/notificaciones", headers=h).json()["no_leidas"] == 1, "leerlo en Telegram no lo marca como leído en la app"
+    assert _en_la_base("SELECT COALESCE(SUM(mensajes), 0), COALESCE(SUM(tokens), 0), COALESCE(SUM(medios), 0) FROM asistente_uso WHERE user_id = ?", uid)[0][:] == (0, 0, 0), "no gasta el cupo"
+
+
+def test_un_fallo_de_telegram_se_reintenta_y_despues_de_cinco_se_deja_de_insistir(client):
+    uid, h = _cuenta(client, "tg_aviso_falla")
+    _vincular(uid, 8102)
+    _con_un_aviso(client, h)
+    bot, tg, _ = _bot(client, servicio=_cliente_interno(client))
+    enviar_ok = tg.enviar
+
+    def caido(chat_id, texto, botones=None):
+        raise RuntimeError("Telegram caído")
+
+    tg.enviar = caido
+    assert bot.entregar_avisos() == 0 and _entrega(uid) == [(0, 1)], _entrega(uid)
+    tg.enviar = enviar_ok
+    assert bot.entregar_avisos() == 1 and _entrega(uid) == [(2, 1)], "el reintento lo entrega"
+
+    uid2, h2 = _cuenta(client, "tg_aviso_falla2")
+    _vincular(uid2, 8103)
+    _con_un_aviso(client, h2)
+    tg.enviar = caido
+    for _ in range(7):
+        bot.entregar_avisos()
+    assert _entrega(uid2) == [(0, 5)], _entrega(uid2)   # cinco intentos y no más
+    tg.enviar = enviar_ok
+    assert bot.entregar_avisos() == 0 and tg.a(8103) == []
+    assert client.get("/api/notificaciones", headers=h2).json()["no_leidas"] == 1, "en la campana sigue"
+
+
+def test_los_avisos_solo_van_a_su_cuenta_y_a_quien_tiene_el_asistente_activo(client):
+    ana, h_ana = _cuenta(client, "tg_aviso_ana")
+    beto, h_beto = _cuenta(client, "tg_aviso_beto")
+    sin_chat, h_sin = _cuenta(client, "tg_aviso_sin_chat")
+    _vincular(ana, 8111)
+    _vincular(beto, 8112)
+    _con_un_aviso(client, h_ana, "Casa de Ana")
+    _con_un_aviso(client, h_sin, "Sin chat")
+    bot, tg, _ = _bot(client, servicio=_cliente_interno(client))
+    master_db.set_asistente_activo(beto, False)
+    _con_un_aviso(client, h_beto, "Viaje de Beto")
+    assert bot.entregar_avisos() == 1
+    assert "Casa de Ana" in tg.a(8111)[0][1] and tg.a(8112) == [], "lo de Ana a Ana; Beto tiene el asistente apagado"
+    assert all("Sin chat" not in e[1] and "Viaje de Beto" not in e[1] for e in tg.enviados)
+    assert _entrega(beto) == [(0, 0)], "lo de Beto espera en su bandeja"
+    master_db.set_asistente_activo(beto, True)
+    assert bot.entregar_avisos() == 1 and "Viaje de Beto" in tg.a(8112)[0][1], "al reactivarlo, llega"
+
+
+def test_no_llegan_avisos_viejos_y_un_reclamo_que_murio_vuelve_a_pendiente(client):
+    from asistente import avisos
+    from database import get_tenant_conn
+    uid, h = _cuenta(client, "tg_aviso_viejo")
+    _vincular(uid, 8121)
+    _con_un_aviso(client, h)
+    conn = get_tenant_conn(master_db.get_user_by_id(uid)["db_name"])
+    conn.execute("UPDATE notificaciones SET creada_en = '2020-01-01 10:00:00'")
+    conn.commit()
+    conn.close()
+    assert avisos.reclamar() == [], "pasadas 24 horas el aviso se queda solo en la campana"
+    conn = get_tenant_conn(master_db.get_user_by_id(uid)["db_name"])
+    conn.execute("UPDATE notificaciones SET creada_en = ?", (avisos._texto(avisos.ahora_local()),))
+    conn.commit()
+    conn.close()
+    assert len(avisos.reclamar()) == 1 and avisos.reclamar() == [], "reclamado por un bot, no se le da a otro"
+    ahora = avisos.ahora_local()
+    assert avisos.reclamar(ahora=ahora + timedelta(minutes=5)) == [], "el reclamo aún no vence"
+    assert len(avisos.reclamar(ahora=ahora + timedelta(minutes=avisos.RECLAMO_VENCE_MIN + 1))) == 1, "el bot murió con el aviso en la mano: se reintenta"
+
+
+def test_un_bot_que_siempre_muere_con_el_aviso_en_la_mano_no_lo_reenvia_sin_fin(client):
+    from asistente import avisos
+    uid, h = _cuenta(client, "tg_aviso_muere")
+    _vincular(uid, 8161)
+    _con_un_aviso(client, h)
+    momento = avisos.ahora_local()
+    reclamados = 0
+    for vuelta in range(10):   # cada vuelta, diez minutos después: el bot reclama y muere sin avisar el resultado
+        reclamados += sum(a["chat_id"] == 8161 for a in avisos.reclamar(ahora=momento + timedelta(minutes=(avisos.RECLAMO_VENCE_MIN + 1) * vuelta)))
+    assert reclamados == avisos.MAX_INTENTOS, reclamados
+    assert client.get("/api/notificaciones", headers=h).json()["no_leidas"] == 1, "en la campana sigue"
+
+
+def test_dos_repartos_a_la_vez_no_entregan_el_mismo_aviso_dos_veces(client):
+    import threading
+    from asistente import avisos
+    uid, h = _cuenta(client, "tg_aviso_carrera")
+    _vincular(uid, 8131)
+    _con_un_aviso(client, h, "Meta 0")
+    for i in (1, 2, 3, 4):   # más avisos: cada meta nueva cumplida deja uno
+        meta = client.post("/api/apartados", json={"nombre": f"Extra {i}", "tipo": "meta", "meta_monto": 10}, headers=h).json()["id"]
+        assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 10, "accion": "depositar"}, headers=h).status_code == 200
+    resultados, barrera = [], threading.Barrier(6)
+
+    def reclamar():
+        barrera.wait()
+        resultados.append([a["id"] for a in avisos.reclamar(limite=10)])
+
+    hilos = [threading.Thread(target=reclamar) for _ in range(6)]
+    [t.start() for t in hilos]
+    [t.join() for t in hilos]
+    todos = [i for r in resultados for i in r]
+    assert sorted(todos) == sorted(set(todos)) and len(todos) == 5, resultados
+
+
+def test_la_api_de_avisos_exige_el_secreto_valida_lo_que_recibe_y_un_chat_ajeno_no_marca_nada(client):
+    uid, h = _cuenta(client, "tg_aviso_api")
+    _vincular(uid, 8141)
+    _con_un_aviso(client, h)
+    secreto = "s" * 40
+    os.environ["ASISTENTE_SECRETO_INTERNO"] = secreto
+    cab = {"X-Asistente-Secreto": secreto}
+    for ruta, cuerpo in (("pendientes", {}), ("resultado", {"chat_id": 8141, "aviso_id": 1, "entregado": True})):
+        assert client.post(f"/internal/asistente/avisos/{ruta}", json=cuerpo).status_code == 401, ruta
+        assert client.post(f"/internal/asistente/avisos/{ruta}", json=cuerpo, headers={"X-Asistente-Secreto": "x" * 40}).status_code == 401, ruta
+        assert client.post(f"/internal/asistente/avisos/{ruta}", json=cuerpo, headers=h).status_code == 401, "un JWT de sesión no es el secreto"
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": 8141, "aviso_id": 0, "entregado": True}, headers=cab).status_code == 422
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": 8141, "aviso_id": 1}, headers=cab).status_code == 422
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": "x", "aviso_id": 1, "entregado": True}, headers=cab).status_code == 422
+    # Un chat sin vínculo no marca nada, ni diciendo el id de un aviso que existe
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": 999999, "aviso_id": 1, "entregado": True}, headers=cab).json() == {"registrado": False}
+    pendientes = client.post("/internal/asistente/avisos/pendientes", json={}, headers=cab).json()["avisos"]
+    assert [(a["chat_id"], sorted(a)) for a in pendientes] == [(8141, ["chat_id", "id", "texto", "titulo"])], pendientes
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": 8141, "aviso_id": 1, "entregado": True}, headers=cab).json() == {"registrado": True}
+    assert client.post("/internal/asistente/avisos/resultado", json={"chat_id": 8141, "aviso_id": 1, "entregado": True}, headers=cab).json() == {"registrado": False}, "solo se registra una vez"
+
+
+def test_si_la_app_o_telegram_fallan_el_reparto_no_lanza_y_los_eventos_no_llevan_texto(client):
+    uid, h = _cuenta(client, "tg_aviso_eventos")
+    _vincular(uid, 8151)
+    _con_un_aviso(client, h, "Secreta 123")
+    eventos = []
+    bot, tg, _ = _bot(client, servicio=_cliente_interno(client))
+    bot._registrar = lambda nombre, **campos: eventos.append((nombre, campos))
+    assert bot.entregar_avisos() == 1
+    assert eventos == [("aviso_entregado", {})], eventos
+
+    class AppCaida:
+        def avisos_pendientes(self):
+            raise ConnectionError("no hay app en 10.0.0.5")
+
+    bot.servicio = AppCaida()
+    assert bot.entregar_avisos() == 0
+    assert eventos[-1] == ("avisos_sin_app", {"tipo": "ConnectionError"}), eventos
+    assert "10.0.0.5" not in str(eventos) and "Secreta" not in str(eventos)
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -1301,6 +1476,14 @@ if __name__ == "__main__":
             (test_el_evento_de_turno_no_registra_nombres_de_herramienta_inventados_por_el_modelo, lambda: test_el_evento_de_turno_no_registra_nombres_de_herramienta_inventados_por_el_modelo(client)),
             (test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto, lambda: test_los_topes_diarios_no_se_apagan_por_un_valor_mal_puesto(client)),
             (test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga, lambda: test_un_chat_que_inunda_no_llena_la_cola_y_la_memoria_se_purga(client)),
+            (test_un_aviso_de_la_app_llega_por_telegram_una_sola_vez_sin_gastar_cupo_y_sigue_en_la_campana, lambda: test_un_aviso_de_la_app_llega_por_telegram_una_sola_vez_sin_gastar_cupo_y_sigue_en_la_campana(client)),
+            (test_un_fallo_de_telegram_se_reintenta_y_despues_de_cinco_se_deja_de_insistir, lambda: test_un_fallo_de_telegram_se_reintenta_y_despues_de_cinco_se_deja_de_insistir(client)),
+            (test_los_avisos_solo_van_a_su_cuenta_y_a_quien_tiene_el_asistente_activo, lambda: test_los_avisos_solo_van_a_su_cuenta_y_a_quien_tiene_el_asistente_activo(client)),
+            (test_no_llegan_avisos_viejos_y_un_reclamo_que_murio_vuelve_a_pendiente, lambda: test_no_llegan_avisos_viejos_y_un_reclamo_que_murio_vuelve_a_pendiente(client)),
+            (test_un_bot_que_siempre_muere_con_el_aviso_en_la_mano_no_lo_reenvia_sin_fin, lambda: test_un_bot_que_siempre_muere_con_el_aviso_en_la_mano_no_lo_reenvia_sin_fin(client)),
+            (test_dos_repartos_a_la_vez_no_entregan_el_mismo_aviso_dos_veces, lambda: test_dos_repartos_a_la_vez_no_entregan_el_mismo_aviso_dos_veces(client)),
+            (test_la_api_de_avisos_exige_el_secreto_valida_lo_que_recibe_y_un_chat_ajeno_no_marca_nada, lambda: test_la_api_de_avisos_exige_el_secreto_valida_lo_que_recibe_y_un_chat_ajeno_no_marca_nada(client)),
+            (test_si_la_app_o_telegram_fallan_el_reparto_no_lanza_y_los_eventos_no_llevan_texto, lambda: test_si_la_app_o_telegram_fallan_el_reparto_no_lanza_y_los_eventos_no_llevan_texto(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_telegram")

@@ -218,6 +218,16 @@ def init_master_db() -> None:
             )
         """)
 
+        # Tareas que la app hace sola: una fila por tarea con su candado (`hasta`) y cuándo corrió por última vez. Así, aunque haya varios procesos,
+        # una ronda corre a la vez y no se repite antes de tiempo.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tareas_programadas (
+                nombre TEXT PRIMARY KEY,
+                hasta REAL NOT NULL DEFAULT 0,
+                ultima REAL NOT NULL DEFAULT 0
+            )
+        """)
+
         # Índices optimizados
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -432,6 +442,64 @@ def update_login_activity(user_id: int, timestamp_str: str) -> None:
         conn.commit()
     finally:
         conn.close()
+
+def adquirir_tarea(nombre: str, lease_seg: float, intervalo_min_seg: float, ahora: Optional[float] = None) -> bool:
+    """Toma el candado de una tarea programada: True si nadie la está corriendo (o su candado venció) y pasó el intervalo mínimo desde la última vez.
+    La decisión y la escritura son una sola transacción inmediata: dos procesos a la vez no pueden ganar los dos."""
+    ahora = time.time() if ahora is None else ahora
+    conn = get_master_conn()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        fila = conn.execute("SELECT hasta, ultima FROM tareas_programadas WHERE nombre = ?", (nombre,)).fetchone()
+        if fila is not None and (fila["hasta"] > ahora or ahora - fila["ultima"] < intervalo_min_seg):
+            conn.rollback()
+            return False
+        conn.execute(
+            "INSERT INTO tareas_programadas (nombre, hasta, ultima) VALUES (?, ?, ?) "
+            "ON CONFLICT(nombre) DO UPDATE SET hasta = excluded.hasta, ultima = excluded.ultima",
+            (nombre, ahora + lease_seg, ahora),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def liberar_tarea(nombre: str, ultima: Optional[float] = None) -> None:
+    """Suelta el candado al terminar (la fecha de la última ronda se conserva: el intervalo mínimo sigue contando).
+    Con `ultima` (el instante con el que se adquirió) solo suelta SU candado: si el suyo venció y otro proceso ya tomó la tarea, no se la quita."""
+    conn = get_master_conn()
+    try:
+        if ultima is None:
+            conn.execute("UPDATE tareas_programadas SET hasta = 0 WHERE nombre = ?", (nombre,))
+        else:
+            conn.execute("UPDATE tareas_programadas SET hasta = 0 WHERE nombre = ? AND ultima = ?", (nombre, ultima))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# Las mismas cuentas que la API deja entrar (security.verify_token): una activa que no esté suspendida ni cancelada
+_CUENTA_ACTIVA = "is_active = 1 AND db_name IS NOT NULL AND COALESCE(subscription_status, '') NOT IN ('suspended', 'cancelled')"
+
+
+def cuentas_activas() -> List[Dict[str, Any]]:
+    """Cuentas que pueden tener trabajo pendiente. Solo lo que la tarea necesita (nunca claves ni correos)."""
+    conn = get_master_conn()
+    try:
+        return [dict(r) for r in conn.execute(f"SELECT id, db_name FROM users WHERE {_CUENTA_ACTIVA} ORDER BY id").fetchall()]
+    finally:
+        conn.close()
+
+
+def cuenta_activa(user_id: int) -> bool:
+    """Si la cuenta sigue activa AHORA (la lista de una ronda se arma al empezar y una cuenta pudo suspenderse o borrarse mientras tanto)."""
+    conn = get_master_conn()
+    try:
+        return conn.execute(f"SELECT 1 FROM users WHERE id = ? AND {_CUENTA_ACTIVA}", (user_id,)).fetchone() is not None
+    finally:
+        conn.close()
+
 
 def consumir_jti(jti: Any, vence: Any) -> bool:
     """Marca como usado el token de escritura `jti`. True la primera vez; False si ya se usó (o no trae identificador válido)."""

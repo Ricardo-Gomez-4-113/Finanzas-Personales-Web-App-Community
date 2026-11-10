@@ -28,6 +28,7 @@ sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminTest#12345"
 os.environ["FINANZAS_LOG_DIR"] = LOGS
+os.environ["FINANZAS_MODO_PRUEBA"] = "1"   # sin esto FINANZAS_HOY no tiene efecto
 os.environ["FINANZAS_HOY"] = "2026-11-09T10:00:00"
 
 from fastapi.testclient import TestClient  # noqa: E402

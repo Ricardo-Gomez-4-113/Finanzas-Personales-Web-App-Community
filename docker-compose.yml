@@ -20,6 +20,9 @@ services:
     environment:
       # Dónde está el servicio del asistente web (perfil `asistente`). Sin él arriba la burbuja simplemente no aparece.
       ASISTENTE_WEB_URL: http://finanzas-asistente:8100
+      # Fijos y avisos también con la app cerrada: una ronda cada NOTIFICACIONES_PERIODO_MIN minutos (60 por defecto). NOTIFICACIONES_TAREA=0 la apaga.
+      NOTIFICACIONES_TAREA: ${NOTIFICACIONES_TAREA:-1}
+      NOTIFICACIONES_PERIODO_MIN: ${NOTIFICACIONES_PERIODO_MIN:-60}
     volumes:
       # Solo los datos persisten fuera del contenedor (el código va dentro de la imagen)
       - ./data:/app/data
