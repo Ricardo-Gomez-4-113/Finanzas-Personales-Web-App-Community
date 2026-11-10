@@ -7,7 +7,7 @@ from typing import Literal, Optional
 import sqlite3
 
 from dinero import a_centavos
-from finanzas_core import ahora_local, balance_disponible_a_fecha, clase_movimiento
+from finanzas_core import ahora_local, balance_disponible_a_fecha, cerrar_meta_si_cumplida, clase_movimiento
 from security import (
     get_tenant_db
 )
@@ -128,6 +128,8 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             )
         
         cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (a_centavos(nuevo_saldo), apartado_id))
+        if mov.accion == 'depositar':
+            cerrar_meta_si_cumplida(cursor, apartado_id, fecha_hoy)   # avisa y quita los fijos que le aportaban
         conn.commit()
         return {"status": "ok", "nuevo_saldo": nuevo_saldo}
     except HTTPException:

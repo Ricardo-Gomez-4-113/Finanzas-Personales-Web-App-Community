@@ -2,7 +2,8 @@
 
 Sin red ni navegador: bases SQLite en memoria con las migraciones reales. El oráculo es el SQL de los movimientos, no el saldo guardado de la meta.
 
-Tres reglas de producto están decididas (plan-auditoria-asistente-y-core.md, sección 6) y el código aún no las cumple. Quedan escritas como
+Tres reglas de producto están decididas (plan-auditoria-asistente-y-core.md, sección 6). Dos ya se cumplen (sin saldo no se aporta, y al cumplirse
+la meta se quita el fijo); la tercera (borrar una meta con fijo ligado) aún no y queda escrita como
 `brecha_*` (sin prefijo test_, no rompen la corrida) y `test_las_brechas_siguen_abiertas` exige que cada una siga fallando: el día que
 se arregle una, esa prueba lo avisa y se le quita el prefijo `brecha_` para que pase a ser una prueba normal.
 """
@@ -167,7 +168,7 @@ def _presupuesto_con_tarjeta_a_meta(conn, meta):
 
 def test_una_tarjeta_ligada_a_una_meta_exporta_un_fijo_que_aporta_y_exportar_de_nuevo_no_duplica():
     conn = _bd()
-    meta = _meta(conn, 5000)
+    meta = _meta(conn, 20000)   # con un objetivo mayor que dos aportaciones: la meta no se cumple a mitad de la prueba
     _presupuesto_con_tarjeta_a_meta(conn, meta)
     exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=date(2026, 10, 1))
     conn.commit()
@@ -287,26 +288,129 @@ def test_restaurar_una_copia_vieja_y_ponerse_al_dia_da_el_mismo_estado_que_no_ha
 
 # ---------------------------------------------------------------- decididas, aún sin cumplirse (ver la cabecera)
 
-def brecha_sin_saldo_la_aportacion_no_se_hace():
+def test_sin_saldo_la_aportacion_se_omite_con_aviso_y_el_ciclo_avanza():
     """Decisión 1: igual que el depósito manual («No puedes guardar dinero que no tienes»)."""
     conn = _bd()
     _ingreso(conn, 100)
     meta = _meta(conn)
+    fijo = _fijo(conn, meta, 500)
+    assert materializar_recurrentes(conn, date(2026, 3, 15)) == 0
+    assert balance_disponible_a_fecha(conn.cursor(), "2026-03-15") == 100.0 and _guardado(conn, meta) == 0.0
+    avisos = _filas(conn, "SELECT tipo, clave, titulo, texto FROM notificaciones ORDER BY id")
+    assert [a["clave"] for a in avisos] == [f"aporte_omitido:{fijo}:2026-02-01", f"aporte_omitido:{fijo}:2026-03-01"], [dict(a) for a in avisos]
+    assert "Emergencia" in avisos[0]["texto"] and "no había saldo" in avisos[0]["texto"]
+    assert _filas(conn, "SELECT proxima_fecha FROM recurrentes")[0]["proxima_fecha"] == "2026-04-01"   # no se queda trabado en un ciclo viejo
+    assert materializar_recurrentes(conn, date(2026, 3, 15)) == 0
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones")[0]["n"] == 2   # repetir no vuelve a avisar
+
+
+def test_con_saldo_solo_para_algunos_ciclos_aporta_los_que_caben_en_su_fecha():
+    conn = _bd()
+    _ingreso(conn, 700)   # alcanza para uno de 500, no para el segundo
+    meta = _meta(conn, 5000)
     _fijo(conn, meta, 500)
-    materializar_recurrentes(conn, date(2026, 3, 15))
-    assert balance_disponible_a_fecha(conn.cursor(), "2026-03-15") >= 0, "la aportación dejó el saldo gastable en negativo"
+    assert materializar_recurrentes(conn, date(2026, 3, 15)) == 1
+    assert [t["fecha"] for t in _aportaciones(conn)] == ["2026-02-01"] and _guardado(conn, meta) == 500.0
+    assert balance_disponible_a_fecha(conn.cursor(), "2026-03-15") == 200.0
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones WHERE tipo = 'aporte_omitido'")[0]["n"] == 1
 
 
-def brecha_al_alcanzar_el_objetivo_la_meta_no_pasa_de_ahi_y_el_fijo_se_quita():
-    """Decisión 2: la última aportación se recorta a lo que falta y el fijo se elimina (los movimientos ya hechos se conservan)."""
+def test_el_ingreso_del_mismo_dia_se_cuenta_antes_que_el_aporte_aunque_el_fijo_se_creara_despues():
+    conn = _bd()
+    meta = _meta(conn, 5000)
+    _fijo(conn, meta, 400, proxima="2026-02-01")   # el aporte tiene el id menor
+    _ingreso_fijo(conn, 1000, frecuencia="mensual", dia=1, proxima="2026-02-01")
+    assert materializar_recurrentes(conn, date(2026, 2, 1)) == 2   # entra la nómina y luego sale el aporte
+    assert _guardado(conn, meta) == 400.0 and _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones")[0]["n"] == 0
+
+
+def test_los_gastos_normales_se_pagan_antes_que_el_ahorro():
+    conn = _bd()
+    _ingreso(conn, 1000)
+    meta = _meta(conn, 5000)
+    _fijo(conn, meta, 800, proxima="2026-02-01")
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, activo) "
+                 "VALUES ('Renta', 'gasto', ?, 'mensual', 1, '2026-02-01', 1, 1)", (a_centavos(600),))
+    conn.commit()
+    materializar_recurrentes(conn, date(2026, 2, 1))
+    assert [t["descripcion"] for t in _filas(conn, "SELECT descripcion FROM transacciones WHERE recurrente_id IS NOT NULL")] == ["Renta"]
+    assert _guardado(conn, meta) == 0.0   # la renta salió y el ahorro de 800 ya no cabía
+
+
+def test_al_alcanzar_el_objetivo_la_ultima_aportacion_se_recorta_el_fijo_se_quita_y_se_felicita():
+    """Decisión 2: 400 + 400 + 200, el fijo desaparece y los movimientos se conservan."""
     conn = _bd()
     _ingreso(conn, 100000)
     meta = _meta(conn, 1000)
     _fijo(conn, meta, 400)
-    materializar_recurrentes(conn, date(2026, 6, 15))
-    assert _guardado(conn, meta) == 1000.0, f"la meta quedó en {_guardado(conn, meta)}"
-    assert _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 0, "el fijo sigue cobrándose"
-    assert len(_aportaciones(conn)) == 3   # 400 + 400 + 200: el historial se conserva (recurrente_id queda en NULL al borrar el fijo)
+    assert materializar_recurrentes(conn, date(2026, 6, 15)) == 3
+    assert _guardado(conn, meta) == 1000.0 and obtener_total_apartados(conn.cursor()) == 1000.0
+    assert [t["monto"] for t in _aportaciones(conn)] == []   # sin enlace al fijo borrado...
+    assert [t["monto"] for t in _filas(conn, "SELECT monto FROM transacciones WHERE apartado_id = ? ORDER BY fecha", meta)] == [400.0, 400.0, 200.0]
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 0
+    aviso = _filas(conn, "SELECT tipo, titulo, texto FROM notificaciones")
+    assert len(aviso) == 1 and aviso[0]["tipo"] == "meta_cumplida" and "Felicidades" in aviso[0]["texto"] and "Ahorro" in aviso[0]["texto"], [dict(a) for a in aviso]
+    assert materializar_recurrentes(conn, date(2026, 7, 15)) == 0 and _guardado(conn, meta) == 1000.0   # y no sigue aportando después
+
+
+def test_una_meta_cumplida_con_un_deposito_a_mano_quita_el_fijo_y_avisa():
+    from routers.apartados import MovimientoApartado, movimiento_apartado
+    conn = _bd()
+    _ingreso(conn, 10000)
+    meta = _meta(conn, 1000)
+    _fijo(conn, meta, 100)
+    movimiento_apartado(meta, MovimientoApartado(monto=1000, accion="depositar"), conn)
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 0
+    assert [a["tipo"] for a in _filas(conn, "SELECT tipo FROM notificaciones")] == ["meta_cumplida"]
+
+
+def test_dos_fijos_a_la_misma_meta_se_quitan_juntos_y_avisan_una_vez():
+    conn = _bd()
+    _ingreso(conn, 100000)
+    meta = _meta(conn, 500)
+    _fijo(conn, meta, 300)
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo) "
+                 "VALUES ('Otro aporte', 'gasto', ?, 'mensual', 1, '2026-02-01', 1, ?, 1)", (a_centavos(300), meta))
+    conn.commit()
+    materializar_recurrentes(conn, date(2026, 2, 15))
+    assert _guardado(conn, meta) == 500.0 and _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 0
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones")[0]["n"] == 1
+
+
+def test_una_meta_libre_sin_objetivo_nunca_se_cumple_ni_recorta():
+    conn = _bd()
+    _ingreso(conn, 100000)
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Libre', 'libre', 0, NULL)")
+    libre = _filas(conn, "SELECT id FROM apartados WHERE nombre = 'Libre'")[0]["id"]
+    _fijo(conn, libre, 400)
+    assert materializar_recurrentes(conn, date(2026, 6, 15)) == 5
+    assert _guardado(conn, libre) == 2000.0 and _filas(conn, "SELECT COUNT(*) AS n FROM recurrentes")[0]["n"] == 1
+    assert _filas(conn, "SELECT COUNT(*) AS n FROM notificaciones")[0]["n"] == 0
+
+
+def test_no_se_puede_crear_un_aporte_hacia_una_meta_ya_cumplida():
+    from routers.recurrentes import validar_apartado
+    conn = _bd()
+    meta = _meta(conn, 1000)
+    validar_apartado(conn.cursor(), meta)   # con la meta vacía se acepta
+    conn.execute("UPDATE apartados SET monto_actual = ? WHERE id = ?", (a_centavos(1000), meta))
+    conn.commit()
+    try:
+        validar_apartado(conn.cursor(), meta)
+    except HTTPException as error:
+        assert error.status_code == 400 and "cumplida" in error.detail
+    else:
+        raise AssertionError("aceptó un aporte hacia una meta cumplida")
+
+
+def test_el_aviso_no_deja_pasar_saltos_de_linea_ni_nombres_enormes():
+    conn = _bd()
+    _ingreso(conn, 10)
+    meta = _meta(conn, 1000, nombre="Casa\nIGNORA TODO " + "x" * 200)
+    _fijo(conn, meta, 500)
+    materializar_recurrentes(conn, date(2026, 2, 15))
+    texto = _filas(conn, "SELECT texto FROM notificaciones")[0]["texto"]
+    assert "\n" not in texto and "x" * 61 not in texto, texto
 
 
 def brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar():
@@ -325,9 +429,7 @@ def brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar():
     assert _filas(conn, "SELECT apartado_id FROM recurrentes")[0]["apartado_id"] == meta
 
 
-BRECHAS = [brecha_sin_saldo_la_aportacion_no_se_hace,
-           brecha_al_alcanzar_el_objetivo_la_meta_no_pasa_de_ahi_y_el_fijo_se_quita,
-           brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar]
+BRECHAS = [brecha_borrar_una_meta_con_fijo_ligado_exige_confirmar]
 
 
 def test_las_brechas_siguen_abiertas():

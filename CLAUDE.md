@@ -28,7 +28,7 @@ Convenciones:
 ## Estructura relevante
 
 - `main.py`: servidor FastAPI, middleware de seguridad y rutas SPA.
-- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 22 (`CURRENT_TENANT_SCHEMA_VERSION`).
+- `database.py`: conexiones por tenant y migraciones perezosas. Esquema actual: versión 23 (`CURRENT_TENANT_SCHEMA_VERSION`; la 23 añade `notificaciones`, los avisos del core: aporte omitido por falta de saldo y meta cumplida).
 - `dinero.py`: el dinero se guarda en centavos enteros. `a_centavos` convierte al escribir y `fabrica_filas` (el `row_factory` de los tenants) devuelve pesos al leer las columnas de dinero. Un total en SQL (`SUM`, `CASE`) se divide entre `100.0` en la consulta; `verificar_reglas.sh` lo vigila.
 - `finanzas_core.py`: cálculo financiero puro (conversiones, rendimientos, frecuencias, sub-periodos, reparto en centavos).
 - `security.py`: bcrypt, JWT (HS256, clave obligatoria de al menos 32 caracteres), RBAC y control de tasa.

@@ -32,7 +32,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 TENANTS_DIR = os.path.join(DATA_DIR, "tenants")
 
 # Versión actual del esquema de base de datos de cada tenant
-CURRENT_TENANT_SCHEMA_VERSION = 22
+CURRENT_TENANT_SCHEMA_VERSION = 23
 
 
 # =============================================================================
@@ -639,6 +639,23 @@ def apply_lazy_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trans_canceladas_fecha ON transacciones_canceladas(fecha);")
         cursor.execute("PRAGMA user_version = 22;")
         current_version = 22
+
+    if current_version < 23 and CURRENT_TENANT_SCHEMA_VERSION >= 23:
+        # Avisos de la app (aportación omitida, meta cumplida...). `clave` evita repetir el mismo aviso por el mismo hecho.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notificaciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo TEXT NOT NULL,
+                clave TEXT NOT NULL UNIQUE,
+                titulo TEXT NOT NULL,
+                texto TEXT NOT NULL,
+                creada_en TEXT NOT NULL,
+                leida INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificaciones_leida ON notificaciones(leida, id);")
+        cursor.execute("PRAGMA user_version = 23;")
+        current_version = 23
 
     conn.commit()
 

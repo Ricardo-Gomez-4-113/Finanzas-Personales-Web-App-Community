@@ -68,8 +68,11 @@ class RecurrenteUpdate(BaseModel):
 
 def validar_apartado(cursor, apartado_id: Optional[int]) -> None:
     if apartado_id is not None:
-        if not cursor.execute("SELECT 1 FROM apartados WHERE id = ?", (apartado_id,)).fetchone():
+        meta = cursor.execute("SELECT meta_monto, monto_actual FROM apartados WHERE id = ?", (apartado_id,)).fetchone()
+        if not meta:
             raise HTTPException(status_code=400, detail="El apartado o meta seleccionado no existe.")
+        if meta["meta_monto"] is not None and a_centavos(meta["monto_actual"]) >= a_centavos(meta["meta_monto"]):
+            raise HTTPException(status_code=400, detail="Esa meta ya está cumplida: un gasto fijo no puede seguir aportándole.")
 
 
 def _categoria_compras_a_meses(cursor) -> int:

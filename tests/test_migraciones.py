@@ -364,6 +364,31 @@ def test_v22_crea_la_tabla_de_cancelados_sin_tocar_nada_y_es_idempotente():
         assert _version(conn) == 22 and _conteos(conn) == {**conteos, "transacciones_canceladas": 0}
 
 
+def test_v23_crea_la_tabla_de_avisos_sin_tocar_nada_y_es_idempotente():
+    with tempfile.TemporaryDirectory() as tmp:
+        conn = _db_en_version(os.path.join(tmp, "t.db"), 22)
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, descripcion) VALUES ('2026-10-01', 1999, 'gasto', 'cuenta')")
+        conn.commit()
+        conteos = _conteos(conn)
+
+        _migrar_hasta(conn, 23)
+        assert _version(conn) == 23
+        assert _conteos(conn) == {**conteos, "notificaciones": 0}
+        columnas = {r[1] for r in conn.execute("PRAGMA table_info(notificaciones)")}
+        assert {"tipo", "clave", "titulo", "texto", "creada_en", "leida"} <= columnas, columnas
+        conn.execute("INSERT INTO notificaciones (tipo, clave, titulo, texto, creada_en) VALUES ('t', 'k', 'x', 'y', '2026-10-01 10:00:00')")
+        try:
+            conn.execute("INSERT INTO notificaciones (tipo, clave, titulo, texto, creada_en) VALUES ('t', 'k', 'x', 'y', '2026-10-01 10:00:00')")
+        except sqlite3.IntegrityError:
+            pass
+        else:
+            raise AssertionError("la misma clave no debe poder avisarse dos veces")
+        conn.rollback()
+
+        _migrar_hasta(conn, 23)   # volver a correrla no falla ni cambia nada
+        assert _version(conn) == 23 and _conteos(conn) == {**conteos, "notificaciones": 0}
+
+
 def test_un_alter_que_falla_por_otra_causa_no_marca_la_migracion_como_hecha():
     """El ALTER TABLE ADD COLUMN solo se tolera si la columna ya existe; cualquier otro error del SQL debe salir."""
     with tempfile.TemporaryDirectory() as tmp:

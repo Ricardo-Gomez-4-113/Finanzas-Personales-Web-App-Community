@@ -192,17 +192,57 @@ def ancla_al_editar_proximo_cargo(dia_guardado: Optional[int], nueva_fecha: date
     return nueva_fecha.day
 
 
+def _nombre_en_aviso(texto) -> str:
+    """El nombre de una meta o de un fijo dentro de un aviso: lo escribe la persona, así que sin saltos ni caracteres de control y acotado."""
+    limpio = "".join(c if c.isprintable() else " " for c in str(texto or ""))
+    return " ".join(limpio.split())[:60]
+
+
+def avisar(cursor: sqlite3.Cursor, tipo: str, clave: str, titulo: str, texto: str) -> bool:
+    """Guarda un aviso para la persona. Un mismo hecho (misma `clave`) se avisa una sola vez, aunque el proceso se repita."""
+    cursor.execute(
+        "INSERT OR IGNORE INTO notificaciones (tipo, clave, titulo, texto, creada_en) VALUES (?, ?, ?, ?, ?)",
+        (tipo, clave, titulo, texto, ahora_local().strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    return cursor.rowcount == 1
+
+
+def cerrar_meta_si_cumplida(cursor: sqlite3.Cursor, apartado_id: int, fecha: str) -> bool:
+    """Si la meta (con objetivo) ya llegó a él, sin importar cómo: avisa y quita los fijos que le aportaban (los movimientos ya hechos se conservan).
+    Una meta libre, sin objetivo, no se cumple nunca."""
+    meta = cursor.execute("SELECT nombre, meta_monto, monto_actual FROM apartados WHERE id = ?", (apartado_id,)).fetchone()
+    if meta is None or meta["meta_monto"] is None or a_centavos(meta["monto_actual"]) < a_centavos(meta["meta_monto"]):
+        return False
+    fijos = cursor.execute("SELECT id, descripcion FROM recurrentes WHERE apartado_id = ?", (apartado_id,)).fetchall()
+    for fijo in fijos:
+        cursor.execute("DELETE FROM recurrentes WHERE id = ?", (fijo["id"],))
+    nombre = _nombre_en_aviso(meta["nombre"])
+    texto = f"Completaste tu meta «{nombre}»: llegaste a {pesos_en_mensaje(float(meta['meta_monto']))}. ¡Felicidades!"
+    if fijos:
+        quitados = ", ".join(f"«{_nombre_en_aviso(f['descripcion'])}»" for f in fijos)
+        texto += f" Quité {'el gasto fijo' if len(fijos) == 1 else 'los gastos fijos'} {quitados} que le aportaba{'' if len(fijos) == 1 else 'n'}; lo ya aportado se queda."
+    avisar(cursor, "meta_cumplida", f"meta_cumplida:{apartado_id}:{fecha}", "¡Meta cumplida!", texto)
+    return True
+
+
 def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
     """
     Inserta en `transacciones` las ocurrencias de recurrentes cuya fecha ya llegó.
     Nunca inserta fechas futuras. Devuelve cuántas transacciones creó.
+
+    Un fijo que aporta a una meta cuida a la persona: sin saldo ese día el aporte se omite (con aviso, y el ciclo avanza), la última
+    aportación se recorta a lo que falta para el objetivo y, al cumplirse la meta, el fijo se quita. Se procesan primero los ingresos,
+    luego los gastos normales y al final los aportes a metas: el ahorro usa lo que sobra después de lo que ya se debía pagar.
     """
     cursor = conn.cursor()
     filas = cursor.execute(
-        "SELECT * FROM recurrentes WHERE activo = 1 AND proxima_fecha <= ?", (hoy.isoformat(),)
+        "SELECT * FROM recurrentes WHERE activo = 1 AND proxima_fecha <= ? "
+        "ORDER BY CASE WHEN tipo = 'ingreso' THEN 0 WHEN apartado_id IS NULL THEN 1 ELSE 2 END, id", (hoy.isoformat(),)
     ).fetchall()
     insertadas = 0
     for fila in filas:
+        if cursor.execute("SELECT 1 FROM recurrentes WHERE id = ?", (fila["id"],)).fetchone() is None:
+            continue   # se quitó en esta misma pasada (su meta se cumplió con otro fijo)
         total = fila["total_cuotas"]
         monto = float(fila["monto"])
         generadas = int(fila["cuotas_generadas"])
@@ -210,6 +250,7 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
         dia = fila["dia"]
         apartado_id = fila["apartado_id"] if "apartado_id" in fila.keys() else None
         activo = 1
+        quitado = False
 
         while prox <= hoy and (total is None or generadas < total):
             # Prevenir transacciones duplicadas para el mismo recurrente en la misma fecha
@@ -232,6 +273,25 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
             else:
                 monto_cuota = monto
                 descripcion = fila["descripcion"]
+            aporte_a_meta = bool(apartado_id) and fila["tipo"] == 'gasto' and total is None
+            if aporte_a_meta:
+                meta = cursor.execute("SELECT nombre, meta_monto, monto_actual FROM apartados WHERE id = ?", (apartado_id,)).fetchone()
+                if meta is not None and meta["meta_monto"] is not None:
+                    faltante = a_centavos(meta["meta_monto"]) - a_centavos(meta["monto_actual"])
+                    if faltante <= 0:   # la meta ya estaba cumplida (p. ej. por un depósito a mano): este fijo ya no tiene a qué aportar
+                        quitado = cerrar_meta_si_cumplida(cursor, apartado_id, prox.isoformat())
+                        break
+                    monto_cuota = min(monto_cuota, faltante / 100)   # la última aportación solo completa lo que falta
+                try:
+                    validar_saldo_disponible_fecha(cursor, prox.isoformat(), monto_cuota, 'gasto')
+                except ValueError:
+                    nombre_meta = _nombre_en_aviso(meta["nombre"] if meta is not None else "")
+                    avisar(cursor, "aporte_omitido", f"aporte_omitido:{fila['id']}:{prox.isoformat()}", "No pude aportar a tu meta",
+                           f"El {fecha_corta(prox.isoformat())} no había saldo para aportar {pesos_en_mensaje(monto_cuota)} a «{nombre_meta}» "
+                           f"desde «{_nombre_en_aviso(fila['descripcion'])}». Omití ese aporte; puedes depositarlo a mano cuando tengas saldo.")
+                    generadas += 1
+                    prox = siguiente_fecha(prox, fila["frecuencia"], dia)
+                    continue
             # Inserción blindada con manejo de concurrencia e índice único
             try:
                 cursor.execute(
@@ -252,9 +312,16 @@ def materializar_recurrentes(conn: sqlite3.Connection, hoy: date) -> int:
             except sqlite3.IntegrityError:
                 # Ya fue insertado por otra conexión concurrente
                 generadas += 1
+                prox = siguiente_fecha(prox, fila["frecuencia"], dia)
+                continue
 
+            if aporte_a_meta and cerrar_meta_si_cumplida(cursor, apartado_id, prox.isoformat()):
+                quitado = True
+                break
             prox = siguiente_fecha(prox, fila["frecuencia"], dia)
 
+        if quitado:
+            continue   # el fijo ya no existe
         if total is not None and generadas >= total:
             activo = 0
         cursor.execute(

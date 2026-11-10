@@ -282,6 +282,7 @@ def test_migracion_v7_apartado_recurrente():
 
 def test_recurrente_aporta_a_meta():
     conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo) VALUES ('2026-01-01', 1000000, 'ingreso')")   # sin saldo no se aporta
     conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual, meta_monto) VALUES ('Fondo Emergencia', 'meta', 100000, 500000)")
     apa_id = conn.execute("SELECT id FROM apartados WHERE nombre='Fondo Emergencia'").fetchone()["id"]
     conn.execute(
