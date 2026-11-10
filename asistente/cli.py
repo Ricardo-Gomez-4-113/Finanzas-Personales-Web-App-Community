@@ -90,8 +90,11 @@ def _conversar(args, cliente):
         from asistente.modelo_falso import ModeloFalso
         modelo = ModeloFalso([Respuesta(texto="(modelo falso)")] * 50)
     else:
-        from asistente.modelo_gemini import ModeloGemini
-        modelo = ModeloGemini()
+        from asistente.modelos import crear_modelo
+        _cargar_env_del_asistente()
+        if args.modelo:
+            os.environ["ASISTENTE_MODELO"] = args.modelo
+        modelo = crear_modelo()   # Gemini u Ollama según --modelo o ASISTENTE_MODELO (y ASISTENTE_MODELO_RESPALDO)
     propuestas = Propuestas()
     herramientas = Herramientas(obtener_con_cliente(cliente, user_id), propuestas, user_id, lambda: ahora_local().date())
     motor = Motor(modelo, herramientas, lambda: ahora_local().date())
@@ -123,11 +126,23 @@ def _conversar(args, cliente):
                 print("   Cancelada.")
 
 
+def _cargar_env_del_asistente(ruta=".env"):
+    """Variables del asistente que estén en un .env y no en el entorno (solo las suyas), con o sin comillas."""
+    if not os.path.exists(ruta):
+        return
+    with open(ruta, encoding="utf-8") as archivo:
+        for linea in archivo:
+            nombre, _, valor = linea.strip().partition("=")
+            if nombre.startswith(("OLLAMA_", "ASISTENTE_MODELO")) and nombre not in os.environ:
+                os.environ[nombre] = valor.strip().strip('"').strip("'")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--demo", action="store_true")
     p.add_argument("--usuario")
     p.add_argument("--falso", action="store_true")
+    p.add_argument("--modelo", choices=("gemini", "ollama"), help="proveedor del modelo (por defecto ASISTENTE_MODELO o gemini)")
     p.add_argument("--preguntas", action="store_true")
     args = p.parse_args()
     if not args.demo and not args.usuario:

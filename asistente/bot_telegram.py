@@ -432,7 +432,7 @@ def main():
     import httpx
     from asistente.api import ejecutar_propuesta, obtener_con_proveedor
     from asistente.herramientas import Herramientas
-    from asistente.modelo_gemini import ModeloGemini
+    from asistente.modelos import crear_modelo
     from asistente.motor import Motor
     from asistente.propuestas import Propuestas
     from asistente.servicio import ServicioHTTP
@@ -444,7 +444,7 @@ def main():
         sys.exit("Faltan TELEGRAM_BOT_TOKEN o ASISTENTE_SECRETO_INTERNO (de 32 caracteres o más)")
     app = httpx.Client(base_url=os.environ.get("APP_URL", "http://finanzas-community:8001"), timeout=30)
     servicio = ServicioHTTP(app, secreto)
-    modelo = ModeloGemini()
+    modelo = crear_modelo(registrar=lambda n, **c: _evento(n, **c))   # Gemini u Ollama (y respaldo) según el entorno
     propuestas = Propuestas()
     hoy = lambda: ahora_local().date()  # noqa: E731
 

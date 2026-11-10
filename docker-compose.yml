@@ -46,6 +46,14 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_MODEL_RESPALDO: ${GEMINI_MODEL_RESPALDO:-}
+      # Qué modelo usa el asistente: gemini (por defecto) u ollama, con el otro de respaldo (opcional). Ver .env.example
+      ASISTENTE_MODELO: ${ASISTENTE_MODELO:-}
+      ASISTENTE_MODELO_RESPALDO: ${ASISTENTE_MODELO_RESPALDO:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       ASISTENTE_SECRETO_INTERNO: ${ASISTENTE_SECRETO_INTERNO}
       # Los módulos de la app que importa exigen una clave JWT para arrancar. Esta es de relleno y NO es la real: el bot no puede firmar nada válido.
       JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
@@ -85,6 +93,14 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_MODEL_RESPALDO: ${GEMINI_MODEL_RESPALDO:-}
+      # Qué modelo usa el asistente: gemini (por defecto) u ollama, con el otro de respaldo (opcional). Ver .env.example
+      ASISTENTE_MODELO: ${ASISTENTE_MODELO:-}
+      ASISTENTE_MODELO_RESPALDO: ${ASISTENTE_MODELO_RESPALDO:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       ASISTENTE_WEB_SECRETO: ${ASISTENTE_WEB_SECRETO}   # otro valor que el del bot: este servicio no tiene el secreto de Telegram
       JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
     read_only: true

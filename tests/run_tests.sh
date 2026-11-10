@@ -36,6 +36,7 @@ docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINAN
   paso test_asistente       python3 tests/test_asistente.py
   paso test_telegram        python3 tests/test_telegram.py
   paso test_asistente_web   python3 tests/test_asistente_web.py
+  paso test_modelos         python3 tests/test_modelos.py
   echo
   if [ "$estado" -eq 0 ]; then echo "RESULTADO: todas las suites OK"; else echo "RESULTADO: hay suites con fallos"; fi
   exit "$estado"
