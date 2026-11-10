@@ -17,6 +17,9 @@ from asistente.motor import Respuesta
 
 MODELO_POR_DEFECTO = "qwen2.5:7b"
 NUM_CTX_POR_DEFECTO = 8192
+# Se añade al final del último mensaje de la persona (solo en lo que se envía, no en el historial): un modelo pequeño se olvida de las reglas de las
+# instrucciones cuando la conversación se alarga y empieza a contestar de memoria o a narrar lo que haría; repetirlas junto a la pregunta lo evita.
+RECORDATORIO = "\n\n(Recuerda: los datos de mi cuenta solo salen de una herramienta; llámala antes de contestar y no describas que vas a llamarla.)"
 SEGUNDOS_POR_DEFECTO = 50   # el turno del motor corta a los 60 s: este modelo no debe agotarlo solo
 
 
@@ -84,6 +87,13 @@ class ModeloOllama:
                     raise SinSoporte("este modelo solo lee texto")
                 salida.append({"role": "user", "content": m["texto"] or ""})
             elif m["rol"] == "modelo":
+                if m.get("consultas") and not m.get("llamadas"):
+                    # Un turno anterior que consultó herramientas: se le muestra al modelo CON sus llamadas. Si solo viera respuestas con cifras y
+                    # ninguna llamada, un modelo pequeño aprende a contestar de memoria (se vio con qwen2.5:7b a partir de la sexta pregunta).
+                    # Los resultados no se repiten (los datos cambian y ocupan contexto): una nota dice que son de antes.
+                    salida.append({"role": "assistant", "content": "", "tool_calls": [{"function": {"name": c["nombre"], "arguments": c.get("args") or {}}} for c in m["consultas"]]})
+                    for c in m["consultas"]:
+                        salida.append({"role": "tool", "tool_name": c["nombre"], "content": json.dumps({"nota": "resultado de una consulta anterior; si preguntan de nuevo, vuelve a llamar a la herramienta"})})
                 mensaje = {"role": "assistant", "content": m.get("texto") or ""}
                 if m.get("llamadas"):
                     mensaje["tool_calls"] = [{"function": {"name": c["nombre"], "arguments": c.get("args") or {}}} for c in m["llamadas"]]
@@ -91,6 +101,8 @@ class ModeloOllama:
             else:
                 for r in m["resultados"]:
                     salida.append({"role": "tool", "tool_name": r["nombre"], "content": json.dumps(r["resultado"], ensure_ascii=False, default=str)})
+        if salida[-1]["role"] == "user":
+            salida[-1] = {**salida[-1], "content": salida[-1]["content"] + RECORDATORIO}
         return salida
 
     def generar(self, instrucciones, mensajes, declaraciones):
@@ -100,7 +112,7 @@ class ModeloOllama:
             "tools": [{"type": "function", "function": {"name": d["nombre"], "description": d["descripcion"], "parameters": d["parametros"]}}
                       for d in declaraciones],
             "stream": False,
-            "options": {"temperature": 0.2, "num_ctx": self._num_ctx},
+            "options": {"temperature": 0.1, "num_ctx": self._num_ctx},
         }
         try:
             r = self._cliente.post(f"{self._base}/api/chat", json=cuerpo, headers=self._cabeceras)
@@ -130,7 +142,12 @@ class ModeloOllama:
             en_texto = _llamada_en_texto(texto, conocidas)
             if en_texto:
                 llamadas, texto = [en_texto], ""
-        tokens = int(datos.get("prompt_eval_count") or 0) + int(datos.get("eval_count") or 0)
+        entrada = int(datos.get("prompt_eval_count") or 0)
+        if entrada >= self._num_ctx - 16:
+            # Ollama recorta el principio cuando el prompt no cabe: se pierden las instrucciones y las herramientas y el modelo contesta cualquier
+            # cosa sin avisar. Mejor fallar (el motor lo dice, o responde el modelo de respaldo) que mostrar una respuesta sin fundamento.
+            raise ErrorDeOllama(f"el contexto se llenó ({entrada} tokens de {self._num_ctx}): sube OLLAMA_NUM_CTX o acorta la conversación")
+        tokens = entrada + int(datos.get("eval_count") or 0)
         if tokens <= 0:   # sin cifras del servidor, el tope de tokens no puede quedar ciego: se estima por longitud
             tokens = max(1, (len(instrucciones) + len(str(mensajes)) + len(texto) + len(str(llamadas))) // 3)
         return Respuesta(texto=texto if not llamadas else "", llamadas=llamadas, tokens=tokens)

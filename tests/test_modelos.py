@@ -26,7 +26,7 @@ sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 
 from asistente.herramientas import Herramientas  # noqa: E402
-from asistente.modelo_ollama import ErrorDeOllama, ModeloOllama, SinSoporte, normalizar_url  # noqa: E402
+from asistente.modelo_ollama import RECORDATORIO, ErrorDeOllama, ModeloOllama, SinSoporte, normalizar_url  # noqa: E402
 from asistente.modelo_falso import ModeloFalso  # noqa: E402
 from asistente.modelos import ModeloConRespaldo, crear_modelo  # noqa: E402
 from asistente.motor import INSTRUCCIONES, Motor, Respuesta  # noqa: E402
@@ -94,9 +94,9 @@ def test_ollama_manda_instrucciones_herramientas_y_ventana_y_lee_texto_y_tokens(
         assert r.texto == "Hola, ¿en qué te ayudo?" and r.llamadas == [] and r.tokens == 150, r
         p = srv.peticiones[0]
         assert p["ruta"] == "/api/chat" and p["cuerpo"]["model"] == "qwen2.5:7b" and p["cuerpo"]["stream"] is False
-        assert p["cuerpo"]["messages"] == [{"role": "system", "content": "Eres un asistente."}, {"role": "user", "content": "hola"}]
+        assert p["cuerpo"]["messages"] == [{"role": "system", "content": "Eres un asistente."}, {"role": "user", "content": "hola" + RECORDATORIO}], "la regla se repite junto a la pregunta"
         assert [t["function"]["name"] for t in p["cuerpo"]["tools"]] == ["resumen", "categorias"]
-        assert p["cuerpo"]["options"] == {"temperature": 0.2, "num_ctx": 8192}, "pide una ventana que quepa el prompt de herramientas"
+        assert p["cuerpo"]["options"] == {"temperature": 0.1, "num_ctx": 8192}, "pide una ventana que quepa el prompt de herramientas"
         assert "Authorization" not in p["cabeceras"], "Ollama no pide clave"
     finally:
         srv.cerrar()
@@ -116,6 +116,19 @@ def test_las_llamadas_a_herramientas_se_leen_y_los_resultados_vuelven_como_mensa
         enviados = srv.peticiones[-1]["cuerpo"]["messages"]
         assert enviados[2] == {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "resumen", "arguments": {}}}]}
         assert enviados[3]["role"] == "tool" and enviados[3]["tool_name"] == "resumen" and json.loads(enviados[3]["content"]) == {"balance": 123.5, "nota": "ñandú"}
+    finally:
+        srv.cerrar()
+
+
+def test_los_turnos_anteriores_se_muestran_con_sus_llamadas_para_que_el_modelo_siga_consultando():
+    srv = OllamaFalso([_texto("ok")])
+    try:
+        historial = [{"rol": "usuario", "texto": "¿saldo?"}, {"rol": "modelo", "texto": "Tu saldo es $10.", "consultas": [{"nombre": "resumen", "args": {}}]},
+                     {"rol": "usuario", "texto": "gracias"}, {"rol": "modelo", "texto": "De nada."}, {"rol": "usuario", "texto": "¿y ahora?"}]
+        ModeloOllama(srv.url).generar("i", historial, DECLARACIONES)
+        roles = [(m["role"], m.get("tool_calls", [{}])[0].get("function", {}).get("name") if m.get("tool_calls") else m.get("content", "")[:12]) for m in srv.peticiones[0]["cuerpo"]["messages"]]
+        assert roles == [("system", "i"), ("user", "¿saldo?"), ("assistant", "resumen"), ("tool", "{\"nota\": \"re"), ("assistant", "Tu saldo es "), ("user", "gracias"), ("assistant", "De nada."), ("user", "¿y ahora?\n\n(")], roles
+        assert "vuelve a llamar" in srv.peticiones[0]["cuerpo"]["messages"][3]["content"], "los resultados viejos no se repiten: una nota dice que ya no valen"
     finally:
         srv.cerrar()
 
@@ -162,6 +175,21 @@ def test_los_errores_de_ollama_no_filtran_la_url_ni_el_cuerpo_y_un_archivo_pasa_
         pass
     else:
         raise AssertionError("debe avisar que no lee archivos")
+
+
+def test_un_prompt_que_llena_la_ventana_falla_en_vez_de_contestar_sin_instrucciones():
+    srv = OllamaFalso([_texto("respuesta sin fundamento", prompt_eval_count=8192, eval_count=20), _texto("bien", prompt_eval_count=8000, eval_count=5)])
+    try:
+        m = ModeloOllama(srv.url)
+        try:
+            m.generar("i", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        except ErrorDeOllama as error:
+            assert "contexto" in str(error) and "OLLAMA_NUM_CTX" in str(error)
+        else:
+            raise AssertionError("con la ventana llena Ollama recortó las instrucciones: no se debe usar esa respuesta")
+        assert m.generar("i", [{"rol": "usuario", "texto": "x"}], DECLARACIONES).texto == "bien"
+    finally:
+        srv.cerrar()
 
 
 def test_la_clave_opcional_y_los_ajustes_de_entorno_se_aplican_y_los_valores_malos_no_los_rompen():

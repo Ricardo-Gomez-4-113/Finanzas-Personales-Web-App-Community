@@ -58,8 +58,8 @@ def _sembrar(cliente):
     usuario = master_db.create_user_entry("demo", security.hash_password(clave), email="demo@test.local")
     r = cliente.post("/auth/login", json={"username": "demo", "password": clave})
     cab = {"Authorization": f"Bearer {r.json()['access_token']}"}
-    from datetime import date
-    hoy = date.today()
+    from finanzas_core import ahora_local
+    hoy = ahora_local().date()   # el mismo «hoy» del asistente (México): con date.today() los datos podían quedar fechados un día después
     r = cliente.put("/api/presupuesto/config", json={"ingreso_base": 14000, "frecuencia": "quincenal", "dia_pago": 15}, headers=cab)
     assert r.status_code == 200, r.text
     cliente.post("/api/transacciones", json={"fecha": hoy.isoformat(), "monto": 14000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "Nómina"}, headers=cab)

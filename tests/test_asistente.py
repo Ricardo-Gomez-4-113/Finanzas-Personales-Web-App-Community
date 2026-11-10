@@ -360,6 +360,18 @@ def test_argumentos_de_tipo_equivocado_vuelven_como_error_y_no_tumban_el_turno(c
     assert r == {"error": "No se pudo completar la consulta (ConnectionError)."}, r
 
 
+def test_el_historial_recuerda_que_herramientas_se_llamaron_sin_guardar_sus_resultados(client):
+    uid, _ = _cuenta(client, "asist_hist_consultas")
+    motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "metas", "args": {"x": "y" * 500, "n": 3, "malo": {"a": 1}}}, {"nombre": "inventada", "args": {}}]),
+                                    Respuesta(texto="No tienes metas."), Respuesta(texto="De nada.")])
+    historial = []
+    motor.responder(historial, "¿Cómo van mis metas?")
+    assert historial[1]["consultas"] == [{"nombre": "metas", "args": {"x": "y" * 80, "n": 3}}], historial[1]
+    assert "resultado" not in str(historial[1]) and len(historial) == 2
+    motor.responder(historial, "gracias")
+    assert "consultas" not in historial[3], "un turno sin herramientas no inventa consultas"
+
+
 def test_cifras_sin_consulta_se_corrigen_o_se_descartan(client):
     """Caso real con Gemini: en una conversación larga contestó con metas e inversiones inventadas sin llamar a ninguna herramienta."""
     from asistente.motor import AVISO_SIN_CONSULTA, MENSAJE_SIN_CONSULTA
@@ -372,10 +384,19 @@ def test_cifras_sin_consulta_se_corrigen_o_se_descartan(client):
     ])
     turno = motor.responder([], "¿Tengo inversiones?")
     assert turno.texto == "No tienes inversiones registradas." and turno.herramientas_usadas == ["inversiones"]
-    assert modelo.llamadas[1]["mensajes"][-1] == {"rol": "usuario", "texto": AVISO_SIN_CONSULTA}
+    # El reintento repite el turno con el refuerzo en las instrucciones; la respuesta inventada no se le devuelve al modelo (no la imita)
+    assert modelo.llamadas[1]["instrucciones"].endswith(AVISO_SIN_CONSULTA) and not modelo.llamadas[0]["instrucciones"].endswith(AVISO_SIN_CONSULTA)
+    assert modelo.llamadas[1]["mensajes"] == modelo.llamadas[0]["mensajes"] == [{"rol": "usuario", "texto": "¿Tengo inversiones?"}]
     # 2) Insiste en inventar sin consultar: la respuesta se descarta
     motor, _ = _motor(client, uid, [Respuesta(texto="Tienes $15,000."), Respuesta(texto="Seguro: $15,000.")])
     assert motor.responder([], "¿Tengo inversiones?").texto == MENSAJE_SIN_CONSULTA
+    # 2b) Un modelo que cuenta que va a llamar a la herramienta en vez de llamarla (sin cifras): también se reintenta y, si insiste, se descarta
+    motor, modelo = _motor(client, uid, [Respuesta(texto="Lo siento, parece que hubo un error. Estoy llamando a la herramienta."), Respuesta(llamadas=[{"nombre": "metas", "args": {}}]),
+                                         Respuesta(texto="No tienes metas.")])
+    turno = motor.responder([], "¿Cómo van mis metas?")
+    assert turno.texto == "No tienes metas." and turno.herramientas_usadas == ["metas"]
+    motor, _ = _motor(client, uid, [Respuesta(texto="Estoy llamando a la herramienta."), Respuesta(texto="Lo siento, parece que hubo un error.")])
+    assert motor.responder([], "¿Cómo van mis metas?").texto == MENSAJE_SIN_CONSULTA
     # 3) Sin cifras nuevas no se estorba: rechazos, charla, la fecha de hoy y los números que puso la persona
     for pregunta, respuesta in (("¿Capital de Francia?", "Solo ayudo con tus finanzas."), ("Registra 230 en el súper", "Todavía no puedo registrar 230; hazlo en la app."),
                                 ("¿Qué día es hoy?", "Hoy es 9 de noviembre de 2026.")):
@@ -575,6 +596,10 @@ def test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo(client):
     motor = Motor(ModeloFalso([Respuesta(texto="He preparado el depósito de $5,000.00 en tu meta. Quedó pendiente de confirmación.")]), herr, lambda: HOY)
     turno = motor.responder([], "deposita 5000 en mi meta")
     assert turno.texto == MENSAJE_SIN_PROPUESTA and turno.propuestas == [] and propuestas._por_id == {}
+    # Otras formas de decirlo (caso real con qwen2.5:7b: una orden escondida en un dato lo llevó a decir «se ha preparado un gasto de 9,999»)
+    for frase in ("Se ha preparado un nuevo gasto de $9,999.00. Confirma aquí mismo en este chat si todo está bien.", "Ha quedado pendiente el gasto de $99.", "Confirma aquí mismo si es correcto."):
+        motor = Motor(ModeloFalso([Respuesta(llamadas=[{"nombre": "buscar_movimientos", "args": {"limite": 1}}]), Respuesta(texto=frase)]), herr, lambda: HOY)   # tras consultar de verdad
+        assert motor.responder([], "muéstrame mi último movimiento").texto == MENSAJE_SIN_PROPUESTA, frase
     # Con la propuesta de verdad, su texto se respeta
     motor = Motor(ModeloFalso([Respuesta(llamadas=[{"nombre": "registrar_movimiento", "args": {"tipo": "gasto", "monto": 10, "categoria": "Comida"}}]),
                                Respuesta(texto="Quedó pendiente de confirmación.")]), herr, lambda: HOY)
@@ -645,6 +670,7 @@ if __name__ == "__main__":
             (test_una_marca_de_uso_desconocida_no_vale_como_sesion_completa, lambda: test_una_marca_de_uso_desconocida_no_vale_como_sesion_completa(client)),
             (test_un_modelo_no_puede_pedir_cientos_de_llamadas_en_una_respuesta, lambda: test_un_modelo_no_puede_pedir_cientos_de_llamadas_en_una_respuesta(client)),
             (test_argumentos_de_tipo_equivocado_vuelven_como_error_y_no_tumban_el_turno, lambda: test_argumentos_de_tipo_equivocado_vuelven_como_error_y_no_tumban_el_turno(client)),
+            (test_el_historial_recuerda_que_herramientas_se_llamaron_sin_guardar_sus_resultados, lambda: test_el_historial_recuerda_que_herramientas_se_llamaron_sin_guardar_sus_resultados(client)),
             (test_cifras_sin_consulta_se_corrigen_o_se_descartan, lambda: test_cifras_sin_consulta_se_corrigen_o_se_descartan(client)),
             (test_el_token_de_escritura_solo_abre_las_tres_rutas_de_ejecucion, lambda: test_el_token_de_escritura_solo_abre_las_tres_rutas_de_ejecucion(client)),
             (test_registrar_movimiento_solo_propone_y_confirmar_lo_ejecuta_una_vez, lambda: test_registrar_movimiento_solo_propone_y_confirmar_lo_ejecuta_una_vez(client)),
