@@ -24,7 +24,7 @@ import acciones
 from oraculo import Oraculo
 
 PESOS_ACCION = (
-    ("consultar_saldo", 12), ("consultar_movimientos", 10), ("proponer_gasto", 14), ("proponer_ingreso", 6), ("proponer_meta", 8),
+    ("consultar_saldo", 12), ("consultar_movimientos", 10), ("consultar_movimientos_con_metas", 5), ("proponer_gasto", 14), ("proponer_ingreso", 6), ("proponer_meta", 8),
     ("confirmar", 22), ("cancelar", 6), ("doble_toque", 6), ("boton_ajeno", 6), ("orden_escondida", 4), ("dejar_vencer", 3),
     ("cambiar_clave_ajena", 3), ("grupo", 3), ("token_directo", 6), ("ingreso", 6), ("avanzar_dia", 4),
 )
@@ -192,6 +192,19 @@ def consultar_movimientos(ctx):
              lambda ins, msgs: Respuesta(texto="Suma ${:,.2f} en {} movimientos.".format(
                  msgs[-1]["resultados"][0]["resultado"]["suma"], msgs[-1]["resultados"][0]["resultado"]["total_encontrados"]))]
     res["enviados"] = ctx.decir(ctx.chat, ctx.user_id, f"¿cuánto en {tipo}s?", guion)
+    return res
+
+
+def consultar_movimientos_con_metas(ctx):
+    """Con `incluir_metas` entran los depósitos, retiros y aportes automáticos a metas; sin él no (la app tampoco los cuenta como gasto ni ingreso)."""
+    ctx.montar()
+    from asistente.motor import Respuesta
+    tipo = ctx.rng.choice(("gasto", "ingreso"))
+    res = _base(ctx, "consultar_movimientos_con_metas", entrada={"tipo": tipo, "incluir_metas": True}, tipo=tipo)
+    guion = [Respuesta(llamadas=[_llamar("buscar_movimientos", {"tipo": tipo, "limite": 3, "incluir_metas": True})]),
+             lambda ins, msgs: Respuesta(texto="Suma ${:,.2f} en {} movimientos.".format(
+                 msgs[-1]["resultados"][0]["resultado"]["suma"], msgs[-1]["resultados"][0]["resultado"]["total_encontrados"]))]
+    res["enviados"] = ctx.decir(ctx.chat, ctx.user_id, f"¿cuánto en {tipo}s contando mis metas?", guion)
     return res
 
 
@@ -367,7 +380,8 @@ def avanzar_dia(ctx):
 
 
 FUNCIONES = {
-    "consultar_saldo": consultar_saldo, "consultar_movimientos": consultar_movimientos, "proponer_gasto": proponer_gasto,
+    "consultar_saldo": consultar_saldo, "consultar_movimientos": consultar_movimientos, "consultar_movimientos_con_metas": consultar_movimientos_con_metas,
+    "proponer_gasto": proponer_gasto,
     "proponer_ingreso": proponer_ingreso, "proponer_meta": proponer_meta, "confirmar": confirmar, "cancelar": cancelar,
     "doble_toque": doble_toque, "boton_ajeno": boton_ajeno, "orden_escondida": orden_escondida, "dejar_vencer": dejar_vencer,
     "cambiar_clave_ajena": cambiar_clave_ajena, "grupo": grupo, "token_directo": token_directo, "ingreso": ingreso, "avanzar_dia": avanzar_dia,
@@ -456,6 +470,14 @@ def _verificar_accion(nombre, res, pre, post):
         if esperado not in texto:
             problemas.append(f"el bot dijo «{texto}» y el oráculo suma {esperado}")
     elif nombre == "consultar_movimientos":
+        if not _intacto(pre, post):
+            problemas.append("consultar movimientos cambió la base")
+        filas = [m for m in post["mov"] if m[3] == res["tipo"] and m[4] is None]   # sin los movimientos de metas
+        esperado = "Suma ${:,.2f} en {} movimientos.".format(sum(m[2] for m in filas) / 100, len(filas))
+        texto = _ultimo_texto(res["enviados"], res["chat"])
+        if texto != esperado:
+            problemas.append(f"el bot dijo «{texto}» y el oráculo suma «{esperado}»")
+    elif nombre == "consultar_movimientos_con_metas":
         if not _intacto(pre, post):
             problemas.append("consultar movimientos cambió la base")
         filas = [m for m in post["mov"] if m[3] == res["tipo"]]

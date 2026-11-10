@@ -648,6 +648,94 @@ def test_propuestas_duplicadas_copias_y_resultado_incierto(client):
     assert not ok and "ya se intentó" in texto and len(_movimientos(client, sesion)) == antes + 1
 
 
+def _meta_con_aporte(client, sesion, objetivo=10000, aporte=300, nombre="Fondo casa"):
+    """Una meta, un ingreso fijo que la respalda y un gasto fijo que le aporta solo. Fechas de 2026-10-01 en adelante (hoy es 2026-11-09)."""
+    meta = client.post("/api/apartados", json={"nombre": nombre, "tipo": "meta", "meta_monto": objetivo}, headers=sesion).json()["id"]
+    r = client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 10000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=sesion)
+    assert r.status_code in (200, 201), r.text
+    r = client.post("/api/recurrentes", json={"descripcion": "Ahorro casa", "tipo": "gasto", "monto": aporte, "frecuencia": "mensual", "fecha_inicio": "2026-10-05",
+                                              "categoria_id": 7, "apartado_id": meta}, headers=sesion)
+    assert r.status_code in (200, 201), r.text
+    return meta, r.json()["id"]
+
+
+def test_buscar_movimientos_separa_las_metas_de_los_gastos_y_dice_el_origen(client):
+    uid, sesion = _cuenta(client, "asist_origen")
+    cat = _categoria(client, sesion)
+    _fondear(client, sesion)
+    _movimiento(client, sesion, "2026-11-02", 230, "gasto", "Super semanal", cat)
+    meta, _ = _meta_con_aporte(client, sesion)   # el aporte automático del 5 de octubre y del 5 de noviembre
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 1000, "accion": "depositar"}, headers=sesion).status_code == 200
+    h = _herramientas(client, uid)
+
+    por_defecto = h.ejecutar("buscar_movimientos", {"tipo": "gasto", "desde": "2026-11-01"})
+    assert [m["descripcion"] for m in por_defecto["movimientos"]] == ["Super semanal"], por_defecto
+    assert por_defecto["suma"] == 230.0 and por_defecto["movimientos"][0]["origen"] == "movimiento normal"
+    api = client.get("/api/gastos-por-categoria", headers=sesion).json()
+    assert api["total"] == por_defecto["suma"] == 230.0, (api, por_defecto)   # la app tampoco cuenta lo que va a metas como gasto
+
+    con_metas = h.ejecutar("buscar_movimientos", {"tipo": "gasto", "desde": "2026-10-01", "incluir_metas": True})
+    origenes = sorted(m["origen"] for m in con_metas["movimientos"])
+    assert origenes.count("aporte automático a una meta (de un gasto fijo)") == 2, origenes
+    assert origenes.count("depósito a una meta") == 1 and origenes.count("movimiento normal") == 1, origenes
+    assert con_metas["total_encontrados"] == 4 and con_metas["suma"] == 230.0 + 1000.0 + 600.0, con_metas
+
+    for malo in ("si", 1, [], "true"):
+        assert set(h.ejecutar("buscar_movimientos", {"incluir_metas": malo})) == {"error"}, malo
+
+
+def test_cada_lectura_del_asistente_devuelve_exactamente_lo_que_la_api(client):
+    uid, sesion = _cuenta(client, "asist_paridad")
+    cat = _categoria(client, sesion)
+    _fondear(client, sesion)
+    _movimiento(client, sesion, "2026-11-02", 230.5, "gasto", "Super semanal", cat)
+    _meta_con_aporte(client, sesion)
+    h = _herramientas(client, uid)
+    rutas = {"resumen": ("/api/resumen", {"moneda_base": "MXN"}), "gastos_por_categoria": ("/api/gastos-por-categoria", {"moneda_base": "MXN"}),
+             "metas": ("/api/apartados", None), "fijos_proximos": ("/api/recurrentes/periodos", None), "presupuesto": ("/api/presupuesto", None),
+             "categorias": ("/api/categorias", None)}
+    for nombre, (ruta, params) in rutas.items():
+        esperado = hr.acotar(client.get(ruta, params=params, headers=sesion).json())
+        assert h.ejecutar(nombre, {}) == esperado, f"{nombre} no coincide con {ruta}"
+    # Y los fijos que aportan a una meta se ven como tales: el asistente puede explicar de dónde sale el ahorro
+    aportes = [i for p in h.ejecutar("fijos_proximos", {})["periodos"] for i in p["items"] if i["descripcion"] == "Ahorro casa"]
+    assert aportes and all(i["meta"] is True and i["apartado_nombre"] == "Fondo casa" for i in aportes), aportes
+
+
+def test_mover_a_meta_sin_saldo_se_rechaza_y_uno_que_cumple_la_meta_quita_su_fijo(client):
+    uid, sesion = _cuenta(client, "asist_meta_cumplida")
+    _movimiento(client, sesion, "2026-09-01", 100, "ingreso", "Fondeo chico", _categoria(client, sesion))
+    herr, propuestas = _con_escritura(client, uid)
+    meta = client.post("/api/apartados", json={"nombre": "Moto", "tipo": "meta", "meta_monto": 500}, headers=sesion).json()["id"]
+    r = herr.ejecutar("mover_a_meta", {"meta": "Moto", "accion": "depositar", "monto": 400})
+    ok, texto = _confirmar(client, propuestas, uid, r["propuesta_id"])
+    assert not ok and texto.startswith("No se pudo:"), texto   # solo hay 100 disponibles: misma regla que en la app
+    assert next(a for a in client.get("/api/apartados", headers=sesion).json() if a["id"] == meta)["monto_actual"] == 0
+
+    _movimiento(client, sesion, "2026-11-01", 5000, "ingreso", "Nomina", _categoria(client, sesion))
+    client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 5000, "frecuencia": "mensual", "fecha_inicio": "2026-12-01", "categoria_id": 12}, headers=sesion)
+    fijo = client.post("/api/recurrentes", json={"descripcion": "Ahorro moto", "tipo": "gasto", "monto": 100, "frecuencia": "mensual", "fecha_inicio": "2026-12-05",
+                                                "categoria_id": 7, "apartado_id": meta}, headers=sesion)
+    assert fijo.status_code in (200, 201), fijo.text
+    r = herr.ejecutar("mover_a_meta", {"meta": "Moto", "accion": "depositar", "monto": 500})
+    assert _confirmar(client, propuestas, uid, r["propuesta_id"])[0]
+    assert all(f["descripcion"] != "Ahorro moto" for f in client.get("/api/recurrentes", headers=sesion).json()), "al cumplirse la meta el fijo se quita"
+
+
+def test_saltar_un_fijo_que_aporta_a_una_meta_no_aporta_ese_ciclo(client):
+    uid, sesion = _cuenta(client, "asist_saltar_aporte")
+    _fondear(client, sesion)
+    meta, fijo = _meta_con_aporte(client, sesion)
+    herr, propuestas = _con_escritura(client, uid)
+    guardado = lambda: next(a for a in client.get("/api/apartados", headers=sesion).json() if a["id"] == meta)["monto_actual"]
+    antes = guardado()   # ya aportó octubre y noviembre al abrir la cuenta
+    r = herr.ejecutar("saltar_fijo", {"fijo": "Ahorro casa"})
+    assert r["resumen"] == "Saltar el próximo cobro de «Ahorro casa»", r
+    assert _confirmar(client, propuestas, uid, r["propuesta_id"])[0]
+    proxima = next(f for f in client.get("/api/recurrentes", headers=sesion).json() if f["id"] == fijo)["proxima_fecha"]
+    assert proxima > "2026-12-05" and guardado() == antes, (proxima, guardado(), antes)
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -682,6 +770,10 @@ if __name__ == "__main__":
             (test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo, lambda: test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo(client)),
             (test_el_resumen_neutraliza_el_texto_libre_pero_el_cuerpo_lo_conserva, lambda: test_el_resumen_neutraliza_el_texto_libre_pero_el_cuerpo_lo_conserva(client)),
             (test_propuestas_duplicadas_copias_y_resultado_incierto, lambda: test_propuestas_duplicadas_copias_y_resultado_incierto(client)),
+            (test_buscar_movimientos_separa_las_metas_de_los_gastos_y_dice_el_origen, lambda: test_buscar_movimientos_separa_las_metas_de_los_gastos_y_dice_el_origen(client)),
+            (test_cada_lectura_del_asistente_devuelve_exactamente_lo_que_la_api, lambda: test_cada_lectura_del_asistente_devuelve_exactamente_lo_que_la_api(client)),
+            (test_mover_a_meta_sin_saldo_se_rechaza_y_uno_que_cumple_la_meta_quita_su_fijo, lambda: test_mover_a_meta_sin_saldo_se_rechaza_y_uno_que_cumple_la_meta_quita_su_fijo(client)),
+            (test_saltar_un_fijo_que_aporta_a_una_meta_no_aporta_ese_ciclo, lambda: test_saltar_un_fijo_que_aporta_a_una_meta_no_aporta_ese_ciclo(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_asistente")

@@ -34,6 +34,7 @@ import arnes_asistente  # noqa: E402
 import copias  # noqa: E402
 import fijos  # noqa: E402
 import fijos_metas  # noqa: E402
+import conciliacion  # noqa: E402
 import metas  # noqa: E402
 import portafolio  # noqa: E402
 import presupuesto  # noqa: E402
@@ -98,7 +99,7 @@ def _detalle(respuesta):
         return respuesta.text[:300]
 
 
-SECCIONES = {"movimientos": acciones, "fijos": fijos, "fijos_metas": fijos_metas, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion, "login": acceso, "asistente": arnes_asistente}
+SECCIONES = {"movimientos": acciones, "fijos": fijos, "fijos_metas": fijos_metas, "conciliacion": conciliacion, "presupuesto": presupuesto, "metas": metas, "inversiones": portafolio, "respaldo": copias, "admin": administracion, "login": acceso, "asistente": arnes_asistente}
 
 
 def _episodio(semilla, numero, cliente, mods, bit, fallos, catalogo, persona="laura", base_dueno=None):

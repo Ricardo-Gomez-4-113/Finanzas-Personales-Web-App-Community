@@ -24,14 +24,15 @@ DECLARACIONES = [
      "descripcion": "Saldo, ingresos y gastos del periodo, libre hasta el cobro y patrimonio de la cuenta. Úsala para «¿cuánto me queda?».",
      "parametros": {"type": "object", "properties": {"moneda_base": _MONEDA}}},
     {"nombre": "buscar_movimientos",
-     "descripcion": "Movimientos de la cuenta (gastos e ingresos), del más reciente al más antiguo. Devuelve hasta 50, el total encontrado y la suma.",
+     "descripcion": "Movimientos de la cuenta (gastos e ingresos), del más reciente al más antiguo. Devuelve hasta 50, el total encontrado y la suma. Cada uno trae su `origen` (movimiento normal, gasto fijo o cuota, ingreso fijo, aporte automático a una meta, depósito o retiro de una meta). Por defecto NO incluye los depósitos ni retiros de metas: no son gasto ni ingreso, igual que en la app.",
      "parametros": {"type": "object", "properties": {
          "desde": {"type": "string", "description": "Fecha inicial AAAA-MM-DD, inclusive."},
          "hasta": {"type": "string", "description": "Fecha final AAAA-MM-DD, inclusive."},
          "tipo": {"type": "string", "enum": ["gasto", "ingreso"]},
          "categoria": {"type": "string", "description": "Nombre EXACTO de una categoría (sin distinguir mayúsculas). Úsala solo si la persona nombra una categoría; si dudas, llama antes a `categorias`."},
          "texto": {"type": "string", "description": "Texto que debe aparecer en la descripción («súper», «gasolina»). Para buscar un gasto por su nombre usa solo `texto`: no lo combines con `categoria`, porque deben cumplirse las dos."},
-         "limite": {"type": "integer", "description": "Cuántos devolver, de 1 a 50. Por defecto 20."}}}},
+         "limite": {"type": "integer", "description": "Cuántos devolver, de 1 a 50. Por defecto 20."},
+         "incluir_metas": {"type": "boolean", "description": "true para incluir también los depósitos, retiros y aportes automáticos a metas. Por defecto false."}}}},
     {"nombre": "gastos_por_categoria",
      "descripcion": "Gastos del periodo de cobro actual agrupados por categoría.",
      "parametros": {"type": "object", "properties": {"moneda_base": _MONEDA}}},
@@ -191,8 +192,21 @@ class Herramientas:
         return {"posiciones": self._api("/api/inversiones", {"moneda_base": moneda}),
                 "cuentas_con_rendimiento": self._api("/api/rendimiento", {"moneda_base": moneda})}
 
-    def _buscar_movimientos(self, desde=None, hasta=None, tipo=None, categoria=None, texto=None, limite=20):
+    @staticmethod
+    def _origen(m):
+        """De dónde viene un movimiento, para que se explique solo («¿por qué bajó mi saldo si no gasté?»)."""
+        if m.get("apartado_id") is not None:
+            if m.get("recurrente_id") is not None:
+                return "aporte automático a una meta (de un gasto fijo)"
+            return "depósito a una meta" if m["tipo"] == "gasto" else "retiro de una meta"
+        if m.get("recurrente_id") is not None:
+            return "ingreso fijo" if m["tipo"] == "ingreso" else "gasto fijo o cuota de una compra a meses"
+        return "movimiento normal"
+
+    def _buscar_movimientos(self, desde=None, hasta=None, tipo=None, categoria=None, texto=None, limite=20, incluir_metas=False):
         d, h = self._fecha(desde, "desde"), self._fecha(hasta, "hasta")
+        if not isinstance(incluir_metas, bool):
+            raise _ArgumentoInvalido("incluir_metas debe ser true o false.")
         if tipo is not None and tipo not in ("gasto", "ingreso"):
             raise _ArgumentoInvalido("tipo debe ser «gasto» o «ingreso».")
         if not isinstance(limite, int) or isinstance(limite, bool) or not 1 <= limite <= MAX_MOVIMIENTOS:
@@ -205,6 +219,8 @@ class Herramientas:
             fecha = date.fromisoformat(m["fecha"])
             if d and fecha < d or h and fecha > h:
                 continue
+            if m.get("apartado_id") is not None and not incluir_metas:
+                continue
             if tipo and m["tipo"] != tipo:
                 continue
             if categoria and (m.get("categoria") or "").lower() != categoria.lower():
@@ -215,7 +231,7 @@ class Herramientas:
         suma_c = sum(round(m["monto"] * 100) for m in encontrados)
         return {"total_encontrados": len(encontrados), "suma": suma_c / 100,
                 "movimientos": [{"id": m["id"], "fecha": m["fecha"], "tipo": m["tipo"], "monto": m["monto"],
-                                 "descripcion": m.get("descripcion"), "categoria": m.get("categoria")}
+                                 "descripcion": m.get("descripcion"), "categoria": m.get("categoria"), "origen": self._origen(m)}
                                 for m in encontrados[:limite]]}
 
     # --- escrituras: solo crean una propuesta -----------------------------------------------------------------------
