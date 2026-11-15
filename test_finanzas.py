@@ -2130,10 +2130,39 @@ def test_endpoint_saltar_recurrente_sin_body_y_con_conexion_directa():
     rec_id = cur.lastrowid
     conn.commit()
 
-    # Llamada pasando solo id y conn (sin SaltarPagoRequest)
-    res = saltar_recurrente(rec_id, conn)
+    # Llamada pasando solo id y conn (sin SaltarPagoRequest). El reloj va fijo: el router usa
+    # ahora_local(), y sin fijarlo la prueba dependía de la fecha real (fallaba desde el 15 de nov de 2026).
+    anterior = {k: os.environ.get(k) for k in ("FINANZAS_MODO_PRUEBA", "FINANZAS_HOY")}
+    os.environ["FINANZAS_MODO_PRUEBA"] = "1"
+    os.environ["FINANZAS_HOY"] = "2026-10-20T10:00:00"
+    try:
+        res = saltar_recurrente(rec_id, conn)
+    finally:
+        for k, v in anterior.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
     assert res["proxima_fecha"] == '2026-11-15'
     assert res["activo"] == 1
+
+
+def test_saltar_recurrente_la_nueva_fecha_es_estrictamente_posterior_a_hoy():
+    # Si hoy cae justo en un día de cobro, ese día ya no cuenta como futuro: salta al siguiente ciclo.
+    from finanzas_core import saltar_recurrente_core
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, activo)
+        VALUES ('Luz CFE', 'gasto', 40000, 'mensual', 15, '2026-10-15', 1)
+    """)
+    rec_id = cur.lastrowid
+    conn.commit()
+    r1 = saltar_recurrente_core(cur, rec_id, hoy=date(2026, 11, 14))
+    assert r1["nueva_proxima_fecha"] == '2026-11-15', r1
+    cur.execute("UPDATE recurrentes SET proxima_fecha = '2026-10-15' WHERE id = ?", (rec_id,))
+    r2 = saltar_recurrente_core(cur, rec_id, hoy=date(2026, 11, 15))
+    assert r2["nueva_proxima_fecha"] == '2026-12-15', r2
 
 
 def test_endpoint_saltar_recurrente_no_encontrado_404():
