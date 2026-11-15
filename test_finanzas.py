@@ -3579,6 +3579,95 @@ def test_validar_edicion_coincide_con_un_oraculo_aunque_haya_dias_negativos():
     assert not discrepancias, (len(discrepancias), discrepancias[:2])
 
 
+def _bd_con_movimientos(movs):
+    """BD con una meta (id 1) y movimientos (fecha, tipo, monto, apartado_id); el saldo de la meta sale de sus movimientos."""
+    conn = nueva_bd()
+    conn.execute("INSERT INTO apartados (nombre, tipo, monto_actual) VALUES ('Meta', 'libre', ?)",
+                 (a_centavos(sum((m if t == 'gasto' else -m) for f, t, m, a in movs if a)),))
+    for f, t, m, a in movs:
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, apartado_id) VALUES (?, ?, ?, 1, ?)", (f, a_centavos(m), t, a))
+    conn.commit()
+    return conn
+
+
+def _fila_de(conn, fecha, tipo, monto):
+    return conn.execute("SELECT * FROM transacciones WHERE fecha = ? AND tipo = ? AND monto = ?", (fecha, tipo, a_centavos(monto))).fetchone()
+
+
+def test_eliminar_en_lote_valida_los_retiros_de_meta_como_ingresos():
+    # Antes el lote ignoraba los retiros de meta: borrar uno dejaba el saldo en negativo sin avisar, y uno por uno sí se rechazaba.
+    from finanzas_core import deficit_al_eliminar_lote, validar_eliminacion_transaccion
+    conn = _bd_con_movimientos([("2026-01-01", "ingreso", 1000.0, None), ("2026-01-02", "gasto", 800.0, 1),
+                                ("2026-01-03", "ingreso", 800.0, 1), ("2026-01-04", "gasto", 900.0, None)])
+    retiro = _fila_de(conn, "2026-01-03", "ingreso", 800.0)
+    try:
+        validar_eliminacion_transaccion(conn.cursor(), retiro["id"])
+        raise AssertionError("uno por uno debía rechazarse")
+    except ValueError:
+        pass
+    deficit = deficit_al_eliminar_lote(conn.cursor(), [retiro])
+    assert deficit is not None and deficit[1] == "2026-01-04" and round(deficit[0], 2) == 700.0, deficit
+
+
+def test_eliminar_en_lote_no_resta_depositos_a_metas_que_ocurren_despues():
+    # Antes el lote restaba todo el dinero de las metas desde la fecha del ingreso borrado: un falso déficit.
+    from finanzas_core import deficit_al_eliminar_lote, validar_eliminacion_transaccion
+    conn = _bd_con_movimientos([("2026-01-01", "ingreso", 1000.0, None), ("2026-02-01", "ingreso", 500.0, None),
+                                ("2026-03-01", "ingreso", 2000.0, None), ("2026-03-02", "gasto", 1800.0, 1)])
+    ingreso = _fila_de(conn, "2026-02-01", "ingreso", 500.0)
+    validar_eliminacion_transaccion(conn.cursor(), ingreso["id"])                    # uno por uno: permitido
+    assert deficit_al_eliminar_lote(conn.cursor(), [ingreso]) is None                  # en lote también
+    assert conn.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 4       # la simulación no deja cambios
+
+
+def test_eliminar_en_lote_coincide_con_un_oraculo():
+    import random
+    from finanzas_core import deficit_al_eliminar_lote
+    rng = random.Random(33)
+    base = date(2026, 1, 1)
+
+    def saldo_en(movs, k):
+        return sum((m if t == 'ingreso' else -m) for f, t, m, a in movs if f <= k)
+
+    discrepancias = []; evaluados = 0
+    for _ in range(800):
+        movs = [((base + timedelta(days=rng.randint(0, 60))).isoformat(), rng.choice(['ingreso', 'gasto', 'gasto']), rng.randint(1, 60) * 100.0,
+                 rng.choice([None, None, 1])) for _ in range(rng.randint(3, 10))]
+        # La meta no puede tener retiros mayores a sus depósitos en ningún momento
+        meta = sorted((f, t, m) for f, t, m, a in movs if a)
+        acum, ok = 0.0, True
+        for f, t, m in meta:
+            acum += m if t == 'gasto' else -m
+            ok = ok and acum >= -0.001
+        if not ok:
+            continue
+        conn = _bd_con_movimientos(movs)
+        ids = [r["id"] for r in conn.execute("SELECT id FROM transacciones ORDER BY RANDOM() LIMIT ?", (rng.randint(1, 3),))]
+        lote = [conn.execute("SELECT * FROM transacciones WHERE id = ?", (i,)).fetchone() for i in ids]
+        borradas = [(r["fecha"], r["tipo"], float(r["monto"]), r["apartado_id"]) for r in lote]
+        quedan = list(movs)
+        for b in borradas:
+            quedan.remove(b)
+        ingresos_borrados = [b for b in borradas if b[1] == 'ingreso']
+        if not ingresos_borrados:
+            esperado = True
+        else:
+            t_min = min(b[0] for b in ingresos_borrados)
+            fechas = {x[0] for x in quedan if x[0] >= t_min} | {t_min}
+            def cambio(k):
+                return -sum((m if t == 'ingreso' else -m) for f, t, m, a in borradas if f <= k)
+            esperado = not any(saldo_en(quedan, k) < -0.001 and cambio(k) < -0.001 for k in fechas)
+        try:
+            real = deficit_al_eliminar_lote(conn.cursor(), lote) is None
+        except ValueError:
+            continue   # regla de la meta (un depósito del que ya se retiró), no del saldo
+        evaluados += 1
+        if real != esperado:
+            discrepancias.append((borradas, esperado))
+    assert evaluados > 100, evaluados
+    assert not discrepancias, (len(discrepancias), discrepancias[:2])
+
+
 def test_convertir_rechaza_tasas_que_no_son_finitas_y_positivas():
     from finanzas_core import convertir
     # Antes: una tasa EUR negativa daba -2000.0, una NaN daba NaN, una infinita daba 0.0 y una None un TypeError.

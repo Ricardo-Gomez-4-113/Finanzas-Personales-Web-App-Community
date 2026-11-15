@@ -1797,14 +1797,20 @@ def archivar_movimiento_cancelado(cursor: sqlite3.Cursor, trans) -> None:
 
 
 def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
-    """Simula borrar `transacciones` y devuelve (déficit, fecha) del primer día con saldo negativo,
-    o None si el saldo nunca baja de cero. No deja cambios: todo corre dentro de un savepoint."""
-    ingresos_externos = [t for t in transacciones if t["tipo"] == 'ingreso' and t["apartado_id"] is None]
-    if not ingresos_externos:
+    """Simula borrar `transacciones` y devuelve (déficit, fecha) del primer día con saldo negativo que el lote
+    provoca, o None si no deja ninguno. No deja cambios: todo corre dentro de un savepoint.
+    Es la misma regla que validar_eliminacion_transaccion: el saldo de cada fecha cuenta todos los movimientos
+    hasta ella, los de metas incluidos, y un retiro de meta es dinero que entró a la cuenta."""
+    ingresos = [t for t in transacciones if t["tipo"] == 'ingreso']
+    if not ingresos:
         return None
     ids_set = tuple(t["id"] for t in transacciones)
     placeholders_sim = ",".join("?" for _ in ids_set)
-    t_min = min(t["fecha"] for t in ingresos_externos)
+    t_min = min(t["fecha"] for t in ingresos)
+
+    def cambio_en(f: str) -> float:
+        """Cuánto cambia el saldo acumulado a la fecha f al quitar el lote (negativo = lo empeora)."""
+        return -sum((float(t["monto"]) if t["tipo"] == 'ingreso' else -float(t["monto"])) for t in transacciones if t["fecha"] <= f)
     cursor.execute("SAVEPOINT sim_lote")
     try:
         for t in transacciones:
@@ -1812,18 +1818,17 @@ def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
                 revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
         cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
 
-        tot_ap = obtener_total_apartados(cursor)
         row_prev = cursor.execute("""
             SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0, 0.0)
             FROM transacciones
-            WHERE fecha < ? AND apartado_id IS NULL
+            WHERE fecha < ?
         """, (t_min,)).fetchone()
-        saldo_corriente = float(row_prev[0]) - tot_ap
+        saldo_corriente = float(row_prev[0])
 
         filas_saldo = cursor.execute("""
             SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 as delta
             FROM transacciones
-            WHERE fecha >= ? AND apartado_id IS NULL
+            WHERE fecha >= ?
             GROUP BY fecha
             ORDER BY fecha ASC
         """, (t_min,)).fetchall()
@@ -1832,7 +1837,7 @@ def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
 
         for f in sorted(deltas_por_fecha.keys()):
             saldo_corriente += deltas_por_fecha[f]
-            if saldo_corriente < -0.001:
+            if saldo_corriente < -0.001 and cambio_en(f) < -0.001:   # negativo por este lote, no por datos anteriores
                 return abs(saldo_corriente), f
         return None
     finally:
