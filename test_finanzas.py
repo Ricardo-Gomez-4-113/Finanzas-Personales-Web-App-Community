@@ -3514,6 +3514,71 @@ def test_cambiar_un_fijo_a_mensual_ancla_el_dia_en_su_proximo_cargo():
     assert conn.execute("SELECT dia FROM recurrentes WHERE id = ?", (renta["id"],)).fetchone()["dia"] == 10
 
 
+def _movs_con_dia_negativo():
+    """Una renta de 8000 el 1 de nov se cargó antes de cobrar (un fijo no valida saldo): el saldo ya viene en -8000."""
+    conn = nueva_bd()
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES ('2026-11-01', ?, 'gasto', 1)", (a_centavos(8000.0),))
+    cur = conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES ('2026-11-03', ?, 'ingreso', 1)", (a_centavos(500.0),))
+    conn.commit()
+    return conn, cur.lastrowid
+
+
+def test_editar_un_ingreso_sin_empeorar_el_saldo_no_se_bloquea_aunque_ya_haya_un_dia_negativo():
+    from finanzas_core import validar_edicion_transaccion
+    conn, ingreso = _movs_con_dia_negativo()
+    cur = conn.cursor()
+    # Antes: cualquiera de estas ediciones respondía "respalda gastos que ya hiciste" y el saldo ya venía en negativo
+    validar_edicion_transaccion(cur, ingreso, '2026-11-03', 500.0, 'ingreso')   # solo cambió la descripción
+    validar_edicion_transaccion(cur, ingreso, '2026-11-03', 900.0, 'ingreso')   # sube el monto
+    validar_edicion_transaccion(cur, ingreso, '2026-10-20', 500.0, 'ingreso')   # se adelanta la fecha
+    # Lo que sí empeora el saldo sigue bloqueado
+    for fecha, monto, tipo in (('2026-11-03', 400.0, 'ingreso'), ('2026-11-20', 500.0, 'ingreso'), ('2026-11-03', 500.0, 'gasto')):
+        try:
+            validar_edicion_transaccion(cur, ingreso, fecha, monto, tipo)
+        except ValueError:
+            continue
+        raise AssertionError(f"debía bloquear {(fecha, monto, tipo)}, que deja el saldo más bajo que antes")
+
+
+def test_validar_edicion_coincide_con_un_oraculo_aunque_haya_dias_negativos():
+    import random
+    from finanzas_core import validar_edicion_transaccion
+    rng = random.Random(21)
+    base = date(2026, 1, 1)
+
+    def saldo_en(movs, k):
+        return sum((m if t == 'ingreso' else -m) for f, t, m in movs if f <= k)
+
+    discrepancias = []
+    for _ in range(600):
+        conn = nueva_bd()
+        movs = []
+        for _ in range(rng.randint(2, 10)):
+            mov = ((base + timedelta(days=rng.randint(0, 60))).isoformat(), rng.choice(['ingreso', 'gasto', 'gasto']), rng.randint(1, 60) * 100.0)
+            movs.append(mov)
+            conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES (?, ?, ?, 1)", (mov[0], a_centavos(mov[2]), mov[1]))
+        conn.commit()
+        fila = conn.execute("SELECT id, fecha, tipo, monto FROM transacciones ORDER BY RANDOM() LIMIT 1").fetchone()
+        f, t, m = fila["fecha"], fila["tipo"], float(fila["monto"])
+        f2 = (date.fromisoformat(f) + timedelta(days=rng.randint(-15, 15))).isoformat()
+        t2 = rng.choice(['ingreso', 'gasto']); m2 = max(100.0, m + rng.choice([-1, 0, 1]) * rng.randint(1, 20) * 100.0)
+        if rng.random() < 0.3:
+            f2, t2, m2 = f, t, m   # solo cambia la descripción
+        resto = list(movs); resto.remove((f, t, m)); nuevo = resto + [(f2, t2, m2)]
+        s_ant, s_nue = (m if t == 'ingreso' else -m), (m2 if t2 == 'ingreso' else -m2)
+        # Oráculo: se bloquea solo si en alguna fecha el saldo queda negativo Y esa fecha quedó más baja que antes
+        fechas = {x[0] for x in nuevo} | {f, f2}
+        esperado = not any(saldo_en(nuevo, k) < -0.001 and ((s_nue if k >= f2 else 0) - (s_ant if k >= f else 0)) < -0.001 for k in fechas)
+        try:
+            validar_edicion_transaccion(conn.cursor(), fila["id"], f2, m2, t2)
+            real = True
+        except ValueError:
+            real = False
+        if real != esperado:
+            discrepancias.append(((f, t, m), (f2, t2, m2), esperado))
+    assert not discrepancias, (len(discrepancias), discrepancias[:2])
+
+
 def test_convertir_rechaza_tasas_que_no_son_finitas_y_positivas():
     from finanzas_core import convertir
     # Antes: una tasa EUR negativa daba -2000.0, una NaN daba NaN, una infinita daba 0.0 y una None un TypeError.

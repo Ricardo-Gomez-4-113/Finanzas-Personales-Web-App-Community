@@ -799,9 +799,9 @@ def validar_edicion_transaccion(
     Protección Retroactiva de Ingresos y de Saldo:
     Invariante: si se reduce el monto de un ingreso, se posterga su fecha o se cambia a gasto,
     simula la cronología resultante. Si genera déficit en cualquier fecha t, lanza ValueError.
-    Un gasto que sigue siendo gasto solo se simula cuando el cambio puede empeorar el saldo (sube el monto
-    o se adelanta la fecha): bajarlo, posponerlo o corregir su descripción no se bloquea aunque el saldo
-    ya viniera negativo de datos anteriores.
+    Una edición solo se bloquea si deja el saldo más bajo que antes en una fecha donde queda negativo: bajar un
+    gasto, posponerlo, subir un ingreso o corregir su descripción nunca se bloquea, aunque el saldo ya viniera
+    negativo de datos anteriores (por ejemplo, un fijo que se cargó antes del cobro).
     """
     trans = cursor.execute("SELECT * FROM transacciones WHERE id = ?", (transaccion_id,)).fetchone()
     if not trans:
@@ -814,7 +814,15 @@ def validar_edicion_transaccion(
     fecha_orig = trans["fecha"]
 
     solo_gasto = tipo_orig != 'ingreso' and nuevo_tipo != 'ingreso'
-    if solo_gasto and not (float(nuevo_monto) > float(trans["monto"]) + 0.001 or nueva_fecha < fecha_orig):
+    s_ant = float(trans["monto"]) if tipo_orig == 'ingreso' else -float(trans["monto"])
+    s_nue = float(nuevo_monto) if nuevo_tipo == 'ingreso' else -float(nuevo_monto)
+
+    def cambio_en(f: str) -> float:
+        """Cuánto cambia el saldo acumulado a la fecha f por esta edición (negativo = lo empeora)."""
+        return (s_nue if f >= nueva_fecha else 0.0) - (s_ant if f >= fecha_orig else 0.0)
+
+    # El cambio es constante entre las dos fechas y después de ellas: basta mirarlo en ambas
+    if cambio_en(fecha_orig) >= -0.001 and cambio_en(nueva_fecha) >= -0.001:
         return
 
     t_min = min(fecha_orig, nueva_fecha)
@@ -843,7 +851,7 @@ def validar_edicion_transaccion(
 
     for f in sorted(deltas_por_fecha.keys()):
         saldo_corriente += deltas_por_fecha[f]
-        if saldo_corriente < -0.001:
+        if saldo_corriente < -0.001 and cambio_en(f) < -0.001:   # negativo por esta edición, no por datos anteriores
             deficit = abs(saldo_corriente)
             if solo_gasto:
                 raise ValueError(
