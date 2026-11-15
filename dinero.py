@@ -9,7 +9,7 @@ binarios. El resto del código (cálculos, API, pantalla) sigue en pesos. La fro
 Los totales calculados en SQL (SUM, CASE...) no pasan por la fábrica: se dividen entre 100.0 en la consulta.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Optional
 
 # Columnas que guardan dinero en centavos. Cantidades y precios de la bolsa, porcentajes y tasas no.
@@ -27,10 +27,14 @@ def a_centavos(valor: Any) -> Optional[int]:
     """Pesos a centavos enteros, redondeando la media fracción hacia arriba. None se queda en None."""
     if valor is None:
         return None
-    pesos = Decimal(str(valor))
-    if not pesos.is_finite():
-        raise ValueError(f"Monto no válido: {valor!r}")
-    return int((pesos * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    try:
+        pesos = Decimal(str(valor))
+        if not pesos.is_finite():
+            raise ValueError
+        return int((pesos * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError):
+        # Texto no numérico o un exponente fuera de rango: el mismo error que un monto infinito
+        raise ValueError(f"Monto no válido: {valor!r}") from None
 
 
 def de_centavos(centavos: Optional[int]) -> Optional[float]:

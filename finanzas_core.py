@@ -8,6 +8,7 @@ Reúne los cálculos que antes estaban duplicados en main.py y export_service.py
 """
 
 import calendar
+import math
 import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -40,6 +41,14 @@ def ahora_local() -> datetime:
 MONEDAS_SOPORTADAS = ("USD", "MXN", "EUR")
 
 
+def _tasa_valida(tasa) -> bool:
+    """Una tasa de cambio sirve solo si es un número finito y mayor que cero."""
+    try:
+        return math.isfinite(tasa) and tasa > 0
+    except TypeError:
+        return False
+
+
 def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> float:
     """Convierte un monto entre USD, MXN y EUR pasando por USD. Las tasas son unidades de moneda por USD.
     Un monto en EUR sin tasa_usd_eur es un error: sin ella el valor sería nominal y el total saldría mal."""
@@ -50,9 +59,9 @@ def convertir(monto: float, moneda_origen: str, moneda_base: str, tasa_usd_mxn: 
             raise ValueError(f"Moneda no soportada: {moneda}. Solo se admiten {', '.join(MONEDAS_SOPORTADAS)}.")
     if origen == base:
         return monto
-    if "EUR" in (origen, base) and not tasa_usd_eur:
+    if "EUR" in (origen, base) and not _tasa_valida(tasa_usd_eur):
         raise ValueError("Falta el tipo de cambio USD/EUR para convertir montos en EUR.")
-    if "MXN" in (origen, base) and not tasa_usd_mxn > 0:
+    if "MXN" in (origen, base) and not _tasa_valida(tasa_usd_mxn):
         raise ValueError("Falta el tipo de cambio USD/MXN para convertir montos en MXN.")
     if origen == "USD":
         usd = monto

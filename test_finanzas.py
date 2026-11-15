@@ -3452,6 +3452,41 @@ def test_crear_una_compra_a_meses_minima_responde_422_y_no_guarda_nada():
     assert conn.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
 
 
+def test_convertir_rechaza_tasas_que_no_son_finitas_y_positivas():
+    from finanzas_core import convertir
+    # Antes: una tasa EUR negativa daba -2000.0, una NaN daba NaN, una infinita daba 0.0 y una None un TypeError.
+    invalidas = (-0.9, 0.0, float("nan"), float("inf"), float("-inf"), None)
+    for tasa in invalidas:
+        for args in ((100, "EUR", "MXN", 18.0, tasa), (100, "MXN", "EUR", 18.0, tasa), (100, "USD", "EUR", 18.0, tasa)):
+            try:
+                resultado = convertir(*args)
+            except ValueError:
+                continue
+            raise AssertionError(f"convertir{args} devolvió {resultado} en vez de rechazar la tasa EUR {tasa}")
+        for args in ((100, "MXN", "USD", tasa, 0.9), (100, "USD", "MXN", tasa, 0.9), (100, "EUR", "MXN", tasa, 0.9)):
+            try:
+                resultado = convertir(*args)
+            except ValueError:
+                continue
+            raise AssertionError(f"convertir{args} devolvió {resultado} en vez de rechazar la tasa MXN {tasa}")
+    # Una tasa que no se usa no estorba, y las válidas siguen funcionando
+    assert convertir(100, "USD", "USD", None, None) == 100
+    assert convertir(100, "MXN", "USD", 20.0, None) == 5.0
+    assert round(convertir(100, "EUR", "MXN", 18.0, 0.9), 2) == 2000.0
+
+
+def test_a_centavos_rechaza_con_value_error_todo_lo_que_no_es_un_monto():
+    from dinero import a_centavos
+    # Antes: texto, booleanos y exponentes enormes lanzaban decimal.InvalidOperation, que los except ValueError no atrapan.
+    for malo in ("abc", "", True, 1e300, "1e400", float("nan"), float("inf"), "--5"):
+        try:
+            resultado = a_centavos(malo)
+        except ValueError:
+            continue
+        raise AssertionError(f"a_centavos({malo!r}) devolvió {resultado} en vez de ValueError")
+    assert a_centavos(None) is None and a_centavos("12.345") == 1235 and a_centavos(0.1 + 0.2) == 30
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo
