@@ -1502,15 +1502,10 @@ def exportar_presupuesto_a_fijos_core(
                     a, m = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
                     prox = date(a, m, min(dia_f, ultimo_dia_mes(a, m)))
             elif freq == 'quincenal':
-                dia2 = (dia_f + 15) if dia_f <= 15 else (dia_f - 15)
-                c1, c2 = min(dia_f, dia2), max(dia_f, dia2)
-                if hoy_d.day <= c1:
-                    prox = date(hoy_d.year, hoy_d.month, min(c1, ultimo_dia_mes(hoy_d.year, hoy_d.month)))
-                elif hoy_d.day <= c2:
-                    prox = date(hoy_d.year, hoy_d.month, min(c2, ultimo_dia_mes(hoy_d.year, hoy_d.month)))
-                else:
-                    a, m = (hoy_d.year + 1, 1) if hoy_d.month == 12 else (hoy_d.year, hoy_d.month + 1)
-                    prox = date(a, m, min(c1, ultimo_dia_mes(a, m)))
+                # Un fijo quincenal solo cobra el 15 y el fin de mes (siguiente_fecha). Un dia_pago cualquiera daba
+                # una primera fecha fuera de ese ciclo: el 20, luego el 31 (once días después), luego el 15.
+                prox = primera_fecha_quincenal(hoy_d)
+                dia_f = prox.day
             else:
                 prox = hoy_d
         else:

@@ -22,6 +22,7 @@ from finanzas_core import (
     ahora_local,
     unidades_activas,
     validar_dias_unidades,
+    primera_fecha_quincenal,
 )
 from dinero import a_centavos
 from security import get_tenant_db
@@ -320,17 +321,24 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
 
     # Sincronizar la nómina del presupuesto, si existe. Un ingreso hecho a mano no se toca aunque diga "nómina"
     rec_nomina = cursor.execute("""
-        SELECT id, dia FROM recurrentes
+        SELECT id, dia, frecuencia, proxima_fecha FROM recurrentes
         WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
         LIMIT 1
     """, (NOMINA_PRESUPUESTO,)).fetchone()
     if rec_nomina:
+        # Al cambiar de frecuencia la fecha del próximo cobro se re-ancla, igual que al editar un fijo: una nómina
+        # mensual del 10 pasada a quincenal cobraba el 10, el 15 y el 31 (dos pagos en la primera quincena).
+        proxima = date.fromisoformat(rec_nomina["proxima_fecha"])
+        if frecuencia_nueva == 'quincenal':
+            proxima = primera_fecha_quincenal(proxima)
         dia_fijo = dia_pago if dia_pago is not None else rec_nomina["dia"]
+        if frecuencia_nueva == 'mensual' and rec_nomina["frecuencia"] != 'mensual' and dia_pago is None:
+            dia_fijo = proxima.day   # el día del alta de un fijo quincenal o semanal no es un ancla mensual
         cursor.execute("""
             UPDATE recurrentes
-            SET monto = ?, frecuencia = ?, dia = COALESCE(?, dia)
+            SET monto = ?, frecuencia = ?, dia = COALESCE(?, dia), proxima_fecha = ?
             WHERE id = ?
-        """, (a_centavos(ingreso_nuevo), frecuencia_nueva, dia_fijo, rec_nomina["id"]))
+        """, (a_centavos(ingreso_nuevo), frecuencia_nueva, dia_fijo, proxima.isoformat(), rec_nomina["id"]))
 
     conn.commit()
     return get_presupuesto(conn)

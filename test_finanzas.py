@@ -3579,6 +3579,63 @@ def test_validar_edicion_coincide_con_un_oraculo_aunque_haya_dias_negativos():
     assert not discrepancias, (len(discrepancias), discrepancias[:2])
 
 
+def _cadena_de_cobros(proxima, frecuencia, dia, n=6):
+    from finanzas_core import siguiente_fecha
+    fechas = [proxima]
+    for _ in range(n - 1):
+        fechas.append(siguiente_fecha(fechas[-1], frecuencia, dia))
+    return fechas
+
+
+def test_exportar_una_nomina_quincenal_cobra_siempre_el_15_y_el_fin_de_mes():
+    from finanzas_core import NOMINA_PRESUPUESTO, exportar_presupuesto_a_fijos_core, ultimo_dia_mes
+    # Antes, con un dia_pago cualquiera la nómina arrancaba en una fecha fuera del ciclo (el 20, luego el 31, luego el 15)
+    for dia_pago in range(1, 32):
+        for desplazamiento in range(0, 365, 9):
+            hoy = date(2026, 1, 1) + timedelta(days=desplazamiento)
+            conn = nueva_bd()
+            conn.execute("UPDATE presupuesto_config SET ingreso_base = ?, frecuencia = 'quincenal', dia_pago = ? WHERE id = 1", (a_centavos(10000.0), dia_pago))
+            conn.commit()
+            exportar_presupuesto_a_fijos_core(conn.cursor(), fecha_base=hoy)
+            nomina = conn.execute("SELECT * FROM recurrentes WHERE descripcion = ?", (NOMINA_PRESUPUESTO,)).fetchone()
+            proxima = date.fromisoformat(nomina["proxima_fecha"])
+            assert proxima >= hoy and proxima.day in (15, ultimo_dia_mes(proxima.year, proxima.month)), (dia_pago, hoy, proxima)
+            cadena = _cadena_de_cobros(proxima, nomina["frecuencia"], nomina["dia"])
+            huecos = [(b - a).days for a, b in zip(cadena, cadena[1:])]
+            assert 13 <= min(huecos) and max(huecos) <= 17, (dia_pago, hoy, cadena, huecos)
+
+
+def test_guardar_la_configuracion_reancla_la_nomina_al_cambiar_de_frecuencia():
+    from finanzas_core import NOMINA_PRESUPUESTO
+    from routers.presupuesto import ConfigPresupuestoUpdate, update_config_presupuesto
+
+    def nomina_en(frecuencia, dia, proxima):
+        conn = nueva_bd()
+        insertar_recurrente(conn, NOMINA_PRESUPUESTO, "ingreso", 10000.0, frecuencia, dia, proxima)
+        return conn
+
+    def guardar(conn, frecuencia):
+        update_config_presupuesto(ConfigPresupuestoUpdate(ingreso_base=10000.0, frecuencia=frecuencia), conn)
+        return conn.execute("SELECT frecuencia, dia, proxima_fecha FROM recurrentes WHERE descripcion = ?", (NOMINA_PRESUPUESTO,)).fetchone()
+
+    # Mensual del 10 -> quincenal: antes cobraba el 10, el 15 y el 31 (dos pagos en la primera quincena)
+    n = guardar(nomina_en("mensual", 10, date(2026, 12, 10)), "quincenal")
+    assert (n["frecuencia"], n["proxima_fecha"]) == ("quincenal", "2026-12-15"), tuple(n)
+    cadena = _cadena_de_cobros(date.fromisoformat(n["proxima_fecha"]), n["frecuencia"], n["dia"])
+    assert [d.isoformat() for d in cadena[:3]] == ["2026-12-15", "2026-12-31", "2027-01-15"], cadena
+    # Semanal -> quincenal
+    n = guardar(nomina_en("semanal", 3, date(2026, 12, 3)), "quincenal")
+    assert n["proxima_fecha"] == "2026-12-15", tuple(n)
+    # Quincenal (alta el día 1) -> mensual: el ancla pasa a ser el día del próximo cobro, no el del alta
+    n = guardar(nomina_en("quincenal", 1, date(2026, 12, 15)), "mensual")
+    assert (n["frecuencia"], n["dia"], n["proxima_fecha"]) == ("mensual", 15, "2026-12-15"), tuple(n)
+    # Sin cambio de frecuencia nada se mueve
+    n = guardar(nomina_en("mensual", 10, date(2026, 12, 10)), "mensual")
+    assert (n["dia"], n["proxima_fecha"]) == (10, "2026-12-10"), tuple(n)
+    n = guardar(nomina_en("quincenal", 15, date(2026, 12, 31)), "quincenal")
+    assert n["proxima_fecha"] == "2026-12-31", tuple(n)
+
+
 def _bd_con_movimientos(movs):
     """BD con una meta (id 1) y movimientos (fecha, tipo, monto, apartado_id); el saldo de la meta sale de sus movimientos."""
     conn = nueva_bd()
