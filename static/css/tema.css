@@ -1250,6 +1250,9 @@
 /* Sin degradado de fondo mientras se ve el login */
 :root:has(#vista-login:not(.hidden)) body {
     background-image: none;
+    /* El login ya ocupa toda la pantalla (100dvh): el relleno inferior que la app lleva en móvil lo hacía 20 px más alto
+       que la ventana, y cualquier desplazamiento (un foco, un clic) movía la tarjeta esos 20 px */
+    padding-bottom: 0;
 }
 
 :root .login-card {
