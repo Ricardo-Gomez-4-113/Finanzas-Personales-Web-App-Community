@@ -295,6 +295,12 @@ function elementosMenuUsuario() {
     return [...menu.querySelectorAll('[role="menuitem"]')].filter(el => el.offsetParent !== null);
 }
 
+// Las clases `show` y `hidden` se ponen con retraso para dejar correr la animación. Cada retraso pendiente se
+// cancela al abrir o cerrar de nuevo: si no, el `hidden` de un cierre anterior llegaba después de reabrir el menú
+// y lo dejaba con `show hidden`, es decir, invisible (se vio al volver a abrirlo a los ~60 ms de cerrarlo).
+let retrasoMostrarMenu = null;
+let retrasoOcultarMenu = null;
+
 export function toggleUserDropdown(event) {
     if (event) event.stopPropagation();
     const menu = document.getElementById('user-dropdown-menu');
@@ -302,8 +308,10 @@ export function toggleUserDropdown(event) {
     if (!menu) return;
     const isHidden = menu.classList.contains('hidden') || !menu.classList.contains('show');
     if (isHidden) {
+        clearTimeout(retrasoOcultarMenu);
+        clearTimeout(retrasoMostrarMenu);
         menu.classList.remove('hidden');
-        setTimeout(() => {
+        retrasoMostrarMenu = setTimeout(() => {
             menu.classList.add('show');
             elementosMenuUsuario()[0]?.focus();
         }, 10);
@@ -319,8 +327,10 @@ export function cerrarUserDropdown(devolverFoco = false) {
     const menu = document.getElementById('user-dropdown-menu');
     const trigger = document.getElementById('btn-user-menu-trigger');
     if (menu) {
+        clearTimeout(retrasoMostrarMenu);
+        clearTimeout(retrasoOcultarMenu);
         menu.classList.remove('show');
-        setTimeout(() => {
+        retrasoOcultarMenu = setTimeout(() => {
             menu.classList.add('hidden');
         }, 150);
     }
