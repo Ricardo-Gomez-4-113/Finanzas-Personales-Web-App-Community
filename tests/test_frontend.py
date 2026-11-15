@@ -1827,7 +1827,19 @@ def test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion(navegador, 
         page.evaluate("document.querySelector('[data-on-click*=\"logoutUsuario\"]')?.click()")
         page.wait_for_selector("#modal-confirmar:not(.hidden)")
         page.click("#btn-confirmar-aceptar")
-        _esperar(page, "document.getElementById('notif-lista').children.length === 0 && document.getElementById('panel-notificaciones').classList.contains('hidden')")
+        # Community se queda en la misma página y la campana debe quedar limpia; el SaaS navega a su landing, donde la campana
+        # ya no existe (y mientras navega el contexto se destruye): ambas cosas cuentan como «nada de la cuenta a la vista».
+        from playwright.sync_api import Error as ErrorPlaywright
+        limpia = "(() => { const l = document.getElementById('notif-lista'), p = document.getElementById('panel-notificaciones'); return !l || (l.children.length === 0 && p.classList.contains('hidden')); })()"
+        limite = time.time() + 10
+        while True:
+            try:
+                if page.evaluate(limpia):
+                    break
+            except ErrorPlaywright:
+                pass   # la página está cambiando de documento
+            assert time.time() < limite, "la campana debía quedar limpia o la página salir de la app"
+            page.wait_for_timeout(100)
         assert not errores, errores
     finally:
         ctx.close()
