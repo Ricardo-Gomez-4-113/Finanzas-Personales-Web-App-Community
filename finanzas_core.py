@@ -1558,6 +1558,8 @@ def exportar_presupuesto_a_fijos_core(
                 "monto": round(monto_tarjeta, 2), "frecuencia": 'mensual', "dia": dia_f,
                 "proxima": prox_f, "categoria_id": cat_id, "apartado_id": apartado_id,
                 "total_cuotas": msi_total,
+                # Sin el total la deuda MSI de la compra salía en cero: deuda_pendiente lo necesita
+                "monto_total": round(monto_tarjeta * msi_total, 2) if msi_total else None,
             })
             continue
 
@@ -1648,12 +1650,12 @@ def exportar_presupuesto_a_fijos_core(
         item["proxima"] = _sin_cargo_previo(cursor, item, fila["id"] if fila is not None else None)
         valores = (item["descripcion"], item["tipo"], a_centavos(item["monto"]), item["frecuencia"], item["dia"],
                    item["proxima"].isoformat(), item["categoria_id"], item["apartado_id"], item["tarjeta_id"],
-                   item.get("total_cuotas"))
+                   item.get("total_cuotas"), a_centavos(item.get("monto_total")))
         if fila is not None:
             cursor.execute("""
                 UPDATE recurrentes
                 SET descripcion = ?, tipo = ?, monto = ?, frecuencia = ?, dia = ?, proxima_fecha = ?,
-                    categoria_id = ?, apartado_id = ?, presupuesto_tarjeta_id = ?, total_cuotas = ?, activo = 1
+                    categoria_id = ?, apartado_id = ?, presupuesto_tarjeta_id = ?, total_cuotas = ?, monto_total = ?, activo = 1
                 WHERE id = ?
             """, valores + (fila["id"],))
             actualizados += 1
@@ -1661,8 +1663,8 @@ def exportar_presupuesto_a_fijos_core(
         else:
             cursor.execute("""
                 INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha,
-                                         categoria_id, apartado_id, presupuesto_tarjeta_id, total_cuotas, activo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                                         categoria_id, apartado_id, presupuesto_tarjeta_id, total_cuotas, monto_total, activo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """, valores)
             creados += 1
             accion = "creado"

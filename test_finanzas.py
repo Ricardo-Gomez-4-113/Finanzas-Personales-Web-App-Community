@@ -1496,6 +1496,40 @@ def test_exportar_msi_del_presupuesto_crea_compra_a_cuotas():
     assert cur.execute("SELECT COUNT(*) FROM recurrentes WHERE descripcion = 'Celular'").fetchone()[0] == 1
 
 
+def test_una_compra_a_meses_exportada_del_presupuesto_cuenta_su_deuda():
+    from finanzas_core import deuda_pendiente, materializar_recurrentes
+    # Antes la exportación dejaba monto_total vacío y la deuda MSI de la compra salía en cero (a mano sí contaba)
+    conn = nueva_bd()
+    cur = conn.cursor()
+    cur.execute("UPDATE presupuesto_config SET ingreso_base = 1000000, frecuencia = 'mensual' WHERE id = 1")
+    cur.execute("INSERT INTO presupuesto_unidades (orden, dia_pago) VALUES (1, 10) ON CONFLICT(orden) DO UPDATE SET dia_pago = 10")
+    cur.execute("""
+        INSERT INTO presupuesto_tarjetas (nombre, icono, color, porcentaje, monto, unidad_orden, tipo, msi_cuotas)
+        VALUES ('Celular', 'credit-card', 'amber', 10.0, 100000, 1, 'msi', 12)
+    """)
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 10, 22))
+    fijo = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Celular'").fetchone()
+    assert fijo["monto_total"] == 12000.0, fijo["monto_total"]
+    assert deuda_pendiente(fijo) == 12000.0
+    # Tras cobrar 2 cuotas (10 nov y 10 dic) quedan 10 por 1000
+    materializar_recurrentes(conn, date(2026, 12, 15))
+    fijo = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Celular'").fetchone()
+    assert fijo["cuotas_generadas"] == 2 and deuda_pendiente(fijo) == 10000.0, (fijo["cuotas_generadas"], deuda_pendiente(fijo))
+    # Si la tarjeta cambia de monto, el total se actualiza en la siguiente exportación y las cuotas ya cobradas se conservan
+    cur.execute("UPDATE presupuesto_tarjetas SET monto = 150000 WHERE nombre = 'Celular'")
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 12, 15))
+    fijo = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Celular'").fetchone()
+    assert fijo["monto_total"] == 18000.0 and fijo["cuotas_generadas"] == 2, (fijo["monto_total"], fijo["cuotas_generadas"])
+    # Un fijo normal no lleva total
+    cur.execute("UPDATE presupuesto_tarjetas SET tipo = 'normal', msi_cuotas = NULL WHERE nombre = 'Celular'")
+    conn.commit()
+    exportar_presupuesto_a_fijos_core(cur, fecha_base=date(2026, 12, 15))
+    fijo = cur.execute("SELECT * FROM recurrentes WHERE descripcion = 'Celular'").fetchone()
+    assert fijo["total_cuotas"] is None and fijo["monto_total"] is None, (fijo["total_cuotas"], fijo["monto_total"])
+
+
 def test_exportar_presupuesto_respeta_dias():
     conn = nueva_bd()
     cur = conn.cursor()
