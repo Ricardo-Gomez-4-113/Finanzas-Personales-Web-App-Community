@@ -3177,7 +3177,8 @@ def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
         NOMINA_PRESUPUESTO: (12000.0, 'quincenal'),
     }, estado()
 
-    # Registrar un gasto consulta la ventana de cobro: tampoco puede reescribir ingresos hechos a mano
+    # Registrar un gasto consulta la ventana de cobro, y esa consulta solo lee: no reescribe ningún ingreso,
+    # ni siquiera la nómina del presupuesto, aunque la configuración haya cambiado por otra vía.
     cur.execute("UPDATE presupuesto_config SET ingreso_base = 900000, frecuencia = 'mensual' WHERE id = 1")
     conn.commit()
     obtener_ventana_corte_fecha(cur, '2026-11-20')
@@ -3185,8 +3186,25 @@ def test_guardar_presupuesto_solo_sincroniza_la_nomina_del_presupuesto():
     assert estado() == {
         'Nómina de mi pareja': (5000.0, 'mensual'),
         'Sueldo': (30000.0, 'mensual'),
-        NOMINA_PRESUPUESTO: (9000.0, 'mensual'),
+        NOMINA_PRESUPUESTO: (12000.0, 'quincenal'),
     }, estado()
+
+
+def test_la_validacion_de_la_ventana_no_pisa_la_nomina_editada_desde_fijos():
+    from finanzas_core import NOMINA_PRESUPUESTO, obtener_ventana_corte_fecha
+    from routers.recurrentes import RecurrenteUpdate, editar_recurrente
+    # Antes: editar la nómina a 25 000 desde Fijos respondía bien, y la siguiente validación la devolvía a lo que decía el presupuesto.
+    conn = nueva_bd()
+    cur = conn.cursor()
+    conn.execute("UPDATE presupuesto_config SET ingreso_base = ?, frecuencia = 'mensual' WHERE id = 1", (a_centavos(20000.0),))
+    nomina = insertar_recurrente(conn, NOMINA_PRESUPUESTO, "ingreso", 20000.0, "mensual", 1, date(2026, 12, 1))
+    with reloj_fijo("2026-11-05T10:00:00"):
+        editar_recurrente(nomina["id"], RecurrenteUpdate(monto=25000.0), conn)
+        obtener_ventana_corte_fecha(cur, "2026-11-05")
+        obtener_ventana_corte_fecha(cur, "2026-11-20")
+    conn.commit()
+    fila = conn.execute("SELECT monto, frecuencia FROM recurrentes WHERE id = ?", (nomina["id"],)).fetchone()
+    assert (fila["monto"], fila["frecuencia"]) == (25000.0, "mensual"), tuple(fila)
 
 
 def test_factores_desde_mxn_son_lo_que_vale_un_peso_en_cada_moneda():

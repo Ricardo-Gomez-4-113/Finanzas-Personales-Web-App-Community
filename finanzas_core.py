@@ -872,20 +872,12 @@ def obtener_ventana_corte_fecha(
     """
     f_target = date.fromisoformat(fecha_str)
 
-    # Sincronización automática de nómina de presupuesto si la configuración fue actualizada
+    # Esta función solo lee: la nómina del presupuesto se sincroniza al guardar su configuración
+    # (PUT /api/presupuesto/config). Reescribirla aquí pisaba, sin avisar, lo editado desde Fijos.
     cfg = cursor.execute("SELECT * FROM presupuesto_config WHERE id = 1").fetchone()
     cfg_ingreso = float(cfg["ingreso_base"]) if cfg and "ingreso_base" in cfg.keys() and cfg["ingreso_base"] else 0.0
     cfg_frecuencia = (cfg["frecuencia"] if cfg and "frecuencia" in cfg.keys() and cfg["frecuencia"] else "mensual")
     cfg_dia = int(cfg["dia_pago"]) if cfg and "dia_pago" in cfg.keys() and cfg["dia_pago"] is not None else None
-
-    if cfg_ingreso > 0:
-        # Solo la nómina que administra el presupuesto: un ingreso hecho a mano no se reescribe por su nombre
-        cursor.execute("""
-            UPDATE recurrentes
-            SET monto = ?, frecuencia = ?
-            WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL
-            AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
-        """, (a_centavos(cfg_ingreso), cfg_frecuencia, NOMINA_PRESUPUESTO))
 
     # Obtener ingresos fijos activos para deducir fechas de corte
     ingresos = cursor.execute("""
