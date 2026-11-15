@@ -3405,6 +3405,53 @@ def test_el_monto_minimo_se_guarda_como_un_centavo_y_no_como_cero():
             crear()   # no debe lanzar
 
 
+def test_una_compra_a_meses_solo_se_acepta_si_todas_sus_cuotas_llegan_a_un_centavo():
+    from dinero import a_centavos
+    from finanzas_core import cuota_msi, validar_compra_msi
+    # Antes: 0.03 a 6 meses daba cuotas de 0.01 y una última de -0.02 (un gasto negativo); 0.01 a 3 daba cuotas de 0.
+    for total_c in range(1, 401):
+        for meses in range(2, 61):
+            total = total_c / 100
+            cuota_c = a_centavos(cuota_msi(total, meses))
+            ultima_c = total_c - cuota_c * (meses - 1)
+            valida = cuota_c >= 1 and ultima_c >= 1
+            try:
+                validar_compra_msi(total, meses)
+                aceptada = True
+            except ValueError:
+                aceptada = False
+            assert aceptada == valida, (total, meses, cuota_c, ultima_c)
+            if aceptada:
+                assert cuota_c * (meses - 1) + ultima_c == total_c   # las cuotas suman exactamente el total
+    # Los bordes y un caso normal
+    validar_compra_msi(0.60, 60)        # 60 cuotas de un centavo
+    validar_compra_msi(24000, 12)
+    for total, meses in ((0.59, 60), (0.50, 60), (0.03, 6), (0.01, 3)):
+        try:
+            validar_compra_msi(total, meses)
+        except ValueError as e:
+            assert "demasiado pequeña" in str(e)
+        else:
+            raise AssertionError(f"{total} a {meses} meses debía rechazarse")
+
+
+def test_crear_una_compra_a_meses_minima_responde_422_y_no_guarda_nada():
+    from fastapi import HTTPException
+    from observabilidad import codigo_de_rechazo
+    from routers.recurrentes import RecurrenteCreate, crear_recurrente
+    conn = nueva_bd()
+    req = RecurrenteCreate(descripcion="Chicle a meses", monto_total=0.50, meses=60, fecha_inicio="2026-10-01")
+    try:
+        crear_recurrente(req, conn)
+    except HTTPException as e:
+        assert e.status_code == 422, e.status_code
+        assert codigo_de_rechazo(e.detail) == "compra_msi_muy_pequena", e.detail
+    else:
+        raise AssertionError("una compra de 0.50 a 60 meses debía rechazarse")
+    assert conn.execute("SELECT COUNT(*) FROM recurrentes").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

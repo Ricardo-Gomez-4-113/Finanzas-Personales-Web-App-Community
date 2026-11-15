@@ -57,6 +57,7 @@ CODIGOS_RECHAZO = (
     ("no puedes eliminar un apartado con saldo", "meta_con_saldo"),
     ("ya existe un apartado", "nombre_repetido"),
     ("una meta requiere un monto", "meta_sin_monto"),
+    ("demasiado pequeña para repartirla", "compra_msi_muy_pequena"),
 )
 
 

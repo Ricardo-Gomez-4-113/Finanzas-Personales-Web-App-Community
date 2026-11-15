@@ -412,6 +412,16 @@ def cuota_msi(monto_total: float, meses: int) -> float:
     return round(monto_total / meses, 2)
 
 
+def validar_compra_msi(monto_total: float, meses: int) -> None:
+    """La compra debe poder repartirse en cuotas de al menos un centavo, y la última (que absorbe el redondeo) también.
+    Con importes mínimos la cuota redondeada se pasa del total: la última sale en cero o negativa y se guardaría
+    como un gasto negativo. Se calcula en centavos enteros, igual que materializar_recurrentes."""
+    total_c = a_centavos(monto_total)
+    cuota_c = a_centavos(cuota_msi(monto_total, meses))
+    if cuota_c < 1 or total_c - cuota_c * (meses - 1) < 1:
+        raise ValueError(f"La compra es demasiado pequeña para repartirla en {meses} meses: cada cuota debe ser de al menos $0.01.")
+
+
 def mensualizar(monto: float, frecuencia: str) -> float:
     """Equivalente mensual de un monto periódico."""
     if frecuencia == 'quincenal':
