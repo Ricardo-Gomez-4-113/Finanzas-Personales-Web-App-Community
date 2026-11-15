@@ -123,6 +123,26 @@ def insertar_recurrente(conn, descripcion, tipo, monto, frecuencia, dia, proxima
     return conn.execute("SELECT * FROM recurrentes ORDER BY id DESC LIMIT 1").fetchone()
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def reloj_fijo(iso):
+    """Fija "hoy" para el router y el core (ahora_local lo respeta solo en modo de pruebas) y lo restaura al salir."""
+    claves = ("FINANZAS_MODO_PRUEBA", "FINANZAS_HOY")
+    anterior = {k: os.environ.get(k) for k in claves}
+    os.environ["FINANZAS_MODO_PRUEBA"] = "1"
+    os.environ["FINANZAS_HOY"] = iso
+    try:
+        yield
+    finally:
+        for k, v in anterior.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def test_convertir():
     assert convertir(100, 'USD', 'MXN', 18) == 1800
     assert convertir(1800, 'MXN', 'USD', 18) == 100
@@ -3450,6 +3470,30 @@ def test_crear_una_compra_a_meses_minima_responde_422_y_no_guarda_nada():
         raise AssertionError("una compra de 0.50 a 60 meses debía rechazarse")
     assert conn.execute("SELECT COUNT(*) FROM recurrentes").fetchone()[0] == 0
     assert conn.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == 0
+
+
+def test_cambiar_un_fijo_a_mensual_ancla_el_dia_en_su_proximo_cargo():
+    from finanzas_core import siguiente_fecha, ultimo_dia_mes
+    from routers.recurrentes import RecurrenteUpdate, editar_recurrente
+    # Antes el `dia` seguía siendo el del alta: un quincenal con dia 1 pasado a mensual cobraba el 15 de dic y luego el 1 de ene.
+    for frecuencia, dia_alta, proxima in (("quincenal", 1, date(2026, 12, 15)), ("semanal", 3, date(2026, 11, 10)), ("quincenal", 31, date(2026, 11, 30))):
+        conn = nueva_bd()
+        insertar_recurrente(conn, "Nómina", "ingreso", 50000, "mensual", 1, date(2026, 12, 1))
+        gasto = insertar_recurrente(conn, "Gimnasio", "gasto", 1000, frecuencia, dia_alta, proxima)
+        with reloj_fijo("2026-11-05T10:00:00"):
+            editar_recurrente(gasto["id"], RecurrenteUpdate(frecuencia="mensual"), conn)
+        fila = conn.execute("SELECT frecuencia, dia, proxima_fecha FROM recurrentes WHERE id = ?", (gasto["id"],)).fetchone()
+        assert fila["frecuencia"] == "mensual" and fila["proxima_fecha"] == proxima.isoformat(), tuple(fila)
+        assert fila["dia"] == proxima.day, (frecuencia, dia_alta, tuple(fila))
+        sig = siguiente_fecha(proxima, "mensual", fila["dia"])
+        assert sig.day == min(proxima.day, ultimo_dia_mes(sig.year, sig.month)), sig
+    # Una edición que no cambia la frecuencia no toca el día
+    conn = nueva_bd()
+    insertar_recurrente(conn, "Nómina", "ingreso", 50000, "mensual", 1, date(2026, 12, 1))
+    renta = insertar_recurrente(conn, "Renta", "gasto", 5000, "mensual", 10, date(2026, 12, 10))
+    with reloj_fijo("2026-11-05T10:00:00"):
+        editar_recurrente(renta["id"], RecurrenteUpdate(descripcion="Renta depa"), conn)
+    assert conn.execute("SELECT dia FROM recurrentes WHERE id = ?", (renta["id"],)).fetchone()["dia"] == 10
 
 
 def test_convertir_rechaza_tasas_que_no_son_finitas_y_positivas():

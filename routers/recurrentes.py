@@ -295,6 +295,8 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
 
     # Sin nueva proxima_fecha, la fecha guardada se ajusta en una sola escritura:
     # - al pasar a quincenal se re-ancla al día 15 o fin de mes, igual que al crear;
+    # - al pasar a mensual desde otra frecuencia, el día ancla es el del próximo cargo (el `dia` guardado es el del alta
+    #   y no tiene que ver con un ciclo quincenal o semanal: dejaba un primer intervalo irregular);
     # - al reactivar un pausado se avanza a la vigente, para no cobrar retroactivamente lo acumulado.
     if req.proxima_fecha is None:
         fecha_guardada = date.fromisoformat(fila["proxima_fecha"])
@@ -304,9 +306,14 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
             base = fecha_nueva or fecha_guardada
             if base < hoy:
                 fecha_nueva = proxima_fecha_vigente(base, req.frecuencia or fila["frecuencia"], fila["dia"], hoy)
+        dia_nuevo = None
         if fecha_nueva is not None and fecha_nueva != fecha_guardada:
             campos.append("proxima_fecha = ?"); valores.append(fecha_nueva.isoformat())
-            campos.append("dia = ?"); valores.append(ancla_al_editar_proximo_cargo(fila["dia"], fecha_nueva, req.frecuencia or fila["frecuencia"]))
+            dia_nuevo = ancla_al_editar_proximo_cargo(fila["dia"], fecha_nueva, req.frecuencia or fila["frecuencia"])
+        if req.frecuencia == 'mensual' and fila["frecuencia"] != 'mensual':
+            dia_nuevo = (fecha_nueva or fecha_guardada).day
+        if dia_nuevo is not None:
+            campos.append("dia = ?"); valores.append(dia_nuevo)
     if req.categoria_id is not None:
         campos.append("categoria_id = ?"); valores.append(req.categoria_id)
     if "presupuesto_tarjeta_id" in req.model_fields_set:
