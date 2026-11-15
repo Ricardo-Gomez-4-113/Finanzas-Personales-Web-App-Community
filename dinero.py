@@ -18,6 +18,11 @@ COLUMNAS_DINERO = frozenset({
 })  # `monto` también es la columna de transacciones_canceladas
 
 
+# Menor monto que no se redondea a cero centavos (a_centavos redondea la media fracción hacia arriba).
+# Los campos de dinero de la API lo exigen como mínimo: un monto menor se guardaría como $0.00.
+MONTO_MINIMO = 0.005
+
+
 def a_centavos(valor: Any) -> Optional[int]:
     """Pesos a centavos enteros, redondeando la media fracción hacia arriba. None se queda en None."""
     if valor is None:

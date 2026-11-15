@@ -11,7 +11,7 @@ from typing import Literal, Optional, List
 import re
 import sqlite3
 
-from dinero import a_centavos
+from dinero import MONTO_MINIMO, a_centavos
 from finanzas_core import (
     ahora_local,
     clase_movimiento,
@@ -49,7 +49,7 @@ class EliminarLoteRequest(BaseModel):
 
 class Transaccion(BaseModel):
     fecha: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha en formato ISO YYYY-MM-DD")
-    monto: float = Field(..., gt=0, le=1e12, description="Monto mayor a 0")
+    monto: float = Field(..., ge=MONTO_MINIMO, le=1e12, description="Monto de al menos medio centavo (0.005)")
     tipo: Literal['gasto', 'ingreso'] = Field(..., description="Tipo de movimiento")
     categoria_id: Optional[int] = Field(1, description="ID de categoría")
     descripcion: Optional[str] = Field(None, max_length=255, description="Concepto o detalle")
@@ -81,7 +81,7 @@ def es_cuota_msi(cursor, recurrente_id) -> bool:
 
 class TransaccionUpdate(BaseModel):
     fecha: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
-    monto: Optional[float] = Field(None, gt=0, le=1e12)
+    monto: Optional[float] = Field(None, ge=MONTO_MINIMO, le=1e12)
     tipo: Optional[Literal['gasto', 'ingreso']] = None
     categoria_id: Optional[int] = None
     descripcion: Optional[str] = Field(None, max_length=255)

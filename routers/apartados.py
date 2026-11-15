@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import sqlite3
 
-from dinero import a_centavos
+from dinero import MONTO_MINIMO, a_centavos
 from finanzas_core import (
     ahora_local, avisar, balance_disponible_a_fecha, cerrar_meta_si_cumplida, clase_movimiento, nombre_en_aviso, pesos_en_mensaje,
 )
@@ -19,11 +19,11 @@ router = APIRouter()
 class ApartadoCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
     tipo: Literal['libre', 'meta']
-    meta_monto: Optional[float] = Field(None, gt=0, le=1e12)
+    meta_monto: Optional[float] = Field(None, ge=MONTO_MINIMO, le=1e12)
 
 
 class MovimientoApartado(BaseModel):
-    monto: float = Field(..., gt=0, le=1e12)
+    monto: float = Field(..., ge=MONTO_MINIMO, le=1e12)
     accion: Literal['depositar', 'retirar']
 
 

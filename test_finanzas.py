@@ -3365,6 +3365,46 @@ def test_renombrar_una_tarjeta_no_duplica_el_cargo_ya_registrado():
     assert nuevo["proxima_fecha"] > fijo["proxima_fecha"], (fijo["proxima_fecha"], nuevo["proxima_fecha"])   # el cargo de esa fecha ya existe
 
 
+def _constructores_de_dinero(monto):
+    """Un constructor por cada campo de dinero de la API (el mismo `monto` en cada uno)."""
+    from routers.apartados import ApartadoCreate, MovimientoApartado
+    from routers.inversiones import RendimientoCreate, RendimientoMovimiento
+    from routers.movimientos import Transaccion, TransaccionUpdate
+    from routers.recurrentes import RecurrenteCreate, RecurrenteUpdate
+    return {
+        "Transaccion.monto": lambda: Transaccion(fecha="2026-10-01", monto=monto, tipo="gasto"),
+        "TransaccionUpdate.monto": lambda: TransaccionUpdate(monto=monto),
+        "RecurrenteCreate.monto": lambda: RecurrenteCreate(descripcion="x", monto=monto, fecha_inicio="2026-10-01"),
+        "RecurrenteCreate.monto_total": lambda: RecurrenteCreate(descripcion="x", monto_total=monto, meses=2, fecha_inicio="2026-10-01"),
+        "RecurrenteUpdate.monto": lambda: RecurrenteUpdate(monto=monto),
+        "ApartadoCreate.meta_monto": lambda: ApartadoCreate(nombre="x", tipo="meta", meta_monto=monto),
+        "MovimientoApartado.monto": lambda: MovimientoApartado(monto=monto, accion="depositar"),
+        "RendimientoCreate.capital": lambda: RendimientoCreate(nombre="x", capital=monto, tasa_anual=5, fecha_inicio="2026-10-01"),
+        "RendimientoMovimiento.monto": lambda: RendimientoMovimiento(monto=monto, accion="aportar"),
+    }
+
+
+def test_un_monto_menor_a_medio_centavo_se_rechaza_en_cada_campo_de_dinero():
+    # Pasaba el `gt=0` y se guardaba como $0.00 (movimientos de cero y cuotas de cero).
+    from pydantic import ValidationError
+    for monto in (0.004, 0.001, 1e-9):
+        for campo, crear in _constructores_de_dinero(monto).items():
+            try:
+                crear()
+            except ValidationError:
+                continue
+            raise AssertionError(f"{campo} aceptó {monto}, que se guarda como $0.00")
+
+
+def test_el_monto_minimo_se_guarda_como_un_centavo_y_no_como_cero():
+    from dinero import MONTO_MINIMO, a_centavos
+    assert MONTO_MINIMO == 0.005 and a_centavos(MONTO_MINIMO) == 1
+    assert a_centavos(0.0049) == 0   # lo que el mínimo deja fuera
+    for monto in (MONTO_MINIMO, 0.01, 1.0):
+        for campo, crear in _constructores_de_dinero(monto).items():
+            crear()   # no debe lanzar
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

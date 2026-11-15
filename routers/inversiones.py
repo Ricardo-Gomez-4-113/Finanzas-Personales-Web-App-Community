@@ -9,7 +9,7 @@ import sqlite3
 
 from datetime import date
 
-from dinero import a_centavos
+from dinero import MONTO_MINIMO, a_centavos
 from finanzas_core import MONEDAS_SOPORTADAS, ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
 from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
@@ -215,7 +215,7 @@ FECHA_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 
 class RendimientoCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=60)
-    capital: float = Field(..., gt=0, le=1e12)
+    capital: float = Field(..., ge=MONTO_MINIMO, le=1e12)
     tasa_anual: float = Field(..., ge=0, le=100)
     fecha_inicio: str = Field(..., pattern=FECHA_PATTERN)
 
@@ -226,7 +226,7 @@ class RendimientoCreate(BaseModel):
 
 
 class RendimientoMovimiento(BaseModel):
-    monto: float = Field(..., gt=0, le=1e12)
+    monto: float = Field(..., ge=MONTO_MINIMO, le=1e12)
     accion: Literal['aportar', 'retirar']
 
 

@@ -7,7 +7,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
-from dinero import a_centavos
+from dinero import MONTO_MINIMO, a_centavos
 from finanzas_core import (
     cuota_msi,
     validar_fecha_operativa,
@@ -36,8 +36,8 @@ class RecurrenteCreate(BaseModel):
     descripcion: str = Field(..., min_length=1, max_length=100)
     tipo: Literal['ingreso', 'gasto'] = 'gasto'
     frecuencia: Literal['semanal', 'quincenal', 'mensual'] = 'mensual'
-    monto: Optional[float] = Field(None, gt=0, le=1e12, description="Monto por ocurrencia (fijos)")
-    monto_total: Optional[float] = Field(None, gt=0, le=1e12, description="Monto total de la compra (MSI)")
+    monto: Optional[float] = Field(None, ge=MONTO_MINIMO, le=1e12, description="Monto por ocurrencia (fijos)")
+    monto_total: Optional[float] = Field(None, ge=MONTO_MINIMO, le=1e12, description="Monto total de la compra (MSI)")
     meses: Optional[int] = Field(None, ge=2, le=60, description="Número de meses (MSI)")
     fecha_inicio: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     categoria_id: Optional[int] = None
@@ -52,7 +52,7 @@ class RecurrenteCreate(BaseModel):
 
 class RecurrenteUpdate(BaseModel):
     descripcion: Optional[str] = Field(None, min_length=1, max_length=100)
-    monto: Optional[float] = Field(None, gt=0, le=1e12)
+    monto: Optional[float] = Field(None, ge=MONTO_MINIMO, le=1e12)
     frecuencia: Optional[Literal['semanal', 'quincenal', 'mensual']] = None
     proxima_fecha: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     apartado_id: Optional[int] = None
