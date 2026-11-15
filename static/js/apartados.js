@@ -33,7 +33,8 @@ export async function cargarApartados() {
         apartados.forEach(item => {
             const card = document.createElement('div');
             card.className = 'card-apartado';
-            
+            card.dataset.apartadoId = item.id;
+
             let contenidoMeta = '';
             if (item.tipo === 'meta') {
                 const porcentaje = Math.min(item.porcentaje || 0, 100);
@@ -49,10 +50,10 @@ export async function cargarApartados() {
             }
 
             card.innerHTML = `
-                <button type="button" class="btn-eliminar-apartado" data-on-click="${escapeHTML(JSON.stringify([["eliminarApartado", item.id]]))}" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">Eliminar</button>
                 <div class="apartado-cabecera">
-                    <h3 class="apartado-nombre">${escapeHTML(item.nombre)}</h3>
+                    <h3 class="apartado-nombre" title="${escapeHTML(item.nombre)}">${escapeHTML(item.nombre)}</h3>
                     <span class="badge-tag ${item.tipo === 'meta' ? 'badge-fijo' : ''}">${item.tipo === 'meta' ? 'Meta' : 'Sobre libre'}</span>
+                    <button type="button" class="btn-eliminar-apartado" data-on-click="${escapeHTML(JSON.stringify([["eliminarApartado", item.id]]))}" title="Eliminar" aria-label="Eliminar ${escapeHTML(item.nombre)}">Eliminar</button>
                 </div>
                 <p class="apartado-saldo">${montoMxnHTML(item.monto_actual)}</p>
                 ${contenidoMeta}
@@ -222,14 +223,16 @@ export async function eliminarApartado(id) {
     }
     if (!await confirmar({ titulo: 'Eliminar apartado', mensaje, aceptar: fijos.length ? 'Eliminar meta y fijo' : 'Eliminar', peligro: true })) return;
     
-    // Feedback visual inmediato en la tarjeta
-    const btnEliminar = document.querySelector(`.card-apartado button[onclick*="eliminarApartado(${id})"]`);
-    const card = btnEliminar ? btnEliminar.closest('.card-apartado') : null;
+    // Feedback visual inmediato en la tarjeta. Antes se buscaba por onclick, que ya no existe (los botones usan
+    // data-on-click): la tarjeta nunca se atenuaba y el botón se podía pulsar dos veces mientras eliminaba.
+    const card = document.querySelector(`.card-apartado[data-apartado-id="${id}"]`);
+    const btnEliminar = card ? card.querySelector('.btn-eliminar-apartado') : null;
     if (card) {
         card.style.opacity = '0.3';
         card.style.pointerEvents = 'none';
         card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
     }
+    if (btnEliminar) btnEliminar.disabled = true;
 
     try {
         const res = await apiFetch(`/api/apartados/${id}${fijos.length ? '?confirmar_fijos=true' : ''}`, { method: 'DELETE' });
@@ -242,6 +245,7 @@ export async function eliminarApartado(id) {
                 card.style.opacity = '1';
                 card.style.pointerEvents = 'auto';
             }
+            if (btnEliminar) btnEliminar.disabled = false;
             const error = await res.json();
             toast(error.detail || "No se pudo eliminar el apartado.", 'error');
         }
@@ -250,6 +254,7 @@ export async function eliminarApartado(id) {
             card.style.opacity = '1';
             card.style.pointerEvents = 'auto';
         }
+        if (btnEliminar) btnEliminar.disabled = false;
         console.error("Error al eliminar:", error);
         toast("Error de conexión al eliminar el apartado.", 'error');
     }

@@ -1623,6 +1623,78 @@ def test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base):
     finally:
         ctx.close()
 
+def _se_cruzan(a, b):
+    """Dos cajas {l, t, r, b} se solapan por más de medio píxel en ambos ejes."""
+    return a["l"] < b["r"] - 0.5 and b["l"] < a["r"] - 0.5 and a["t"] < b["b"] - 0.5 and b["t"] < a["b"] - 0.5
+
+
+def test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en_movil(navegador, base):
+    """El botón «Eliminar» vive en la fila de la cabecera: no se monta sobre el nombre ni sobre la etiqueta, aunque el
+    nombre sea largo, y queda dentro de su tarjeta. Antes iba en posición absoluta y la etiqueta quedaba debajo."""
+    usuario, clave = _usuario_nuevo("metas_ui")
+    api = _api(base, usuario, clave)
+    assert api.post("/api/apartados", json={"nombre": "Fondo para el enganche de la casa en la playa de Mazatlán", "tipo": "meta", "meta_monto": 250000}).status_code in (200, 201)
+    assert api.post("/api/apartados", json={"nombre": "Libre", "tipo": "libre"}).status_code in (200, 201)
+    assert api.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 18000}).status_code in (200, 201)
+    medir = """() => [...document.querySelectorAll('.card-apartado')].map(c => {
+        const caja = e => { const r = e.getBoundingClientRect(); return {l: r.left, t: r.top, r: r.right, b: r.bottom}; };
+        return {nombre: c.querySelector('.apartado-nombre').innerText, tarjeta: caja(c), n: caja(c.querySelector('.apartado-nombre')),
+                e: caja(c.querySelector('.badge-tag')), x: caja(c.querySelector('.btn-eliminar-apartado'))};
+    })"""
+    for nombre_vp, viewport in VIEWPORTS.items():
+        for tema in ("dark", "light"):
+            ctx, page, errores = _contexto(navegador, viewport)
+            try:
+                _entrar(page, base, usuario, clave)
+                page.evaluate(f"document.documentElement.setAttribute('data-theme', '{tema}')")
+                _ir(page, "tab-apartados")
+                page.wait_for_selector(".card-apartado")
+                tarjetas = page.evaluate(medir)
+                assert len(tarjetas) == 3, tarjetas
+                for t in tarjetas:
+                    donde = f"{nombre_vp}/{tema}/{t['nombre'][:20]}"
+                    assert not _se_cruzan(t["n"], t["x"]), f"«Eliminar» se monta sobre el nombre: {donde} {t}"
+                    assert not _se_cruzan(t["e"], t["x"]), f"«Eliminar» se monta sobre la etiqueta: {donde} {t}"
+                    assert not _se_cruzan(t["n"], t["e"]), f"la etiqueta se monta sobre el nombre: {donde} {t}"
+                    tj, x = t["tarjeta"], t["x"]
+                    assert x["l"] >= tj["l"] and x["r"] <= tj["r"] + 0.5 and x["t"] >= tj["t"], f"«Eliminar» se sale de la tarjeta: {donde} {t}"
+                    assert abs((x["t"] + x["b"]) / 2 - (t["e"]["t"] + t["e"]["b"]) / 2) < 14, f"etiqueta y botón deben ir en la misma fila: {donde} {t}"
+                _sin_desbordamiento(page, f"{nombre_vp}/{tema}/metas")
+                if nombre_vp == "movil":
+                    area = page.evaluate("""() => { const b = document.querySelector('.btn-eliminar-apartado');
+                        const cs = getComputedStyle(b, '::after'), r = b.getBoundingClientRect();
+                        return {w: r.width - parseFloat(cs.left) - parseFloat(cs.right), h: r.height - parseFloat(cs.top) - parseFloat(cs.bottom)}; }""")
+                    assert area["w"] >= 44 and area["h"] >= 44, f"el área táctil de «Eliminar» debe ser de 44 px: {area}"
+                assert not errores, errores
+            finally:
+                ctx.close()
+
+
+def test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde(navegador, base):
+    """Con la petición DELETE en vuelo la tarjeta se atenúa y no se puede pulsar otra vez. Antes el selector buscaba
+    un onclick que ya no existe y la tarjeta quedaba como si nada pasara."""
+    usuario, clave = _usuario_nuevo("metas_del")
+    assert _api(base, usuario, clave).post("/api/apartados", json={"nombre": "Meta lenta", "tipo": "meta", "meta_monto": 1000}).status_code in (200, 201)
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-apartados")
+        tarjeta = page.locator(".card-apartado", has_text="Meta lenta")
+        tarjeta.wait_for()
+        retenidas = []
+        page.route("**/api/apartados/*", lambda ruta: retenidas.append(ruta) if ruta.request.method == "DELETE" else ruta.continue_())
+        tarjeta.locator(".btn-eliminar-apartado").click()
+        _responder_confirmacion(page, aceptar=True)
+        _esperar(page, "document.querySelector('.card-apartado').style.opacity === '0.3'")
+        assert tarjeta.locator(".btn-eliminar-apartado").is_disabled(), "el botón debe quedar bloqueado mientras responde"
+        assert tarjeta.evaluate("e => getComputedStyle(e).pointerEvents") == "none"
+        assert len(retenidas) == 1, retenidas
+        retenidas[0].continue_()
+        tarjeta.wait_for(state="detached")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
 def test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo(navegador, base):
     """El diálogo nombra el gasto fijo que aporta a la meta; cancelar no toca nada y confirmar elimina meta y fijo."""
     ctx, page, errores = _flujo_escenario(navegador, base)
@@ -2857,6 +2929,8 @@ if __name__ == "__main__":
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
+                (test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en_movil, lambda: test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en_movil(navegador, base)),
+                (test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde, lambda: test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde(navegador, base)),
                 (test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo, lambda: test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo(navegador, base)),
                 (test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto, lambda: test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto(navegador, base)),
                 (test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion, lambda: test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion(navegador, base)),

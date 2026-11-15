@@ -1420,8 +1420,14 @@
 }
 
 :root .card-apartado:hover { border-color: var(--gold-border); transform: none; }
-:root .apartado-cabecera { display: flex; align-items: center; gap: 10px; padding-right: 24px; }
-:root .apartado-nombre { margin: 0; font-size: var(--fs-base); font-weight: 600; color: var(--text-color); }
+:root .apartado-cabecera { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* El nombre cede espacio (hasta dos líneas) antes que la etiqueta y el botón: nada se monta ni se sale de la tarjeta */
+:root .apartado-nombre {
+    margin: 0; font-size: var(--fs-base); font-weight: 600; color: var(--text-color);
+    flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+:root .apartado-cabecera .badge-tag { flex: none; }
 
 :root .apartado-saldo {
     font-family: var(--font-num);
@@ -1449,7 +1455,7 @@
 :root .acciones-apartado button:last-of-type:hover { background: var(--danger-subtle); color: var(--danger-text); border-color: color-mix(in srgb, var(--danger-color) 35%, transparent); }
 
 :root .btn-eliminar-apartado {
-    position: absolute; top: 12px; right: 12px;
+    position: relative; flex: none; margin-left: auto;
     background: transparent; border: 1px solid transparent; border-radius: var(--radius-s);
     color: var(--text-muted); box-shadow: none;
 }
@@ -1932,6 +1938,7 @@
     :root .tab-btn { position: relative; }
     :root .btn-editar::after,
     :root .btn-eliminar::after { content: ""; position: absolute; inset: -8px; }
+    :root .btn-eliminar-apartado::after { content: ""; position: absolute; inset: -9px -4px; }
     :root .tab-btn::after { content: ""; position: absolute; inset: -3px 0; }
 }
 
