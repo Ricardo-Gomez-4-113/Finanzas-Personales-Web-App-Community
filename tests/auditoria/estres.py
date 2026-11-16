@@ -182,6 +182,7 @@ class Metricas:
         self.errores = collections.Counter()  # tipo -> n
         self.cinco_xx = []                    # (método, ruta, estado, cuerpo)
         self.salud = []                       # ms de /health
+        self.logins_ok = 0                    # sesiones que lograron entrar
         self.cpu = []                         # % de un núcleo
         self.mb = []
 
@@ -232,7 +233,10 @@ class Sesion:
         r = await self.pedir(M, "POST", "/auth/login", json={"username": self.cuenta.usuario, "password": personas.CLAVE})
         if r is not None and r.status_code == 200:
             self.cab = {"Authorization": f"Bearer {r.json()['access_token']}"}
+            M.logins_ok += 1
             return True
+        if r is not None and r.status_code < 500 and r.status_code not in (401, 403):
+            M.errores[f"login rechazado {r.status_code}"] += 1     # p. ej. 429: antes la sesión se perdía sin dejar rastro
         return False
 
     def marca(self):
@@ -504,7 +508,8 @@ def foto_inicial(c):
 # ---------------------------------------------------------------------------------------------------------------------
 def resumen_escalon(n, dur, M, servidor_ticks):
     lecturas = [ms for (e, s, ms) in M.peticiones if s and not any(p in e for p in PESADAS) and not e.startswith("UI:")]
-    todos = [ms for (e, s, ms) in M.peticiones if s and not e.startswith("UI:")]
+    todos = [ms for (e, s, ms) in M.peticiones if s and not e.startswith("UI:") and e != "POST /auth/login"]
+    logins = [ms for (e, s, ms) in M.peticiones if s and e == "POST /auth/login"]
     n_req = len([1 for (e, _s, _m) in M.peticiones if not e.startswith("UI:")])
     negocio = sum(1 for (e, s, _m) in M.peticiones if s in NEGOCIO)
     err = M.total_errores()
@@ -517,6 +522,7 @@ def resumen_escalon(n, dur, M, servidor_ticks):
         "errores_pct": round(100 * err / max(1, n_req), 2), "errores_tipo": dict(M.errores), "rechazos_negocio": negocio,
         "p50": round(percentil(todos, 50)), "p95": round(percentil(todos, 95)), "p99": round(percentil(todos, 99)),
         "p95_decisivo": round(percentil(lecturas, 95)),
+        "login_p50": round(percentil(logins, 50)), "login_p95": round(percentil(logins, 95)), "logins": len(logins), "sesiones_activas": M.logins_ok,
         "cpu_max_pct": round(max(M.cpu or [0])), "cpu_media_pct": round(sum(M.cpu) / max(1, len(M.cpu))), "mb_max": round(max(M.mb or [0])),
         "salud_p95": round(percentil(M.salud, 95)), "salud_max": round(max(M.salud or [0])),
         "cinco_xx": [list(x) for x in M.cinco_xx[:5]], "cinco_xx_total": len(M.cinco_xx),
@@ -551,7 +557,8 @@ async def correr_escalon(n, dur, cuentas_api, cuentas_nav, base, servidor, rng, 
     sesiones = [Sesion(usadas[i % len(usadas)], base, random.Random(rng.random()), httpx) for i in range(n)]   # las sobrantes repiten cuenta
     parar = asyncio.Event()
     muestreo = asyncio.create_task(muestrear(servidor, M, base, parar))
-    tareas = [asyncio.create_task(s.correr(M, fin, rng.random() * min(8.0, dur / 5))) for s in sesiones]
+    rampa = min(dur / 3, max(8.0, n / 8))     # ~8 logins por segundo como mucho
+    tareas = [asyncio.create_task(s.correr(M, fin, rng.random() * rampa)) for s in sesiones]
     if con_navegador and navegador is not None:
         perfiles = [{"dispositivo": "escritorio" if i % 2 == 0 else "celular", "tema": "dark" if (i // 2) % 2 == 0 else "light"} for i in range(n_nav)]
         for i, p in enumerate(perfiles):
@@ -574,13 +581,15 @@ def escribir_informe(carpeta, etiqueta, args, escalones, limite, hall, violacion
          f"- Servidor lanzado {'**con** `--reload` (como el Dockerfile del SaaS)' if servidor.con_reload else '**sin** `--reload` (como el Dockerfile de Community)'}, un solo proceso de uvicorn.",
          f"- {semb['cuentas']} cuentas sembradas ({semb['reparto']}); escalones de {args.duracion} s; cliente y servidor comparten esta máquina ({os.cpu_count()} núcleos), "
          "así que los números son **relativos**: sirven para comparar y encontrar errores, no como capacidad exacta de tu servidor.",
+         "- Los percentiles p50/p95/p99 **no incluyen el inicio de sesión** (bcrypt, unos 200 ms de CPU cada uno): va aparte en «Login». "
+         "Las sesiones entran escalonadas, como mucho unas 8 por segundo. Los navegadores (Chromium) comparten los mismos núcleos que el servidor.",
          f"- Regla de paro: más de {int(LIMITE_ERRORES * 100)} % de errores, o un p95 > {LIMITE_P95_MS} ms en las peticiones normales (sin descargas pesadas ni inicio de sesión).", ""]
     L += ["## Resultado por escalón", "",
-          "| Sesiones | Navegadores | Peticiones | req/s | Errores | % | Rechazos de negocio | p50 ms | p95 ms | p99 ms | CPU máx % | MB | /health p95 ms |",
-          "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+          "| Sesiones (activas) | Navegadores | Peticiones | req/s | Errores | % | Rechazos de negocio | p50 ms | p95 ms | p99 ms | Login p50 / p95 ms | CPU máx % | MB | /health p95 ms |",
+          "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for e in escalones:
-        L.append(f"| {e['sesiones']} | {e['navegadores']} | {e['peticiones']} | {e['rps']} | {e['errores']} | {e['errores_pct']} | {e['rechazos_negocio']} | "
-                 f"{e['p50']} | {e['p95']} | {e['p99']} | {e['cpu_max_pct']} | {e['mb_max']} | {e['salud_p95']} |")
+        L.append(f"| {e['sesiones']} ({e['sesiones_activas']}) | {e['navegadores']} | {e['peticiones']} | {e['rps']} | {e['errores']} | {e['errores_pct']} | {e['rechazos_negocio']} | "
+                 f"{e['p50']} | {e['p95']} | {e['p99']} | {e['login_p50']} / {e['login_p95']} | {e['cpu_max_pct']} | {e['mb_max']} | {e['salud_p95']} |")
     L += ["", f"**Límite encontrado:** {limite}", ""]
     errores = [e for e in escalones if e["errores"] or e["cinco_xx_total"] or e["fallos_del_arnes"] or e["errores_servidor_nuevos"]]
     if errores:
