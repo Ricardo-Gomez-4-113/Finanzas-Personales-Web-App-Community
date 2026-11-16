@@ -6,3 +6,4 @@ bcrypt==5.0.0
 pyjwt==2.15.1
 python-multipart==0.0.32
 segno==1.6.6
+tzdata==2025.2

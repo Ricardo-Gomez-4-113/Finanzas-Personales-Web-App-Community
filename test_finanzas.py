@@ -143,6 +143,23 @@ def reloj_fijo(iso):
                 os.environ[k] = v
 
 
+def test_la_zona_horaria_de_mexico_esta_disponible_y_ahora_local_la_usa():
+    # Sin los datos de zona horaria, ahora_local cae en silencio en la hora del servidor (UTC en Docker): después de las 18:00
+    # en México el «hoy» de la app sería el día siguiente. requirements.txt trae tzdata para no depender de la imagen base.
+    from zoneinfo import ZoneInfo
+    from finanzas_core import ahora_local
+    assert str(ZoneInfo("America/Mexico_City")) == "America/Mexico_City"
+    claves = ("FINANZAS_MODO_PRUEBA", "FINANZAS_HOY")
+    anterior = {k: os.environ.pop(k, None) for k in claves}
+    try:
+        assert ahora_local().tzinfo is not None, "ahora_local cayó en la hora del servidor"
+        assert ahora_local().utcoffset() == timedelta(hours=-6), ahora_local().utcoffset()   # México ya no usa horario de verano
+    finally:
+        for k, v in anterior.items():
+            if v is not None:
+                os.environ[k] = v
+
+
 def test_convertir():
     assert convertir(100, 'USD', 'MXN', 18) == 1800
     assert convertir(1800, 'MXN', 'USD', 18) == 100
