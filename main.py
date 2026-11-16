@@ -194,8 +194,8 @@ def _aplicar_cabeceras(response, path: str, es_https: bool):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=(), payment=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
         "font-src 'self' data:; "
         "img-src 'self' data: https:; "
         "connect-src 'self'; "

@@ -577,6 +577,15 @@ def test_las_tipografias_se_sirven_desde_este_servidor_y_la_csp_no_abre_dominios
     assert "Hanken Grotesk" in css and "Fraunces" in css and "fonts.g" not in css
     for licencia in ("OFL-Fraunces.txt", "OFL-HankenGrotesk.txt"):
         assert client.get(f"/static/fonts/{licencia}").status_code == 200, licencia
+    # Chart.js también: un script de un CDN corre con acceso a la sesión, así que va alojado y la CSP no nombra a nadie más
+    assert "jsdelivr" not in csp, csp
+    script_src = next(d for d in csp.split(";") if d.strip().startswith("script-src"))
+    assert script_src.split()[1:] == ["'self'"], script_src
+    html = client.get("/login").text   # la página de la app (en el SaaS, «/» es la landing)
+    assert "/static/vendor/chart-4.4.1.umd.js" in html and "jsdelivr" not in html
+    r = client.get("/static/vendor/chart-4.4.1.umd.js")
+    assert r.status_code == 200 and "Chart.js v4.4.1" in r.text[:200], (r.status_code, r.text[:80])
+    assert client.get("/static/vendor/LICENSE-ChartJS.txt").status_code == 200
 
 
 def test_arranque_define_la_ruta_de_clave_inicial(client):

@@ -588,6 +588,9 @@ def _abrir_formulario(page, que):
     }[que]
     page.evaluate(f"document.getElementById('{boton}').click()")  # clic por JS: la barra superior puede tapar el botón
     page.wait_for_selector(f"#{modal}:not(.hidden)")
+    # La app enfoca el primer campo 50 ms después de abrir (abrirModalFormulario). Si la prueba ya escribió en otro, ese
+    # temporizador le roba el foco y el texto cae en el campo equivocado (en «monto», que es numérico, queda vacío).
+    _esperar(page, f"document.getElementById('{modal}').contains(document.activeElement)")
 
 
 def _ir(page, tab):
@@ -1291,14 +1294,15 @@ def test_las_tipografias_se_cargan_desde_este_servidor_sin_pedir_nada_a_terceros
     una petición colgada dejaba el login sin cargar 30 s, y cada visita le mandaba su IP a Google."""
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
     externas, locales = [], []
-    page.on("request", lambda r: externas.append(r.url) if re.search(r"fonts\.g(oogleapis|static)\.com", r.url) else None)
+    page.on("request", lambda r: externas.append(r.url) if re.search(r"fonts\.g(oogleapis|static)\.com|jsdelivr", r.url) else None)
     page.on("response", lambda r: locales.append((r.url.split("/")[-1], r.status)) if "/static/fonts/" in r.url else None)
     try:
         respuesta = page.goto(base + "/login")
         assert "fonts.g" not in respuesta.headers["content-security-policy"], respuesta.headers["content-security-policy"]
         cargada = "[...document.fonts].some(f => f.family.includes('%s') && f.status === 'loaded')"
         _esperar(page, cargada % "Hanken" + " && " + cargada % "Fraunces", timeout=10.0)   # cargadas de verdad, no solo declaradas
-        assert not externas, f"salieron peticiones a Google Fonts: {externas}"
+        assert not externas, f"salieron peticiones a terceros (Google Fonts o CDN): {externas}"
+        assert page.evaluate("typeof window.Chart === 'function' && Chart.version") == "4.4.1"   # Chart.js alojado, cargado de verdad
         assert locales and all(estado == 200 for _, estado in locales), locales
         assert {"hanken-grotesk-latin.woff2", "fraunces-latin.woff2"} <= {n for n, _ in locales}, locales
         assert page.evaluate("getComputedStyle(document.body).fontFamily").startswith('"Hanken Grotesk"')

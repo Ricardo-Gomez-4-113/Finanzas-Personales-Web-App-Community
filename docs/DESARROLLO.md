@@ -75,6 +75,8 @@ Reglas que las pruebas vigilan: los periodos son contiguos y no se solapan, cada
 - `static/css/tokens.css`: paleta (oscuro obsidiana y champán, claro porcelana y tinta), tipografías (`--font-ui` Hanken Grotesk, `--font-num` Fraunces), radios y sombras. Todo color sale de aquí.
 - `static/css/tema.css`: capa de componentes que se carga al final; sus reglas llevan prefijo `:root` para ganar a las anteriores sin `!important`.
 - Las gráficas leen sus colores de los tokens (`colorVar`) y se redibujan al cambiar de tema.
+- Chart.js 4.4.1 alojado en `static/vendor/chart-4.4.1.umd.js` (MIT, licencia al lado). Para actualizarlo: descargar el `dist/chart.umd.js` de la
+  nueva versión, guardarlo con la versión en el nombre y cambiar la etiqueta de `index.html`. La CSP ya no nombra ningún dominio de terceros.
 - Tipografías alojadas en el propio servidor: `static/fonts/*.woff2` (Hanken Grotesk y Fraunces, fuentes variables con subconjuntos
   latin y latin-ext) y `static/css/fuentes.css` con sus `@font-face`. Licencia SIL OFL 1.1 (textos en `static/fonts/OFL-*.txt`).
   No se cargan de terceros: una hoja de estilo externa bloquea el pintado y manda la IP de cada visitante a ese tercero
