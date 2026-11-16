@@ -49,5 +49,11 @@ if grep -nE "SUM\((CASE|[a-z]\.)?[^)]*(monto|monto_actual|capital|ingreso_base)"
   echo "FALLO: SUM sobre una columna de dinero sin dividir entre 100.0 (los montos se guardan en centavos)"; fallos=1
 fi
 
+# 7. Las tipografías se alojan en static/fonts (fuentes.css): ninguna referencia a Google Fonts. Una hoja de estilo externa
+#    bloquea el pintado (una petición colgada deja la página en blanco) y manda la IP de cada visitante a un tercero.
+if grep -rnE "fonts\.(googleapis|gstatic)\.com" static/ main.py --include=*.html --include=*.css --include=*.js --include=*.py; then
+  echo "FALLO: referencia a Google Fonts (las tipografías viven en static/fonts, ver static/css/fuentes.css)"; fallos=1
+fi
+
 [[ $fallos -eq 0 ]] && echo "Reglas OK"
 exit $fallos

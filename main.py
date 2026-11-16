@@ -195,8 +195,8 @@ def _aplicar_cabeceras(response, path: str, es_https: bool):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
-        "font-src 'self' https://fonts.gstatic.com data:; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' data:; "
         "img-src 'self' data: https:; "
         "connect-src 'self'; "
         "frame-ancestors 'self'; "

@@ -97,7 +97,6 @@ def _login(page, base):
 
 def test_login_incorrecto_muestra_error(navegador, base):
     page = navegador.new_page()
-    _sin_fuentes_externas(page)
     page.goto(base + "/login")
     page.fill("#login-username", USUARIO)
     page.fill("#login-password", "clave-equivocada")
@@ -424,18 +423,9 @@ def test_cuadro_de_quitar_en_movil_con_botones_de_44px(navegador, base):
         ctx.close()
 
 
-def _sin_fuentes_externas(donde):
-    """Las tipografías de Google son una hoja de estilo que bloquea el pintado: una petición que se cuelga (se vio 1 de cada
-    ~400 cargas) dejaba la página sin terminar de cargar 30 s y la prueba fallaba sin que la app tuviera culpa. Las pruebas no
-    deben depender de internet: se responde al instante con un CSS vacío y la página usa sus tipografías de respaldo."""
-    donde.route(re.compile(r"https://fonts\.(googleapis|gstatic)\.com/.*"),
-                lambda ruta: ruta.fulfill(status=200, content_type="text/css", body=""))
-
-
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
-    _sin_fuentes_externas(ctx)
     page = ctx.new_page()
     errores = []
     page.on("pageerror", lambda e: errores.append(f"pageerror: {e}"))
@@ -1291,6 +1281,27 @@ def test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base):
         page.select_option("#rec-categoria", index=0)
         page.click("#btn-guardar-recurrente")
         _esperar(page, "document.getElementById('fijos-periodos').textContent.includes('Gimnasio')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_las_tipografias_se_cargan_desde_este_servidor_sin_pedir_nada_a_terceros(navegador, base):
+    """Hanken Grotesk y Fraunces viven en static/fonts. Antes venían de una hoja de estilo externa que bloquea el pintado:
+    una petición colgada dejaba el login sin cargar 30 s, y cada visita le mandaba su IP a Google."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    externas, locales = [], []
+    page.on("request", lambda r: externas.append(r.url) if re.search(r"fonts\.g(oogleapis|static)\.com", r.url) else None)
+    page.on("response", lambda r: locales.append((r.url.split("/")[-1], r.status)) if "/static/fonts/" in r.url else None)
+    try:
+        respuesta = page.goto(base + "/login")
+        assert "fonts.g" not in respuesta.headers["content-security-policy"], respuesta.headers["content-security-policy"]
+        cargada = "[...document.fonts].some(f => f.family.includes('%s') && f.status === 'loaded')"
+        _esperar(page, cargada % "Hanken" + " && " + cargada % "Fraunces", timeout=10.0)   # cargadas de verdad, no solo declaradas
+        assert not externas, f"salieron peticiones a Google Fonts: {externas}"
+        assert locales and all(estado == 200 for _, estado in locales), locales
+        assert {"hanken-grotesk-latin.woff2", "fraunces-latin.woff2"} <= {n for n, _ in locales}, locales
+        assert page.evaluate("getComputedStyle(document.body).fontFamily").startswith('"Hanken Grotesk"')
         assert not errores, errores
     finally:
         ctx.close()
@@ -3013,6 +3024,7 @@ if __name__ == "__main__":
                 (test_menu_usuario_teclado_y_hoja_movil, lambda: test_menu_usuario_teclado_y_hoja_movil(navegador, base)),
                 (test_inversion_nueva_aparece_en_el_portafolio, lambda: test_inversion_nueva_aparece_en_el_portafolio(navegador, base)),
                 (test_fijo_quincenal_y_gasto_con_su_ingreso, lambda: test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base)),
+                (test_las_tipografias_se_cargan_desde_este_servidor_sin_pedir_nada_a_terceros, lambda: test_las_tipografias_se_cargan_desde_este_servidor_sin_pedir_nada_a_terceros(navegador, base)),
                 (test_el_login_no_roba_el_foco_a_la_contrasena_a_los_80_ms, lambda: test_el_login_no_roba_el_foco_a_la_contrasena_a_los_80_ms(navegador, base)),
                 (test_el_menu_de_usuario_reabierto_al_instante_no_queda_oculto, lambda: test_el_menu_de_usuario_reabierto_al_instante_no_queda_oculto(navegador, base)),
                 (test_respaldo_desde_el_menu_se_descarga_y_se_restaura, lambda: test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base)),

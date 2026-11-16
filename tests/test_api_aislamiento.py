@@ -563,6 +563,22 @@ def test_csp_no_permite_scripts_inline(client):
     assert "default-src 'self'" in csp
 
 
+def test_las_tipografias_se_sirven_desde_este_servidor_y_la_csp_no_abre_dominios_de_terceros(client):
+    """Las fuentes viven en static/fonts: antes venían de fonts.googleapis.com, una hoja de estilo externa que bloquea el pintado
+    (una petición colgada dejaba la página en blanco) y que mandaba la IP de cada visitante a Google."""
+    csp = client.get("/login").headers["content-security-policy"]
+    assert "fonts.googleapis.com" not in csp and "fonts.gstatic.com" not in csp, csp
+    font_src = next(d for d in csp.split(";") if d.strip().startswith("font-src"))
+    assert "'self'" in font_src, font_src
+    for archivo in ("hanken-grotesk-latin", "hanken-grotesk-latin-ext", "fraunces-latin", "fraunces-latin-ext"):
+        r = client.get(f"/static/fonts/{archivo}.woff2")
+        assert r.status_code == 200 and r.content[:4] == b"wOF2", (archivo, r.status_code, r.content[:4])
+    css = client.get("/static/css/fuentes.css").text
+    assert "Hanken Grotesk" in css and "Fraunces" in css and "fonts.g" not in css
+    for licencia in ("OFL-Fraunces.txt", "OFL-HankenGrotesk.txt"):
+        assert client.get(f"/static/fonts/{licencia}").status_code == 200, licencia
+
+
 def test_arranque_define_la_ruta_de_clave_inicial(client):
     """La rutina de arranque escribe admin_inicial.txt en DATA_DIR; main debe importar ese símbolo."""
     import database
@@ -781,6 +797,7 @@ if __name__ == "__main__":
             (test_lote_que_falla_a_mitad_no_deja_cambios_a_medias, lambda: test_lote_que_falla_a_mitad_no_deja_cambios_a_medias(client)),
             (test_tenant_sin_db_name_falla_cerrado, test_tenant_sin_db_name_falla_cerrado),
             (test_csp_no_permite_scripts_inline, lambda: test_csp_no_permite_scripts_inline(client)),
+            (test_las_tipografias_se_sirven_desde_este_servidor_y_la_csp_no_abre_dominios_de_terceros, lambda: test_las_tipografias_se_sirven_desde_este_servidor_y_la_csp_no_abre_dominios_de_terceros(client)),
             (test_tarjetas_por_porcentaje_no_se_guardan_en_cero, lambda: test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha)),
             (test_pagos_del_presupuesto_por_api, lambda: test_pagos_del_presupuesto_por_api(client, ha)),
             (test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra, lambda: test_dia_de_cobro_lo_fija_el_pago_1_y_guardar_el_ingreso_no_lo_borra(client, ha)),

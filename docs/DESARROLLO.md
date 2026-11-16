@@ -75,6 +75,11 @@ Reglas que las pruebas vigilan: los periodos son contiguos y no se solapan, cada
 - `static/css/tokens.css`: paleta (oscuro obsidiana y champán, claro porcelana y tinta), tipografías (`--font-ui` Hanken Grotesk, `--font-num` Fraunces), radios y sombras. Todo color sale de aquí.
 - `static/css/tema.css`: capa de componentes que se carga al final; sus reglas llevan prefijo `:root` para ganar a las anteriores sin `!important`.
 - Las gráficas leen sus colores de los tokens (`colorVar`) y se redibujan al cambiar de tema.
+- Tipografías alojadas en el propio servidor: `static/fonts/*.woff2` (Hanken Grotesk y Fraunces, fuentes variables con subconjuntos
+  latin y latin-ext) y `static/css/fuentes.css` con sus `@font-face`. Licencia SIL OFL 1.1 (textos en `static/fonts/OFL-*.txt`).
+  No se cargan de terceros: una hoja de estilo externa bloquea el pintado y manda la IP de cada visitante a ese tercero
+  (`verificar_reglas.sh` falla si reaparece una referencia a Google Fonts, y la CSP ya no abre esos dominios). Para actualizar una
+  fuente, descarga su `woff2`, conserva el `unicode-range` y reemplaza el archivo.
 - Textos en tipo oración; cifras en Fraunces con `tabular-nums`; íconos SVG con `stroke-width` 1.8.
 
 ## Moneda base y tipos de cambio
