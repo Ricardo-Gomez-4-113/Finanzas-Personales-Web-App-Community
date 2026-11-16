@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 IMAGEN="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/python:v1.48.0-jammy}"
-docker run --rm --ipc=host -e SOLO="${SOLO:-}" -v "$PWD":/src:ro "$IMAGEN" bash -c '
+docker run --rm --ipc=host -e SOLO="${SOLO:-}" -e REINTENTOS="${REINTENTOS:-1}" -v "$PWD":/src:ro "$IMAGEN" bash -c '
   set -e
   pip install -q --no-cache-dir -r /src/requirements.txt playwright==1.48.0 2>&1 | grep -v "notice\|WARNING: Running pip" || true
   cp -r /src /tmp/app && cd /tmp/app

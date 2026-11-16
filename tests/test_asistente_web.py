@@ -524,7 +524,19 @@ def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(c
     hilo.start()
     base = f"http://127.0.0.1:{http.server_address[1]}"
 
-    def pedir(ruta, datos=None, cabeceras=None, metodo=None):
+    def sin_peticiones_en_curso():
+        """El servidor suelta su cupo de «una petición a la vez» DESPUÉS de contestar. Sin esperar a que quede libre, la petición
+        siguiente podía llegar antes y recibir 503 en vez de lo que se está probando (era la causa de la falla intermitente)."""
+        for _ in range(300):
+            if libres.acquire(blocking=False):
+                libres.release()
+                return
+            time.sleep(0.01)
+        raise AssertionError("el servidor no soltó su cupo de peticiones en 3 s")
+
+    def pedir(ruta, datos=None, cabeceras=None, metodo=None, esperar=True):
+        if esperar:
+            sin_peticiones_en_curso()
         peticion = urllib.request.Request(base + ruta, data=datos, method=metodo, headers=cabeceras or {})
         try:
             with urllib.request.urlopen(peticion, timeout=10) as r:
@@ -539,6 +551,7 @@ def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(c
         codigo, datos = pedir("/web/mensaje", cuerpo, cab)
         assert codigo == 200 and datos["estado"] == "ok" and datos["texto"] == "Dime más.", (codigo, datos)
         assert pedir("/web/confirmar", b"x" * 20_000, cab)[0] == 413, "las rutas sin archivo admiten 16 KB"
+        sin_peticiones_en_curso()
         grande = socket.create_connection(("127.0.0.1", http.server_address[1]), timeout=10)   # solo se mandan las cabeceras: el servidor rechaza sin leer el cuerpo
         grande.sendall(b"POST /web/mensaje HTTP/1.0\r\nX-Asistente-Secreto: " + SECRETO.encode() + b"\r\nContent-Length: " + str(servidor_web.MAX_CUERPO_ARCHIVO + 10).encode() + b"\r\n\r\n")
         assert b" 413 " in grande.recv(4096).split(b"\r\n")[0], "y /web/mensaje, 8 MB como máximo"
@@ -551,6 +564,7 @@ def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(c
         anterior = servidor_web.PLAZO_DE_LECTURA_SEG
         servidor_web.PLAZO_DE_LECTURA_SEG = 0.5
         try:
+            sin_peticiones_en_curso()
             lento = socket.create_connection(("127.0.0.1", http.server_address[1]), timeout=10)
             lento.sendall(b"POST /web/mensaje HTTP/1.0\r\nX-Asistente-Secreto: " + SECRETO.encode() + b"\r\nContent-Length: 200\r\n\r\nabc")
             respuesta = lento.recv(4096)
@@ -569,8 +583,9 @@ def test_el_servidor_http_real_limita_el_cuerpo_y_atiende_en_paralelo_con_tope(c
         time.sleep(0.5)
         assert pedir("/health")[0] == 200
         # Con el tope de simultáneas lleno, lo demás recibe 503 y no se apila
+        sin_peticiones_en_curso()
         libres.acquire()
-        assert pedir("/health")[0] == 503
+        assert pedir("/health", esperar=False)[0] == 503
         libres.release()
         assert pedir("/health")[0] == 200
     finally:

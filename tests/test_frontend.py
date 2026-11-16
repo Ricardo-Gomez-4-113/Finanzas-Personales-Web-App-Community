@@ -42,6 +42,7 @@ import security  # noqa: E402
 USUARIO, CLAVE = "front_user", "Passw0rd#Front1"
 PESTANAS = ["tab-dashboard", "tab-movimientos", "tab-apartados", "tab-inversiones", "tab-presupuesto", "tab-calculadora-rf"]
 VIEWPORTS = {"laptop": {"width": 1366, "height": 768}, "movil": {"width": 390, "height": 844}}
+AREA_TACTIL_MIN = 43.99   # los 44 px se miden en fracciones de píxel: 43.99994 sigue siendo un área táctil de 44
 LOGS = tempfile.mkdtemp(prefix="finanzas_logs_front_")  # el servidor de la prueba escribe aquí su registro
 
 
@@ -96,6 +97,7 @@ def _login(page, base):
 
 def test_login_incorrecto_muestra_error(navegador, base):
     page = navegador.new_page()
+    _sin_fuentes_externas(page)
     page.goto(base + "/login")
     page.fill("#login-username", USUARIO)
     page.fill("#login-password", "clave-equivocada")
@@ -115,6 +117,7 @@ def test_login_sin_fab_con_texto_fijo_y_ojo_de_contrasena(navegador, base):
         assert page.locator("#btn-fab, .fab").count() == 0, "ya no hay botón «+» flotante"
         page.fill("#login-username", "nadie")
         page.fill("#login-password", "clave-equivocada")
+        _esperar(page, "document.querySelector('.login-card').getAnimations().length === 0")   # la animación de entrada mueve la tarjeta unos px
         arriba_antes = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
         page.click("#form-login [type=submit]")
         page.wait_for_selector("#login-error:not(.hidden)", timeout=10000)
@@ -231,6 +234,7 @@ def test_login_movil_centrado_y_sin_saltar_al_fallar(navegador, base):
         centro = page.evaluate("(() => { const r = document.querySelector('.login-card').getBoundingClientRect(); return (r.top + r.bottom) / 2; })()")
         alto_vista = VIEWPORTS["movil"]["height"]
         assert abs(centro - alto_vista / 2) < 40, f"la tarjeta no está centrada: centro {centro}, pantalla {alto_vista / 2}"
+        _esperar(page, "document.querySelector('.login-card').getAnimations().length === 0")   # la animación de entrada mueve la tarjeta unos px
         arriba_antes = page.evaluate("document.querySelector('.login-card').getBoundingClientRect().top")
         page.fill("#login-username", "nadie")
         page.fill("#login-password", "clave-equivocada")
@@ -412,7 +416,7 @@ def test_cuadro_de_quitar_en_movil_con_botones_de_44px(navegador, base):
         assert "ingreso" in page.inner_text("#quitar-mensaje").lower(), "el aviso de un ingreso dice que su dinero sale del saldo"
         for boton in ("#btn-quitar-cancelar", "#btn-quitar-eliminar", "#btn-quitar-volver"):
             alto = page.evaluate(f"document.querySelector('{boton}').getBoundingClientRect().height")
-            assert alto >= 44, f"{boton} mide {alto} px"
+            assert alto >= AREA_TACTIL_MIN, f"{boton} mide {alto} px"
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), "el cuadro desborda el ancho"
         page.keyboard.press("Escape")
         assert not errores, errores
@@ -420,9 +424,18 @@ def test_cuadro_de_quitar_en_movil_con_botones_de_44px(navegador, base):
         ctx.close()
 
 
+def _sin_fuentes_externas(donde):
+    """Las tipografías de Google son una hoja de estilo que bloquea el pintado: una petición que se cuelga (se vio 1 de cada
+    ~400 cargas) dejaba la página sin terminar de cargar 30 s y la prueba fallaba sin que la app tuviera culpa. Las pruebas no
+    deben depender de internet: se responde al instante con un CSS vacío y la página usa sus tipografías de respaldo."""
+    donde.route(re.compile(r"https://fonts\.(googleapis|gstatic)\.com/.*"),
+                lambda ruta: ruta.fulfill(status=200, content_type="text/css", body=""))
+
+
 def _contexto(navegador, viewport):
     """Contexto nuevo con registro de errores de JavaScript. Cada prueba abre el suyo: no comparten estado."""
     ctx = navegador.new_context(viewport=viewport)
+    _sin_fuentes_externas(ctx)
     page = ctx.new_page()
     errores = []
     page.on("pageerror", lambda e: errores.append(f"pageerror: {e}"))
@@ -646,7 +659,7 @@ def test_lista_de_movimientos_sigue_el_periodo_de_cobro(navegador, base):
     try:
         page.wait_for_selector("#periodo-libre:not(:empty)")
         _ir(page, "tab-movimientos")
-        page.wait_for_function("document.getElementById('lbl-ventana-movimientos').textContent.startsWith('Periodo del')", timeout=10000)
+        _esperar(page, "document.getElementById('lbl-ventana-movimientos').textContent.startsWith('Periodo del')", timeout=10.0)
         inicio, fin = page.evaluate("""() => fetch('/api/resumen?moneda_base=MXN', {headers: {Authorization: 'Bearer ' + localStorage.getItem('jwt_token')}})
             .then(r => r.json()).then(d => { const p = d.periodos.find(x => x.en_curso); return [p.inicio, p.fin]; })""")
         celdas = page.locator("#tabla-movimientos td.td-fecha")
@@ -654,7 +667,7 @@ def test_lista_de_movimientos_sigue_el_periodo_de_cobro(navegador, base):
         assert fechas_periodo, "el periodo en curso no tiene movimientos en el escenario"
         assert all(inicio <= f <= fin for f in fechas_periodo), (inicio, fin, fechas_periodo)
         page.select_option("#filtro-ventana", "todo")
-        page.wait_for_function("document.getElementById('lbl-ventana-movimientos').textContent === 'Todo el historial'", timeout=10000)
+        _esperar(page, "document.getElementById('lbl-ventana-movimientos').textContent === 'Todo el historial'", timeout=10.0)
         assert page.locator("#tabla-movimientos td.td-fecha").count() >= len(fechas_periodo)
         assert not errores, errores
     finally:
@@ -727,7 +740,7 @@ def test_presupuesto_muestra_totales_en_una_linea(navegador, base):
         _ir(page, "tab-presupuesto")
         # Las cuatro tarjetas KPI se quitaron: los totales van en una sola línea del encabezado de pagos
         assert page.locator(".pres-kpi-card").count() == 0
-        page.wait_for_function("document.querySelector('#lbl-pres-totales').textContent.includes('Sin asignar')")
+        _esperar(page, "document.querySelector('#lbl-pres-totales').textContent.includes('Sin asignar')")
         texto = page.inner_text("#lbl-pres-totales")
         assert "Ingreso" in texto and "Asignado" in texto and "$" in texto, texto
         # El día de cobro se fija en cada pago: la configuración del ingreso ya no tiene ese campo
@@ -1713,7 +1726,7 @@ def test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en
                     area = page.evaluate("""() => { const b = document.querySelector('.btn-eliminar-apartado');
                         const cs = getComputedStyle(b, '::after'), r = b.getBoundingClientRect();
                         return {w: r.width - parseFloat(cs.left) - parseFloat(cs.right), h: r.height - parseFloat(cs.top) - parseFloat(cs.bottom)}; }""")
-                    assert area["w"] >= 44 and area["h"] >= 44, f"el área táctil de «Eliminar» debe ser de 44 px: {area}"
+                    assert area["w"] >= AREA_TACTIL_MIN and area["h"] >= AREA_TACTIL_MIN, f"el área táctil de «Eliminar» debe ser de 44 px: {area}"
                 assert not errores, errores
             finally:
                 ctx.close()
@@ -1866,7 +1879,7 @@ def test_el_panel_de_avisos_cabe_en_el_celular_y_se_va_con_la_sesion(navegador, 
         caja = page.evaluate("(() => { const r = document.getElementById('panel-notificaciones').getBoundingClientRect(); return [r.left, r.right, document.documentElement.scrollWidth, window.innerWidth]; })()")
         assert caja[0] >= 0 and caja[1] <= caja[3] and caja[2] <= caja[3], f"el panel se sale de la pantalla: {caja}"
         alto = page.evaluate("Math.min(...[...document.querySelectorAll('#panel-notificaciones .notif-accion:not(.hidden)')].map(b => b.getBoundingClientRect().height))")
-        assert alto >= 44, f"los botones del panel deben tener 44 px de alto: {alto}"
+        assert alto >= AREA_TACTIL_MIN, f"los botones del panel deben tener 44 px de alto: {alto}"
         # Al cerrar la sesión la campana queda limpia: nada de la cuenta se queda a la vista
         page.evaluate("document.querySelector('[data-on-click*=\"logoutUsuario\"]')?.click()")
         page.wait_for_selector("#modal-confirmar:not(.hidden)")
@@ -1986,12 +1999,15 @@ def test_marco_de_la_app_titulo_menu_y_campo_del_modal_a_la_vista(navegador, bas
         assert page.locator("#btn-fab, .fab").count() == 0, "ya no hay botón «+» flotante en el celular"
         _abrir_formulario(page, "movimiento")
         _esperar(page, "document.activeElement && document.activeElement.id === 'monto'")
-        tapado = page.evaluate("""() => {
+        libre = """(() => {
             const campo = document.getElementById('monto').getBoundingClientRect();
             const el = document.elementFromPoint(campo.left + campo.width / 2, campo.top + campo.height / 2);
-            return !(el && el.id === 'monto');
-        }""")
-        assert not tapado, "el campo enfocado del modal queda tapado por otro elemento"
+            return !!(el && el.id === 'monto');
+        })()"""
+        try:
+            _esperar(page, libre, timeout=3.0)   # el modal se desliza al abrir: se mide cuando termina, no a mitad del movimiento
+        except AssertionError:
+            raise AssertionError("el campo enfocado del modal queda tapado por otro elemento (aun esperando a que termine la animación)")
         assert not errores, errores
     finally:
         ctx.close()
@@ -2004,7 +2020,7 @@ def test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px(navegador, base):
         area = page.evaluate("""() => { const b = document.querySelector('#tabla-movimientos .btn-editar');
             const cs = getComputedStyle(b, '::after');
             return {w: b.getBoundingClientRect().width + parseFloat(cs.left) * -2, h: b.getBoundingClientRect().height + parseFloat(cs.top) * -2}; }""")
-        assert area["w"] >= 44 and area["h"] >= 44, area
+        assert area["w"] >= AREA_TACTIL_MIN and area["h"] >= AREA_TACTIL_MIN, area
         assert not errores, errores
     finally:
         ctx.close()
@@ -2745,7 +2761,7 @@ def test_la_burbuja_no_existe_sin_servicio_y_aparece_abajo_a_la_derecha_con_el(n
             page.wait_for_selector("#asistente-burbuja", timeout=10000)
             caja = page.locator("#asistente-burbuja").bounding_box()
             vp = VIEWPORTS[nombre]
-            assert caja["width"] >= 44 and caja["height"] >= 44, caja
+            assert caja["width"] >= AREA_TACTIL_MIN and caja["height"] >= AREA_TACTIL_MIN, caja
             assert abs((vp["width"] - (caja["x"] + caja["width"])) - (16 if nombre == "laptop" else 12)) <= 2, ("a la derecha", caja)
             assert abs((vp["height"] - (caja["y"] + caja["height"])) - (16 if nombre == "laptop" else 12)) <= 2, ("abajo", caja)
             assert page.get_attribute("#asistente-burbuja", "aria-label") == "Abrir el asistente" and page.get_attribute("#asistente-burbuja", "aria-expanded") == "false"
