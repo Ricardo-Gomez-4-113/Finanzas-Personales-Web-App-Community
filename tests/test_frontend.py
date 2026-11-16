@@ -1696,6 +1696,27 @@ def test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en
                 ctx.close()
 
 
+def test_movimientos_sin_filas_el_mensaje_ocupa_todo_el_ancho_en_celular_y_laptop(navegador, base):
+    """En celular cada fila de la tabla es una cuadrícula de 32 px · 1fr · auto: el mensaje de «sin movimientos» caía
+    en la primera columna y quedaba aplastado en una tira de 32 px, una palabra por línea."""
+    usuario, clave = _usuario_nuevo("sin_movs")
+    for nombre_vp, viewport in VIEWPORTS.items():
+        ctx, page, errores = _contexto(navegador, viewport)
+        try:
+            _entrar(page, base, usuario, clave)
+            _ir(page, "tab-movimientos")
+            page.wait_for_selector("#tabla-movimientos td.empty-state")
+            medida = page.evaluate("""() => { const td = document.querySelector('#tabla-movimientos td.empty-state'), tabla = td.closest('table');
+                const r = td.getBoundingClientRect(), t = tabla.getBoundingClientRect();
+                return {ancho: r.width, alto: r.height, ancho_tabla: t.width, texto: td.innerText.slice(0, 40)}; }""")
+            assert medida["ancho"] >= medida["ancho_tabla"] * 0.8, f"{nombre_vp}: el mensaje mide {medida['ancho']:.0f} px de una tabla de {medida['ancho_tabla']:.0f} px: {medida}"
+            assert medida["alto"] < 140, f"{nombre_vp}: el mensaje se apila en {medida['alto']:.0f} px de alto: {medida}"
+            _sin_desbordamiento(page, f"{nombre_vp}/movimientos vacío")
+            assert not errores, errores
+        finally:
+            ctx.close()
+
+
 def test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde(navegador, base):
     """Con la petición DELETE en vuelo la tarjeta se atenúa y no se puede pulsar otra vez. Antes el selector buscaba
     un onclick que ya no existe y la tarjeta quedaba como si nada pasara."""
@@ -2969,6 +2990,7 @@ if __name__ == "__main__":
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
                 (test_metas_con_texto_meta_eliminar_visible_y_avance_minimo, lambda: test_metas_con_texto_meta_eliminar_visible_y_avance_minimo(navegador, base)),
                 (test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en_movil, lambda: test_metas_el_boton_de_eliminar_no_se_empalma_y_tiene_area_tactil_de_44px_en_movil(navegador, base)),
+                (test_movimientos_sin_filas_el_mensaje_ocupa_todo_el_ancho_en_celular_y_laptop, lambda: test_movimientos_sin_filas_el_mensaje_ocupa_todo_el_ancho_en_celular_y_laptop(navegador, base)),
                 (test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde, lambda: test_eliminar_una_meta_atenua_la_tarjeta_y_bloquea_el_boton_mientras_responde(navegador, base)),
                 (test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo, lambda: test_borrar_una_meta_con_un_fijo_ligado_lo_advierte_con_su_nombre_y_se_lleva_el_fijo(navegador, base)),
                 (test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto, lambda: test_la_campana_muestra_los_avisos_los_marca_y_trata_el_texto_como_texto(navegador, base)),

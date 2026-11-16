@@ -1402,6 +1402,9 @@
     :root #tabla-movimientos td:nth-child(4) { grid-column: 2; grid-row: 3; font-size: var(--fs-xs); color: var(--text-muted); }
     :root #tabla-movimientos td.td-tipo { display: none; }
     :root #tabla-movimientos td.col-acciones { grid-column: 3; grid-row: 3; justify-self: end; }
+    /* El mensaje de «sin movimientos» ocupa todo el ancho: sin esto caía en la primera columna (32 px) y el texto
+       quedaba aplastado en una tira, una palabra por línea */
+    :root #tabla-movimientos td.empty-state { grid-column: 1 / -1; grid-row: auto; padding: 8px 0; }
     :root .filtros-movimientos > * { flex: 1 1 100%; }
 }
 
