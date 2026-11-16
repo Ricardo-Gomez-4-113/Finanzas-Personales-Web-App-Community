@@ -127,6 +127,26 @@ Antes de migrar un tenant se guarda una copia en `data/backups_premigracion/` (l
 - El respaldo nocturno automático está fuera de Community: no hay script ni cron. Queda pendiente para el servidor de producción.
 - Los usuarios descargan y restauran su propia base desde la app (`/api/backup`, `/api/restore`).
 
+## Prueba de estrés
+
+Muchos usuarios a la vez contra una instancia **temporal** con datos sembrados (nunca toca `data/` ni los contenedores):
+
+```bash
+tests/auditoria/run_estres.sh --humo                              # comprobación corta (1 min)
+tests/auditoria/run_estres.sh --etiqueta community                # escalones de 10, 25, 50, 100 y 200 sesiones (~20 min)
+tests/auditoria/run_estres.sh --fuente ~/finanzas-app --etiqueta saas   # el SaaS, que arranca con --reload
+tests/auditoria/run_estres.sh --etiqueta pi --cpus 4              # con menos núcleos
+```
+- Fase A: sesiones por API con lecturas, escrituras y descargas pesadas; algunas cuentas se abren en dos sesiones a la vez.
+  Fase B: seis navegadores (escritorio y celular, tema claro y oscuro) en los escalones de 50 y 100, que buscan errores de
+  JavaScript, 5xx, desbordes, empalmes y pestañas lentas. Al final, con SQL propio, comprueba integridad, saldos de metas,
+  sobregiros y duplicados. El informe queda en `auditoria/corridas/estres-<etiqueta>-<fecha>/informe_estres.md`.
+- Cliente y servidor comparten la máquina: los números son **relativos** (comparar, encontrar errores), no la capacidad exacta.
+- El servidor se lanza con el `CMD` del `Dockerfile` de la copia probada: Community sin `--reload`, el SaaS con él.
+- Control: antes de fiarte de un resultado limpio, inyecta un 500, un error de JavaScript y un descuadre de meta en una copia
+  (`git archive HEAD`) y corre con `--fuente`: los tres deben aparecer en el informe.
+- Los inicios de sesión fallidos y el asistente con IA y Telegram quedan fuera de la prueba.
+
 ## Sincronizar SaaS y Community (mantenedores)
 
 La edición Community comparte el núcleo con una edición privada (SaaS). El flujo es:
