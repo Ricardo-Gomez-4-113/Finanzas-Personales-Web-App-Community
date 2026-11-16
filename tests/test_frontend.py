@@ -2352,6 +2352,7 @@ def test_tarjeta_elige_su_meta_en_un_selector_y_la_conserva(navegador, base):
     try:
         _entrar(page, base, usuario, clave)
         _ir(page, "tab-presupuesto")
+        page.wait_for_selector(".pres-pago-add")   # el botón se pinta cuando llega /api/presupuesto, después de abrir la pestaña
         page.evaluate("document.querySelector('.pres-pago-add').click()")   # una tarjeta siempre pertenece a un pago
         page.wait_for_selector("#modal-tarjeta-presupuesto:not(.hidden)")
         page.fill("#tarjeta-pres-nombre", "Ahorro mensual")
