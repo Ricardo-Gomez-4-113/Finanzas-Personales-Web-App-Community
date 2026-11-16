@@ -41,7 +41,12 @@ export function mostrarVistaLogin(errorMsg = '') {
         }
     }
     const inputUser = document.getElementById('login-username');
-    if (inputUser) setTimeout(() => inputUser.focus(), 80);
+    if (inputUser) setTimeout(() => {
+        // Solo se enfoca el usuario si la persona aún no tocó nada. Antes se enfocaba siempre a los 80 ms: si ya estaba en la
+        // contraseña (o un autocompletador escribía en ella), el foco saltaba al usuario y la contraseña se tecleaba allí.
+        const activo = document.activeElement;
+        if (!activo || activo === document.body) inputUser.focus();
+    }, 80);
 }
 
 

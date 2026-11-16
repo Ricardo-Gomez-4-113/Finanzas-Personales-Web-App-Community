@@ -1283,6 +1283,29 @@ def test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base):
         ctx.close()
 
 
+def test_el_login_no_roba_el_foco_a_la_contrasena_a_los_80_ms(navegador, base):
+    """mostrarVistaLogin enfocaba el usuario a los 80 ms sin mirar dónde estaba el foco: quien ya estaba en la contraseña
+    (o un autocompletador escribiendo en ella) veía su contraseña tecleada en el campo de usuario. Pasaba en ~1 % de
+    los inicios de sesión de las pruebas, que rellenan el formulario en cuanto carga la página."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        # En DOMContentLoaded los módulos ya corrieron y el retraso de 80 ms está pendiente: ahí se pasa a la contraseña
+        page.add_init_script("document.addEventListener('DOMContentLoaded', () => document.getElementById('login-password')?.focus())")
+        page.goto(base + "/login")
+        page.wait_for_selector("#vista-login:not(.hidden)")
+        page.wait_for_timeout(400)   # más que los 80 ms
+        activo = page.evaluate("document.activeElement && document.activeElement.id")
+        assert activo == "login-password", f"el foco debía seguir en la contraseña y está en «{activo}»"
+        # Y sin que nadie toque nada, el usuario sigue recibiendo el foco al abrir el login
+        page2 = ctx.new_page()
+        page2.goto(base + "/login")
+        page2.wait_for_selector("#vista-login:not(.hidden)")
+        _esperar(page2, "document.activeElement && document.activeElement.id === 'login-username'", timeout=3.0)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_el_menu_de_usuario_reabierto_al_instante_no_queda_oculto(navegador, base):
     """Cerrar el menú programa un `hidden` a los 150 ms: si se reabre antes, ese retraso no puede ocultarlo.
     Antes quedaba con las clases `show hidden` (invisible) y «Restaurar» no se podía pulsar."""
@@ -2973,6 +2996,7 @@ if __name__ == "__main__":
                 (test_menu_usuario_teclado_y_hoja_movil, lambda: test_menu_usuario_teclado_y_hoja_movil(navegador, base)),
                 (test_inversion_nueva_aparece_en_el_portafolio, lambda: test_inversion_nueva_aparece_en_el_portafolio(navegador, base)),
                 (test_fijo_quincenal_y_gasto_con_su_ingreso, lambda: test_fijo_quincenal_y_gasto_con_su_ingreso(navegador, base)),
+                (test_el_login_no_roba_el_foco_a_la_contrasena_a_los_80_ms, lambda: test_el_login_no_roba_el_foco_a_la_contrasena_a_los_80_ms(navegador, base)),
                 (test_el_menu_de_usuario_reabierto_al_instante_no_queda_oculto, lambda: test_el_menu_de_usuario_reabierto_al_instante_no_queda_oculto(navegador, base)),
                 (test_respaldo_desde_el_menu_se_descarga_y_se_restaura, lambda: test_respaldo_desde_el_menu_se_descarga_y_se_restaura(navegador, base)),
                 (test_mi_perfil_exige_contrasena_actual_para_cambiarla, lambda: test_mi_perfil_exige_contrasena_actual_para_cambiarla(navegador, base)),
