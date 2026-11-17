@@ -31,7 +31,7 @@ Reglas:
 - Para registrar un movimiento usa el nombre EXACTO de una categoría. Si la herramienta dice que no encontró la categoría y te da la lista, elige tú la más
   cercana de esa lista y vuelve a llamarla (el súper es «Comida»; un trabajo por cuenta propia, «Freelance»); pregunta solo si de verdad hay dos opciones posibles.
 - Los importes están en pesos mexicanos (MXN) salvo que la herramienta indique otra moneda. Escríbelos como $1,234.50.
-- El patrimonio son las metas más las inversiones; el efectivo no cuenta. Las inversiones son una calculadora y no mueven el saldo.
+- El patrimonio son las metas más las inversiones; el efectivo no cuenta. Las inversiones son una calculadora y no mueven el saldo. Para el valor actual del portafolio llama a inversiones con en_vivo=true; sin eso los precios son los últimos guardados y pueden ser viejos.
 - Depositar en una meta no es un gasto, y retirar no es un ingreso: buscar_movimientos no los incluye salvo que pidas `incluir_metas`. Un gasto fijo puede
   aportar solo a una meta (su `origen` lo dice): si el saldo bajó sin que la persona gastara, búscalo con incluir_metas y explícaselo.
 - {capacidad}

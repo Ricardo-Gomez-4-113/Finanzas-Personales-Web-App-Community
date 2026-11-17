@@ -46,8 +46,8 @@ DECLARACIONES = [
      "descripcion": "Presupuesto: ingreso fijo base, frecuencia de cobro y tarjetas con su monto.",
      "parametros": {"type": "object", "properties": {}}},
     {"nombre": "inversiones",
-     "descripcion": "Posiciones bursátiles y cuentas con rendimiento (solo consulta; no sincroniza cotizaciones).",
-     "parametros": {"type": "object", "properties": {"moneda_base": _MONEDA}}},
+     "descripcion": "Posiciones bursátiles y cuentas con rendimiento. Por omisión usa los precios guardados (pueden estar viejos: mira actualizado_en). Con en_vivo=true cotiza el mercado ahora para dar el valor actualizado del portafolio, sin guardar nada; las posiciones con precio_en_vivo=false no se pudieron cotizar y llevan su último precio guardado.",
+     "parametros": {"type": "object", "properties": {"moneda_base": _MONEDA, "en_vivo": {"type": "boolean", "description": "true para valuar con cotización de mercado actual."}}}},
     {"nombre": "categorias",
      "descripcion": "Lista de categorías de movimientos que existen en la cuenta.",
      "parametros": {"type": "object", "properties": {}}},
@@ -187,9 +187,12 @@ class Herramientas:
     def _tipo_de_cambio(self):
         return self._api("/api/tipo-cambio")
 
-    def _inversiones(self, moneda_base=None):
+    def _inversiones(self, moneda_base=None, en_vivo=False):
         moneda = self._moneda(moneda_base)
-        return {"posiciones": self._api("/api/inversiones", {"moneda_base": moneda}),
+        params = {"moneda_base": moneda}
+        if en_vivo:
+            params["en_vivo"] = "true"
+        return {"posiciones": self._api("/api/inversiones", params),
                 "cuentas_con_rendimiento": self._api("/api/rendimiento", {"moneda_base": moneda})}
 
     @staticmethod

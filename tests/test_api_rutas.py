@@ -109,6 +109,21 @@ def test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client):
         assert client.post("/api/inversiones/sincronizar", headers=h).status_code == 422
 
 
+def test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada(client):
+    _crear_usuario("ruta_en_vivo")
+    h = _login(client, "ruta_en_vivo")
+    for t in ("MSFT", "CAIDO"):
+        client.post("/api/inversiones", json={"ticker": t, "cantidad": 2, "precio_promedio": 100, "precio_actual": 100, "moneda": "USD"}, headers=h)
+    mercado = {"cotizar_varios": lambda ts: {t: ((150.0, "USD") if t == "MSFT" else (None, "USD")) for t in ts}}
+    with _parchar(rinversiones, **mercado):
+        vivo = client.get("/api/inversiones?moneda_base=USD&en_vivo=true", headers=h).json()
+    por_ticker = {p["ticker"]: p for p in vivo["posiciones"]}
+    assert por_ticker["MSFT"]["valor_actual"] == 300.0 and por_ticker["MSFT"]["precio_en_vivo"] is True
+    assert por_ticker["CAIDO"]["valor_actual"] == 200.0 and por_ticker["CAIDO"]["precio_en_vivo"] is False, "sin cotización conserva el precio guardado"
+    guardado = client.get("/api/inversiones?moneda_base=USD", headers=h).json()
+    assert {p["ticker"]: p["valor_actual"] for p in guardado["posiciones"]} == {"MSFT": 200.0, "CAIDO": 200.0}, "no persiste"
+
+
 def test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client):
     _crear_usuario("ruta_moneda_def")
     h = _login(client, "ruta_moneda_def")
@@ -639,6 +654,7 @@ if __name__ == "__main__":
         registradas = [
             (test_inversiones_crud_y_validaciones, lambda: test_inversiones_crud_y_validaciones(client)),
             (test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar, lambda: test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client)),
+            (test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada, lambda: test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada(client)),
             (test_monedas_no_soportadas_del_mercado_se_rechazan, lambda: test_monedas_no_soportadas_del_mercado_se_rechazan(client)),
             (test_tipo_de_cambio_privado_y_publico, lambda: test_tipo_de_cambio_privado_y_publico(client)),
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),

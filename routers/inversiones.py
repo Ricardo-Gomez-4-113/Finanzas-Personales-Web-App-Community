@@ -38,10 +38,31 @@ class InversionUpdate(BaseModel):
 # ENDPOINTS MULTI-TENANT: INVERSIONES & ASSET ALLOCATION
 # =============================================================================
 
+def _con_cotizacion_en_vivo(filas):
+    """Copia las filas con el precio de mercado de ahora, sin tocar la base. `precio_en_vivo` dice si cada una se pudo cotizar."""
+    cotizaciones = cotizar_varios([f["ticker"] for f in filas])
+    resultado = []
+    for f in filas:
+        item = dict(f)
+        precio, moneda = cotizaciones.get(f["ticker"], (None, None))
+        if precio is not None and moneda in MONEDAS_SOPORTADAS:
+            item["precio_actual"], item["moneda"], item["precio_en_vivo"] = precio, moneda, True
+        else:
+            item["precio_en_vivo"] = False
+        resultado.append(item)
+    return resultado
+
+
 @router.get("/api/inversiones", summary="Listar portafolio con rendimientos del tenant")
-def listar_inversiones(moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"), conn: sqlite3.Connection = Depends(get_tenant_db)):
+def listar_inversiones(
+    moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"),
+    en_vivo: bool = Query(False, description="Valúa con cotización de mercado sin guardarla; si un ticker no cotiza se queda con el precio guardado."),
+    conn: sqlite3.Connection = Depends(get_tenant_db),
+):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
+    if en_vivo:
+        filas = _con_cotizacion_en_vivo(filas)
     tasas = obtener_tasas_cambio()
     try:
         return valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
