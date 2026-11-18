@@ -2,15 +2,14 @@
  * static/js/inversiones.js - Posiciones bursátiles, dona de asignación, buscador y sincronización.
  */
 
-import { abrirModalFormulario, actualizarIndicadorTasa, apiFetch, avisoFormulario, cerrarModalFormulario, colorVar, escapeHTML, estado, fmt, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { abrirModalFormulario, actualizarIndicadorTasa, apiFetch, avisoFormulario, cerrarModalFormulario, colorVar, escapeHTML, estado, fmt, leerJson, montoHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 
 export async function cargarInversiones() {
     try {
         const res = await apiFetch(`/api/inversiones?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`);
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await leerJson(res, 'No se pudieron cargar las inversiones.');
         const { resumen, posiciones, tasa_usd_mxn } = data;
 
         if (tasa_usd_mxn) {
@@ -82,6 +81,7 @@ export async function cargarInversiones() {
         actualizarGraficaDona(posiciones);
 
     } catch (error) {
+        if (error.esHttp) toast(error.message, 'error');
         console.error("Error al cargar inversiones:", error);
     }
 }

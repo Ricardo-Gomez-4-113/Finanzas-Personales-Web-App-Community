@@ -2,7 +2,7 @@
  * static/js/recurrentes.js - Pestaña "Fijos y MSI": nómina, gastos fijos y compras a meses.
  */
 
-import { abrirModalFormulario, apiFetch, avisoFormulario, cerrarModalFormulario, desdeMXN, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { abrirModalFormulario, apiFetch, avisoFormulario, cerrarModalFormulario, desdeMXN, escapeHTML, estado, fmt, fmtMXN, leerJson, montoHTML, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { renderTablaMovimientos } from './movimientos.js';
 import { bloqueTarjetaPartes } from './tarjeta_partes.js';
@@ -598,10 +598,11 @@ export async function cargarRecurrentes() {
             apiFetch('/api/apartados'),
             apiFetch('/api/recurrentes/periodos?n=4')
         ]);
-        const items = await resRec.json();
-        const porPeriodo = resPeriodos.ok ? await resPeriodos.json() : { periodos: [], pausados: [] };
+        // Un fallo aquí no se disfraza de lista vacía: se avisa y se deja lo que ya había
+        const items = await leerJson(resRec, 'No se pudieron cargar los fijos.');
+        const porPeriodo = await leerJson(resPeriodos, 'No se pudieron cargar los periodos de los fijos.');
         const resumen = await resumenJson(resResumen);
-        const apartados = resApartados.ok ? await resApartados.json() : [];
+        const apartados = await leerJson(resApartados, 'No se pudieron cargar las metas.');
         estado.cache.apartados = apartados;
         estado.cache.recurrentes = items;
 
@@ -626,12 +627,13 @@ export async function cargarRecurrentes() {
         llenarCategoriasRec();
         llenarApartadosRec();
     } catch (error) {
+        if (error.esHttp) toast(error.message, 'error');
         console.error('No se pudieron cargar los fijos y MSI:', error);
     }
 }
 
 async function resumenJson(res) {
-    return res.ok ? res.json() : {};
+    return leerJson(res, 'No se pudo cargar el resumen de los fijos.');
 }
 
 

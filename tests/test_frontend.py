@@ -2152,6 +2152,23 @@ def test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base):
         ctx.close()
 
 
+def test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base):
+    """Antes un fallo del resumen no avisaba y cortaba la carga: movimientos, metas e inversiones se quedaban sin pintar."""
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        page.route("**/api/resumen**", lambda route: route.fulfill(
+            status=500, content_type="application/json", body='{"detail": "Error interno del servidor."}'))
+        _entrar(page, base, escenario.USUARIO, escenario.CLAVE)
+        _esperar(page, "[...document.querySelectorAll('.toast')].some(t => t.innerText.includes('Error interno del servidor'))", 15.0)
+        _esperar(page, "document.querySelectorAll('#tabla-movimientos tr').length > 0", 15.0)
+        _esperar(page, "document.querySelectorAll('.card-apartado').length > 0", 15.0)
+        ignorados = ("Failed to load resource", "Error al actualizar datos", "No se pudieron cargar los fijos")
+        assert [e for e in errores if not any(i in e for i in ignorados)] == [], errores
+        page.unroute("**/api/resumen**")
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3061,6 +3078,7 @@ if __name__ == "__main__":
                 (test_sesion_vencida_a_mitad_de_uso_vuelve_al_login, lambda: test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base)),
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
+                (test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga, lambda: test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base)),
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),

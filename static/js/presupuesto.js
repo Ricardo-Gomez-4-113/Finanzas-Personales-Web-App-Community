@@ -4,7 +4,7 @@
  * su distribución del ingreso y sus tarjetas. Al exportar, cada tarjeta de un pago es un fijo mensual en su día.
  */
 
-import { apiFetch, escapeHTML, fmtMXN, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, fmtMXN, leerJson, montoMxnHTML, formatErrorDetail, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 let cachePresupuesto = null;
@@ -35,11 +35,11 @@ const FRECUENCIA_LABEL = {
 export async function cargarPresupuesto() {
     try {
         const res = await apiFetch('/api/presupuesto');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await leerJson(res, 'No se pudo cargar el presupuesto.');
         cachePresupuesto = data;
         renderizarVistaPresupuesto(data);
     } catch (e) {
+        if (e.esHttp) toast(e.message, 'error');
         console.error('Error al cargar presupuesto:', e);
     }
 }

@@ -9,11 +9,11 @@ import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPerio
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, cerrarModalNuevaPosicion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=51dfc3485e';
+import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=660caf3960';
 import { cargarCategorias, cerrarModalEditarTransaccion, cerrarModalNuevoMovimiento, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=51dfc3485e';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=660caf3960';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import './asistente_web.js'; // la burbuja del asistente (se monta sola con la sesión)
@@ -50,15 +50,16 @@ async function cargarMovimientos() {
 
 async function cargarGraficaCategorias() {
     const res = await apiFetch(`/api/gastos-por-categoria?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`);
-    if (res.ok) actualizarGraficaCategorias(await res.json());
+    actualizarGraficaCategorias(await leerJson(res, 'No se pudieron cargar los gastos por categoría.'));
 }
 
-export async function cargarDatos() {
-    try {
+// Cada recarga lleva su número: la respuesta lenta de una carga anterior (otra moneda, otra cuenta) no pinta encima de la actual.
+let generacionCarga = 0;
 
-        // 1. Resumen Consolidado del Tenant
+async function cargarResumen(gen) {
         const resResumen = await apiFetch(`/api/resumen?moneda_base=${encodeURIComponent(estado.monedaGlobal)}`);
-        const dataResumen = await resResumen.json();
+        const dataResumen = await leerJson(resResumen, 'No se pudo cargar el resumen.');
+        if (gen !== generacionCarga) return;
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
 
         if (document.getElementById('lbl-dash-patrimonio')) {
@@ -88,11 +89,6 @@ export async function cargarDatos() {
 
         renderPeriodo(dataResumen.periodo);
 
-        // Cinta de periodos: el periodo en curso y los siguientes, con su saldo al cierre
-        const resCinta = await apiFetch('/api/recurrentes/periodos?n=4');
-        const dataCinta = await leerJson(resCinta, 'No se pudo cargar la cinta de periodos.');
-        renderCintaPeriodos(document.getElementById('cinta-periodos'), dataCinta.periodos);
-
         // La lista de movimientos se acota al periodo en curso, el mismo corte que las tarjetas del resumen
         const periodosResumen = dataResumen.periodos || [];
         const periodoActual = periodosResumen.find(p => p.en_curso) || periodosResumen[0];
@@ -103,9 +99,20 @@ export async function cargarDatos() {
             document.getElementById('lbl-apartados-total-acum').innerHTML = `${montoHTML(dataResumen.apartados)}`;
         }
 
-        // 2. Historial por periodo de cobro: mes, quincena o semana, según el ingreso fijo
+}
+
+async function cargarCinta(gen) {
+        const resCinta = await apiFetch('/api/recurrentes/periodos?n=4');
+        const dataCinta = await leerJson(resCinta, 'No se pudo cargar la cinta de periodos.');
+        if (gen !== generacionCarga) return;
+        renderCintaPeriodos(document.getElementById('cinta-periodos'), dataCinta.periodos);
+
+}
+
+async function cargarHistorial(gen) {
         const resHistorial = await apiFetch('/api/historial-periodos');
         const historial = await leerJson(resHistorial, 'No se pudo cargar el historial.');
+        if (gen !== generacionCarga) return;
         const por = historial.granularidad;   // «mes», «quincena» o «semana»
         document.getElementById('titulo-grafica-periodos').textContent = `Ingresos y gastos por ${por}`;
         document.getElementById('titulo-historial-periodos').textContent = `Historial por ${por}`;
@@ -133,20 +140,37 @@ export async function cargarDatos() {
 
         actualizarGrafica(historial.periodos.slice(0, 12).reverse().map(p => ({ ...p, ingresos: desdeMXN(p.ingresos), gastos: desdeMXN(p.gastos) })));
 
-        // 3. Resto de datos en paralelo: movimientos, categorías, fijos y MSI, metas e inversiones
-        await Promise.all([
-            cargarMovimientos(),
-            cargarCategorias(),
-            cargarRecurrentes(),
-            cargarGraficaCategorias(),
-            cargarApartados(),
-            cargarInversiones(),
-            cargarPresupuesto(),
-        ]);
+}
 
-    } catch (error) {
-        if (error.esHttp) toast(error.message, 'error');
-        console.error("Error al actualizar datos:", error);
+// Cada bloque se carga por separado: si uno falla se avisa de cuál y los demás se pintan igual. Antes un solo fallo dejaba
+// el resto de la pantalla con cifras viejas, y un resumen con error se veía como «$0.00».
+export async function cargarDatos() {
+    const gen = ++generacionCarga;
+    const fallos = [];
+    const registrar = (resultado) => {
+        if (resultado.status === 'rejected' && gen === generacionCarga) {
+            fallos.push(resultado.reason);
+            console.error("Error al actualizar datos:", resultado.reason);
+        }
+    };
+    // El resumen va primero: fija la ventana del periodo que usa la lista de movimientos
+    registrar((await Promise.allSettled([cargarResumen(gen)]))[0]);
+    (await Promise.allSettled([
+        cargarCinta(gen),
+        cargarHistorial(gen),
+        cargarMovimientos(),
+        cargarCategorias(),
+        cargarRecurrentes(),
+        cargarGraficaCategorias(),
+        cargarApartados(),
+        cargarInversiones(),
+        cargarPresupuesto(),
+    ])).forEach(registrar);
+    const http = fallos.filter(e => e && e.esHttp);
+    if (http.length) {
+        toast(http.length === 1 ? http[0].message : `${http[0].message} (y ${http.length - 1} más)`, 'error');
+    } else if (fallos.length) {
+        toast('No se pudieron cargar algunos datos. Recarga la página.', 'error');
     }
 }
 
