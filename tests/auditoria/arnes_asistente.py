@@ -112,7 +112,7 @@ class Contexto(acciones.Contexto):
             return Motor(ModeloFalso(list(self.guiones.get(uid, []))), Herramientas(obtener, self.propuestas, uid, lambda: self.hoy), lambda: self.hoy)
 
         def ejecutar(propuesta, chat_id):
-            return ejecutar_propuesta(self.cliente, propuesta, lambda: self.servicio.token(chat_id, escritura=True, cuenta_id=propuesta.user_id))
+            return ejecutar_propuesta(self.cliente, propuesta, lambda: self.servicio.token(chat_id, escritura=True, cuenta_id=propuesta.user_id, metodo=propuesta.metodo, ruta=propuesta.ruta))
 
         self.bot = bot_telegram.Bot(self.tg, self.servicio, crear_motor, self.propuestas, ejecutar, reloj=self.reloj)
         self.vincular(self.user_id, self.chat)
@@ -350,7 +350,7 @@ def token_directo(ctx):
     from asistente.tokens import emitir_token
     res = _base(ctx, "token_directo")
     lectura = {"Authorization": f"Bearer {emitir_token(ctx.user_id)}"}
-    escritura = {"Authorization": f"Bearer {emitir_token(ctx.user_id, escritura=True)}"}
+    escritura = {"Authorization": f"Bearer {emitir_token(ctx.user_id, escritura=True, sin_operacion=True)}"}
     movs = ctx.oraculo.movimientos()
     objetivo = movs[-1][0] if movs else 1
     cuerpo = {"fecha": ctx.hoy.isoformat(), "monto": 1.0, "tipo": "ingreso", "categoria_id": 12, "descripcion": "token"}

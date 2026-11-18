@@ -179,6 +179,10 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
     if uso is not None and not permitido(uso, request.method, getattr(request.scope.get("route"), "path", None)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token solo sirve para las consultas del asistente.")
 
+    # Un token de escritura pedido para una operación concreta (Telegram) solo sirve para esa: ni otra ruta ni otro id
+    if uso == USO_ESCRITURA and payload.get("req") is not None and payload["req"] != f"{request.method.upper()} {request.url.path}":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token de escritura es de otra operación.")
+
     if uso == USO_ESCRITURA and not master_db.consumir_jti(payload.get("jti"), payload.get("exp")):   # ya pasó la lista blanca: una petición por token
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Este token de escritura ya se usó.")
 

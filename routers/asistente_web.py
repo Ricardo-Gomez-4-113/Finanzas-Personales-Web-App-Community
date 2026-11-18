@@ -189,7 +189,7 @@ def confirmar(id_: str, usuario: Dict[str, Any] = Depends(verify_token)):
 
     def cuerpo():
         try:
-            token = emitir_token(int(user["id"]), escritura=True)   # solo aquí, y solo para la cuenta de la sesión
+            token = emitir_token(int(user["id"]), escritura=True, sin_operacion=True)   # solo aquí, y solo para la cuenta de la sesión
         except (AsistenteDesactivado, ValueError):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
         return {"id": id_, "token_escritura": token}

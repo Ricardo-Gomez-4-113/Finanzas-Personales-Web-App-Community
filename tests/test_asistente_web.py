@@ -223,7 +223,7 @@ def test_validaciones_de_las_rutas_web_y_un_token_del_asistente_no_las_usa(clien
         assert r.status_code in (400, 404), (malo, r.status_code)
     assert client.post("/api/asistente/web/mensaje", json={"texto": "hola"}).status_code == 401
     for escritura in (False, True):   # el asistente no se llama a sí mismo
-        t = {"Authorization": f"Bearer {emitir_token(uid, escritura=escritura)}"}
+        t = {"Authorization": f"Bearer {emitir_token(uid, escritura=escritura, sin_operacion=escritura)}"}
         assert client.post("/api/asistente/web/mensaje", json={"texto": "hola"}, headers=t).status_code == 403
         assert client.post("/api/asistente/web/confirmar/abcdef12", headers=t).status_code == 403
         assert client.get("/api/asistente/web/estado", headers=t).status_code == 403

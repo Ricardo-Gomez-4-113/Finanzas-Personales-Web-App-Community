@@ -51,13 +51,16 @@ class ServicioLocal:
         from asistente import vinculos
         return vinculos.desvincular_chat(chat_id) is not None
 
-    def token(self, chat_id, escritura=False, cuenta_id=None):
+    def token(self, chat_id, escritura=False, cuenta_id=None, metodo=None, ruta=None):
+        from asistente.permisos import plantilla_de_escritura
         from asistente.tokens import AsistenteDesactivado as _Apagado, emitir_token
         cuenta = self.usuario_de_chat(chat_id)
         if not cuenta or (cuenta_id is not None and cuenta_id != cuenta["id"]):
             raise SinVinculo()
+        if escritura and not plantilla_de_escritura(metodo, ruta):
+            raise ValueError("un token de escritura se pide para una operación concreta del asistente")
         try:
-            return emitir_token(cuenta["id"], escritura=escritura)
+            return emitir_token(cuenta["id"], escritura=escritura, metodo=metodo, ruta=ruta)
         except _Apagado:
             raise AsistenteDesactivado() from None
 
@@ -117,7 +120,7 @@ class ServicioHTTP:
         r.raise_for_status()
         return bool(r.json().get("desvinculado"))
 
-    def token(self, chat_id, escritura=False, cuenta_id=None):
-        r = self._post("/token", {"chat_id": chat_id, "escritura": escritura, "cuenta_id": cuenta_id})
+    def token(self, chat_id, escritura=False, cuenta_id=None, metodo=None, ruta=None):
+        r = self._post("/token", {"chat_id": chat_id, "escritura": escritura, "cuenta_id": cuenta_id, "metodo": metodo, "ruta": ruta})
         self._revisar(r)
         return r.json()["token"]

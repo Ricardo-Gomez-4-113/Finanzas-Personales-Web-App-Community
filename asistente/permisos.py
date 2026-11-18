@@ -10,6 +10,8 @@ desconocido. Se compara con la plantilla de la ruta (`/api/apartados/{apartado_i
 Fuera de las listas, siempre: autenticación, administración, respaldo, perfil, ediciones y borrados.
 """
 
+import re
+
 USO_ASISTENTE = "asistente"
 USO_ESCRITURA = "asistente_escritura"
 
@@ -34,6 +36,16 @@ RUTAS_ESCRITURA = frozenset({
 })
 
 RUTAS_POR_USO = {USO_ASISTENTE: RUTAS_LECTURA, USO_ESCRITURA: RUTAS_ESCRITURA}
+
+
+def plantilla_de_escritura(metodo, ruta):
+    """La plantilla de escritura que casa con esa ruta real (`/api/apartados/3/movimiento` -> `/api/apartados/{apartado_id}/movimiento`),
+    o None. Con ella se decide si un token de escritura puede pedirse para esa operación."""
+    for m, plantilla in RUTAS_ESCRITURA:
+        patron = "^" + re.sub(r"\\\{.*?\\\}", "[^/]+", re.escape(plantilla)) + "$"
+        if m == str(metodo).upper() and re.fullmatch(patron, str(ruta)):
+            return plantilla
+    return None
 
 
 def permitido(uso, metodo, plantilla):

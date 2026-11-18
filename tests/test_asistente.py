@@ -78,7 +78,7 @@ def _herramientas(client, user_id):
 
 
 def _cabecera_asistente(user_id, **opciones):
-    return {"Authorization": f"Bearer {emitir_token(user_id, **opciones)}"}
+    return {"Authorization": f"Bearer {emitir_token(user_id, **{**opciones, 'sin_operacion': bool(opciones.get('escritura'))})}"}
 
 
 def test_el_token_del_asistente_solo_abre_las_rutas_de_lectura(client):

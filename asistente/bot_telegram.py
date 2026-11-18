@@ -478,7 +478,7 @@ def main():
         return Motor(modelo, Herramientas(obtener, propuestas, cuenta["id"], hoy), hoy)
 
     def ejecutar(propuesta, chat_id):
-        return ejecutar_propuesta(app, propuesta, lambda: servicio.token(chat_id, escritura=True, cuenta_id=propuesta.user_id))
+        return ejecutar_propuesta(app, propuesta, lambda: servicio.token(chat_id, escritura=True, cuenta_id=propuesta.user_id, metodo=propuesta.metodo, ruta=propuesta.ruta))
 
     telegram = TelegramHTTP(token)
     bot = Bot(telegram, servicio, crear_motor, propuestas, ejecutar, registrar=_evento)   # los topes diarios los lleva la app (asistente/cupo.py)

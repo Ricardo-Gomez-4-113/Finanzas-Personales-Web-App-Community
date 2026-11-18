@@ -109,7 +109,7 @@ def test_los_tokens_del_asistente_no_abren_las_rutas_de_vinculacion(client):
     from asistente.tokens import emitir_token
     uid, _ = _cuenta(client, "tg_tokens")
     for escritura in (False, True):
-        h = {"Authorization": f"Bearer {emitir_token(uid, escritura=escritura)}"}
+        h = {"Authorization": f"Bearer {emitir_token(uid, escritura=escritura, sin_operacion=escritura)}"}
         assert client.get("/api/asistente/telegram", headers=h).status_code == 403
         assert client.post("/api/asistente/telegram/codigo", json={"contrasena_actual": PASS}, headers=h).status_code == 403
         assert client.delete("/api/asistente/telegram", headers=h).status_code == 403
@@ -253,7 +253,7 @@ def _bot(client, guiones=None, reloj=None, servicio=None):
         return Motor(modelo, Herramientas(obtener, propuestas, uid, lambda: HOY), lambda: HOY)
 
     def ejecutar(propuesta, chat_id):
-        return ejecutar_propuesta(client, propuesta, lambda: servicio.token(chat_id, escritura=True))
+        return ejecutar_propuesta(client, propuesta, lambda: servicio.token(chat_id, escritura=True, metodo=propuesta.metodo, ruta=propuesta.ruta))
 
     bot = bot_telegram.Bot(tg, servicio, crear_motor, propuestas, ejecutar, reloj=reloj or Reloj())
     bot.modelos = modelos
@@ -571,16 +571,16 @@ def test_la_api_interna_solo_da_tokens_de_chats_vinculados(client):
         lectura = {"Authorization": f"Bearer {servicio.token(8801)}"}
         assert client.get("/api/resumen", headers=lectura).status_code == 200
         assert client.get("/auth/me", headers=lectura).status_code == 403
-        escritura = {"Authorization": f"Bearer {servicio.token(8801, escritura=True)}"}
+        escritura = {"Authorization": f"Bearer {servicio.token(8801, escritura=True, metodo='POST', ruta='/api/transacciones')}"}
         assert client.get("/api/resumen", headers=escritura).status_code == 403
         import jwt as _jwt
         assert _jwt.decode(servicio.token(8801), options={"verify_signature": False})["sub"] == str(uid)
-        assert _jwt.decode(servicio.token(8801, escritura=True), options={"verify_signature": False})["uso"] == "asistente_escritura"
+        assert _jwt.decode(servicio.token(8801, escritura=True, metodo="POST", ruta="/api/transacciones"), options={"verify_signature": False})["uso"] == "asistente_escritura"
         # El bot dice qué cuenta espera: si el chat ya no es de ella, no hay token
         assert servicio.token(8801, cuenta_id=uid)
         for esperada in (otro, 999999):
             try:
-                servicio.token(8801, escritura=True, cuenta_id=esperada)
+                servicio.token(8801, escritura=True, cuenta_id=esperada, metodo="POST", ruta="/api/transacciones")
             except SinVinculo:
                 pass
             else:
@@ -591,6 +591,45 @@ def test_la_api_interna_solo_da_tokens_de_chats_vinculados(client):
                 pass
             else:
                 raise AssertionError("ServicioLocal debe comportarse igual")
+        # Un token de escritura se pide para UNA operación y solo sirve para ella (un bot con el secreto no obtiene un token «para lo que sea»)
+        interno = {"X-Asistente-Secreto": "s" * 40}
+        for cuerpo in ({"chat_id": 8801, "escritura": True},
+                       {"chat_id": 8801, "escritura": True, "metodo": "DELETE", "ruta": "/api/transacciones/1"},
+                       {"chat_id": 8801, "escritura": True, "metodo": "POST", "ruta": "/api/transacciones/eliminar-lote"},
+                       {"chat_id": 8801, "escritura": True, "metodo": "POST", "ruta": "/admin/users"}):
+            assert client.post("/internal/asistente/token", json=cuerpo, headers=interno).status_code == 422, cuerpo
+        try:
+            ServicioLocal().token(8801, escritura=True)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("ServicioLocal debe exigir la operación igual que la app")
+        siete = {"Authorization": f"Bearer {servicio.token(8801, escritura=True, metodo='POST', ruta='/api/apartados/7/movimiento')}"}
+        assert client.post("/api/apartados/8/movimiento", json={"monto": 1, "accion": "depositar"}, headers=siete).status_code == 403, "otro id"
+        assert client.post("/api/transacciones", json={"fecha": "2026-10-20", "monto": 1, "tipo": "gasto", "categoria_id": 2}, headers=siete).status_code == 403, "otra ruta"
+        propio = {"Authorization": f"Bearer {servicio.token(8801, escritura=True, metodo='POST', ruta='/api/apartados/7/movimiento')}"}
+        assert client.post("/api/apartados/7/movimiento", json={"monto": 1, "accion": "depositar"}, headers=propio).status_code in (200, 400, 404, 422), "la operación pedida sí pasa la guardia"
+        # Otro método con la misma ruta: el token es de POST /api/transacciones
+        post_tx = {"Authorization": f"Bearer {servicio.token(8801, escritura=True, metodo='POST', ruta='/api/transacciones')}"}
+        assert client.delete("/api/transacciones/1", headers=post_tx).status_code == 403
+        assert client.put("/api/transacciones/1", json={"monto": 1}, headers=post_tx).status_code == 403
+        # Un rechazo por operación equivocada no gasta el token: sigue sirviendo para la correcta
+        assert client.post("/api/transacciones", json={"fecha": "2026-10-20", "monto": 1, "tipo": "gasto", "categoria_id": 2}, headers=post_tx).status_code in (200, 201, 400, 422)
+        # La plantilla casa solo lo que debe (mayúsculas del método, sin barra final, sin «..», sin consulta, sin saltos de línea)
+        from asistente.permisos import plantilla_de_escritura as _pl
+        assert _pl("post", "/api/transacciones") == "/api/transacciones"
+        assert _pl("POST", "/api/apartados/7/movimiento") == "/api/apartados/{apartado_id}/movimiento"
+        for metodo, ruta in (("POST", "/api/transacciones/"), ("GET", "/api/transacciones"), ("POST", "/api/apartados/7/movimiento/"),
+                             ("POST", "/api/apartados//movimiento"), ("POST", "/api/apartados/7/8/movimiento"), (None, None), ("POST", None)):
+            assert _pl(metodo, ruta) is None, (metodo, ruta)
+        # Emitir un token de escritura sin operación ni aviso expreso ya no es posible
+        from asistente.tokens import emitir_token as _emitir
+        try:
+            _emitir(uid, escritura=True)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("un token de escritura sin operación debe pedirse con sin_operacion=True")
         # No hay forma de pedir un token de otra cuenta: solo se elige el chat
         assert client.post("/internal/asistente/token", json={"chat_id": 8801, "user_id": otro}, headers={"X-Asistente-Secreto": "s" * 40}).status_code == 200
         assert _jwt.decode(servicio.token(8801), options={"verify_signature": False})["sub"] == str(uid), "un user_id en el cuerpo se ignora"

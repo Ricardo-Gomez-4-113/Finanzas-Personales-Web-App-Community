@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 import master_db
 from asistente import avisos, cupo, pase, vinculos
+from asistente.permisos import plantilla_de_escritura
 from asistente.tokens import AsistenteDesactivado, emitir_token
 from security import clave_bloqueada, obtener_ip_cliente, reservar_intento_login
 
@@ -38,6 +39,8 @@ class VincularRequest(ChatRequest):
 
 class TokenRequest(ChatRequest):
     escritura: bool = False
+    metodo: Optional[str] = Field(None, max_length=10, description="Con escritura: el método de la operación que se va a ejecutar")
+    ruta: Optional[str] = Field(None, max_length=200, description="Con escritura: la ruta exacta de la operación (con su id)")
     cuenta_id: Optional[int] = Field(None, ge=1, description="Cuenta que el bot espera: si el chat ya no es de ella, no hay token")
 
 
@@ -126,8 +129,11 @@ def token_del_chat(cuerpo: TokenRequest):
     cuenta = vinculos.usuario_de_chat(cuerpo.chat_id)
     if not cuenta or (cuerpo.cuenta_id is not None and cuerpo.cuenta_id != cuenta["id"]):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat sin vínculo.")
+    if cuerpo.escritura and not plantilla_de_escritura(cuerpo.metodo, cuerpo.ruta):
+        # Un token de escritura se pide para una operación concreta de la lista del asistente, y solo sirve para ella
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Un token de escritura se pide para una operación concreta del asistente.")
     try:
-        return {"token": emitir_token(cuenta["id"], escritura=cuerpo.escritura)}
+        return {"token": emitir_token(cuenta["id"], escritura=cuerpo.escritura, metodo=cuerpo.metodo, ruta=cuerpo.ruta)}
     except AsistenteDesactivado:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
 

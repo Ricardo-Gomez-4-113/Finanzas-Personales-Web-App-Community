@@ -24,7 +24,7 @@ def obtener_con_cliente(cliente, user_id):
 def ejecutar_propuesta(cliente, propuesta, token_de_escritura=None):
     """Ejecuta una propuesta ya confirmada con un token de escritura de pocos segundos (`token_de_escritura()` o, por defecto, uno
     emitido aquí). Devuelve `(ok, texto)`; el texto lo arma el código con el resumen y lo que respondió la API, nunca el modelo."""
-    token = token_de_escritura() if token_de_escritura else emitir_token(propuesta.user_id, escritura=True)
+    token = token_de_escritura() if token_de_escritura else emitir_token(propuesta.user_id, escritura=True, sin_operacion=True)
     r = cliente.request(propuesta.metodo, propuesta.ruta, json=propuesta.cuerpo, headers={"Authorization": f"Bearer {token}"})
     if r.status_code < 300:
         return True, f"Listo: {propuesta.resumen}."
