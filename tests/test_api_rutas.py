@@ -687,6 +687,35 @@ def test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento(c
     assert any(f["tipo"] == "ingreso" for f in client.get("/api/recurrentes", headers=h).json())
 
 
+def test_el_saldo_de_una_meta_sigue_a_sus_movimientos_con_mas_de_dos_decimales(client):
+    """El saldo de la meta (pesos en coma flotante) y el movimiento (centavos) se desfasaban con 0.015: ahora todo va en centavos."""
+    _crear_usuario("ruta_meta_centavos")
+    h = _login(client, "ruta_meta_centavos")
+    client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h)
+    meta = client.post("/api/apartados", json={"nombre": "Centavos", "tipo": "meta", "meta_monto": 500}, headers=h).json()["id"]
+    for monto in (0.015, 0.005, 1.1, 0.007):
+        assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": monto, "accion": "depositar"}, headers=h).status_code == 200, monto
+    guardado = next(a for a in client.get("/api/apartados", headers=h).json() if a["id"] == meta)["monto_actual"]
+    movs = [m for m in client.get("/api/transacciones", headers=h).json() if m["apartado_id"] == meta]
+    # Cada monto se redondea una vez a centavos (0.015 -> 2, 0.005 -> 1, 0.007 -> 1) y el saldo es exactamente la suma de sus movimientos
+    assert sorted(m["monto"] for m in movs) == [0.01, 0.01, 0.02, 1.1], [m["monto"] for m in movs]
+    assert round(sum(m["monto"] for m in movs), 2) == guardado == 1.14, guardado
+    r = client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 1.14, "accion": "retirar"}, headers=h)
+    assert r.status_code == 200 and r.json()["nuevo_saldo"] == 0, r.text
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 0.01, "accion": "retirar"}, headers=h).status_code == 400, "no se retira de una meta en cero"
+
+
+def test_un_fijo_ligado_a_una_tarjeta_inexistente_es_422_no_500(client):
+    _crear_usuario("ruta_tarjeta_inexistente")
+    h = _login(client, "ruta_tarjeta_inexistente")
+    client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 10000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=h)
+    gasto = {"descripcion": "Renta", "tipo": "gasto", "monto": 3000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 4}
+    assert client.post("/api/recurrentes", json={**gasto, "presupuesto_tarjeta_id": 99999}, headers=h).status_code == 422
+    creado = client.post("/api/recurrentes", json=gasto, headers=h)
+    assert creado.status_code == 201, creado.text
+    assert client.patch(f"/api/recurrentes/{creado.json()['id']}", json={"presupuesto_tarjeta_id": 99999}, headers=h).status_code == 422
+
+
 def test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client):
     """Se revierten primero los retiros y después los depósitos: antes el depósito se rechazaba porque el retiro seguía aplicado."""
     _crear_usuario("ruta_vaciar_meta")
@@ -882,6 +911,8 @@ if __name__ == "__main__":
             (test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento, lambda: test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento(client)),
             (test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad, lambda: test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad(client)),
             (test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento, lambda: test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento(client)),
+            (test_el_saldo_de_una_meta_sigue_a_sus_movimientos_con_mas_de_dos_decimales, lambda: test_el_saldo_de_una_meta_sigue_a_sus_movimientos_con_mas_de_dos_decimales(client)),
+            (test_un_fijo_ligado_a_una_tarjeta_inexistente_es_422_no_500, lambda: test_un_fijo_ligado_a_una_tarjeta_inexistente_es_422_no_500(client)),
             (test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta, lambda: test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),

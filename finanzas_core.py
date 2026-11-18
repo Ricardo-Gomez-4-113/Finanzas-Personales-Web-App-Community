@@ -688,6 +688,24 @@ def balance_disponible_a_fecha(cursor: sqlite3.Cursor, fecha: str) -> float:
     return round(float(fila[0]), 2)
 
 
+def validar_deposito_no_sobregira_despues(cursor: sqlite3.Cursor, fecha: str, monto: float) -> None:
+    """Un depósito a una meta saca dinero de la cuenta desde hoy: no puede dejar el saldo en negativo en ninguna fecha posterior
+    (un gasto ya registrado para la semana próxima se validó contra el saldo de esa fecha, que este depósito se llevaría).
+    Lanza ValueError con la primera fecha en que no alcanzaría."""
+    saldo = balance_disponible_a_fecha(cursor, fecha) - monto
+    filas = cursor.execute("""
+        SELECT fecha, SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END) / 100.0 AS delta
+        FROM transacciones WHERE fecha > ? GROUP BY fecha ORDER BY fecha
+    """, (fecha,)).fetchall()
+    for f in filas:
+        saldo += float(f["delta"])
+        if saldo < -0.001:
+            raise ValueError(
+                f"No puedes guardar ese dinero: tu saldo quedaría en {pesos_en_mensaje(saldo)} el {fecha_corta(f['fecha'])} "
+                f"por un gasto que ya tienes registrado para entonces."
+            )
+
+
 _MESES_ABREVIADOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
 

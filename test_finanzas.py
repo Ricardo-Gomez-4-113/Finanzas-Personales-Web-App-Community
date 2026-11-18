@@ -3830,6 +3830,31 @@ def test_precio_en_moneda_de_la_posicion_convierte_en_los_dos_sentidos():
     assert f(0.0001, "MXN", "USD", mxn, eur) is None, "un resultado que redondea a cero no es un precio"
 
 
+def test_un_deposito_a_una_meta_no_deja_el_saldo_negativo_en_una_fecha_posterior():
+    """Depositar miraba solo el saldo de hoy: un gasto ya registrado para la semana próxima (validado contra el saldo de esa fecha) quedaba
+    sin fondos porque el depósito se llevaba el dinero."""
+    from finanzas_core import validar_deposito_no_sobregira_despues as validar
+    conn = _bd_con_movimientos([("2026-01-01", "ingreso", 1000.0, None), ("2026-01-20", "gasto", 800.0, None)])
+    cur = conn.cursor()
+    validar(cur, "2026-01-10", 200.0)   # queda justo en cero el día 20
+    for monto in (200.01, 300.0):
+        try:
+            validar(cur, "2026-01-10", monto)
+        except ValueError as e:
+            assert "20 ene 2026" in str(e), str(e)
+        else:
+            raise AssertionError(f"un depósito de {monto} debía rechazarse")
+    # Un ingreso programado después de ese gasto no lo rescata: la fecha del gasto es la que cuenta
+    conn2 = _bd_con_movimientos([("2026-01-01", "ingreso", 1000.0, None), ("2026-01-20", "gasto", 800.0, None), ("2026-01-25", "ingreso", 500.0, None)])
+    try:
+        validar(conn2.cursor(), "2026-01-10", 300.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("el ingreso del 25 no sostiene el gasto del 20")
+    validar(conn2.cursor(), "2026-01-21", 300.0)   # depositar después del gasto sí se puede: saldo 200 y luego 700
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

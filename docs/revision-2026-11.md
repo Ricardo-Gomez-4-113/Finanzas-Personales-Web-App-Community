@@ -164,4 +164,6 @@ Hecho (Community primero, luego SaaS; cada uno con su prueba, que falla con el c
 
 | B6 | Borrar una meta ya no se bloquea por tener saldo: en cero se borra sin más (su historial queda en Movimientos como movimientos normales, que se pueden eliminar desde ahí); con dinero, ese dinero pasa a Movimientos como un ingreso («Dinero de la meta … (eliminada)») y la caja queda como estaba. El diálogo avisa del dinero y, si hay un gasto fijo ligado, de que también se elimina. |
 
-Pendiente: B10–B17, F3, F10–F12 y F14–F26, A2–A15, G1–G3 (repetir la prueba con Gemini otro día), V1–V8, actualizar el oráculo de Admin del arnés (R1) y las observaciones de la revisión de código (rechazos nuevos sin código estable para `observabilidad`; los cargadores de movimientos, metas, inversiones y fijos sin contador de generación).
+| B10, B11, B13 | Depositar a una meta valida también las fechas posteriores (un gasto ya registrado para la semana próxima no queda sin fondos); el saldo de la meta y sus movimientos se calculan en centavos enteros (con 0.015 se desfasaban); un fijo ligado a una tarjeta del presupuesto inexistente da 422 en vez de 500. |
+
+Pendiente: B12, B14–B17, F3, F10–F12 y F14–F26, A2–A15, G1–G3 (repetir la prueba con Gemini otro día), V1–V8, actualizar el oráculo de Admin del arnés (R1) y las observaciones de la revisión de código (rechazos nuevos sin código estable para `observabilidad`; los cargadores de movimientos, metas, inversiones y fijos sin contador de generación).

@@ -8,7 +8,7 @@ import sqlite3
 
 from dinero import MONTO_MINIMO, a_centavos
 from finanzas_core import (
-    ahora_local, avisar, balance_disponible_a_fecha, cerrar_meta_si_cumplida, clase_movimiento, nombre_en_aviso, pesos_en_mensaje,
+    ahora_local, avisar, balance_disponible_a_fecha, validar_deposito_no_sobregira_despues, cerrar_meta_si_cumplida, clase_movimiento, nombre_en_aviso, pesos_en_mensaje,
 )
 from security import (
     get_tenant_db
@@ -122,37 +122,48 @@ def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3
             
         monto_actual = round(float(apartado['monto_actual'] or 0), 2)
         fecha_hoy = ahora_local().strftime('%Y-%m-%d')
-        
+        # Todo se calcula en centavos enteros: el saldo de la meta y el movimiento se guardan igual (con 3 decimales, p. ej. 0.015,
+        # el saldo en pesos y el movimiento en centavos se desfasaban)
+        monto_c = a_centavos(mov.monto)
+        saldo_c = a_centavos(monto_actual)
+
         if mov.accion == 'depositar':
             balance_disponible = balance_disponible_a_fecha(cursor, fecha_hoy)
 
-            if round(mov.monto, 2) > balance_disponible:
+            if monto_c > a_centavos(balance_disponible):
                 conn.rollback()
                 raise HTTPException(
                     status_code=400, 
                     detail=f"No puedes guardar dinero que no tienes. Tu balance disponible es de ${balance_disponible:.2f} MXN"
                 )
                 
-            nuevo_saldo = round(monto_actual + mov.monto, 2)
+            try:
+                validar_deposito_no_sobregira_despues(cursor, fecha_hoy, monto_c / 100.0)
+            except ValueError as e:
+                conn.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
+
+            nuevo_saldo_c = saldo_c + monto_c
             desc = f"Ahorro destinado a: {apartado['nombre']}"
             cursor.execute(
                 'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, a_centavos(mov.monto), 'gasto', 1, desc, apartado_id, clase_movimiento('gasto', apartado_id, None, False))
+                (fecha_hoy, monto_c, 'gasto', 1, desc, apartado_id, clase_movimiento('gasto', apartado_id, None, False))
             )
             
         elif mov.accion == 'retirar':
-            if round(mov.monto, 2) > monto_actual:
+            if monto_c > saldo_c:
                 conn.rollback()
                 raise HTTPException(status_code=400, detail="No puedes retirar más de lo que hay en este apartado")
             
-            nuevo_saldo = round(monto_actual - mov.monto, 2)
+            nuevo_saldo_c = saldo_c - monto_c
             desc = f"Retiro de ahorro: {apartado['nombre']}"
             cursor.execute(
                 'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (fecha_hoy, a_centavos(mov.monto), 'ingreso', 1, desc, apartado_id, clase_movimiento('ingreso', apartado_id, None, False))
+                (fecha_hoy, monto_c, 'ingreso', 1, desc, apartado_id, clase_movimiento('ingreso', apartado_id, None, False))
             )
         
-        cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (a_centavos(nuevo_saldo), apartado_id))
+        nuevo_saldo = nuevo_saldo_c / 100.0
+        cursor.execute('UPDATE apartados SET monto_actual = ? WHERE id = ?', (nuevo_saldo_c, apartado_id))
         if mov.accion == 'depositar':
             cerrar_meta_si_cumplida(cursor, apartado_id, fecha_hoy)   # avisa y quita los fijos que le aportaban
         conn.commit()

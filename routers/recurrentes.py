@@ -67,6 +67,11 @@ class RecurrenteUpdate(BaseModel):
     presupuesto_tarjeta_id: Optional[int] = None
 
 
+def validar_tarjeta_presupuesto(cursor, tarjeta_id: Optional[int]) -> None:
+    if tarjeta_id is not None and not cursor.execute("SELECT 1 FROM presupuesto_tarjetas WHERE id = ?", (tarjeta_id,)).fetchone():
+        raise HTTPException(status_code=422, detail="La tarjeta del presupuesto no existe.")
+
+
 def validar_apartado(cursor, apartado_id: Optional[int]) -> None:
     if apartado_id is not None:
         meta = cursor.execute("SELECT meta_monto, monto_actual FROM apartados WHERE id = ?", (apartado_id,)).fetchone()
@@ -151,6 +156,7 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
 
     validar_categoria(cursor, categoria_id)
     validar_apartado(cursor, req.apartado_id)
+    validar_tarjeta_presupuesto(cursor, req.presupuesto_tarjeta_id)
     if req.apartado_id is not None and tipo == 'ingreso':
         raise HTTPException(
             status_code=400,
@@ -321,6 +327,7 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
     if req.categoria_id is not None:
         campos.append("categoria_id = ?"); valores.append(req.categoria_id)
     if "presupuesto_tarjeta_id" in req.model_fields_set:
+        validar_tarjeta_presupuesto(cursor, req.presupuesto_tarjeta_id)
         campos.append("presupuesto_tarjeta_id = ?"); valores.append(req.presupuesto_tarjeta_id)
 
     if campos:
