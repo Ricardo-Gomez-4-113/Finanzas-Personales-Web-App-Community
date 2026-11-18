@@ -229,11 +229,15 @@ def restaurar_backup(
         db_name = current_user["db_name"]
         target_path = get_tenant_path(db_name)
         if os.path.exists(target_path):
-            bak_path = target_path + ".bak"
+            # Respaldo en caliente: copiar solo el archivo principal perdía lo último escrito (la base está en WAL). Y si la copia
+            # de seguridad falla no se sigue: restaurar sin ella dejaría sin salida si el respaldo resulta no ser el esperado.
             try:
-                shutil.copy2(target_path, bak_path)
+                backup_tenant_db_hot(db_name, target_path + ".bak", prefer_vacuum=True)
             except Exception:
-                pass
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="No se pudo guardar una copia de tu base actual antes de restaurar, así que no se cambió nada. Intenta de nuevo."
+                )
 
         # 5. Reemplazo seguro mediante SQLite backup API
         src = sqlite3.connect(tmp_path)

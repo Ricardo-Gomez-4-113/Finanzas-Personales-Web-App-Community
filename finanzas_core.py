@@ -1733,6 +1733,19 @@ def exportar_presupuesto_a_fijos_core(
     }
 
 
+def validar_fijos_con_ingreso_tras_exportar(cursor: sqlite3.Cursor) -> None:
+    """El reemplazo total de la exportación borra también los ingresos fijos hechos a mano: sin ingreso en la exportación
+    (incluir_ingreso=false o ingreso base en cero) quedaría un estado que /api/recurrentes impide crear, gastos fijos sin un
+    ingreso fijo que los sostenga. La API lo llama tras exportar y, si lanza, revierte."""
+    hay_gastos = cursor.execute("SELECT 1 FROM recurrentes WHERE tipo = 'gasto' AND activo = 1 LIMIT 1").fetchone()
+    hay_ingreso = cursor.execute("SELECT 1 FROM recurrentes WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL LIMIT 1").fetchone()
+    if hay_gastos and not hay_ingreso:
+        raise ValueError(
+            "Esta exportación dejaría gastos fijos sin un ingreso fijo que los sostenga. "
+            "Define tu ingreso fijo base en el presupuesto e incluye el ingreso en la exportación."
+        )
+
+
 GRANULARIDAD_POR_FRECUENCIA = {'mensual': 'mes', 'quincenal': 'quincena', 'semanal': 'semana'}
 
 

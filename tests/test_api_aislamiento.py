@@ -196,6 +196,19 @@ def test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb):
     assert client.get("/api/transacciones", headers=hb).json() == antes
 
 
+def test_restore_guarda_una_copia_previa_con_lo_ultimo_escrito(client, hb):
+    """La copia de seguridad previa a restaurar es un respaldo en caliente: antes copiaba solo el archivo principal y, con la base en WAL,
+    no traía lo último escrito."""
+    client.post("/api/transacciones", json=dict(MOV, tipo="ingreso", monto=500.0, descripcion="base-del-respaldo"), headers=hb)
+    respaldo = client.get("/api/backup", headers=hb).content
+    client.post("/api/transacciones", json=dict(MOV, descripcion="ultimo-antes-de-restaurar"), headers=hb)
+    r = client.post("/api/restore", files={"file": ("respaldo.db", respaldo, "application/octet-stream")}, headers=hb)
+    assert r.status_code == 200, r.text
+    assert "ultimo-antes-de-restaurar" not in json.dumps(client.get("/api/transacciones", headers=hb).json()), "se restauró el respaldo"
+    copias = [os.path.join(d, f) for d, _, fs in os.walk(TMP) for f in fs if f.endswith(".db.bak")]
+    assert any("ultimo-antes-de-restaurar" in "".join(str(f) for f in sqlite3.connect(c).execute("SELECT descripcion FROM transacciones").fetchall()) for c in copias), copias
+
+
 def test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles(client, hb):
     """Un respaldo que la app no puede usar sin romper cosas se rechaza y no toca los datos del usuario."""
     antes = client.get("/api/transacciones", headers=hb).json()
@@ -783,6 +796,7 @@ if __name__ == "__main__":
             (test_exportar_presupuesto_con_fecha_base_no_da_500, lambda: test_exportar_presupuesto_con_fecha_base_no_da_500(client, ha)),
             (test_jwt_alg_none_y_algoritmos_ajenos_rechazados, lambda: test_jwt_alg_none_y_algoritmos_ajenos_rechazados(client, ua)),
             (test_restore_rechaza_archivos_malos_sin_tocar_datos, lambda: test_restore_rechaza_archivos_malos_sin_tocar_datos(client, ub, hb)),
+            (test_restore_guarda_una_copia_previa_con_lo_ultimo_escrito, lambda: test_restore_guarda_una_copia_previa_con_lo_ultimo_escrito(client, hb)),
             (test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles, lambda: test_restore_rechaza_esquema_futuro_columnas_extra_y_tipos_incompatibles(client, hb)),
             (test_restore_solo_afecta_al_propio_tenant, lambda: test_restore_solo_afecta_al_propio_tenant(client, ha, hb)),
             (test_health_publico_solo_dice_si_responde, lambda: test_health_publico_solo_dice_si_responde(client)),

@@ -18,6 +18,7 @@ from finanzas_core import (
     sincronizar_fijos_presupuesto_core,
     calcular_fecha_inicio_exportacion,
     exportar_presupuesto_a_fijos_core,
+    validar_fijos_con_ingreso_tras_exportar,
     materializar_recurrentes,
     NOMINA_PRESUPUESTO,
     ahora_local,
@@ -404,6 +405,7 @@ def _simular_o_exportar(req: ExportarFijosRequest, conn: sqlite3.Connection, hoy
             incluir_ingreso=req.incluir_ingreso,
             fecha_base=fecha_inicio_efectiva
         )
+        validar_fijos_con_ingreso_tras_exportar(conn.cursor())
     except ValueError as e:
         conn.rollback()
         raise HTTPException(status_code=422, detail=str(e))

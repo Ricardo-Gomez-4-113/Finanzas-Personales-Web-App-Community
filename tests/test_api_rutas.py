@@ -655,6 +655,26 @@ def test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_c
     assert client.patch(f"/api/recurrentes/{sueldo}", json={"descripcion": "Sueldo base"}, headers=h).status_code == 200
 
 
+def test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento(client):
+    """El reemplazo total borra los ingresos fijos hechos a mano: sin ingreso en la exportación quedarían gastos fijos sin ingreso fijo."""
+    _crear_usuario("ruta_exportar_sin_ingreso")
+    h = _login(client, "ruta_exportar_sin_ingreso")
+    cfg = {"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}
+    assert client.put("/api/presupuesto/config", json=cfg, headers=h).status_code == 200
+    assert client.post("/api/presupuesto/tarjetas", json={"nombre": "Renta", "monto": 5000, "unidad_orden": 1, "dia_pago": 10}, headers=h).status_code == 201
+    assert client.put("/api/presupuesto/unidades/1", json={"dia_pago": 10}, headers=h).status_code == 200   # sin fecha de pago la exportación se rechaza por otra causa
+    manual = client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 10000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=h)
+    assert manual.status_code == 201, manual.text
+    r = client.post("/api/presupuesto/exportar-a-fijos", json={"incluir_ingreso": False}, headers=h)
+    assert r.status_code == 422 and "sin un ingreso fijo" in r.json()["detail"], r.text
+    assert client.post("/api/presupuesto/exportar-a-fijos/vista-previa", json={"incluir_ingreso": False}, headers=h).status_code == 422, "la vista previa avisa igual"
+    fijos = client.get("/api/recurrentes", headers=h).json()
+    assert [f["descripcion"] for f in fijos] == ["Sueldo"], "el rechazo no cambia nada"
+    ok = client.post("/api/presupuesto/exportar-a-fijos", json={"incluir_ingreso": True}, headers=h)
+    assert ok.status_code == 200, ok.text
+    assert any(f["tipo"] == "ingreso" for f in client.get("/api/recurrentes", headers=h).json())
+
+
 def test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client):
     """Se revierten primero los retiros y después los depósitos: antes el depósito se rechazaba porque el retiro seguía aplicado."""
     _crear_usuario("ruta_vaciar_meta")
@@ -849,6 +869,7 @@ if __name__ == "__main__":
             (test_compra_a_meses_no_se_liga_a_una_meta, lambda: test_compra_a_meses_no_se_liga_a_una_meta(client)),
             (test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento, lambda: test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento(client)),
             (test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad, lambda: test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad(client)),
+            (test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento, lambda: test_exportar_el_presupuesto_sin_ingreso_no_deja_gastos_fijos_sin_sustento(client)),
             (test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta, lambda: test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
