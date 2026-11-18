@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from finanzas_core import (
+    validar_capacidad_al_cambiar_ingreso,
     mensualizar,
     convertir_frecuencias,
     convertir_de_mensual,
@@ -300,6 +301,24 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
         except (ValueError, TypeError):
             dia_pago = None
 
+    # El ingreso del presupuesto es también la nómina fija. Una sola fila: la misma se valida y se sincroniza (con una nómina
+    # pausada de id menor se validaba una y se actualizaba otra). Un ingreso hecho a mano no se toca aunque diga «nómina».
+    rec_nomina = cursor.execute("""
+        SELECT id, dia, frecuencia, proxima_fecha, monto, activo FROM recurrentes
+        WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
+        ORDER BY activo DESC, id
+        LIMIT 1
+    """, (NOMINA_PRESUPUESTO,)).fetchone()
+    # Solo se valida si el cambio le quita capacidad a los gastos fijos: guardar otros datos de la pantalla (días, subdivisión)
+    # o subir el ingreso nunca se bloquea, aunque los fijos ya estuvieran por encima de lo que rinde la nómina.
+    if rec_nomina and rec_nomina["activo"]:
+        baja = mensualizar(float(ingreso_nuevo), frecuencia_nueva) < mensualizar(float(rec_nomina["monto"]), rec_nomina["frecuencia"]) - 0.005
+        if baja:
+            try:
+                validar_capacidad_al_cambiar_ingreso(cursor, rec_nomina["id"], ingreso_nuevo, frecuencia_nueva)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=f"{e} Baja o elimina primero esos gastos fijos.")
+
     cursor.execute("""
         UPDATE presupuesto_config
         SET ingreso_base = ?, frecuencia = ?, dia_pago = ?, subdivision_tipo = ?, subdivision_config = ?, actualizado_en = CURRENT_TIMESTAMP
@@ -319,12 +338,7 @@ def update_config_presupuesto(req: ConfigPresupuestoUpdate, conn: sqlite3.Connec
             monto_recalc = round(ingreso_nuevo * (pct / 100.0), 2) if ingreso_nuevo > 0 else 0.0
             cursor.execute("UPDATE presupuesto_tarjetas SET monto = ? WHERE id = ?", (a_centavos(monto_recalc), t_id))
 
-    # Sincronizar la nómina del presupuesto, si existe. Un ingreso hecho a mano no se toca aunque diga "nómina"
-    rec_nomina = cursor.execute("""
-        SELECT id, dia, frecuencia, proxima_fecha FROM recurrentes
-        WHERE tipo = 'ingreso' AND (presupuesto_tarjeta_id IS NOT NULL OR descripcion = ?)
-        LIMIT 1
-    """, (NOMINA_PRESUPUESTO,)).fetchone()
+    # Sincronizar la nómina del presupuesto (la misma fila ya elegida arriba), si existe
     if rec_nomina:
         # Al cambiar de frecuencia la fecha del próximo cobro se re-ancla, igual que al editar un fijo: una nómina
         # mensual del 10 pasada a quincenal cobraba el 10, el 15 y el 31 (dos pagos en la primera quincena).
@@ -463,6 +477,8 @@ def crear_tarjeta(req: TarjetaPresupuestoCreate, conn: sqlite3.Connection = Depe
     monto, porcentaje = _resolver_montos(req.monto, req.porcentaje, ingreso)
     msi_cuotas = _validar_tipo_msi(req.tipo, req.msi_cuotas)
     apartado_id = _validar_apartado(cursor, req.apartado_id)
+    if req.tipo == 'msi' and apartado_id is not None:
+        raise HTTPException(status_code=422, detail="Una compra a meses no puede ligarse a una meta: solo los gastos fijos aportan a una meta.")
 
     if req.unidad_orden is not None:
         if req.unidad_orden > unidades_activas(cfg["frecuencia"]):
@@ -533,6 +549,10 @@ def actualizar_tarjeta(tarjeta_id: int, req: TarjetaPresupuestoUpdate, conn: sql
         cuotas_nuevas = req.msi_cuotas if req.msi_cuotas is not None else fila["msi_cuotas"]
         campos.extend(["tipo = ?", "msi_cuotas = ?"])
         valores.extend([tipo_nuevo, _validar_tipo_msi(tipo_nuevo, cuotas_nuevas)])
+    tipo_final = req.tipo if req.tipo is not None else fila["tipo"]
+    apartado_final = req.apartado_id if "apartado_id" in req.model_fields_set else fila["apartado_id"]
+    if tipo_final == 'msi' and apartado_final is not None:
+        raise HTTPException(status_code=422, detail="Una compra a meses no puede ligarse a una meta: solo los gastos fijos aportan a una meta.")
     dia_efectivo = req.dia_pago if "dia_pago" in req.model_fields_set else fila["dia_pago"]
 
     if "distribucion_subperiodos" in req.model_fields_set and not es_pago:

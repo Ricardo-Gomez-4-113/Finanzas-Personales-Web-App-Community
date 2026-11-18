@@ -549,6 +549,78 @@ def test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client):
 
 
 
+def test_compra_a_meses_no_se_liga_a_una_meta(client):
+    """Una cuota de compra a meses no es ahorro: ligarla a una meta inflaba el patrimonio y podía «cumplir» la meta."""
+    _crear_usuario("ruta_msi_meta")
+    h = _login(client, "ruta_msi_meta")
+    meta = client.post("/api/apartados", json={"nombre": "Viaje", "tipo": "meta", "meta_monto": 5000}, headers=h).json()["id"]
+    client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 30000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=h)
+    msi = {"descripcion": "Laptop", "meses": 3, "monto_total": 3000, "fecha_inicio": "2026-10-05"}
+    assert client.post("/api/recurrentes", json={**msi, "apartado_id": meta}, headers=h).status_code == 400
+    sin_meta = client.post("/api/recurrentes", json=msi, headers=h)
+    assert sin_meta.status_code == 201, sin_meta.text
+    assert client.patch(f"/api/recurrentes/{sin_meta.json()['id']}", json={"apartado_id": meta}, headers=h).status_code == 400
+    # Un gasto fijo normal sí puede aportar a la meta
+    assert client.post("/api/recurrentes", json={"descripcion": "Ahorro", "tipo": "gasto", "monto": 500, "frecuencia": "mensual", "fecha_inicio": "2026-10-06", "categoria_id": 1, "apartado_id": meta}, headers=h).status_code == 201
+    # Lo mismo en las tarjetas del presupuesto (con ingreso base: sin él ninguna tarjeta cabe y el rechazo sería por otra causa)
+    assert client.put("/api/presupuesto/config", json={"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}, headers=h).status_code == 200
+    tarjeta = {"nombre": "Teléfono", "monto": 300, "unidad_orden": 1, "tipo": "msi", "msi_cuotas": 6}
+    assert client.post("/api/presupuesto/tarjetas", json={**tarjeta, "apartado_id": meta}, headers=h).status_code == 422
+    creada = client.post("/api/presupuesto/tarjetas", json=tarjeta, headers=h)
+    assert creada.status_code in (200, 201), creada.text
+    assert client.patch(f"/api/presupuesto/tarjetas/{creada.json()['id']}", json={"apartado_id": meta}, headers=h).status_code == 422
+
+
+def test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento(client):
+    """Guardar la configuración del presupuesto reescribe la nómina fija: no puede saltarse la regla de Fijos."""
+    _crear_usuario("ruta_config_sustento")
+    h = _login(client, "ruta_config_sustento")
+    cfg = {"ingreso_base": 20000, "frecuencia": "mensual", "dia_pago": 5, "subdivision_tipo": "ninguna"}
+    assert client.put("/api/presupuesto/config", json=cfg, headers=h).status_code == 200
+    nomina = client.post("/api/recurrentes", json={"descripcion": "Nómina Fija (Presupuesto)", "tipo": "ingreso", "monto": 20000, "frecuencia": "mensual", "fecha_inicio": "2026-10-05", "categoria_id": 12}, headers=h)
+    assert nomina.status_code == 201, nomina.text
+    assert client.post("/api/recurrentes", json={"descripcion": "Renta", "tipo": "gasto", "monto": 9000, "frecuencia": "mensual", "fecha_inicio": "2026-10-06", "categoria_id": 4}, headers=h).status_code == 201
+    for bajo in ({**cfg, "ingreso_base": 0}, {**cfg, "ingreso_base": 5000}, {**cfg, "frecuencia": "semanal", "ingreso_base": 1000}):
+        assert client.put("/api/presupuesto/config", json=bajo, headers=h).status_code == 422, bajo
+    fijo = next(r for r in client.get("/api/recurrentes", headers=h).json() if r["descripcion"] == "Nómina Fija (Presupuesto)")
+    assert fijo["monto"] == 20000 and fijo["frecuencia"] == "mensual", "el rechazo no toca la nómina"
+    # Guardar sin empeorar la capacidad (otro día de pago, mismo ingreso; o subirlo) nunca se bloquea
+    assert client.put("/api/presupuesto/config", json={**cfg, "dia_pago": 10}, headers=h).status_code == 200
+    assert client.put("/api/presupuesto/config", json={**cfg, "ingreso_base": 25000}, headers=h).status_code == 200
+    assert client.put("/api/presupuesto/config", json={**cfg, "ingreso_base": 15000}, headers=h).status_code == 200
+
+
+def test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad(client):
+    """Pausarlo o bajarlo con gastos fijos activos es 422; subirlo, 200. Protege la regla «gastos fijos exigen ingreso fijo»."""
+    _crear_usuario("ruta_editar_ingreso")
+    h = _login(client, "ruta_editar_ingreso")
+    sueldo = client.post("/api/recurrentes", json={"descripcion": "Sueldo", "tipo": "ingreso", "monto": 10000, "frecuencia": "quincenal", "fecha_inicio": "2026-10-01", "categoria_id": 12}, headers=h).json()["id"]
+    client.post("/api/recurrentes", json={"descripcion": "Renta", "tipo": "gasto", "monto": 9000, "frecuencia": "mensual", "fecha_inicio": "2026-10-01", "categoria_id": 4}, headers=h)
+    assert client.patch(f"/api/recurrentes/{sueldo}", json={"activo": False}, headers=h).status_code == 422
+    assert client.patch(f"/api/recurrentes/{sueldo}", json={"monto": 100}, headers=h).status_code == 422
+    assert client.patch(f"/api/recurrentes/{sueldo}", json={"frecuencia": "mensual", "monto": 8000}, headers=h).status_code == 422
+    estado = next(r for r in client.get("/api/recurrentes", headers=h).json() if r["id"] == sueldo)
+    assert estado["activo"] and estado["monto"] == 10000, "los rechazos no cambian nada"
+    assert client.patch(f"/api/recurrentes/{sueldo}", json={"monto": 12000}, headers=h).status_code == 200
+    # Renombrarlo, sin tocar monto ni frecuencia, sigue permitido
+    assert client.patch(f"/api/recurrentes/{sueldo}", json={"descripcion": "Sueldo base"}, headers=h).status_code == 200
+
+
+def test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client):
+    """Se revierten primero los retiros y después los depósitos: antes el depósito se rechazaba porque el retiro seguía aplicado."""
+    _crear_usuario("ruta_vaciar_meta")
+    h = _login(client, "ruta_vaciar_meta")
+    client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h)
+    meta = client.post("/api/apartados", json={"nombre": "Fondo", "tipo": "meta", "meta_monto": 500}, headers=h).json()["id"]
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 100, "accion": "depositar"}, headers=h).status_code == 200
+    assert client.post(f"/api/apartados/{meta}/movimiento", json={"monto": 50, "accion": "retirar"}, headers=h).status_code == 200
+    r = client.post("/api/transacciones/eliminar-lote", json={"todos": True}, headers=h)
+    assert r.status_code == 200, r.text
+    assert client.get("/api/transacciones", headers=h).json() == []
+    guardado = next(a for a in client.get("/api/apartados", headers=h).json() if a["id"] == meta)
+    assert guardado["monto_actual"] == 0, guardado
+
+
 def test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client):
     """Con versión, una edición vieja no pisa el cambio de otra pestaña; al recargar y repetir, guarda."""
     _crear_usuario("ruta_dos_pestanas")
@@ -724,6 +796,10 @@ if __name__ == "__main__":
             (test_eliminar_la_cuenta_exige_la_contrasena_actual, lambda: test_eliminar_la_cuenta_exige_la_contrasena_actual(client)),
             (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),
             (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
+            (test_compra_a_meses_no_se_liga_a_una_meta, lambda: test_compra_a_meses_no_se_liga_a_una_meta(client)),
+            (test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento, lambda: test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento(client)),
+            (test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad, lambda: test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad(client)),
+            (test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta, lambda: test_vaciar_todo_con_un_deposito_y_un_retiro_de_la_misma_meta(client)),
             (test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409, lambda: test_dos_pestanas_editan_el_mismo_movimiento_y_la_segunda_recibe_409(client)),
             (test_edicion_sin_version_conserva_la_ultima_escritura, lambda: test_edicion_sin_version_conserva_la_ultima_escritura(client)),
             (test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409, lambda: test_escritura_concurrente_entre_la_lectura_y_el_guardado_da_409(client)),

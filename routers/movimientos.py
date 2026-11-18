@@ -24,6 +24,7 @@ from finanzas_core import (
     archivar_movimiento_cancelado,
     deficit_al_eliminar_lote,
     deshacer_efectos_de_movimiento,
+    ordenar_para_revertir,
     convertir,
     materializar_recurrentes,
     validar_saldo_disponible_fecha,
@@ -204,7 +205,7 @@ def eliminar_transacciones_lote(
             )
 
     # Procesar ajustes en una transacción SQL atómica
-    for t in transacciones:
+    for t in ordenar_para_revertir(transacciones):
         try:
             deshacer_efectos_de_movimiento(cursor, t)
         except ValueError as e:

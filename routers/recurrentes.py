@@ -156,6 +156,8 @@ def crear_recurrente(req: RecurrenteCreate, conn: sqlite3.Connection = Depends(g
             status_code=400,
             detail="Solo los gastos recurrentes pueden vincularse a un sobre o meta de ahorro."
         )
+    if req.apartado_id is not None and total_cuotas is not None:
+        raise HTTPException(status_code=400, detail="Una compra a meses no puede ligarse a una meta: solo los gastos fijos aportan a una meta.")
 
     # Validar sustentabilidad financiera exclusiva de gastos fijos y compras a meses
     if tipo == 'gasto':
@@ -280,6 +282,8 @@ def editar_recurrente(recurrente_id: int, req: RecurrenteUpdate, conn: sqlite3.C
         campos.append("dia = ?"); valores.append(ancla_al_editar_proximo_cargo(fila["dia"], nueva_fecha, req.frecuencia or fila["frecuencia"]))
     if "apartado_id" in req.model_fields_set:
         validar_apartado(cursor, req.apartado_id)
+        if req.apartado_id is not None and fila["total_cuotas"] is not None:
+            raise HTTPException(status_code=400, detail="Una compra a meses no puede ligarse a una meta: solo los gastos fijos aportan a una meta.")
         if req.apartado_id is not None and fila["tipo"] == 'ingreso':
             raise HTTPException(
                 status_code=400,

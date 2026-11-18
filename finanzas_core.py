@@ -616,6 +616,31 @@ def validar_sustentabilidad_gasto_fijo(
         )
 
 
+def validar_capacidad_al_cambiar_ingreso(cursor: sqlite3.Cursor, ingreso_id: int, nuevo_monto: float, nueva_frecuencia: str) -> None:
+    """Un ingreso fijo que cambia de monto o de frecuencia no puede dejar a los gastos fijos activos sin sustento.
+    Mismo criterio que la edición de un ingreso en /api/recurrentes: la capacidad es lo que aportan los demás ingresos fijos
+    más el nuevo monto; los compromisos son los gastos fijos activos y las cuotas de compras a meses que faltan."""
+    gastos = cursor.execute(
+        "SELECT monto, frecuencia, total_cuotas, cuotas_generadas FROM recurrentes WHERE tipo = 'gasto' AND activo = 1"
+    ).fetchall()
+    if not gastos:
+        return
+    otros = cursor.execute(
+        "SELECT monto, frecuencia FROM recurrentes WHERE tipo = 'ingreso' AND activo = 1 AND total_cuotas IS NULL AND id != ?",
+        (ingreso_id,)
+    ).fetchall()
+    capacidad = sum(mensualizar(float(o["monto"]), o["frecuencia"]) for o in otros) + mensualizar(float(nuevo_monto), nueva_frecuencia)
+    compromisos = 0.0
+    for g in gastos:
+        if g["total_cuotas"] is not None and int(g["cuotas_generadas"] or 0) >= int(g["total_cuotas"]):
+            continue
+        compromisos += mensualizar(float(g["monto"]), g["frecuencia"])
+    if compromisos - capacidad > 0.01:
+        raise ValueError(
+            "No es posible modificar este ingreso fijo porque los gastos fijos activos superarían la capacidad recurrente."
+        )
+
+
 def obtener_total_apartados(cursor: sqlite3.Cursor, hasta: Optional[str] = None) -> float:
     """Dinero que de verdad salió de la cuenta hacia las metas: depósitos menos retiros, tal como están
     registrados en los movimientos. No usa el saldo guardado de la meta (`monto_actual`): una meta con ahorro
@@ -1542,7 +1567,8 @@ def exportar_presupuesto_a_fijos_core(
 
         cat_id = resolver_categoria_por_nombre(cursor, f"{nombre} {t['notas'] or ''}", tipo="gasto")
         apartado_id = None
-        if "apartado_id" in t.keys() and t["apartado_id"] is not None:
+        # Una compra a meses no aporta a una meta (regla de Fijos): una tarjeta msi con meta heredada se exporta sin ella
+        if "apartado_id" in t.keys() and t["apartado_id"] is not None and t["tipo"] != 'msi':
             ap = cursor.execute("SELECT id FROM apartados WHERE id = ?", (t["apartado_id"],)).fetchone()
             apartado_id = ap["id"] if ap else None
 
@@ -1754,6 +1780,12 @@ def revertir_movimiento_apartado(cursor: sqlite3.Cursor, apartado_id: int, tipo:
     )
 
 
+def ordenar_para_revertir(transacciones):
+    """Orden en que se deshace un lote: primero los retiros de metas (devuelven dinero a la meta) y después los depósitos.
+    Al revés, un depósito que ya tiene un retiro posterior en el mismo lote se rechazaba siempre: la meta aún no recuperaba lo retirado."""
+    return sorted(transacciones, key=lambda t: 0 if (t["apartado_id"] is not None and t["tipo"] == 'ingreso') else 1)
+
+
 def deshacer_efectos_de_movimiento(cursor: sqlite3.Cursor, trans) -> None:
     """Lo que hay que ajustar cuando un movimiento sale del saldo, sea al eliminarlo o al cancelarlo:
     un depósito o retiro de meta se revierte en la meta, y una cuota de fijo o compra a meses baja
@@ -1810,7 +1842,7 @@ def deficit_al_eliminar_lote(cursor: sqlite3.Cursor, transacciones: list):
         return -sum((float(t["monto"]) if t["tipo"] == 'ingreso' else -float(t["monto"])) for t in transacciones if t["fecha"] <= f)
     cursor.execute("SAVEPOINT sim_lote")
     try:
-        for t in transacciones:
+        for t in ordenar_para_revertir(transacciones):
             if t["apartado_id"] is not None:
                 revertir_movimiento_apartado(cursor, t["apartado_id"], t["tipo"], t["monto"])
         cursor.execute(f"DELETE FROM transacciones WHERE id IN ({placeholders_sim})", ids_set)
