@@ -570,17 +570,29 @@ def test_salud_detalle_es_solo_de_administradores(client):
     assert r.status_code == 200 and r.json() == {"status": "ok", "base_maestra": "ok"}, r.text
 
 
-def test_apartado_solo_se_borra_sin_saldo(client):
+def test_una_meta_se_borra_y_su_dinero_pasa_a_movimientos(client):
     _crear_usuario("ruta_apartado")
     h = _login(client, "ruta_apartado")
     assert client.post("/api/transacciones", json={"fecha": "2026-10-01", "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"}, headers=h).status_code in (200, 201)
     assert client.post("/api/apartados", json={"nombre": "Coche", "tipo": "meta", "meta_monto": 5000}, headers=h).status_code in (200, 201)
     apartado = next(a["id"] for a in client.get("/api/apartados", headers=h).json() if a["nombre"] == "Coche")
     assert client.post(f"/api/apartados/{apartado}/movimiento", json={"monto": 300, "accion": "depositar"}, headers=h).status_code in (200, 201)
-    assert client.delete(f"/api/apartados/{apartado}", headers=h).status_code == 400
-    assert client.post(f"/api/apartados/{apartado}/movimiento", json={"monto": 300, "accion": "retirar"}, headers=h).status_code in (200, 201)
-    assert client.delete(f"/api/apartados/{apartado}", headers=h).status_code == 200
+    # Con dinero: se borra y ese dinero pasa a los movimientos como un ingreso normal (vuelve a la caja)
+    r = client.delete(f"/api/apartados/{apartado}", headers=h)
+    assert r.status_code == 200 and r.json()["pasado_a_movimientos"] == 300, r.text
+    movs = client.get("/api/transacciones", headers=h).json()
+    ingreso = next(m for m in movs if "Dinero de la meta" in m["descripcion"])
+    assert (ingreso["tipo"], ingreso["monto"], ingreso["apartado_id"]) == ("ingreso", 300, None), ingreso
+    caja = sum(m["monto"] if m["tipo"] == "ingreso" else -m["monto"] for m in movs)
+    assert caja == 1000, "el depósito (−300) y el dinero devuelto (+300) dejan la caja como estaba"
     assert client.delete(f"/api/apartados/{apartado}", headers=h).status_code == 404
+    # En cero: se borra sin más, sin crear ningún movimiento
+    assert client.post("/api/apartados", json={"nombre": "Vacía", "tipo": "meta", "meta_monto": 100}, headers=h).status_code in (200, 201)
+    vacia = next(a["id"] for a in client.get("/api/apartados", headers=h).json() if a["nombre"] == "Vacía")
+    antes = len(client.get("/api/transacciones", headers=h).json())
+    r = client.delete(f"/api/apartados/{vacia}", headers=h)
+    assert r.status_code == 200 and r.json()["pasado_a_movimientos"] == 0, r.text
+    assert len(client.get("/api/transacciones", headers=h).json()) == antes
 
 
 def test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client):
@@ -865,7 +877,7 @@ if __name__ == "__main__":
             (test_contrasena_con_acentos_de_mas_de_72_bytes_da_422_y_no_500, lambda: test_contrasena_con_acentos_de_mas_de_72_bytes_da_422_y_no_500(client)),
             (test_eliminar_la_cuenta_exige_la_contrasena_actual, lambda: test_eliminar_la_cuenta_exige_la_contrasena_actual(client)),
             (test_salud_detalle_es_solo_de_administradores, lambda: test_salud_detalle_es_solo_de_administradores(client)),
-            (test_apartado_solo_se_borra_sin_saldo, lambda: test_apartado_solo_se_borra_sin_saldo(client)),
+            (test_una_meta_se_borra_y_su_dinero_pasa_a_movimientos, lambda: test_una_meta_se_borra_y_su_dinero_pasa_a_movimientos(client)),
             (test_compra_a_meses_no_se_liga_a_una_meta, lambda: test_compra_a_meses_no_se_liga_a_una_meta(client)),
             (test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento, lambda: test_el_ingreso_del_presupuesto_no_deja_gastos_fijos_sin_sustento(client)),
             (test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad, lambda: test_editar_un_ingreso_fijo_que_sostiene_gastos_se_rechaza_si_los_deja_sin_capacidad(client)),

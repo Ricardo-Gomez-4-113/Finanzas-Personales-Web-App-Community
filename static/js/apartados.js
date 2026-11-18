@@ -2,7 +2,7 @@
  * static/js/apartados.js - Apartados y metas de ahorro.
  */
 
-import { apiFetch, escapeHTML, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
+import { apiFetch, escapeHTML, estado, fmt, fmtMXN, montoHTML, montoMxnHTML, formatErrorDetail, leerJson, recargar, toast } from './core.js';
 import { confirmar } from './confirmar.js';
 
 
@@ -215,11 +215,16 @@ async function fijosQueAportan(id) {
 
 export async function eliminarApartado(id) {
     const fijos = await fijosQueAportan(id);
+    const saldo = Number(((estado.cache.apartados || []).find(a => Number(a.id) === Number(id)) || {}).monto_actual) || 0;
     let mensaje = '¿Seguro que deseas eliminar este apartado? Se perderá el registro de este sobre.';
+    if (saldo > 0) {
+        mensaje += `\n\nLos ${fmtMXN(saldo)} que tiene pasarán a tus movimientos como un ingreso. Si no los quieres en tu caja, elimina ese movimiento desde Movimientos.`;
+    }
     if (fijos.length) {
         const lista = fijos.map(f => `• ${f.descripcion} (${fmtMXN(f.monto)})`).join('\n');
         mensaje = `Esta meta recibe aportes de ${fijos.length === 1 ? 'este gasto fijo' : 'estos gastos fijos'}:\n${lista}\n\n` +
-            `Si la eliminas, ${fijos.length === 1 ? 'ese gasto fijo' : 'esos gastos fijos'} también se eliminará. Lo que ya aportó se conserva en tus movimientos.`;
+            `Si la eliminas, ${fijos.length === 1 ? 'ese gasto fijo' : 'esos gastos fijos'} también se eliminará. Lo que ya aportó se conserva en tus movimientos.` +
+            (saldo > 0 ? `\n\nLos ${fmtMXN(saldo)} que tiene pasarán a tus movimientos como un ingreso. Si no los quieres en tu caja, elimina ese movimiento desde Movimientos.` : '');
     }
     if (!await confirmar({ titulo: 'Eliminar apartado', mensaje, aceptar: fijos.length ? 'Eliminar meta y fijo' : 'Eliminar', peligro: true })) return;
     
@@ -237,9 +242,11 @@ export async function eliminarApartado(id) {
     try {
         const res = await apiFetch(`/api/apartados/${id}${fijos.length ? '?confirmar_fijos=true' : ''}`, { method: 'DELETE' });
         if (res.ok) {
+            const resultado = await res.json().catch(() => ({}));
             if (card) card.remove();
             await cargarApartados();
             recargar();
+            if (resultado.pasado_a_movimientos > 0) toast(`Los ${fmtMXN(resultado.pasado_a_movimientos)} de la meta pasaron a tus movimientos como un ingreso.`, 'ok');
         } else {
             if (card) {
                 card.style.opacity = '1';

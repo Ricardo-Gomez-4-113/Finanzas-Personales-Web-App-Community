@@ -2278,6 +2278,29 @@ def test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_
         ctx.close()
 
 
+def test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas(navegador, base):
+    """El diálogo avisa que el gasto fijo ligado también se elimina y que el dinero de la meta pasa a Movimientos como un ingreso."""
+    usuario, clave = _usuario_nuevo("meta_aviso")
+    api = _api(base, usuario, clave)
+    api.post("/api/transacciones", json={"fecha": escenario.HOY, "monto": 5000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"})
+    meta = api.post("/api/apartados", json={"nombre": "Coche", "tipo": "meta", "meta_monto": 9000}).json()["id"]
+    api.post(f"/api/apartados/{meta}/movimiento", json={"monto": 400, "accion": "depositar"})
+    api.post("/api/recurrentes", json={"descripcion": "Para el coche", "tipo": "ingreso", "monto": 9000, "frecuencia": "mensual", "fecha_inicio": escenario.HOY, "categoria_id": 12})
+    api.post("/api/recurrentes", json={"descripcion": "Aporte coche", "tipo": "gasto", "monto": 500, "frecuencia": "mensual", "fecha_inicio": "2026-11-20", "categoria_id": 1, "apartado_id": meta})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-apartados")
+        page.click(".card-apartado .btn-eliminar-apartado")
+        visto = _responder_confirmacion(page, aceptar=False)
+        texto = visto["mensaje"]
+        assert "Aporte coche" in texto and "también se eliminará" in texto, texto
+        assert "$400.00" in texto and "pasarán a tus movimientos como un ingreso" in texto, texto
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3188,6 +3211,7 @@ if __name__ == "__main__":
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga, lambda: test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base)),
+                (test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas, lambda: test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas(navegador, base)),
                 (test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas, lambda: test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas(navegador, base)),
                 (test_editar_una_posicion_permite_corregir_su_moneda, lambda: test_editar_una_posicion_permite_corregir_su_moneda(navegador, base)),
                 (test_escape_cierra_todos_los_modales, lambda: test_escape_cierra_todos_los_modales(navegador, base)),

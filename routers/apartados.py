@@ -80,12 +80,6 @@ def eliminar_apartado(
         raise HTTPException(status_code=404, detail="Apartado no encontrado")
 
     saldo_actual = round(float(apartado["monto_actual"] or 0), 2)
-    if saldo_actual > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No puedes eliminar un apartado con saldo disponible (${saldo_actual:.2f} MXN). Retira los fondos al balance disponible primero."
-        )
-        
     # Un gasto fijo que aporta a esta meta no puede quedarse suelto: seguiría cobrándose como gasto normal. Se elimina con la meta, y solo si la
     # persona lo confirma (la interfaz le muestra cuáles son antes de pedir la confirmación).
     fijos = cursor.execute("SELECT id, descripcion, monto FROM recurrentes WHERE apartado_id = ? ORDER BY id", (apartado_id,)).fetchall()
@@ -100,9 +94,20 @@ def eliminar_apartado(
         cursor.execute("DELETE FROM recurrentes WHERE id = ?", (f["id"],))   # lo ya aportado se conserva en los movimientos
         avisar(cursor, "fijo_retirado", f"fijo_retirado:{f['id']}", "Quité un gasto fijo",
                f"Eliminaste la meta «{nombre_en_aviso(apartado['nombre'])}», así que también quité el gasto fijo «{nombre_en_aviso(f['descripcion'])}» que le aportaba.")
+    # Una meta en cero se borra sin más (su historial queda en Movimientos, donde se puede eliminar). Una meta con dinero lo devuelve a
+    # los movimientos como un ingreso normal: ese dinero vuelve a la caja y la persona puede quitarlo de ahí eliminando el movimiento.
+    if saldo_actual > 0:
+        categoria_ingreso = cursor.execute("SELECT id FROM categorias WHERE tipo = 'ingreso' AND nombre = 'Otros ingresos'").fetchone()
+        if categoria_ingreso is None:
+            categoria_ingreso = cursor.execute("SELECT id FROM categorias WHERE tipo = 'ingreso' ORDER BY id LIMIT 1").fetchone()
+        cursor.execute(
+            'INSERT INTO transacciones (fecha, monto, tipo, categoria_id, descripcion, apartado_id, rubro) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (ahora_local().strftime('%Y-%m-%d'), a_centavos(saldo_actual), 'ingreso', categoria_ingreso["id"],
+             f"Dinero de la meta «{apartado['nombre']}» (eliminada)", None, clase_movimiento('ingreso', None, None, False))
+        )
     cursor.execute('DELETE FROM apartados WHERE id = ?', (apartado_id,))
     conn.commit()
-    return {"status": "ok", "mensaje": "Apartado eliminado", "fijos_eliminados": len(fijos)}
+    return {"status": "ok", "mensaje": "Apartado eliminado", "fijos_eliminados": len(fijos), "pasado_a_movimientos": saldo_actual}
 
 @router.post("/api/apartados/{apartado_id}/movimiento", summary="Depositar o retirar en un apartado")
 def movimiento_apartado(apartado_id: int, mov: MovimientoApartado, conn: sqlite3.Connection = Depends(get_tenant_db)):
