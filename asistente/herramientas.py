@@ -46,7 +46,7 @@ DECLARACIONES = [
      "descripcion": "Presupuesto: ingreso fijo base, frecuencia de cobro y tarjetas con su monto.",
      "parametros": {"type": "object", "properties": {}}},
     {"nombre": "inversiones",
-     "descripcion": "Posiciones bursátiles y cuentas con rendimiento. Por omisión usa los precios guardados (pueden estar viejos: mira actualizado_en). Con en_vivo=true cotiza el mercado ahora para dar el valor actualizado del portafolio, sin guardar nada; las posiciones con precio_en_vivo=false no se pudieron cotizar y llevan su último precio guardado.",
+     "descripcion": "Posiciones bursátiles y cuentas con rendimiento. Por omisión usa los precios guardados (pueden estar viejos: mira actualizado_en). Con en_vivo=true cotiza el mercado ahora para dar el valor actualizado del portafolio, sin guardar nada; las posiciones con precio_en_vivo=false (listadas en sin_cotizar) no se pudieron cotizar y llevan su último precio guardado: si hay alguna, dilo al dar el total.",
      "parametros": {"type": "object", "properties": {"moneda_base": _MONEDA, "en_vivo": {"type": "boolean", "description": "true para valuar con cotización de mercado actual."}}}},
     {"nombre": "categorias",
      "descripcion": "Lista de categorías de movimientos que existen en la cuenta.",

@@ -122,6 +122,56 @@ def test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada(client):
     assert por_ticker["CAIDO"]["valor_actual"] == 200.0 and por_ticker["CAIDO"]["precio_en_vivo"] is False, "sin cotización conserva el precio guardado"
     guardado = client.get("/api/inversiones?moneda_base=USD", headers=h).json()
     assert {p["ticker"]: p["valor_actual"] for p in guardado["posiciones"]} == {"MSFT": 200.0, "CAIDO": 200.0}, "no persiste"
+    assert vivo["sin_cotizar"] == ["CAIDO"], "el total avisa qué posición quedó con precio guardado"
+    assert "sin_cotizar" not in guardado
+
+    llamadas = []
+    def mercado_contado(ts):
+        llamadas.append(list(ts))
+        return {t: (150.0, "USD") for t in ts}
+    url = "/api/inversiones?moneda_base=USD&en_vivo=true"
+    rinversiones._cache_en_vivo.clear()
+    try:
+        with _parchar(rinversiones, cotizar_varios=mercado_contado):
+            for _ in range(3):
+                assert client.get(url, headers=h).status_code == 200
+            assert len(llamadas) == 1, "las consultas repetidas dentro del TTL salen a la red una sola vez"
+
+            client.post("/api/inversiones", json={"ticker": "NUEVA", "cantidad": 1, "precio_promedio": 10, "precio_actual": 10, "moneda": "USD"}, headers=h)
+            r = client.get(url, headers=h).json()
+            assert llamadas[-1] == ["NUEVA"] and len(llamadas) == 2, "solo se cotiza el ticker que no estaba en el caché"
+            assert {p["ticker"]: p["precio_en_vivo"] for p in r["posiciones"]}["NUEVA"] is True
+
+            _crear_usuario("ruta_en_vivo_otro")
+            h2 = _login(client, "ruta_en_vivo_otro")
+            client.post("/api/inversiones", json={"ticker": "MSFT", "cantidad": 1, "precio_promedio": 10, "precio_actual": 10, "moneda": "USD"}, headers=h2)
+            client.get(url, headers=h2)
+            assert llamadas[-1] == ["MSFT"] and len(llamadas) == 3, "el caché no se comparte entre cuentas"
+
+        with _parchar(rinversiones, cotizar_varios=mercado_contado, TTL_EN_VIVO_SEG=0):
+            antes = len(llamadas)
+            client.get(url, headers=h); client.get(url, headers=h)
+            assert len(llamadas) == antes + 2, "pasado el TTL vuelve a consultar el mercado"
+
+        rinversiones._cache_en_vivo.clear()
+        reintentos = []
+        def mercado_intermitente(ts):
+            reintentos.append(list(ts))
+            return {t: ((None, "USD") if len(reintentos) == 1 else (150.0, "USD")) for t in ts}
+        with _parchar(rinversiones, cotizar_varios=mercado_intermitente):
+            assert client.get(url, headers=h).json()["sin_cotizar"], "primera consulta: el mercado falla"
+            r = client.get(url, headers=h).json()
+            assert r["sin_cotizar"] == [] and len(reintentos) == 2, "un fallo no se cachea: la siguiente consulta reintenta"
+
+        with _parchar(rinversiones, MAX_POSICIONES_SYNC=1):
+            assert client.get("/api/inversiones?en_vivo=true", headers=h).status_code == 422, "tope de posiciones"
+            assert client.get("/api/inversiones", headers=h).status_code == 200, "sin en_vivo no aplica el tope"
+        rinversiones._cache_en_vivo.clear()
+        with _parchar(rinversiones, cotizar_varios=lambda ts: {t: (55.0, "GBP") for t in ts}):
+            r = client.get(url, headers=h).json()
+        assert all(p["precio_en_vivo"] is False and p["valor_actual"] in (200.0, 10.0) for p in r["posiciones"]), "moneda no soportada: se queda con lo guardado"
+    finally:
+        rinversiones._cache_en_vivo.clear()
 
 
 def test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client):

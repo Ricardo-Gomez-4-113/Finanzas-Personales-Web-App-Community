@@ -38,9 +38,36 @@ class InversionUpdate(BaseModel):
 # ENDPOINTS MULTI-TENANT: INVERSIONES & ASSET ALLOCATION
 # =============================================================================
 
-def _con_cotizacion_en_vivo(filas):
+TTL_EN_VIVO_SEG = 60
+_cache_en_vivo: Dict[str, Dict[str, tuple]] = {}  # db_name -> {ticker: (momento, (precio, moneda))}; solo cotizaciones logradas
+
+
+def _cotizar_en_vivo_acotado(tickers, clave):
+    """Cotiza con un caché corto por cuenta y por ticker: repetir la consulta (el asistente, un bucle) no vuelve a salir a la red.
+    Los fallos no se guardan, así que un ticker que no cotizó se reintenta en la siguiente consulta."""
+    ahora = time.monotonic()
+    guardadas = _cache_en_vivo.setdefault(clave, {})
+    resultado, faltan = {}, []
+    for t in dict.fromkeys(tickers):
+        previa = guardadas.get(t)
+        if previa and ahora - previa[0] < TTL_EN_VIVO_SEG:
+            resultado[t] = previa[1]
+        else:
+            faltan.append(t)
+    if faltan:
+        if len(_cache_en_vivo) > 1000:
+            _cache_en_vivo.clear()
+            guardadas = _cache_en_vivo.setdefault(clave, {})
+        for t, cot in cotizar_varios(faltan).items():
+            resultado[t] = cot
+            if cot[0] is not None:
+                guardadas[t] = (ahora, cot)
+    return resultado
+
+
+def _con_cotizacion_en_vivo(filas, clave):
     """Copia las filas con el precio de mercado de ahora, sin tocar la base. `precio_en_vivo` dice si cada una se pudo cotizar."""
-    cotizaciones = cotizar_varios([f["ticker"] for f in filas])
+    cotizaciones = _cotizar_en_vivo_acotado([f["ticker"] for f in filas], clave)
     resultado = []
     for f in filas:
         item = dict(f)
@@ -58,16 +85,23 @@ def listar_inversiones(
     moneda_base: str = Query("MXN", pattern=r"^(?i)(MXN|USD|EUR)$"),
     en_vivo: bool = Query(False, description="Valúa con cotización de mercado sin guardarla; si un ticker no cotiza se queda con el precio guardado."),
     conn: sqlite3.Connection = Depends(get_tenant_db),
+    current_user: Dict[str, Any] = Depends(verify_token),
 ):
     cursor = conn.cursor()
     filas = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
     if en_vivo:
-        filas = _con_cotizacion_en_vivo(filas)
+        if len(filas) > MAX_POSICIONES_SYNC:
+            raise HTTPException(status_code=422, detail=f"Demasiadas posiciones para cotizar en vivo (máximo {MAX_POSICIONES_SYNC}).")
+        filas = _con_cotizacion_en_vivo(filas, current_user["db_name"])
     tasas = obtener_tasas_cambio()
     try:
-        return valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
+        valoradas = valorar_posiciones(filas, moneda_base, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    if en_vivo:
+        # Los totales mezclan precios de ahora con guardados: que quede dicho cuáles no se pudieron cotizar.
+        valoradas["sin_cotizar"] = [p["ticker"] for p in valoradas["posiciones"] if not p.get("precio_en_vivo")]
+    return valoradas
 
 def _exigir_moneda_soportada(ticker: str, moneda: str) -> str:
     if moneda not in MONEDAS_SOPORTADAS:
