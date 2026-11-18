@@ -2151,3 +2151,24 @@
 /* Badge de moneda en el portafolio */
 :root .badge-peso--usd { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
 :root .badge-peso--otra { background: color-mix(in srgb, var(--accent-color) 15%, transparent); color: var(--accent-color); }
+
+/* Inversiones en teléfonos (revisión visual de noviembre de 2026) */
+/* El h3 de las tarjetas es flex: sin separación se perdía el espacio antes de «(MXN)» */
+:root .inv-card h3 { gap: 0.3em; }
+
+@media (max-width: 420px) {
+    /* Con cifras de nueve dígitos dos columnas partían el número a la mitad: una columna da el ancho para verlo entero */
+    :root .cards-inversiones { grid-template-columns: 1fr; }
+    :root .cards-inversiones > .card:nth-child(3) { grid-column: auto; }
+    :root .cards-inversiones .card:nth-child(even) { border-left: 0; }   /* la raya vertical era del diseño de dos columnas */
+    :root .cards-inversiones .card:nth-child(n + 2) { border-top: 1px solid var(--border-color); }
+    /* Un título de una sola palabra («Inversiones», «Presupuesto») no se puede partir: un paso más chico para que quepa sin «…» */
+    :root .topbar-section-title { font-size: 0.82rem; }
+    :root .topbar-left { gap: 8px; }
+}
+
+@media (max-width: 900px) {
+    /* La tabla de posiciones hace scroll a un lado: el aviso de «sin posiciones» y su botón se quedan en el ancho visible */
+    :root .table-responsive:has(#tabla-inversiones) { container-type: inline-size; }
+    :root #tabla-inversiones .empty-state-fija { position: sticky; left: 0; width: 100cqw; box-sizing: border-box; padding: 0 12px; white-space: normal; }
+}

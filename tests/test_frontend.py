@@ -2254,6 +2254,30 @@ def test_editar_una_posicion_permite_corregir_su_moneda(navegador, base):
         ctx.close()
 
 
+def test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas(navegador, base):
+    """En un teléfono angosto el título de una palabra no se corta con «…», el aviso de «sin posiciones» y su botón quedan dentro del
+    ancho visible (la tabla hace scroll a un lado) y «Capital invertido (MXN)» conserva el espacio antes del paréntesis."""
+    usuario, clave = _usuario_nuevo("inv360")
+    ctx, page, errores = _contexto(navegador, {"width": 360, "height": 740})
+    try:
+        _entrar(page, base, usuario, clave)
+        for pestana in ("tab-inversiones", "tab-presupuesto"):
+            _ir(page, pestana)
+            cortado = page.evaluate("(() => { const t = document.querySelector('.topbar-section-title'); return t.scrollWidth > t.clientWidth + 1; })()")
+            assert not cortado, f"el título de la barra se corta en {pestana}"
+        _ir(page, "tab-inversiones")
+        _esperar(page, "document.querySelector('#tabla-inversiones .empty-state-fija') !== null", 10.0)
+        dentro = page.evaluate("""(() => { const b = document.querySelector('#tabla-inversiones .empty-state-fija button').getBoundingClientRect();
+            const t = document.querySelector('#tabla-inversiones .empty-state-fija').getBoundingClientRect(); return [b.left >= 0, b.right <= innerWidth, t.right <= innerWidth + 1]; })()""")
+        assert dentro == [True, True, True], f"el aviso de la tabla vacía se sale del ancho visible: {dentro}"
+        separado = page.evaluate("""(() => { const h = document.querySelector('.inv-card h3'); const r = document.createRange(); r.setStart(h.firstChild, 0);
+            r.setEnd(h.firstChild, h.firstChild.length); return h.querySelector('.sin-corte').getBoundingClientRect().left - r.getBoundingClientRect().right; })()""")
+        assert separado >= 2, f"«(MXN)» pegado a la etiqueta ({separado}px)"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3164,6 +3188,7 @@ if __name__ == "__main__":
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga, lambda: test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base)),
+                (test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas, lambda: test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas(navegador, base)),
                 (test_editar_una_posicion_permite_corregir_su_moneda, lambda: test_editar_una_posicion_permite_corregir_su_moneda(navegador, base)),
                 (test_escape_cierra_todos_los_modales, lambda: test_escape_cierra_todos_los_modales(navegador, base)),
                 (test_cambiar_la_frecuencia_con_el_ingreso_vacio_no_guarda_cero, lambda: test_cambiar_la_frecuencia_con_el_ingreso_vacio_no_guarda_cero(navegador, base)),

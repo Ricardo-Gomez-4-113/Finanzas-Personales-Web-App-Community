@@ -44,7 +44,7 @@ export async function cargarInversiones() {
         if (tbody) {
             tbody.innerHTML = '';
             if (posiciones.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Sin posiciones registradas. ¡Añade tu primer ETF o acción! <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;enfocarTickerInversion&quot;]]">Registrar posición</button></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-state-fija">Sin posiciones registradas. ¡Añade tu primer ETF o acción! <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;enfocarTickerInversion&quot;]]">Registrar posición</button></div></td></tr>';
             } else {
                 posiciones.forEach(pos => {
                     const tr = document.createElement('tr');
