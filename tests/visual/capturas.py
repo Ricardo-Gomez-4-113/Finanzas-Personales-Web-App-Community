@@ -190,6 +190,8 @@ def correr(base, navegador):
 
 def _registrar(page, archivo, cuenta, vista, tema, ancho, hallazgos, errores):
     ruta = os.path.join(SALIDA, cuenta, archivo + ".png")
+    if os.environ.get("EVALUAR") and vista == os.environ.get("EVALUAR_VISTA", ""):
+        print("evaluar", ancho, page.evaluate(os.environ["EVALUAR"]))
     if os.environ.get("SIN_REDIMENSIONAR") and vista == "tab-dashboard":
         for cid in ("graficaFinanzas", "graficaCategorias"):
             page.locator("#" + cid).scroll_into_view_if_needed(); page.wait_for_timeout(2500)
