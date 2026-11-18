@@ -3,7 +3,7 @@
  */
 
 import { cargarDatosAdmin } from './admin.js';
-import { apiFetch, cargarTiposCambio, estado, recargar, toast } from './core.js';
+import { apiFetch, cargarTiposCambio, estado, recargar, toast, formatErrorDetail } from './core.js';
 import { renderMenuUsuario } from './menu_usuario.js';
 import { cambiarPestana } from './ui.js';
 import { confirmar } from './confirmar.js';
@@ -384,7 +384,7 @@ export async function enviarSolicitudCodigo(e) {
             if (formPaso2) formPaso2.classList.add('hidden');
             if (alertaNoConfigurado) alertaNoConfigurado.classList.remove('hidden');
         } else {
-            toast(data.detail || 'Hubo un error al procesar la solicitud.', 'error');
+            toast(formatErrorDetail(data.detail, 'Hubo un error al procesar la solicitud.'), 'error');
         }
     } catch (err) {
         console.error('Error al solicitar código:', err);
@@ -451,7 +451,7 @@ export async function enviarRestablecerPassword(e) {
                 inputLoginPass.focus();
             }
         } else {
-            toast(data.detail || 'No se pudo restablecer la contraseña. Verifica el código.', 'error');
+            toast(formatErrorDetail(data.detail, 'No se pudo restablecer la contraseña. Verifica el código.'), 'error');
         }
     } catch (err) {
         console.error('Error al restablecer contraseña:', err);

@@ -308,7 +308,7 @@ export async function ejecutarSaltarRecurrente(id, contabilizar_cuota = false) {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            toast(err.detail || 'No se pudo saltar el pago.', 'error');
+            toast(formatErrorDetail(err.detail, 'No se pudo saltar el pago.'), 'error');
             return;
         }
         const data = await res.json();

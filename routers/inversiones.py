@@ -10,7 +10,7 @@ import sqlite3
 from datetime import date
 
 from dinero import MONTO_MINIMO, a_centavos
-from finanzas_core import MONEDAS_SOPORTADAS, ahora_local, convertir, factores_desde_mxn, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
+from finanzas_core import MONEDAS_SOPORTADAS, ahora_local, convertir, factores_desde_mxn, precio_en_moneda_de_la_posicion, valor_rendimiento, valorar_posiciones, validar_fecha_operativa
 from mercado import consultar_precio_y_moneda_mercado, buscar_tickers_mercado, obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 from security import (
     verify_token,
@@ -68,12 +68,22 @@ def _cotizar_en_vivo_acotado(tickers, clave):
 def _con_cotizacion_en_vivo(filas, clave):
     """Copia las filas con el precio de mercado de ahora, sin tocar la base. `precio_en_vivo` dice si cada una se pudo cotizar."""
     cotizaciones = _cotizar_en_vivo_acotado([f["ticker"] for f in filas], clave)
+    tasas = obtener_tasas_cambio()
+    tasa_mxn, tasa_eur = tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO)
+    en_respaldo = tasas_en_respaldo()
     resultado = []
     for f in filas:
         item = dict(f)
-        precio, moneda = cotizaciones.get(f["ticker"], (None, None))
-        if precio is not None and moneda in MONEDAS_SOPORTADAS:
-            item["precio_actual"], item["moneda"], item["precio_en_vivo"] = precio, moneda, True
+        precio, moneda_mercado = cotizaciones.get(f["ticker"], (None, None))
+        moneda_posicion = (item.get("moneda") or "USD").upper()
+        moneda_mercado = (moneda_mercado or moneda_posicion).upper()
+        distinta = moneda_mercado != moneda_posicion
+        # Convertir con un tipo de cambio de respaldo daría un precio con una tasa inventada: ese precio no se usa
+        convertido = None if (distinta and en_respaldo) else precio_en_moneda_de_la_posicion(precio, moneda_mercado, moneda_posicion, tasa_mxn, tasa_eur)
+        if convertido is not None:
+            item["precio_actual"], item["precio_en_vivo"] = convertido, True   # en la moneda de la posición; su moneda no cambia
+            if distinta:
+                item["moneda_mercado"] = moneda_mercado   # el mercado cotiza en otra moneda que la registrada: revisar la posición
         else:
             item["precio_en_vivo"] = False
         resultado.append(item)
@@ -121,6 +131,13 @@ def crear_inversion(item: InversionCreate, conn: sqlite3.Connection = Depends(ge
             _exigir_moneda_soportada(ticker, moneda_mercado)
             if moneda is None:
                 moneda = moneda_mercado
+            elif moneda != moneda_mercado:
+                # La persona eligió otra moneda que la del mercado: su precio promedio va en esa, así que el de mercado también
+                tasas = obtener_tasas_cambio()
+                # (con un tipo de cambio de respaldo no se convierte: se parte del precio promedio y sincronizar lo actualiza)
+                convertido = None if tasas_en_respaldo() else precio_en_moneda_de_la_posicion(
+                    precio_mercado, moneda_mercado, moneda, tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO))
+                precio_actual = convertido if convertido else item.precio_promedio
     if moneda is None:
         moneda = "MXN" if ticker.endswith(".MX") else "USD"  # sin cotización ni moneda, como al sincronizar
 
@@ -180,7 +197,7 @@ def sincronizar_precios(
     current_user: Dict[str, Any] = Depends(verify_token),
 ):
     cursor = conn.cursor()
-    filas = cursor.execute("SELECT id, ticker FROM inversiones").fetchall()
+    filas = cursor.execute("SELECT id, ticker, moneda FROM inversiones").fetchall()
     if len(filas) > MAX_POSICIONES_SYNC:
         raise HTTPException(status_code=422, detail=f"Demasiadas posiciones para sincronizar a la vez (máximo {MAX_POSICIONES_SYNC}).")
     ahora_sync = time.time()
@@ -193,15 +210,29 @@ def sincronizar_precios(
 
     pendientes = []
     cotizaciones = cotizar_varios([fila["ticker"] for fila in filas])
+    tasas = obtener_tasas_cambio()
+    tasa_mxn, tasa_eur = tasas.get("MXN", TASA_MXN_RESPALDO), tasas.get("EUR", TASA_EUR_RESPALDO)
+    en_respaldo = tasas_en_respaldo()
+    moneda_distinta, sin_tipo_de_cambio = [], []
     for fila in filas:
         t = fila["ticker"]
-        precio, moneda = cotizaciones[t]
-        if precio is not None and moneda not in MONEDAS_SOPORTADAS:
-            precio = None
-        if precio is not None:
-            moneda_actualizada = moneda or ("MXN" if t.endswith(".MX") else "USD")
-            pendientes.append((precio, moneda_actualizada, fila["id"]))
-            actualizados.append({"ticker": t, "precio": precio, "moneda": moneda_actualizada})
+        precio, moneda_mercado = cotizaciones[t]
+        moneda_posicion = (fila["moneda"] or ("MXN" if t.endswith(".MX") else "USD")).upper()
+        moneda_mercado = (moneda_mercado or moneda_posicion).upper()
+        distinta = moneda_mercado != moneda_posicion
+        if distinta and precio is not None and en_respaldo:
+            # Convertir con un tipo de cambio de respaldo grabaría un precio calculado con una tasa inventada
+            no_actualizados.append(t)
+            sin_tipo_de_cambio.append(t)
+            continue
+        # El precio se guarda en la moneda de la posición (como su costo promedio); la moneda de la posición no cambia
+        convertido = precio_en_moneda_de_la_posicion(precio, moneda_mercado, moneda_posicion, tasa_mxn, tasa_eur)
+        if convertido is not None:
+            pendientes.append((convertido, fila["id"]))
+            actualizados.append({"ticker": t, "precio": convertido, "moneda": moneda_posicion})
+            if distinta:
+                # El mercado cotiza en otra moneda que la registrada: si esa se adivinó mal (sin cotización al crear), la persona la corrige
+                moneda_distinta.append({"ticker": t, "moneda_posicion": moneda_posicion, "moneda_mercado": moneda_mercado})
         else:
             no_actualizados.append(t)
 
@@ -209,7 +240,7 @@ def sincronizar_precios(
         cursor.executemany(
             """
             UPDATE inversiones 
-            SET precio_actual = ?, moneda = ?, actualizado_en = CURRENT_TIMESTAMP 
+            SET precio_actual = ?, actualizado_en = CURRENT_TIMESTAMP 
             WHERE id = ?
             """,
             pendientes
@@ -218,6 +249,8 @@ def sincronizar_precios(
     return {
         "actualizados": actualizados,
         "no_actualizados": no_actualizados,
+        "moneda_distinta": moneda_distinta,
+        "sin_tipo_de_cambio": sin_tipo_de_cambio,
         "mensaje": f"Se sincronizaron {len(actualizados)} de {len(filas)} posiciones."
     }
 

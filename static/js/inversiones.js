@@ -355,7 +355,7 @@ export async function buscarCotizacionTicker() {
             }
         } else {
             const error = await res.json();
-            toast(error.detail || "No se encontró cotización en vivo. Puedes ingresarla manualmente.", 'error');
+            toast(formatErrorDetail(error.detail, "No se encontró cotización en vivo. Puedes ingresarla manualmente."), 'error');
         }
     } catch (err) {
         toast("Error de conexión al consultar cotización.", 'error');
@@ -474,6 +474,14 @@ export async function sincronizarPrecios() {
             await cargarInversiones();
             await recargar();
             toast(data.mensaje || 'Cotizaciones actualizadas con éxito.', 'ok');
+            // El mercado cotiza en otra moneda que la registrada: se avisa para que la persona la revise en lugar de dar el rendimiento por bueno
+            if (data.moneda_distinta && data.moneda_distinta.length) {
+                const lista = data.moneda_distinta.map(p => `${p.ticker} (registrada en ${p.moneda_posicion}, cotiza en ${p.moneda_mercado})`).join(', ');
+                toast(`Revisa la moneda de: ${lista}. Si la registrada es incorrecta, edita la posición.`, 'error');
+            }
+            if (data.sin_tipo_de_cambio && data.sin_tipo_de_cambio.length) {
+                toast(`No se actualizó ${data.sin_tipo_de_cambio.join(', ')}: no hay un tipo de cambio vigente para convertir su cotización.`, 'error');
+            }
         } else {
             toast("Error al sincronizar cotizaciones.", 'error');
         }
@@ -503,6 +511,11 @@ export function abrirModalEditarInversion(id, ticker, cantidad, precio_promedio,
     if (inputCant) inputCant.value = cantidad;
     if (inputProm) inputProm.value = precio_promedio;
     if (lblMoneda) lblMoneda.textContent = moneda || 'USD';
+    const selMoneda = document.getElementById('modal-edit-moneda-select');
+    if (selMoneda) {
+        selMoneda.value = ['USD', 'MXN', 'EUR'].includes(moneda) ? moneda : 'USD';
+        selMoneda.onchange = () => { if (lblMoneda) lblMoneda.textContent = selMoneda.value; };
+    }
 
     const modal = document.getElementById('modal-editar-inversion');
     if (modal) {
@@ -542,7 +555,7 @@ export async function guardarEdicionInversion(e) {
         const res = await apiFetch(`/api/inversiones/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cantidad, precio_promedio })
+            body: JSON.stringify({ cantidad, precio_promedio, moneda: document.getElementById('modal-edit-moneda-select')?.value || undefined })
         });
 
         if (res.ok) {
@@ -551,7 +564,7 @@ export async function guardarEdicionInversion(e) {
             await recargar();
         } else {
             const err = await res.json();
-            toast(err.detail || "Error al actualizar la posición.", 'error');
+            toast(formatErrorDetail(err.detail, "Error al actualizar la posición."), 'error');
         }
     } catch (err) {
         toast("Error de red al intentar guardar los cambios.", 'error');

@@ -174,6 +174,55 @@ def test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada(client):
         rinversiones._cache_en_vivo.clear()
 
 
+def test_el_precio_de_mercado_se_guarda_en_la_moneda_de_la_posicion(client):
+    """El costo promedio y el precio actual viven en la moneda de la posición: si el mercado cotiza en otra se convierte,
+    en vez de cambiar la moneda y dejar el costo en la anterior (AAPL en pesos con 190 USD daba una pérdida falsa de ~95 %)."""
+    import export_service
+    _crear_usuario("ruta_precio_moneda")
+    h = _login(client, "ruta_precio_moneda")
+    tasas = {"obtener_tasas_cambio": lambda: {"MXN": 20.0, "EUR": 0.9}}
+    mercado = {**tasas, "consultar_precio_y_moneda_mercado": lambda t: (190.0, "USD"), "cotizar_varios": lambda ts: {t: (200.0, "USD") for t in ts}}
+    with _parchar(rinversiones, **mercado):
+        r = client.post("/api/inversiones", json={"ticker": "AAPL", "cantidad": 1, "precio_promedio": 3500, "moneda": "MXN"}, headers=h)
+        assert r.status_code == 201, r.text
+        pos = lambda: next(p for p in client.get("/api/inversiones?moneda_base=MXN", headers=h).json()["posiciones"] if p["ticker"] == "AAPL")
+        assert (pos()["moneda"], pos()["precio_actual"], pos()["precio_promedio"]) == ("MXN", 3800.0, 3500.0), pos()
+        # Sincronizar: el precio llega convertido y la moneda y el costo no se tocan
+        sync = client.post("/api/inversiones/sincronizar", headers=h).json()
+        assert sync["actualizados"] == [{"ticker": "AAPL", "precio": 4000.0, "moneda": "MXN"}], sync
+        assert (pos()["moneda"], pos()["precio_actual"], pos()["precio_promedio"]) == ("MXN", 4000.0, 3500.0)
+        # En vivo: lo mismo, sin guardar
+        vivo = client.get("/api/inversiones?moneda_base=MXN&en_vivo=true", headers=h).json()["posiciones"][0]
+        assert (vivo["moneda"], vivo["precio_actual"], vivo["precio_en_vivo"]) == ("MXN", 4000.0, True)
+        assert abs(vivo["pnl_porcentaje"] - 14.29) < 0.01, vivo   # (4000-3500)/3500, no -95 %
+    # Sincronizar avisa que el mercado cotiza en otra moneda que la registrada (por si la registrada se adivinó mal)
+    assert sync["moneda_distinta"] == [{"ticker": "AAPL", "moneda_posicion": "MXN", "moneda_mercado": "USD"}], sync
+    # Con un tipo de cambio de respaldo no se convierte ni se graba: la cotización no se usa y se dice por qué
+    with _parchar(rinversiones, **mercado, tasas_en_respaldo=lambda: True):
+        rinversiones._ultima_sync.clear()
+        sync_respaldo = client.post("/api/inversiones/sincronizar", headers=h).json()
+        assert sync_respaldo["no_actualizados"] == ["AAPL"] and sync_respaldo["sin_tipo_de_cambio"] == ["AAPL"], sync_respaldo
+        rinversiones._cache_en_vivo.clear()
+        sin_tasa = client.get("/api/inversiones?moneda_base=MXN&en_vivo=true", headers=h).json()["posiciones"][0]
+        assert sin_tasa["precio_en_vivo"] is False and sin_tasa["precio_actual"] == 4000.0, sin_tasa
+        creada = client.post("/api/inversiones", json={"ticker": "NVDA", "cantidad": 1, "precio_promedio": 2000, "moneda": "MXN"}, headers=h)
+        assert creada.status_code == 201, creada.text
+        nvda = next(p for p in client.get("/api/inversiones?moneda_base=MXN", headers=h).json()["posiciones"] if p["ticker"] == "NVDA")
+        assert nvda["precio_actual"] == 2000.0, "al crear con tasa de respaldo se parte del precio promedio"
+    # En vivo marca la moneda del mercado cuando difiere
+    rinversiones._cache_en_vivo.clear()
+    with _parchar(rinversiones, **mercado):
+        vivo2 = next(p for p in client.get("/api/inversiones?moneda_base=MXN&en_vivo=true", headers=h).json()["posiciones"] if p["ticker"] == "AAPL")
+        assert vivo2.get("moneda_mercado") == "USD", vivo2
+    # Una cotización en moneda no soportada no se usa: ni cambia la moneda ni rompe la exportación a Excel
+    gbp = {**tasas, "cotizar_varios": lambda ts: {t: (55.0, "GBP") for t in ts}}
+    with _parchar(rinversiones, **gbp), _parchar(export_service, **gbp):
+        assert client.get("/api/exportar-excel?moneda_base=MXN", headers=h).status_code == 200
+        assert pos()["moneda"] == "MXN" and pos()["precio_actual"] == 4000.0
+        assert client.get("/api/inversiones?moneda_base=MXN", headers=h).status_code == 200
+        assert client.get("/api/resumen?moneda_base=MXN", headers=h).status_code == 200
+
+
 def test_inversion_sin_moneda_toma_la_que_cotiza_el_mercado(client):
     _crear_usuario("ruta_moneda_def")
     h = _login(client, "ruta_moneda_def")
@@ -777,6 +826,7 @@ if __name__ == "__main__":
             (test_inversiones_crud_y_validaciones, lambda: test_inversiones_crud_y_validaciones(client)),
             (test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar, lambda: test_inversiones_con_mercado_simulado_sincronizar_cotizar_y_buscar(client)),
             (test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada, lambda: test_inversiones_en_vivo_valua_con_el_mercado_sin_guardar_nada(client)),
+            (test_el_precio_de_mercado_se_guarda_en_la_moneda_de_la_posicion, lambda: test_el_precio_de_mercado_se_guarda_en_la_moneda_de_la_posicion(client)),
             (test_monedas_no_soportadas_del_mercado_se_rechazan, lambda: test_monedas_no_soportadas_del_mercado_se_rechazan(client)),
             (test_tipo_de_cambio_privado_y_publico, lambda: test_tipo_de_cambio_privado_y_publico(client)),
             (test_rendimiento_ciclo_completo, lambda: test_rendimiento_ciclo_completo(client)),

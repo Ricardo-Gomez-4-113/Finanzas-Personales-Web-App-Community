@@ -3811,6 +3811,25 @@ def test_a_centavos_rechaza_con_value_error_todo_lo_que_no_es_un_monto():
     assert a_centavos(None) is None and a_centavos("12.345") == 1235 and a_centavos(0.1 + 0.2) == 30
 
 
+def test_precio_en_moneda_de_la_posicion_convierte_en_los_dos_sentidos():
+    """El precio de mercado se expresa en la moneda de la posición; sin precio, con monedas no soportadas o sin tasa no se usa."""
+    from finanzas_core import precio_en_moneda_de_la_posicion as f
+    mxn, eur = 20.0, 0.9   # unidades de cada moneda por USD
+    assert f(100, "USD", "USD", mxn, eur) == 100
+    assert f(100, "USD", "MXN", mxn, eur) == 2000.0
+    assert f(2000, "MXN", "USD", mxn, eur) == 100.0
+    assert f(90, "EUR", "USD", mxn, eur) == 100.0
+    assert f(100, "USD", "EUR", mxn, eur) == 90.0
+    assert f(90, "EUR", "MXN", mxn, eur) == 2000.0
+    assert f(100, "usd", "mxn", mxn, eur) == 2000.0, "las monedas no distinguen mayúsculas"
+    for malo in ((None, "USD", "MXN"), (0, "USD", "MXN"), (-5, "USD", "MXN"), (55, "GBP", "MXN"), (55, "USD", "GBP"), (55, None, "MXN"), (55, "USD", None)):
+        assert f(*malo, mxn, eur) is None, malo
+    assert f(100, "USD", "MXN", None, eur) is None, "sin tasa MXN no se convierte"
+    assert f(100, "USD", "EUR", mxn, None) is None, "sin tasa EUR no se convierte"
+    assert f(100, "USD", "MXN", float("nan"), eur) is None
+    assert f(0.0001, "MXN", "USD", mxn, eur) is None, "un resultado que redondea a cero no es un precio"
+
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
     from ejecutor import ejecutar_modulo

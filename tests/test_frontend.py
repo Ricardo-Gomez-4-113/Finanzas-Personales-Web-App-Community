@@ -2169,6 +2169,91 @@ def test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegad
         ctx.close()
 
 
+def test_escape_cierra_todos_los_modales(navegador, base):
+    """Antes Esc solo cerraba 11 modales: eliminar usuario (lleva una contraseña), editar fijo, exportar presupuesto, saltar compra
+    a meses, comentarios y Telegram se quedaban abiertos."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        for modal in ("modal-eliminar-usuario", "modal-editar-recurrente", "modal-exportar-presupuesto", "modal-saltar-msi", "modal-comentarios", "modal-telegram"):
+            page.evaluate("(id) => document.getElementById(id).classList.remove('hidden')", modal)
+            assert page.evaluate("(id) => !document.getElementById(id).classList.contains('hidden')", modal), modal
+            page.keyboard.press("Escape")
+            _esperar(page, f"document.getElementById('{modal}').classList.contains('hidden')", 5.0)
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_cambiar_la_frecuencia_con_el_ingreso_vacio_no_guarda_cero(navegador, base):
+    """Antes un campo vacío se guardaba como 0 (y el select dispara el guardado solo): borraba el ingreso base."""
+    usuario, clave = _usuario_nuevo("f8")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    puts = []
+    try:
+        _entrar(page, base, usuario, clave)
+        page.on("request", lambda r: puts.append(r.post_data) if r.method == "PUT" and r.url.endswith("/api/presupuesto/config") else None)
+        _ir(page, "tab-presupuesto")
+        page.fill("#pres-ingreso-base", "12345")
+        page.click("#form-presupuesto-config [type=submit]")
+        _esperar(page, "[...document.querySelectorAll('.toast')].some(t => t.innerText.includes('actualizados'))", 10.0)
+        page.fill("#pres-ingreso-base", "")
+        page.select_option("#pres-frecuencia", "quincenal")
+        limite = time.time() + 10
+        while len(puts) < 2 and time.time() < limite:
+            page.wait_for_timeout(100)
+        page.wait_for_timeout(500)   # por si hubiera un tercer guardado
+        assert len(puts) == 2, puts
+        assert json.loads(puts[-1])["ingreso_base"] == 12345, puts[-1]
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_guardar_un_movimiento_sin_categoria_no_lo_manda_a_la_categoria_uno(navegador, base):
+    """Antes `Number(select.value) || 1` guardaba el movimiento en la categoría 1 si el selector estaba vacío."""
+    usuario, clave = _usuario_nuevo("f9")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    posts = []
+    try:
+        _entrar(page, base, usuario, clave)
+        page.on("request", lambda r: posts.append(r.url) if r.method == "POST" and r.url.endswith("/api/transacciones") else None)
+        _ir(page, "tab-movimientos")
+        page.evaluate("""() => { document.getElementById('modal-nuevo-movimiento').classList.remove('hidden');
+            document.getElementById('categoria').innerHTML = '';
+            document.getElementById('monto').value = '10';
+            document.getElementById('fecha').value = '%s'; }""" % escenario.HOY)
+        page.evaluate("document.getElementById('transaccion-form').requestSubmit()")
+        _esperar(page, "document.getElementById('mensaje').textContent.includes('Elige una categoría')", 5.0)
+        page.wait_for_load_state("networkidle")
+        assert posts == [], posts
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_editar_una_posicion_permite_corregir_su_moneda(navegador, base):
+    """La moneda de una posición adivinada mal (sin cotización al crear) ya no la corrige sincronizar: se corrige al editar."""
+    usuario, clave = _usuario_nuevo("moneda_pos")
+    _api(base, usuario, clave).post("/api/inversiones", json={"ticker": "SAP", "cantidad": 2, "precio_promedio": 140, "precio_actual": 150, "moneda": "USD"})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    puts = []
+    try:
+        _entrar(page, base, usuario, clave)
+        page.on("request", lambda r: puts.append(r.post_data) if r.method == "PUT" and "/api/inversiones/" in r.url else None)
+        _ir(page, "tab-inversiones")
+        page.click("#tabla-inversiones .btn-editar")
+        page.wait_for_selector("#modal-editar-inversion:not(.hidden)")
+        assert page.input_value("#modal-edit-moneda-select") == "USD"
+        page.select_option("#modal-edit-moneda-select", "EUR")
+        assert page.inner_text("#modal-edit-moneda") == "EUR", "la etiqueta del precio sigue a la moneda elegida"
+        page.click("#form-editar-inversion [type=submit]")
+        _esperar(page, "document.getElementById('modal-editar-inversion').classList.contains('hidden')", 10.0)
+        assert len(puts) == 1 and json.loads(puts[0])["moneda"] == "EUR", puts
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3079,6 +3164,10 @@ if __name__ == "__main__":
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga, lambda: test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base)),
+                (test_editar_una_posicion_permite_corregir_su_moneda, lambda: test_editar_una_posicion_permite_corregir_su_moneda(navegador, base)),
+                (test_escape_cierra_todos_los_modales, lambda: test_escape_cierra_todos_los_modales(navegador, base)),
+                (test_cambiar_la_frecuencia_con_el_ingreso_vacio_no_guarda_cero, lambda: test_cambiar_la_frecuencia_con_el_ingreso_vacio_no_guarda_cero(navegador, base)),
+                (test_guardar_un_movimiento_sin_categoria_no_lo_manda_a_la_categoria_uno, lambda: test_guardar_un_movimiento_sin_categoria_no_lo_manda_a_la_categoria_uno(navegador, base)),
                 (test_otra_pestana_cambio_el_movimiento_y_no_se_pisa, lambda: test_otra_pestana_cambio_el_movimiento_y_no_se_pisa(navegador, base)),
                 (test_icono_del_menu_colapsado_queda_centrado_con_el_cursor, lambda: test_icono_del_menu_colapsado_queda_centrado_con_el_cursor(navegador, base)),
                 (test_campos_y_selectores_nativos_siguen_el_tema, lambda: test_campos_y_selectores_nativos_siguen_el_tema(navegador, base)),

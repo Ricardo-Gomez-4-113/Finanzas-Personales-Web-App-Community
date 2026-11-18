@@ -257,12 +257,21 @@ if (formTrans) {
             return;
         }
 
+        const categoriaElegida = Number(document.getElementById('categoria').value);
+        if (!categoriaElegida) {
+            if (mensajeDiv) {
+                mensajeDiv.className = 'msg-error';
+                mensajeDiv.textContent = 'Elige una categoría.';
+            }
+            return;
+        }
+
         const datos = {
             fecha: document.getElementById('fecha').value,
             monto: montoVal,
             tipo: document.getElementById('tipo').value,
             descripcion: document.getElementById('descripcion').value.trim(),
-            categoria_id: Number(document.getElementById('categoria').value) || 1
+            categoria_id: categoriaElegida
         };
 
         guardandoTransaccion = true;

@@ -443,6 +443,25 @@ def mensualizar(monto: float, frecuencia: str) -> float:
     raise ValueError(f"Frecuencia desconocida: {frecuencia}")
 
 
+def precio_en_moneda_de_la_posicion(precio: Optional[float], moneda_mercado: Optional[str], moneda_posicion: Optional[str],
+                                   tasa_usd_mxn: float, tasa_usd_eur: Optional[float] = None) -> Optional[float]:
+    """El precio de mercado expresado en la moneda de la posición. El precio promedio y el actual de una posición viven en SU moneda:
+    si el mercado cotiza en otra (VOO en USD guardado en pesos) se convierte, en vez de cambiar la moneda y dejar el costo en la anterior.
+    None si no hay precio o alguna de las dos monedas no está soportada: ese precio no se usa."""
+    if precio is None or precio <= 0:
+        return None
+    origen, destino = (moneda_mercado or "").upper(), (moneda_posicion or "").upper()
+    if origen not in MONEDAS_SOPORTADAS or destino not in MONEDAS_SOPORTADAS:
+        return None
+    if origen == destino:
+        return precio
+    try:
+        convertido = round(convertir(precio, origen, destino, tasa_usd_mxn, tasa_usd_eur), 4)
+    except ValueError:
+        return None
+    return convertido if convertido > 0 else None
+
+
 def convertir_frecuencias(monto: float, frecuencia_origen: str) -> Dict[str, float]:
     """Calcula el equivalente mensual, quincenal y semanal de un monto dado."""
     mensual = mensualizar(monto, frecuencia_origen)

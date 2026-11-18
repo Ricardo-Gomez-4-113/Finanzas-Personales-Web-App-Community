@@ -96,7 +96,7 @@ export async function cambiarEstadoUsuario(userId, nuevoEstado) {
             cargarDatosAdmin();
         } else {
             const err = await res.json();
-            toast(err.detail || "Error al modificar el estado del usuario.", 'error');
+            toast(formatErrorDetail(err.detail, "Error al modificar el estado del usuario."), 'error');
         }
     } catch (e) {
         toast("Error de red al actualizar estado.", 'error');
@@ -119,7 +119,7 @@ export async function cambiarAsistenteUsuario(userId, activo) {
             cargarDatosAdmin();
         } else {
             const err = await res.json();
-            toast(err.detail || 'No se pudo cambiar el asistente de la cuenta.', 'error');
+            toast(formatErrorDetail(err.detail, 'No se pudo cambiar el asistente de la cuenta.'), 'error');
         }
     } catch (e) {
         toast('Error de red al cambiar el asistente.', 'error');

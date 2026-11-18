@@ -18,8 +18,8 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.utils import get_column_letter
-from finanzas_core import ahora_local, convertir, deuda_pendiente, valor_rendimiento
-from mercado import obtener_tasas_cambio, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
+from finanzas_core import ahora_local, convertir, deuda_pendiente, precio_en_moneda_de_la_posicion, valor_rendimiento
+from mercado import obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 
 def _como_texto(celda):
     """El texto del usuario nunca es una fórmula: lo que empieza con = + - @ se guarda como texto."""
@@ -77,16 +77,25 @@ def generar_reporte_excel(moneda_base: str = "MXN", conn: sqlite3.Connection = N
     filas_inv_raw = cursor.execute("SELECT * FROM inversiones ORDER BY id DESC").fetchall()
     actualizaciones_mkt = []
     cotizaciones = cotizar_varios([inv["ticker"] for inv in filas_inv_raw])
+    tasas_inv = obtener_tasas_cambio()
     for inv in filas_inv_raw:
         precio_mkt, moneda_mkt = cotizaciones[inv["ticker"]]
-        if precio_mkt and precio_mkt > 0:
-            actualizaciones_mkt.append((precio_mkt, moneda_mkt, inv["id"]))
+        # Mismo criterio que sincronizar: el precio se guarda en la moneda de la posición, que no cambia; una cotización en una
+        # moneda no soportada no se usa (antes dejaba la moneda en GBP y la exportación y las pantallas fallaban)
+        moneda_pos = (inv["moneda"] or "USD").upper()
+        moneda_mkt = (moneda_mkt or moneda_pos).upper()
+        if moneda_mkt != moneda_pos and tasas_en_respaldo():
+            continue   # convertir con un tipo de cambio de respaldo grabaría un precio calculado con una tasa inventada
+        convertido = precio_en_moneda_de_la_posicion(precio_mkt, moneda_mkt, moneda_pos,
+                                                     tasas_inv.get("MXN", TASA_MXN_RESPALDO), tasas_inv.get("EUR", TASA_EUR_RESPALDO))
+        if convertido is not None:
+            actualizaciones_mkt.append((convertido, inv["id"]))
 
     if actualizaciones_mkt:
         cursor.executemany(
             """
             UPDATE inversiones 
-            SET precio_actual = ?, moneda = ?, actualizado_en = CURRENT_TIMESTAMP 
+            SET precio_actual = ?, actualizado_en = CURRENT_TIMESTAMP 
             WHERE id = ?
             """,
             actualizaciones_mkt

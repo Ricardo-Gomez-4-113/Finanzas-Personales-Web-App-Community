@@ -118,7 +118,7 @@ export async function guardarNuevoApartado(e) {
             recargar();
         } else {
             const error = await res.json();
-            toast(error.detail || 'Error al crear apartado', 'error');
+            toast(formatErrorDetail(error.detail, 'Error al crear apartado'), 'error');
         }
     } catch (err) {
         toast("Error al conectar con el servidor.", 'error');
@@ -247,7 +247,7 @@ export async function eliminarApartado(id) {
             }
             if (btnEliminar) btnEliminar.disabled = false;
             const error = await res.json();
-            toast(error.detail || "No se pudo eliminar el apartado.", 'error');
+            toast(formatErrorDetail(error.detail, "No se pudo eliminar el apartado."), 'error');
         }
     } catch (error) {
         if (card) {

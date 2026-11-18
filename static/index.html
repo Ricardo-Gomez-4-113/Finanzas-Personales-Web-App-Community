@@ -23,12 +23,12 @@
     <!-- Tipografías alojadas en este servidor (static/fonts): Hanken Grotesk (interfaz) + Fraunces (cifras), sin peticiones a terceros -->
     <link rel="preload" href="/static/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/static/css/fuentes.css?v=660caf3960">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=660caf3960">
-    <link rel="stylesheet" href="/static/css/layout.css?v=660caf3960">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=660caf3960">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=660caf3960">
-    <link rel="stylesheet" href="/static/css/tema.css?v=660caf3960">
+    <link rel="stylesheet" href="/static/css/fuentes.css?v=a4cb35ed9e">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=a4cb35ed9e">
+    <link rel="stylesheet" href="/static/css/layout.css?v=a4cb35ed9e">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=a4cb35ed9e">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=a4cb35ed9e">
+    <link rel="stylesheet" href="/static/css/tema.css?v=a4cb35ed9e">
     <script src="/static/vendor/chart-4.4.1.umd.js"></script>
 
 </head>
@@ -1275,6 +1275,16 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="modal-edit-moneda-select">Moneda de la posición</label>
+                    <select id="modal-edit-moneda-select">
+                        <option value="USD">USD (dólares)</option>
+                        <option value="MXN">MXN (pesos mexicanos)</option>
+                        <option value="EUR">EUR (euros)</option>
+                    </select>
+                    <small class="hint-text">Si el mercado cotiza este activo en otra moneda, corrígela aquí. Cambiarla no convierte tu precio promedio: escríbelo en la moneda elegida.</small>
+                </div>
+
+                <div class="form-group">
                     <label for="modal-edit-precio-promedio">Precio Promedio de Compra (<span id="modal-edit-moneda"></span>):</label>
                     <input type="number" step="0.01" min="0.01" id="modal-edit-precio-promedio" required>
                 </div>
@@ -2143,7 +2153,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=660caf3960"></script>
+    <script type="module" src="/static/js/main.js?v=a4cb35ed9e"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

@@ -260,7 +260,15 @@ export async function guardarConfigPresupuesto(e) {
     const selFrec = document.getElementById('pres-frecuencia');
     if (!inp || !selFrec) return;
 
-    const ingreso_base = parseFloat(inp.value) || 0;
+    // Un campo vacío o con basura no se guarda como 0 (borraba el ingreso base). Al cambiar solo la frecuencia (sin formulario)
+    // se conserva el ingreso ya guardado; al pulsar «Guardar ingreso» el campo no puede estar vacío.
+    const texto = inp.value.trim();
+    let ingreso_base = parseFloat(texto);
+    if (texto === '' && !(e && e.preventDefault)) ingreso_base = Number(cachePresupuesto?.config?.ingreso_base ?? 0);
+    if (!Number.isFinite(ingreso_base) || ingreso_base < 0 || (texto === '' && e && e.preventDefault)) {
+        toast('Escribe tu ingreso fijo base (cero o más).', 'error');
+        return;
+    }
     const frecuencia = selFrec.value;
 
     try {
@@ -271,7 +279,7 @@ export async function guardarConfigPresupuesto(e) {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            toast(err.detail || 'No se pudo guardar la configuración.', 'error');
+            toast(formatErrorDetail(err.detail, 'No se pudo guardar la configuración.'), 'error');
             return;
         }
         toast('Presupuesto y periodicidad actualizados.', 'ok');
@@ -523,7 +531,7 @@ export async function ejecutarExportarPresupuesto() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            toast(err.detail || 'No se pudo exportar el presupuesto.', 'error');
+            toast(formatErrorDetail(err.detail, 'No se pudo exportar el presupuesto.'), 'error');
             return;
         }
 

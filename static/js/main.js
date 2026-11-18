@@ -9,11 +9,11 @@ import { apiFetch, conTituloPrivado, desdeMXN, escapeHTML, estado, etiquetaPerio
 import { actualizarGrafica, actualizarGraficaCategorias, renderPeriodo } from './dashboard.js';
 import { renderCintaPeriodos } from './cinta_periodos.js';
 import { cargarInversiones, cerrarModalEditarInversion, cerrarModalNuevaPosicion, inicializarBuscadorTickers } from './inversiones.js';
-import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=660caf3960';
+import { cargarRecurrentes, cerrarModalNuevoFijo } from './recurrentes.js?v=a4cb35ed9e';
 import { cargarCategorias, cerrarModalEditarTransaccion, cerrarModalNuevoMovimiento, renderTablaMovimientos } from './movimientos.js';
 import { cerrarModalLegal, cerrarSidebarMobile, cerrarUserDropdown, inicializarAccesibilidadModales, inicializarEstadoSidebar, inicializarMenuUsuario, inicializarTabs } from './ui.js';
 import { inicializarCalculadoraRF } from './calculadora_rf.js';
-import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=660caf3960';
+import { cargarPresupuesto, cerrarModalTarjetaPresupuesto, inicializarPresupuesto } from './presupuesto.js?v=a4cb35ed9e';
 import './respaldo.js'; // registra handlers de Excel y respaldo en window
 import './comentarios.js'; // registra el envío de comentarios en window
 import './asistente_web.js'; // la burbuja del asistente (se monta sola con la sesión)
@@ -188,6 +188,10 @@ window.addEventListener('keydown', (e) => {
         cerrarModalRecuperarPassword();
         cerrarModalLegal();
         cerrarModalTarjetaPresupuesto();
+        // Los demás modales (eliminar usuario, editar fijo, exportar presupuesto, saltar compra a meses, comentarios, Telegram...) no
+        // estaban en la lista: se cierran con su propio botón ×, así cada uno limpia lo suyo (el QR de vinculación, la contraseña escrita)
+        const abierto = [...document.querySelectorAll('.modal-overlay[role="dialog"]:not(.hidden):not(#modal-confirmar)')].pop();
+        abierto?.querySelector('.btn-modal-close')?.click();
     }
 });
 
