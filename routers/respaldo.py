@@ -209,6 +209,19 @@ def restaurar_backup(
         finally:
             test_conn.close()
 
+        # 2b. Triggers y vistas se rechazan ANTES de migrar: de otro modo un trigger hostil correría durante las migraciones
+        previo = sqlite3.connect(tmp_path)
+        try:
+            if previo.execute("SELECT count(*) FROM sqlite_master WHERE type IN ('trigger', 'view')").fetchone()[0]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El respaldo contiene triggers o vistas, que no forman parte del esquema de la aplicación."
+                )
+        except sqlite3.DatabaseError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo proporcionado no es una base de datos SQLite válida o está dañado.")
+        finally:
+            previo.close()
+
         # 3. Aplicar migraciones defensivas a la BD temporal
         try:
             init_tenant_db(tmp_path)

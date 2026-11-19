@@ -414,6 +414,26 @@ def test_restore_rechaza_triggers_y_textos_enormes(client, hb):
         r = client.post("/api/restore", files={"file": ("respaldo.db", contenido, "application/octet-stream")}, headers=hb)
         assert r.status_code == 400, (nombre, r.status_code, r.text)
     assert client.get("/api/transacciones", headers=hb).json() == antes
+    # El trigger se rechaza antes de migrar: las migraciones nunca corren con un trigger ajeno dentro
+    import routers.respaldo as rrespaldo
+    migrar = rrespaldo.init_tenant_db
+    rrespaldo.init_tenant_db = lambda *a, **k: (_ for _ in ()).throw(AssertionError("se migró un respaldo con trigger"))
+    try:
+        r = client.post("/api/restore", files={"file": ("respaldo.db", casos["trigger"], "application/octet-stream")}, headers=hb)
+        assert r.status_code == 400, r.text
+    finally:
+        rrespaldo.init_tenant_db = migrar
+
+
+def test_el_excel_no_trata_como_formula_un_texto_que_empieza_con_tabulador_o_retorno(client):
+    import export_service
+    from openpyxl import Workbook
+    hoja = Workbook().active
+    for texto in ("\t=1+1", "\r=2+2", "=3+3", "+4", "-5", "@SUM(A1)", "normal"):
+        hoja["A1"] = texto
+        assert export_service._como_texto(hoja["A1"]).data_type == ("s" if texto != "normal" else hoja["A1"].data_type), texto
+    hoja["A1"] = "\t=1+1"
+    assert export_service._como_texto(hoja["A1"]).data_type == "s", "el tabulador al inicio ya no abre una fórmula en Excel"
 
 
 def test_tarjetas_por_porcentaje_no_se_guardan_en_cero(client, ha):
@@ -830,6 +850,7 @@ if __name__ == "__main__":
             (test_editar_al_fin_de_febrero_no_corre_el_mensual_del_31, lambda: test_editar_al_fin_de_febrero_no_corre_el_mensual_del_31(client, ha)),
             (test_hsts_solo_sobre_https, lambda: test_hsts_solo_sobre_https(client)),
             (test_restore_rechaza_triggers_y_textos_enormes, lambda: test_restore_rechaza_triggers_y_textos_enormes(client, hb)),
+            (test_el_excel_no_trata_como_formula_un_texto_que_empieza_con_tabulador_o_retorno, lambda: test_el_excel_no_trata_como_formula_un_texto_que_empieza_con_tabulador_o_retorno(client)),
             (test_login_bloquea_tras_5_fallos, lambda: test_login_bloquea_tras_5_fallos(client)),
             (test_token_deja_de_valer_tras_cambiar_contrasena, lambda: test_token_deja_de_valer_tras_cambiar_contrasena(client, ua)),
             (test_cambiar_contrasena_exige_la_actual_y_8_caracteres, lambda: test_cambiar_contrasena_exige_la_actual_y_8_caracteres(client, hadmin)),

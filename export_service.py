@@ -22,8 +22,8 @@ from finanzas_core import ahora_local, convertir, deuda_pendiente, precio_en_mon
 from mercado import obtener_tasas_cambio, tasas_en_respaldo, cotizar_varios, TASA_MXN_RESPALDO, TASA_EUR_RESPALDO
 
 def _como_texto(celda):
-    """El texto del usuario nunca es una fórmula: lo que empieza con = + - @ se guarda como texto."""
-    if isinstance(celda.value, str) and celda.value[:1] in ("=", "+", "-", "@"):
+    """El texto del usuario nunca es una fórmula: lo que empieza con = + - @ (o con tabulador o retorno de carro) se guarda como texto."""
+    if isinstance(celda.value, str) and celda.value[:1] in ("=", "+", "-", "@", "\t", "\r"):
         celda.data_type = "s"
     return celda
 

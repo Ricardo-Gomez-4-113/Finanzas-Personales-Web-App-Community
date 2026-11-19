@@ -406,9 +406,32 @@ def es_ip_privada_o_loopback(ip_str: str) -> bool:
 
 # Proxies cuya cabecera CF-Connecting-IP se acepta: solo el loopback del host y el gateway
 # del bridge de Docker (por donde llega el tráfico de cloudflared hacia el contenedor).
-_PROXIES_CONFIABLES = {
-    ip.strip() for ip in os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1,172.17.0.1").split(",") if ip.strip()
-}
+def parsear_proxies(texto: str) -> list:
+    """«127.0.0.1,172.16.0.0/12»: direcciones o rangos (CIDR). Lo que no se entiende se ignora: nunca se confía por error."""
+    redes = []
+    for trozo in (texto or "").split(","):
+        trozo = trozo.strip()
+        if not trozo:
+            continue
+        try:
+            redes.append(ipaddress.ip_network(trozo, strict=False))
+        except ValueError:
+            continue
+    return redes
+
+
+# Por defecto, el loopback y los rangos de los bridges de Docker (172.16.0.0/12). El tráfico de cloudflared llega al contenedor por
+# la puerta de enlace de la red de Docker, que cambia según la red (172.17.0.1, 172.21.0.1...): con una lista fija, el proxy no se
+# reconocía y todos los visitantes compartían una sola IP en los límites de intentos. El puerto solo se publica en loopback.
+_PROXIES_CONFIABLES = parsear_proxies(os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1,172.16.0.0/12"))
+
+
+def es_proxy_confiable(direct_ip: str, redes=None) -> bool:
+    try:
+        direccion = ipaddress.ip_address(direct_ip)
+    except ValueError:
+        return False
+    return any(direccion in red for red in (_PROXIES_CONFIABLES if redes is None else redes))
 
 def obtener_ip_cliente(request: Request) -> str:
     """
@@ -421,7 +444,7 @@ def obtener_ip_cliente(request: Request) -> str:
     3. Si no hay proxy confiable o no existe la cabecera, recurre a request.client.host o 'unknown'.
     """
     direct_ip = request.client.host if request.client else "unknown"
-    if direct_ip in _PROXIES_CONFIABLES:
+    if es_proxy_confiable(direct_ip):
         cf_ip = request.headers.get("CF-Connecting-IP")
         if cf_ip:
             cf_ip_clean = cf_ip.strip()

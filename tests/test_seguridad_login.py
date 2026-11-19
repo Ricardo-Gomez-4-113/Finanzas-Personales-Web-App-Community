@@ -344,6 +344,29 @@ def test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta():
     _vaciar_contadores()
 
 
+def test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza():
+    """Detrás de cloudflared el origen que ve la app es la puerta de enlace de la red de Docker (172.17.0.1, 172.21.0.1...): si no se
+    reconoce como proxy, todos los visitantes comparten una sola IP en los límites de intentos y uno solo bloquea a todos."""
+    from types import SimpleNamespace as NS
+    pedir = lambda directa, cf=None: NS(client=NS(host=directa), headers={"CF-Connecting-IP": cf} if cf else {})
+    # Cualquier red de Docker (bridges 172.16.0.0/12) y el loopback valen por defecto
+    for puerta in ("172.17.0.1", "172.21.0.1", "172.30.5.1", "127.0.0.1", "::1"):
+        assert security.obtener_ip_cliente(pedir(puerta, "203.0.113.7")) == "203.0.113.7", puerta
+    # Una conexión directa de internet no puede fingir una IP con la cabecera
+    for ajena in ("203.0.113.9", "8.8.8.8", "100.64.0.5", "192.168.1.10", "172.15.0.1", "172.32.0.1"):
+        assert security.obtener_ip_cliente(pedir(ajena, "1.2.3.4")) == ajena, ajena
+    # Cabecera inválida o ausente: se usa la conexión directa
+    assert security.obtener_ip_cliente(pedir("172.21.0.1", "no-es-ip")) == "172.21.0.1"
+    assert security.obtener_ip_cliente(pedir("172.21.0.1")) == "172.21.0.1"
+    # Dos visitantes distintos detrás del mismo proxy no comparten cubo
+    assert security.obtener_ip_cliente(pedir("172.21.0.1", "198.51.100.1")) != security.obtener_ip_cliente(pedir("172.21.0.1", "198.51.100.2"))
+    # La lista de TRUSTED_PROXY_IPS acepta direcciones y rangos, e ignora lo que no entiende
+    redes = security.parsear_proxies("127.0.0.1, 10.0.0.0/8, basura, , 2001:db8::/32")
+    assert security.es_proxy_confiable("10.9.8.7", redes) and security.es_proxy_confiable("2001:db8::1", redes)
+    assert not security.es_proxy_confiable("172.21.0.1", redes) and not security.es_proxy_confiable("no-ip", redes)
+    assert security.parsear_proxies("basura") == [] and not security.es_proxy_confiable("127.0.0.1", [])
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -360,6 +383,7 @@ if __name__ == "__main__":
         (test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta, test_solicitudes_de_codigo_no_inundan_el_correo_de_la_cuenta),
         (test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada, test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada),
         (test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta, test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta),
+        (test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza, test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")
