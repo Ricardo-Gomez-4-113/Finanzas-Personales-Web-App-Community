@@ -1473,6 +1473,40 @@ def test_login_recorta_igual_que_el_alta_y_una_clave_larga_entra(navegador, base
         ctx.close()
 
 
+def test_una_contrasena_debil_obliga_a_cambiarla_antes_de_ver_datos(navegador, base):
+    """Una cuenta con contraseña de la regla anterior (corta) entra directo al cambio de contraseña: sin cambiarla no hay
+    datos, cerrar el cuadro es salir, y con una buena entra a la app."""
+    nombre = "fr_debil"
+    master_db.create_user_entry(nombre, security.hash_password("corta"), email=f"{nombre}@test.local")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        page.goto(base + "/login")
+        page.fill("#login-username", nombre)
+        page.fill("#login-password", "corta")
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#modal-editar-usuario:not(.hidden)", timeout=15000)
+        assert page.is_visible("#edit-user-aviso-clave"), "debe explicar por qué se pide el cambio"
+        # Cerrar sin cambiar es no entrar
+        page.click("#form-editar-usuario .btn-secondary")
+        page.wait_for_selector("#form-login", state="visible", timeout=15000)
+        page.fill("#login-username", nombre)
+        page.fill("#login-password", "corta")
+        page.click("#form-login [type=submit]")
+        page.wait_for_selector("#modal-editar-usuario:not(.hidden)", timeout=15000)
+        page.click("#form-editar-usuario [type=submit]")  # sin contraseña nueva no se avanza ni se cierra
+        page.wait_for_selector(".toast-error", timeout=5000)
+        assert page.is_visible("#modal-editar-usuario")
+        page.fill("#edit-user-password", "Nueva#Clave99")
+        page.fill("#edit-user-current-password", "corta")
+        page.click("#form-editar-usuario [type=submit]")
+        page.wait_for_selector("#modal-editar-usuario.hidden", state="attached", timeout=10000)
+        _esperar(page, "document.querySelector('#tabla-movimientos') !== null && !document.getElementById('vista-app').classList.contains('hidden')")
+        assert not errores, errores
+    finally:
+        ctx.close()
+    _api(base, nombre, "Nueva#Clave99")
+
+
 def test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base):
     usuario, clave = _usuario_nuevo("del")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3311,6 +3345,7 @@ if __name__ == "__main__":
                 (test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta, lambda: test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta(navegador, base)),
                 (test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda, lambda: test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda(navegador, base)),
                 (test_asistente_telegram_sin_bot_en_el_servidor_lo_dice, lambda: test_asistente_telegram_sin_bot_en_el_servidor_lo_dice(navegador, base)),
+                (test_una_contrasena_debil_obliga_a_cambiarla_antes_de_ver_datos, lambda: test_una_contrasena_debil_obliga_a_cambiarla_antes_de_ver_datos(navegador, base)),
             ]
             codigo = ejecutar(verificar_cobertura(sys.modules[__name__], registradas), "test_frontend")
             navegador.close()

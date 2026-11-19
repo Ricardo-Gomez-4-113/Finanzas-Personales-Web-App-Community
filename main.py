@@ -30,7 +30,7 @@ import observabilidad
 import tarea_programada
 from security import (
     hash_password,
-    clave_cabe_en_bcrypt
+    motivo_clave_debil
 )
 from routers import auth, admin, movimientos, apartados, inversiones, respaldo, recurrentes, presupuesto, salud, diagnostico, comentarios, notificaciones, asistente_telegram, asistente_interno, asistente_web
 from limite_cuerpo import LimiteTamanoCuerpo
@@ -48,10 +48,9 @@ async def lifespan(app: FastAPI):
     # Clave inicial de respaldo si no hay usuarios en master.db
     admin_default_pass = os.environ.get("DEFAULT_ADMIN_PASSWORD") or secrets.token_urlsafe(12)
     clave_generada = not os.environ.get("DEFAULT_ADMIN_PASSWORD")
-    try:
-        clave_cabe_en_bcrypt(admin_default_pass)
-    except ValueError:
-        raise RuntimeError("DEFAULT_ADMIN_PASSWORD pasa de 72 bytes (los acentos y la ñ cuentan doble); usa una más corta.")
+    motivo = motivo_clave_debil(admin_default_pass)
+    if motivo:
+        raise RuntimeError(f"DEFAULT_ADMIN_PASSWORD no sirve: {motivo}")
     admin_default_hash = hash_password(admin_default_pass)
     migrado = master_db.seed_default_admin_and_migrate(admin_default_hash)
     if migrado:

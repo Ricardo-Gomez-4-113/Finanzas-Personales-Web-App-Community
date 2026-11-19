@@ -2,7 +2,7 @@
  * static/js/auth.js - Autenticación, login, sesión y recuperación de contraseña.
  */
 
-import { cargarDatosAdmin } from './admin.js';
+import { abrirModalEditarMiPerfil, cargarDatosAdmin } from './admin.js';
 import { apiFetch, cargarTiposCambio, estado, recargar, toast, formatErrorDetail } from './core.js';
 import { renderMenuUsuario } from './menu_usuario.js';
 import { cambiarPestana } from './ui.js';
@@ -149,6 +149,12 @@ export function establecerSesionActiva(user, token) {
         if (pestanaGuardada === 'tab-admin') {
             cambiarPestana('tab-dashboard');
         }
+    }
+
+    // Contraseña que ya no cumple la regla: el servidor solo deja cambiarla, así que no se piden datos hasta entonces
+    if (user.debe_cambiar_clave) {
+        abrirModalEditarMiPerfil();
+        return;
     }
 
     // Cargar datos financieros del tenant
@@ -504,3 +510,10 @@ Object.assign(window, {
     mostrarVistaLogin,
     volverAPaso1Recuperacion
 });
+
+
+// Cambió la contraseña débil: ahora sí se entra a la app
+document.addEventListener('clave-cambiada', () => {
+    if (estado.usuarioActual) establecerSesionActiva(estado.usuarioActual, localStorage.getItem('jwt_token'));
+});
+document.addEventListener('clave-pendiente-cancelada', () => cerrarSesionLimpia('Para entrar necesitas cambiar tu contraseña.'));

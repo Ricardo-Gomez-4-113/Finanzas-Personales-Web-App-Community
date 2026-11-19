@@ -876,6 +876,59 @@ def test_excel_guarda_como_texto_lo_que_escribe_el_usuario(client):
     assert all(tipo == "s" for _, _, tipo in encontradas), f"texto del usuario guardado como fórmula: {encontradas}"
 
 
+def test_la_regla_de_contrasena_es_la_misma_en_todas_las_puertas(client):
+    """8 o más caracteres, no solo espacios y fuera de las más usadas: alta, perfil, administrador y recuperación."""
+    ha = _login(client, "admin", os.environ["DEFAULT_ADMIN_PASSWORD"])
+    malas = ("corta7!", "12345678", "Password", "aaaaaaaa", "        ")
+    for i, clave in enumerate(malas):
+        assert client.post("/admin/users", json={"username": f"ruta_regla{i}", "password": clave, "role": "user"}, headers=ha).status_code == 422, clave
+    assert client.post("/admin/users", json={"username": "ruta_regla_ok", "password": "Segura#1234", "role": "user"}, headers=ha).status_code == 201
+    h = _login(client, "ruta_regla_ok", "Segura#1234")
+    for clave in malas:
+        assert client.patch("/auth/profile", json={"password": clave, "current_password": "Segura#1234"}, headers=h).status_code == 422, clave
+        assert client.post("/auth/reset-password", json={"identifier": "ruta_regla_ok", "code": "123456", "new_password": clave}).status_code == 422, clave
+    assert security.motivo_clave_debil("Segura#1234") is None
+
+
+def test_una_contrasena_debil_que_ya_existia_solo_puede_cambiarse(client):
+    """Las cuentas creadas con la regla anterior entran, pero solo pueden ver su sesión y cambiar la contraseña."""
+    master_db.create_user_entry("ruta_debil", security.hash_password("corta"), email="ruta_debil@test.local")
+    r = client.post("/auth/login", json={"username": "ruta_debil", "password": "corta"})
+    assert r.status_code == 200 and r.json()["user"]["debe_cambiar_clave"] is True, r.text
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/auth/me", headers=h).json()["user"]["debe_cambiar_clave"] is True
+    assert client.get("/api/resumen", headers=h).status_code == 403
+    assert client.get("/api/transacciones", headers=h).status_code == 403
+    # Cambiarla por otra débil no sirve
+    assert client.patch("/auth/profile", json={"password": "12345678", "current_password": "corta"}, headers=h).status_code == 422
+    assert client.get("/api/resumen", headers=h).status_code == 403
+    cambio = client.patch("/auth/profile", json={"password": "Nueva#Clave88", "current_password": "corta"}, headers=h)
+    assert cambio.status_code == 200, cambio.text
+    h2 = {"Authorization": f"Bearer {cambio.json()['new_token']}"}
+    assert client.get("/api/resumen", headers=h2).status_code == 200
+    r = client.post("/auth/login", json={"username": "ruta_debil", "password": "Nueva#Clave88"})
+    assert r.status_code == 200 and r.json()["user"]["debe_cambiar_clave"] is False
+    # Una administradora con clave débil edita la suya, nunca la de otra persona
+    master_db.create_user_entry("ruta_debil_admin", security.hash_password("admin"), role="admin", email="ruta_debil_admin@test.local")
+    ra = client.post("/auth/login", json={"username": "ruta_debil_admin", "password": "admin"})
+    ha = {"Authorization": f"Bearer {ra.json()['access_token']}"}
+    propio = ra.json()["user"]["id"]
+    otro = master_db.get_user_by_username("ruta_debil")["id"]
+    assert client.patch(f"/admin/users/{otro}", json={"email": "x@test.local", "current_password": "admin"}, headers=ha).status_code == 403
+    assert client.get("/admin/users", headers=ha).status_code == 403
+    assert client.patch(f"/admin/users/{propio}", json={"password": "Admin#Nueva77", "current_password": "admin"}, headers=ha).status_code == 200
+
+
+def test_el_codigo_de_recuperacion_no_se_guarda_en_claro(client):
+    usuario = _crear_usuario("ruta_codigo_hash")
+    codigo = master_db.create_password_reset_code(usuario["id"])
+    with master_db.get_master_conn() as conn:
+        guardado = conn.execute("SELECT code FROM password_resets WHERE user_id = ? ORDER BY id DESC", (usuario["id"],)).fetchone()[0]
+    assert guardado != codigo and codigo not in guardado and guardado.startswith("h1:")
+    assert master_db.verify_reset_code("ruta_codigo_hash", "000000" if codigo != "000000" else "111111")[0] is None
+    assert master_db.verify_reset_code("ruta_codigo_hash", codigo)[0]["id"] == usuario["id"]
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -921,6 +974,9 @@ if __name__ == "__main__":
             (test_excel_en_euros_con_fijos_y_cuentas_no_falla_y_el_archivo_se_llama_eur, lambda: test_excel_en_euros_con_fijos_y_cuentas_no_falla_y_el_archivo_se_llama_eur(client)),
             (test_excel_guarda_como_texto_lo_que_escribe_el_usuario, lambda: test_excel_guarda_como_texto_lo_que_escribe_el_usuario(client)),
             (test_ingreso_fijo_que_sostiene_gastos_no_se_borra, lambda: test_ingreso_fijo_que_sostiene_gastos_no_se_borra(client)),
+            (test_la_regla_de_contrasena_es_la_misma_en_todas_las_puertas, lambda: test_la_regla_de_contrasena_es_la_misma_en_todas_las_puertas(client)),
+            (test_una_contrasena_debil_que_ya_existia_solo_puede_cambiarse, lambda: test_una_contrasena_debil_que_ya_existia_solo_puede_cambiarse(client)),
+            (test_el_codigo_de_recuperacion_no_se_guarda_en_claro, lambda: test_el_codigo_de_recuperacion_no_se_guarda_en_claro(client)),
         ]
         pruebas = verificar_cobertura(sys.modules[__name__], registradas)
         codigo = ejecutar(pruebas, "test_api_rutas")

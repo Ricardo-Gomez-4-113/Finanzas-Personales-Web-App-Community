@@ -133,6 +133,13 @@ def init_master_db() -> None:
         except sqlite3.OperationalError:
             pass
 
+        # 1 = la contraseña con la que entró por última vez no cumple la regla vigente: solo puede cambiarla
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN clave_debil INTEGER NOT NULL DEFAULT 0;")
+        except sqlite3.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+
         # Poblar db_path para cualquier fila existente donde esté vacío
         rows_without_path = cursor.execute("SELECT id, db_name FROM users WHERE db_path IS NULL OR db_path = ''").fetchall()
         for r in rows_without_path:
@@ -301,6 +308,19 @@ def count_recent_reset_requests(user_id: int, hours: int = 24) -> int:
     finally:
         conn.close()
 
+def _huella_codigo(user_id: int, codigo: str) -> str:
+    """El código se guarda con HMAC (clave del servidor + cuenta): una copia de la base no permite restablecer claves."""
+    clave = (os.environ.get("JWT_SECRET_KEY") or "").encode("utf-8")
+    return "h1:" + hmac.new(clave, f"recuperacion:{user_id}:{codigo.strip()}".encode("utf-8"), "sha256").hexdigest()
+
+def marcar_clave_debil(user_id: int, debil: bool) -> None:
+    conn = get_master_conn()
+    try:
+        conn.execute("UPDATE users SET clave_debil = ? WHERE id = ?", (1 if debil else 0, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
 def create_password_reset_code(user_id: int) -> str:
     """Genera y registra un código numérico aleatorio de 6 dígitos con vigencia de 15 minutos."""
     import secrets
@@ -321,7 +341,7 @@ def create_password_reset_code(user_id: int) -> str:
         cursor.execute("UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0", (user_id,))
         cursor.execute(
             "INSERT INTO password_resets (user_id, code, expires_at, used, attempts, created_at) VALUES (?, ?, ?, 0, 0, ?)",
-            (user_id, codigo, expira, ahora_str)
+            (user_id, _huella_codigo(user_id, codigo), expira, ahora_str)
         )
         conn.commit()
         return codigo
@@ -352,7 +372,7 @@ def verify_reset_code(identifier: str, code: str) -> Tuple[Optional[Dict[str, An
         if not user or not row:
             conn.rollback()
             return None, MENSAJE_CODIGO_INVALIDO
-        if hmac.compare_digest(code.strip().encode("utf-8"), row["code"].encode("utf-8")):
+        if hmac.compare_digest(_huella_codigo(user["id"], code).encode("utf-8"), str(row["code"]).encode("utf-8")):
             cursor.execute("UPDATE password_resets SET used = 1 WHERE id = ?", (row["id"],))
             conn.commit()
             return dict(user), None
@@ -370,7 +390,7 @@ def update_user_password(user_id: int, password_hash: str) -> None:
     """Actualiza solo el hash de contraseña de un usuario."""
     conn = get_master_conn()
     try:
-        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+        conn.execute("UPDATE users SET password_hash = ?, clave_debil = 0 WHERE id = ?", (password_hash, user_id))
         conn.commit()
     finally:
         conn.close()
@@ -598,6 +618,7 @@ def update_user(
         if password_hash is not None and password_hash.strip():
             fields.append("password_hash = ?")
             params.append(password_hash.strip())
+            fields.append("clave_debil = 0")   # la nueva ya pasó la regla vigente
 
         if role is not None and role.strip():
             fields.append("role = ?")

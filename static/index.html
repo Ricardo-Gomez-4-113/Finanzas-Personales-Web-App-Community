@@ -23,12 +23,12 @@
     <!-- Tipografías alojadas en este servidor (static/fonts): Hanken Grotesk (interfaz) + Fraunces (cifras), sin peticiones a terceros -->
     <link rel="preload" href="/static/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/static/css/fuentes.css?v=59b7dbc9de">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=59b7dbc9de">
-    <link rel="stylesheet" href="/static/css/layout.css?v=59b7dbc9de">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=59b7dbc9de">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=59b7dbc9de">
-    <link rel="stylesheet" href="/static/css/tema.css?v=59b7dbc9de">
+    <link rel="stylesheet" href="/static/css/fuentes.css?v=5589f595fd">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=5589f595fd">
+    <link rel="stylesheet" href="/static/css/layout.css?v=5589f595fd">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=5589f595fd">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=5589f595fd">
+    <link rel="stylesheet" href="/static/css/tema.css?v=5589f595fd">
     <script src="/static/vendor/chart-4.4.1.umd.js"></script>
 
 </head>
@@ -1484,7 +1484,8 @@
             </div>
             <form id="form-editar-usuario" data-on-submit='[["guardarEdicionUsuario", "$event"]]'>
                 <input type="hidden" id="edit-user-id">
-                
+                <p class="modal-nota hidden" id="edit-user-aviso-clave" role="alert">Tu contraseña es demasiado corta o muy común. Escribe una nueva de 8 caracteres o más para seguir usando la cuenta.</p>
+
                 <div class="form-group">
                     <label for="edit-user-username">Nombre de usuario</label>
                     <input type="text" id="edit-user-username" required minlength="3" maxlength="50" data-on-input='[["actualizarCamposContrasena"]]' placeholder="Nuevo nombre de usuario" autocomplete="off" pattern="^[a-zA-Z0-9_\-]+$">
@@ -2153,7 +2154,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=59b7dbc9de"></script>
+    <script type="module" src="/static/js/main.js?v=5589f595fd"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

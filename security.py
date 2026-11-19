@@ -76,6 +76,37 @@ ACCESS_TOKEN_EXPIRE_HOURS = 8
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 LIMITE_BYTES_CLAVE = 72  # bcrypt no acepta más: los acentos y la ñ ocupan dos bytes
+MINIMO_CLAVE = 8         # caracteres
+
+# Claves que cualquiera prueba primero; se comparan en minúsculas
+CLAVES_COMUNES = frozenset({
+    "12345678", "123456789", "1234567890", "11111111", "00000000", "12341234", "87654321", "123123123",
+    "password", "password1", "password123", "passw0rd", "qwertyui", "qwerty123", "qwertyuiop", "abcd1234", "abc12345",
+    "iloveyou", "admin123", "admin1234", "administrador", "contraseña", "contrasena", "contraseña1", "contrasena1",
+    "contraseña123", "contrasena123", "finanzas", "finanzas1", "finanzas123", "finanzascloud", "letmein1", "welcome1",
+})
+
+
+def motivo_clave_debil(clave: Optional[str]) -> Optional[str]:
+    """Por qué una contraseña no se acepta para guardar, o None si sirve. Una sola regla para el alta, el perfil, la
+    recuperación, el administrador y la clave inicial; el login la usa para exigir el cambio de las que ya existían."""
+    if clave is None or len(clave) < MINIMO_CLAVE:
+        return f"La contraseña debe tener al menos {MINIMO_CLAVE} caracteres."
+    if len(clave.encode("utf-8")) > LIMITE_BYTES_CLAVE:
+        return "La contraseña es demasiado larga: los acentos y la ñ cuentan doble; usa una más corta."
+    if not clave.strip():
+        return "La contraseña no puede ser solo espacios."
+    if clave.strip().lower() in CLAVES_COMUNES or len(set(clave)) == 1:
+        return "Esa contraseña es de las más usadas; elige otra."
+    return None
+
+
+def clave_aceptable(clave: Optional[str]) -> Optional[str]:
+    """Validador de Pydantic para contraseñas nuevas (ver `motivo_clave_debil`)."""
+    motivo = motivo_clave_debil(clave) if clave is not None else None
+    if motivo:
+        raise ValueError(motivo)
+    return clave
 
 
 def clave_cabe_en_bcrypt(clave: Optional[str]) -> Optional[str]:
@@ -154,6 +185,16 @@ def hash_senuelo() -> str:
         HASH_SENUELO = hash_password("senuelo-sin-uso-real")
     return HASH_SENUELO
 
+def _sirve_con_clave_debil(request: Request, user_id: int) -> bool:
+    """Con una contraseña débil solo se puede ver la propia sesión y cambiar la propia contraseña (falla cerrado)."""
+    ruta = getattr(request.scope.get("route"), "path", None)
+    metodo = request.method.upper()
+    if (metodo, ruta) in {("GET", "/auth/me"), ("PATCH", "/auth/profile")}:
+        return True
+    # El administrador edita su propio perfil por la ruta de administración; nunca la de otra persona
+    return metodo == "PATCH" and ruta == "/admin/users/{user_id}" and str(request.path_params.get("user_id")) == str(user_id)
+
+
 def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> Dict[str, Any]:
     """
     Dependencia de seguridad que autentica al usuario:
@@ -211,6 +252,9 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
     if uso is not None and not user.get("asistente_activo", 1):   # apagar el asistente mata también los tokens que ya se emitieron
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
 
+    if user.get("clave_debil") and not _sirve_con_clave_debil(request, user_id_int):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tu contraseña es demasiado corta o muy común. Cámbiala para continuar.")
+
     sub_status = user.get("subscription_status", "active")
     if sub_status in ("suspended", "cancelled"):
         raise HTTPException(
@@ -227,7 +271,8 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
         "db_path": user.get("db_path", ""),
         "email": user.get("email"),
         "is_active": user["is_active"],
-        "subscription_status": sub_status
+        "subscription_status": sub_status,
+        "debe_cambiar_clave": bool(user.get("clave_debil")),
     }
 
 def verify_admin(current_user: Dict[str, Any] = Depends(verify_token)) -> Dict[str, Any]:

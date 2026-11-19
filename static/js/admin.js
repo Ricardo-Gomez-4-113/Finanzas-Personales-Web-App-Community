@@ -228,6 +228,8 @@ export function abrirModalEditarUsuario(id, username, role, email) {
     // Editar la propia cuenta se presenta como "Mi perfil"; editar a otra persona (admin) conserva el nombre en el título
     const esPropio = !!(estado.usuarioActual && estado.usuarioActual.id === id);
     modal.dataset.propio = esPropio ? '1' : '0';
+    modal.dataset.forzado = '0';
+    document.getElementById('edit-user-aviso-clave')?.classList.add('hidden');
     modal.dataset.rolOriginal = role || 'user';
     modal.dataset.usuarioOriginal = username || '';
     modal.dataset.correoOriginal = (email || '').trim().toLowerCase();
@@ -290,6 +292,11 @@ export function abrirModalEditarUsuario(id, username, role, email) {
 export function abrirModalEditarMiPerfil() {
     if (!estado.usuarioActual) return;
     abrirModalEditarUsuario(estado.usuarioActual.id, estado.usuarioActual.username, estado.usuarioActual.role, estado.usuarioActual.email);
+    if (estado.usuarioActual.debe_cambiar_clave) {   // contraseña que ya no cumple la regla: no se sigue sin cambiarla
+        document.getElementById('modal-editar-usuario').dataset.forzado = '1';
+        document.getElementById('edit-user-aviso-clave')?.classList.remove('hidden');
+        setTimeout(() => document.getElementById('edit-user-password')?.focus(), 80);
+    }
 }
 
 
@@ -298,9 +305,15 @@ export function abrirModalEditarMiPerfil() {
  */
 export function cerrarModalEditarUsuario() {
     const modal = document.getElementById('modal-editar-usuario');
-    if (modal) modal.classList.add('hidden');
+    const forzado = modal?.dataset.forzado === '1';
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.dataset.forzado = '0';
+    }
     const form = document.getElementById('form-editar-usuario');
     if (form) form.reset();
+    // Cerrar el cuadro sin cambiar la contraseña débil es no entrar
+    if (forzado) document.dispatchEvent(new CustomEvent('clave-pendiente-cancelada'));
 }
 
 
@@ -328,6 +341,10 @@ export async function guardarEdicionUsuario(e) {
     const cambiaClave = !!(password && password.trim().length > 0);
     const cambiaRol = !!(roleSelect && !roleSelect.disabled && role && role !== modalEditar?.dataset.rolOriginal);
     const cambiaIdentidad = cambiaIdentidadEnModal(modalEditar);
+    if (modalEditar?.dataset.forzado === '1' && !cambiaClave) {
+        toast("Escribe una contraseña nueva de 8 caracteres o más para continuar.", 'error');
+        return;
+    }
     if (cambiaClave && password.length < 8) {
         toast("La nueva contraseña debe tener al menos 8 caracteres.", 'error');
         return;
@@ -361,6 +378,8 @@ export async function guardarEdicionUsuario(e) {
 
         if (res.ok) {
             const data = await res.json();
+            const eraForzado = modalEditar?.dataset.forzado === '1';
+            if (modalEditar) modalEditar.dataset.forzado = '0';   // ya cambió la contraseña: cerrar el cuadro no es rechazarla
             cerrarModalEditarUsuario();
             
             // Si el usuario editado es el usuario en sesión activa, actualizar token y UI
@@ -381,6 +400,7 @@ export async function guardarEdicionUsuario(e) {
                 await cargarDatosAdmin();
             }
             toast(data.mensaje || "Usuario actualizado exitosamente.", 'ok');
+            if (eraForzado) document.dispatchEvent(new CustomEvent('clave-cambiada'));
         } else {
             const err = await res.json().catch(() => ({}));
             toast(formatErrorDetail(err.detail, "Error al actualizar el usuario."), 'error');

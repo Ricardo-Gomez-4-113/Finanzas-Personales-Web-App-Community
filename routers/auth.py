@@ -18,7 +18,8 @@ from security import (
     limpiar_fallos_login,
     obtener_ip_cliente,
     hash_password,
-    clave_cabe_en_bcrypt,
+    clave_aceptable,
+    motivo_clave_debil,
     verify_password,
     create_access_token,
     verify_token
@@ -29,8 +30,8 @@ from finanzas_core import ahora_local
 # otra persona y la recuperación por nombre encontraría su cuenta en vez de la de ella
 PATRON_CORREO = r"^(|[^@\s]+@[^@\s]+\.[^@\s]+)$"
 
-# Contraseña que se va a guardar: además de max_length, cabe en los 72 bytes de bcrypt
-ClaveNueva = Annotated[str, AfterValidator(clave_cabe_en_bcrypt)]
+# Contraseña que se va a guardar: 8 o más caracteres, cabe en los 72 bytes de bcrypt y no es de las más usadas
+ClaveNueva = Annotated[str, AfterValidator(clave_aceptable)]
 
 router = APIRouter()
 
@@ -148,6 +149,11 @@ def login(credentials: LoginRequest, request: Request):
             detail="Tu cuenta ha sido desactivada por el administrador."
         )
         
+    # La contraseña llega en claro solo aquí: si no cumple la regla actual, la sesión solo puede cambiarla
+    debil = motivo_clave_debil(credentials.password) is not None
+    if debil != bool(user.get("clave_debil")):
+        master_db.marcar_clave_debil(user["id"], debil)
+
     # Actualizar métricas de auditoría
     timestamp_hoy = ahora_local().strftime("%Y-%m-%d %H:%M:%S")
     master_db.update_login_activity(user["id"], timestamp_hoy)
@@ -163,7 +169,8 @@ def login(credentials: LoginRequest, request: Request):
             "username": user["username"],
             "role": user["role"],
             "db_name": user["db_name"],
-            "email": user.get("email")
+            "email": user.get("email"),
+            "debe_cambiar_clave": debil
         }
     }
 
