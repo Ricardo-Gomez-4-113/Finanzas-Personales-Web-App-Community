@@ -20,6 +20,7 @@ Comprobar la configuración sin gastar casi nada: `python3 -m asistente.modelo_o
 import base64
 import json
 import os
+import re
 import sys
 import time
 
@@ -29,9 +30,11 @@ from asistente.motor import Respuesta
 URL_POR_DEFECTO = "https://openrouter.ai/api/v1"
 MODELO_TEXTO = "anthropic/claude-haiku-5.5"
 MODELO_MULTIMEDIA = "google/gemini-3.8-flash"
-SEGUNDOS_POR_DEFECTO = 45          # el turno del motor corta a los 60 s: un modelo lento no debe agotarlo solo
+SEGUNDOS_POR_DEFECTO = 30          # el turno del motor corta a los 60 s: un modelo lento no debe agotarlo solo
+PRESUPUESTO_REINTENTO = 12         # solo se reintenta si el primer intento falló rápido: una llamada + pausa + reintento no pasa de ~45 s
 REINTENTAR = (429, 502, 503, 504)  # una sola vez, tras una pausa corta: suelen ser picos de demanda o límites por minuto
 PAUSA_REINTENTO = 1.5
+_ID_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")   # lo que aceptan Anthropic y Google en el id de una llamada
 FORMATO_AUDIO = {"audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/flac": "flac"}
 # Qué le decimos a quien administra cuando OpenRouter rechaza la llamada (nunca el cuerpo de la respuesta: podría traer datos)
 PISTAS = {
@@ -55,15 +58,28 @@ class ErrorDeOpenRouter(Exception):
         self.estado = estado
 
 
-def leer_clave(ruta_env=".env"):
+def limpiar_valor(valor):
+    """El valor de una línea de .env: sin comentario al final (`... # solo texto`), sin comillas ni espacios."""
+    valor = (valor or "").strip()
+    if valor[:1] in ('"', "'"):
+        cierre = valor.find(valor[0], 1)
+        return valor[1:cierre] if cierre > 0 else valor[1:]
+    return re.split(r"\s+#", valor, maxsplit=1)[0].strip()
+
+
+def leer_clave(ruta_env=".env", entorno=None):
     """OPENROUTER_API_KEY del entorno o, si no está, de un archivo .env (con o sin comillas)."""
-    clave = os.environ.get("OPENROUTER_API_KEY", "")
+    entorno = os.environ if entorno is None else entorno
+    clave = limpiar_valor(entorno.get("OPENROUTER_API_KEY", ""))
     if not clave and os.path.exists(ruta_env):
         with open(ruta_env, encoding="utf-8") as archivo:
             for linea in archivo:
+                linea = linea.strip()
+                if linea.startswith("export "):
+                    linea = linea[len("export "):].lstrip()
                 if linea.startswith("OPENROUTER_API_KEY="):
-                    clave = linea.split("=", 1)[1]
-    return clave.strip().strip('"').strip("'").strip()
+                    clave = limpiar_valor(linea.split("=", 1)[1])
+    return clave
 
 
 def normalizar_url(url):
@@ -83,8 +99,9 @@ def _segundos():
     return valor if valor > 0 else SEGUNDOS_POR_DEFECTO
 
 
-def _privacidad():
-    valor = os.environ.get("OPENROUTER_DATA_COLLECTION", "").strip().lower() or "deny"
+def _privacidad(entorno=None):
+    entorno = os.environ if entorno is None else entorno
+    valor = (entorno.get("OPENROUTER_DATA_COLLECTION") or "").strip().lower() or "deny"
     if valor not in ("deny", "allow"):
         raise ValueError("OPENROUTER_DATA_COLLECTION debe ser deny o allow")
     return valor
@@ -108,18 +125,27 @@ class ModeloOpenRouter:
     def _mensajes(self, instrucciones, mensajes):
         salida = [{"role": "system", "content": instrucciones}]
         contador = 0
+        usados = set()
         pendientes = []   # ids de las llamadas de la última ronda del modelo, en orden: cada resultado vuelve con el suyo
 
-        def nuevo_id():
+        def nuevo_id(preferido=None):
+            """El id que dio OpenRouter si es válido y no se repite (las firmas de razonamiento de Gemini se ligan a él); si no, uno nuestro."""
             nonlocal contador
-            contador += 1
-            return f"call_{contador}"
+            if isinstance(preferido, str) and _ID_VALIDO.match(preferido) and preferido not in usados:
+                usados.add(preferido)
+                return preferido
+            while True:
+                contador += 1
+                candidato = f"call_{contador}"
+                if candidato not in usados:
+                    usados.add(candidato)
+                    return candidato
 
         for m in mensajes:
             if m["rol"] == "usuario":
                 adjuntos = m.get("adjuntos") or []
                 if not adjuntos:
-                    salida.append({"role": "user", "content": m["texto"] or ""})
+                    salida.append({"role": "user", "content": m["texto"] or "(sin texto)"})   # Anthropic rechaza un bloque de texto vacío
                     continue
                 partes = [{"type": "text", "text": m["texto"] or "(sin texto)"}]
                 for a in adjuntos:
@@ -146,7 +172,7 @@ class ModeloOpenRouter:
                 mensaje = {"role": "assistant", "content": m.get("texto") or None}
                 llamadas = m.get("llamadas") or []
                 if llamadas:
-                    pendientes = [nuevo_id() for _ in llamadas]
+                    pendientes = [nuevo_id(c.get("id")) for c in llamadas]
                     mensaje["tool_calls"] = [
                         {"id": i, "type": "function", "function": {"name": c["nombre"], "arguments": json.dumps(c.get("args") or {}, ensure_ascii=False)}}
                         for i, c in zip(pendientes, llamadas)]
@@ -165,7 +191,9 @@ class ModeloOpenRouter:
 
     def _pedir(self, cuerpo):
         cabeceras = {"Authorization": f"Bearer {self._clave}", "Content-Type": "application/json"}
+        inicio = time.monotonic()
         for intento in range(2):
+            queda_tiempo = time.monotonic() - inicio < PRESUPUESTO_REINTENTO
             try:
                 r = self._cliente.post(f"{self._base}/chat/completions", json=cuerpo, headers=cabeceras)
             except Exception as error:   # red, tiempo agotado: el texto original podría traer la URL, no se propaga
@@ -179,12 +207,12 @@ class ModeloOpenRouter:
                 if isinstance(datos, dict) and isinstance(datos.get("error"), dict) and not datos.get("choices"):
                     codigo = datos["error"].get("code")
                     codigo = codigo if isinstance(codigo, int) else None
-                    if intento == 0 and codigo in REINTENTAR:
+                    if intento == 0 and codigo in REINTENTAR and queda_tiempo:
                         time.sleep(PAUSA_REINTENTO)
                         continue
                     raise ErrorDeOpenRouter(f"OpenRouter devolvió un error ({codigo}): {PISTAS.get(codigo, 'sin detalle')}", codigo)
                 return datos
-            if intento == 0 and r.status_code in REINTENTAR:
+            if intento == 0 and r.status_code in REINTENTAR and queda_tiempo:
                 time.sleep(PAUSA_REINTENTO)
                 continue
             raise ErrorDeOpenRouter(f"OpenRouter respondió {r.status_code}: {PISTAS.get(r.status_code, 'error del servicio')}", r.status_code)
@@ -200,8 +228,8 @@ class ModeloOpenRouter:
         if declaraciones:   # una lista de herramientas vacía la rechazan algunos proveedores
             cuerpo["tools"] = [{"type": "function", "function": {"name": d["nombre"], "description": d["descripcion"], "parameters": d["parametros"]}}
                                for d in declaraciones]
-        if self._privacidad == "deny":
-            cuerpo["provider"] = {"data_collection": "deny"}
+        # Solo proveedores que cumplan lo que se pide (herramientas, archivos): uno que las ignorara contestaría sin consultar nada
+        cuerpo["provider"] = {"require_parameters": True, **({"data_collection": "deny"} if self._privacidad == "deny" else {})}
         datos = self._pedir(cuerpo)
         try:
             mensaje = datos["choices"][0]["message"]
@@ -222,6 +250,8 @@ class ModeloOpenRouter:
                 except ValueError:
                     args = {}
             llamada = {"nombre": funcion["name"], "args": args if isinstance(args, dict) else {}}
+            if isinstance(c.get("id"), str):
+                llamada["id"] = c["id"]
             if razonamiento:
                 llamada["razonamiento"] = razonamiento
             llamadas.append(llamada)
@@ -260,10 +290,11 @@ def crear(entorno=None, cliente=None):
     # Vacío a propósito = sin modelo multimedia; no definida = el de por defecto
     crudo = entorno.get("OPENROUTER_MODEL_MULTIMEDIA")
     multimedia = MODELO_MULTIMEDIA if crudo is None else crudo.strip()
-    principal = ModeloOpenRouter(texto, cliente=cliente)
+    ajustes = dict(clave=leer_clave(entorno=entorno), url=entorno.get("OPENROUTER_URL"), privacidad=_privacidad(entorno), cliente=cliente)
+    principal = ModeloOpenRouter(texto, **ajustes)
     if not multimedia or multimedia == texto:
         return principal
-    return ModeloPorContenido(principal, ModeloOpenRouter(multimedia, cliente=cliente))
+    return ModeloPorContenido(principal, ModeloOpenRouter(multimedia, **ajustes))
 
 
 def _comprobar():

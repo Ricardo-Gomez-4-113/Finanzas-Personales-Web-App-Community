@@ -134,7 +134,8 @@ def _cargar_env_del_asistente(ruta=".env"):
         for linea in archivo:
             nombre, _, valor = linea.strip().partition("=")
             if nombre.startswith(("OLLAMA_", "OPENROUTER_", "ASISTENTE_MODELO")) and nombre not in os.environ:
-                os.environ[nombre] = valor.strip().strip('"').strip("'")
+                from asistente.modelo_openrouter import limpiar_valor
+                os.environ[nombre] = limpiar_valor(valor)
 
 
 def main():

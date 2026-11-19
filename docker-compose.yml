@@ -59,8 +59,8 @@ services:
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       # OpenRouter: una clave, dos modelos (texto barato; fotos y audios con uno que los lea). Ver .env.example
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
-      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-haiku-5.5}
+      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-google/gemini-3.8-flash}   # no definida = este; definida y vacía = sin modelo multimedia
       OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-}
       OPENROUTER_TIMEOUT: ${OPENROUTER_TIMEOUT:-}
       OPENROUTER_URL: ${OPENROUTER_URL:-}
@@ -113,8 +113,8 @@ services:
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
       # OpenRouter: una clave, dos modelos (texto barato; fotos y audios con uno que los lea). Ver .env.example
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
-      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-haiku-5.5}
+      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-google/gemini-3.8-flash}   # no definida = este; definida y vacía = sin modelo multimedia
       OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-}
       OPENROUTER_TIMEOUT: ${OPENROUTER_TIMEOUT:-}
       OPENROUTER_URL: ${OPENROUTER_URL:-}

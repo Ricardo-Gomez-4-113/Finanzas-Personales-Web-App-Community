@@ -380,14 +380,14 @@ def test_openrouter_manda_modelo_herramientas_clave_y_privacidad_y_lee_texto_y_t
         assert p["cabeceras"]["authorization"] == "Bearer sk-or-v1-clave-de-prueba", "la clave se usa sin las comillas del .env"
         assert not any(c in p["cabeceras"] for c in ("http-referer", "x-title")), "no se manda ninguna cabecera que identifique la app"
         c = p["cuerpo"]
-        assert c["model"] == "anthropic/claude-haiku-5.5" and c["provider"] == {"data_collection": "deny"} and c["stream"] is False
+        assert c["model"] == "anthropic/claude-haiku-5.5" and c["provider"] == {"require_parameters": True, "data_collection": "deny"} and c["stream"] is False
         assert c["messages"] == [{"role": "system", "content": "INSTRUCCIONES"}, {"role": "user", "content": "¿cuánto tengo?"}]
         assert [t["function"]["name"] for t in c["tools"]] == ["resumen", "categorias"] and c["tools"][0]["type"] == "function"
         # Con OPENROUTER_DATA_COLLECTION=allow se quita la restricción de proveedores
         os.environ["OPENROUTER_DATA_COLLECTION"] = "allow"
         falso2 = OpenRouterFalso([])
         ModeloOpenRouter("anthropic/claude-haiku-5.5", cliente=falso2.cliente).generar("i", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
-        assert "provider" not in falso2.peticiones[0]["cuerpo"]
+        assert falso2.peticiones[0]["cuerpo"]["provider"] == {"require_parameters": True}, "con allow se quita solo la restricción de datos"
         os.environ["OPENROUTER_DATA_COLLECTION"] = "quizá"
         try:
             ModeloOpenRouter("m", cliente=falso2.cliente)
@@ -409,7 +409,7 @@ def test_las_llamadas_a_herramientas_y_sus_resultados_van_con_el_mismo_id_y_el_r
                                  (200, _or_texto("Tienes Comida y Renta."))])
         modelo = ModeloOpenRouter("google/gemini-3.8-flash", cliente=falso.cliente)
         r1 = modelo.generar("I", [{"rol": "usuario", "texto": "¿qué categorías?"}], DECLARACIONES)
-        assert r1.llamadas == [{"nombre": "categorias", "args": {"tipo": "gasto"}, "razonamiento": [{"type": "reasoning.encrypted", "data": "abc"}]}], r1
+        assert r1.llamadas == [{"nombre": "categorias", "args": {"tipo": "gasto"}, "id": "x1", "razonamiento": [{"type": "reasoning.encrypted", "data": "abc"}]}], r1
         trabajo = [{"rol": "usuario", "texto": "¿qué categorías?"}, {"rol": "modelo", "texto": "", "llamadas": r1.llamadas},
                    {"rol": "herramienta", "resultados": [{"nombre": "categorias", "resultado": {"categorias": ["Comida", "Renta"]}}]}]
         r2 = modelo.generar("I", trabajo, DECLARACIONES)
@@ -419,7 +419,8 @@ def test_las_llamadas_a_herramientas_y_sus_resultados_van_con_el_mismo_id_y_el_r
         assert asistente["role"] == "assistant" and asistente["content"] is None and asistente["reasoning_details"] == [{"type": "reasoning.encrypted", "data": "abc"}]
         llamada = asistente["tool_calls"][0]
         assert llamada["type"] == "function" and llamada["function"] == {"name": "categorias", "arguments": json.dumps({"tipo": "gasto"})}
-        assert m[3] == {"role": "tool", "tool_call_id": llamada["id"], "content": json.dumps({"categorias": ["Comida", "Renta"]})}
+        assert llamada["id"] == "x1", "el id que dio OpenRouter se conserva (las firmas de razonamiento de Gemini se ligan a él)"
+        assert m[3] == {"role": "tool", "tool_call_id": "x1", "content": json.dumps({"categorias": ["Comida", "Renta"]})}
         # Varias llamadas en una ronda: cada resultado vuelve con el id de SU llamada, en orden
         falso = OpenRouterFalso([])
         trabajo = [{"rol": "usuario", "texto": "x"},
@@ -441,7 +442,22 @@ def test_las_llamadas_a_herramientas_y_sus_resultados_van_con_el_mismo_id_y_el_r
         falso = OpenRouterFalso([(200, {"choices": [{"message": {"content": "", "tool_calls": [
             {"id": "a", "type": "function", "function": {"name": "resumen", "arguments": "{no es json"}}, {"id": "b", "type": "function", "function": {}}, "basura"]}}]})])
         r = ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
-        assert r.llamadas == [{"nombre": "resumen", "args": {}}] and r.tokens >= 1
+        assert r.llamadas == [{"nombre": "resumen", "args": {}, "id": "a"}] and r.tokens >= 1
+        # Un id que el proveedor mande inválido o repetido se reemplaza por uno propio, sin repetir
+        falso = OpenRouterFalso([])
+        trabajo = [{"rol": "usuario", "texto": "x"},
+                   {"rol": "modelo", "texto": "", "llamadas": [{"nombre": "resumen", "args": {}, "id": "dup"}, {"nombre": "categorias", "args": {}, "id": "dup"},
+                                                              {"nombre": "resumen", "args": {}, "id": "con espacios/raros"}]},
+                   {"rol": "herramienta", "resultados": [{"nombre": "resumen", "resultado": 1}, {"nombre": "categorias", "resultado": 2}, {"nombre": "resumen", "resultado": 3}]}]
+        ModeloOpenRouter("m", cliente=falso.cliente).generar("I", trabajo, DECLARACIONES)
+        m = falso.peticiones[0]["cuerpo"]["messages"]
+        ids = [c["id"] for c in m[2]["tool_calls"]]
+        assert ids[0] == "dup" and len(set(ids)) == 3 and all(i.replace("_", "").replace("-", "").isalnum() for i in ids), ids
+        assert [x["tool_call_id"] for x in m[3:6]] == ids
+        # Un mensaje de la persona vacío no va como bloque de texto vacío (Anthropic lo rechaza)
+        falso = OpenRouterFalso([])
+        ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": ""}], DECLARACIONES)
+        assert falso.peticiones[0]["cuerpo"]["messages"][1]["content"] == "(sin texto)"
     _con_clave(prueba)
 
 
@@ -512,6 +528,14 @@ def test_los_errores_de_openrouter_dicen_que_hacer_sin_filtrar_la_clave_ni_el_cu
             ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
         except ErrorDeOpenRouter as e:
             assert e.estado == 503 and len(falso.peticiones) == 2, "solo un reintento"
+        # Si el primer intento ya gastó el presupuesto de tiempo, no se reintenta: el turno del motor corta a los 60 s
+        orr.PRESUPUESTO_REINTENTO = 0
+        falso = OpenRouterFalso([(503, {}), (200, _or_texto("tarde"))])
+        try:
+            ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        except ErrorDeOpenRouter as e:
+            assert e.estado == 503 and len(falso.peticiones) == 1, "sin presupuesto no hay reintento"
+        orr.PRESUPUESTO_REINTENTO = 12
         # Un 200 con un error dentro (el proveedor falló a mitad) también es un error; con 5xx dentro se reintenta
         falso = OpenRouterFalso([(200, {"error": {"code": 502, "message": "x"}}), (200, _or_texto("bien"))])
         assert ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES).texto == "bien"
@@ -553,25 +577,35 @@ def test_la_configuracion_de_openrouter_falla_al_arrancar_si_falta_la_clave_o_la
         assert orr.normalizar_url("https://openrouter.ai/api/v1/chat/completions/") == "https://openrouter.ai/api/v1"
         assert orr.normalizar_url("") == "https://openrouter.ai/api/v1"
         # La fábrica lo elige por entorno y admite combinarlo con otro proveedor de respaldo (pero no consigo mismo)
-        modelo = crear_modelo({"ASISTENTE_MODELO": "openrouter"})
+        base = {"ASISTENTE_MODELO": "openrouter", "OPENROUTER_API_KEY": "sk-or-v1-x"}
+        modelo = crear_modelo(base)
         assert isinstance(modelo, ModeloPorContenido)
-        con_respaldo = crear_modelo({"ASISTENTE_MODELO": "openrouter", "ASISTENTE_MODELO_RESPALDO": "ollama", "OLLAMA_URL": "http://localhost:11434"})
+        # La fábrica usa el entorno que recibe, no solo el del proceso: la clave, los modelos y la privacidad salen de ahí
+        os.environ.pop("OPENROUTER_API_KEY")
+        otro = crear_modelo({**base, "OPENROUTER_API_KEY": "sk-or-v1-otra", "OPENROUTER_MODEL": "a/b", "OPENROUTER_MODEL_MULTIMEDIA": "c/d", "OPENROUTER_DATA_COLLECTION": "allow"})
+        assert (otro.texto.modelo, otro.multimedia.modelo, otro.texto._clave, otro.texto._privacidad) == ("a/b", "c/d", "sk-or-v1-otra", "allow"), vars(otro.texto)
+        os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-x"
+        con_respaldo = crear_modelo({**base, "ASISTENTE_MODELO_RESPALDO": "ollama", "OLLAMA_URL": "http://localhost:11434"})
         assert isinstance(con_respaldo, ModeloConRespaldo) and isinstance(con_respaldo.principal, ModeloPorContenido)
         try:
-            crear_modelo({"ASISTENTE_MODELO": "openrouter", "ASISTENTE_MODELO_RESPALDO": "openrouter"})
+            crear_modelo({**base, "ASISTENTE_MODELO_RESPALDO": "openrouter"})
         except ValueError:
             pass
         else:
             raise AssertionError("el respaldo no puede ser el mismo proveedor")
-        # La clave puede venir de un .env (con comillas)
+        # La clave puede venir de un .env: con comillas, con `export`, con un comentario al final
         os.environ.pop("OPENROUTER_API_KEY")
-        with open(".env", "w", encoding="utf-8") as f:
-            f.write('OTRA=1\nOPENROUTER_API_KEY="sk-or-v1-del-env"\n')
-        try:
-            assert orr.leer_clave() == "sk-or-v1-del-env"
-        finally:
-            os.remove(".env")
-            os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-x"
+        for linea, esperada in (('OPENROUTER_API_KEY="sk-or-v1-del-env"', "sk-or-v1-del-env"), ("export OPENROUTER_API_KEY=sk-or-v1-b # mi clave", "sk-or-v1-b"),
+                                ("OPENROUTER_API_KEY='sk-or-v1-c'  # con comentario", "sk-or-v1-c"), ("OPENROUTER_API_KEY=", "")):
+            with open(".env", "w", encoding="utf-8") as f:
+                f.write("OTRA=1\n" + linea + "\n")
+            try:
+                assert orr.leer_clave() == esperada, (linea, orr.leer_clave())
+            finally:
+                os.remove(".env")
+        assert orr.limpiar_valor("anthropic/claude-haiku-5.5   # solo texto (no lee audio)") == "anthropic/claude-haiku-5.5"
+        assert orr.limpiar_valor('"valor con # adentro"') == "valor con # adentro" and orr.limpiar_valor("a#b") == "a#b"
+        os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-x"
     _con_clave(prueba)
 
 
@@ -589,6 +623,18 @@ def test_el_motor_resuelve_un_turno_completo_con_openrouter_y_una_foto_la_contes
         turno = motor.responder([], "¿qué es esto?", adjuntos=[{"mime": "image/jpeg", "datos": b"\xff\xd8\xffjpg"}])
         assert [p["cuerpo"]["model"] for p in falso.peticiones] == ["google/gemini-3.8-flash"] * 2, "las dos rondas del turno con foto van al multimedia"
     _con_clave(prueba)
+
+
+
+def test_el_compose_trae_los_mismos_modelos_por_defecto_que_el_codigo_y_una_variable_no_definida_no_apaga_el_multimedia():
+    """Docker Compose entrega al contenedor una variable no definida como cadena vacía: si el compose no lleva el valor por defecto,
+    `crear()` cree que el multimedia se desactivó a propósito y un audio iría al modelo de texto (que no lo lee)."""
+    import re as _re
+    compose = open(os.path.join(RAIZ, "docker-compose.yml"), encoding="utf-8").read()
+    multimedia = _re.findall(r"OPENROUTER_MODEL_MULTIMEDIA: \$\{OPENROUTER_MODEL_MULTIMEDIA-([^}]*)\}", compose)
+    texto = _re.findall(r"OPENROUTER_MODEL: \$\{OPENROUTER_MODEL:-([^}]*)\}", compose)
+    assert multimedia == [orr.MODELO_MULTIMEDIA] * 2, multimedia   # bot y servicio web
+    assert texto == [orr.MODELO_TEXTO] * 2, texto
 
 
 class _HerramientasDePrueba:
