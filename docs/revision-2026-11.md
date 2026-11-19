@@ -166,4 +166,16 @@ Hecho (Community primero, luego SaaS; cada uno con su prueba, que falla con el c
 
 | B10, B11, B13 | Depositar a una meta valida también las fechas posteriores (un gasto ya registrado para la semana próxima no queda sin fondos); el saldo de la meta y sus movimientos se calculan en centavos enteros (con 0.015 se desfasaban); un fijo ligado a una tarjeta del presupuesto inexistente da 422 en vez de 500. |
 
-Pendiente: B12, B14–B17, F3, F10–F12 y F14–F26, A2–A15, G1–G3 (repetir la prueba con Gemini otro día), V1–V8, actualizar el oráculo de Admin del arnés (R1) y las observaciones de la revisión de código (rechazos nuevos sin código estable para `observabilidad`; los cargadores de movimientos, metas, inversiones y fijos sin contador de generación).
+## J. Lo que sigue abierto (18 nov 2026), con su confianza
+
+**Dinero y datos (todos de gravedad baja):** B12 (renombrar un fijo revalida la capacidad completa), B14 (saltar un cobro vencido sin materializar pierde ciclos, sin confirmar), B15 (carrera de dos gastos simultáneos, sin confirmar), B16 (el «disponible» incluye movimientos futuros, ¿intencional?, sin confirmar), B17 (montos extremos desbordan, sin confirmar). Resto de B13: un fijo manual ligado a una tarjeta pasa a ser «del presupuesto».
+
+**Pantallas, media:** F3 (al cerrar sesión no se limpia la caché de la cuenta anterior, sin confirmar), F10 (avisos de éxito sin estilo, confirmado), F11 (doble clic al guardar una edición, sin confirmar), F12 (el sondeo de Telegram sigue con la sesión vencida, sin confirmar). **Baja:** F14–F25 y V5–V8 (V5 y V6 confirmados: contrastes bajo AA y áreas táctiles de 32–36 px; V7 sin confirmar; V8 informativo).
+
+**Asistente, media:** A2–A9; **baja:** A10–A15. Casi todos reportados por lectura de código, no ejecutados. G1 (Gemini falló ~55 % de las llamadas, causa sin determinar) y G3 (defensa contra inyección sin probar con el modelo real).
+
+**Casos del arnés sin confirmar:** R4 (crear una posición con ticker repetido no muestra mensaje), R5 (en celular un gasto fijo sin ingreso fijo se rechaza sin mensaje visible; reproduce 1/1), R6 (editar una posición no queda guardada tal cual).
+
+**Mantenimiento:** actualizar el oráculo de Admin del arnés (R1, 425 falsos positivos); T2–T8 (huecos de pruebas); rechazos nuevos sin código estable para `observabilidad`; cargadores de movimientos, metas, inversiones y fijos sin contador de generación; `CLAUDE.md` cita `~/bin/portar-a-saas.sh` (ahora es `~/Proyecto-finanzas/portar-a-saas.sh`) y dice que `mensualizar` y `_ingreso_principal` se quitaron (siguen usándose).
+
+**Decisión tuya pendiente:** el servicio `finanzas-asistente` y el bot no corren en ninguno de los dos entornos, y a Community le falta `ASISTENTE_WEB_SECRETO` en el `.env`.
