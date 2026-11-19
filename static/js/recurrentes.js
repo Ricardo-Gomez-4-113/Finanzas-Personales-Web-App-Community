@@ -547,6 +547,13 @@ export async function guardarEdicionRecurrente(e) {
 let periodosKpi = [];
 let inicioKpiSeleccionado = null;
 let fijosPorPeriodo = { periodos: [], pausados: [] };
+// Al cerrar sesión no queda nada de la cuenta anterior en la memoria de este módulo
+document.addEventListener('sesion-cerrada', () => {
+    periodosKpi = [];
+    inicioKpiSeleccionado = null;
+    fijosPorPeriodo = { periodos: [], pausados: [] };
+    recurrenteSeleccionadoParaSaltar = null;
+});
 
 function pintarCintaMovimientos(periodos) {
     const indiceEnCurso = periodos.findIndex(p => p.en_curso);

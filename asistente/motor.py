@@ -52,6 +52,9 @@ MENSAJE_SIN_CONSULTA = "No pude consultar tus datos ahora, intenta de nuevo."
 MENSAJE_SIN_PROPUESTA = "No pude preparar esa operación. Intenta de nuevo con más detalle."
 # El modelo dice que preparó algo que no preparó: sin una propuesta real no hay nada que confirmar y la persona se confundiría
 _AFIRMA_PROPUESTA = re.compile(r"he preparado|dejé preparad|prepar[eé] (el|la|tu|un)|se (ha )?prepar|ha quedado pendiente|quedó pendiente|queda pendiente|pendiente de confirmaci|confirma aquí mismo", re.I)
+# Lo mismo en pretérito, como si ya lo hubiera hecho («Listo, ya registré tu gasto»): el asistente nunca escribe por su cuenta, solo propone
+_AFIRMA_ESCRITURA = re.compile(r"\b(registr|anot|apunt|guard|agreg|a[ñn]ad|deposit|retir)é\b|\bhe (registrado|anotado|apuntado|guardado|agregado|añadido|depositado|retirado)\b|"
+                               r"\bse (ha )?(registr|guard|anot|agreg|aplic)(ó|ado)\b|\b(ya )?(qued[óo]|est[áa]|queda) (registrad|guardad|anotad|agregad|aplicad|hech)", re.I)
 # Un modelo pequeño a veces cuenta que va a llamar a una herramienta (o que «hubo un error») en vez de llamarla: es una respuesta sin consulta
 _NARRA_HERRAMIENTA = re.compile(r"herramienta|parece que hubo un error|llamando a", re.I)
 _NUMERO = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -124,6 +127,7 @@ class Motor:
         de_la_fecha = {float(hoy.year), float(hoy.month), float(hoy.day)}
         final = "No pude completar la consulta. Intenta de nuevo."
         conocidas = {d["nombre"] for d in self.herramientas.declaraciones()}
+        utiles = []   # consultas que sí devolvieron datos: una herramienta inexistente o con error no respalda ninguna cifra
         inicio = self._reloj()
         for _ in range(self.max_rondas + 1):
             if self._reloj() - inicio > self.max_segundos:
@@ -141,9 +145,9 @@ class Motor:
                 # sacó de la conversación (los datos pueden haber cambiado). Se le obliga a consultar una vez; si insiste, se descarta.
                 # Con un archivo las cifras pueden venir de él (un ticket, un audio): ahí no hay forma de comprobarlas. En su lugar el
                 # código añade un aviso fijo y escribir sigue exigiendo la confirmación de un resumen que arma el código, no el modelo.
-                if adjuntos and not usadas and _numeros(final) - de_la_fecha:
+                if adjuntos and not utiles and _numeros(final) - de_la_fecha:
                     final += "\n\n" + AVISO_CIFRAS_DEL_ARCHIVO
-                if not usadas and not adjuntos and (_numeros(final) - _numeros(texto) - de_la_fecha or _NARRA_HERRAMIENTA.search(final)):
+                if not utiles and not adjuntos and (_numeros(final) - _numeros(texto) - de_la_fecha or _NARRA_HERRAMIENTA.search(final)):
                     if not reintento:
                         reintento = True
                         instrucciones += AVISO_SIN_CONSULTA   # se repite el turno con el refuerzo; la respuesta sin fundamento no se guarda
@@ -161,11 +165,13 @@ class Motor:
                 if llamada["nombre"] in conocidas and isinstance(llamada.get("args"), dict) and len(consultas) < MAX_LLAMADAS_POR_TURNO:
                     consultas.append({"nombre": llamada["nombre"], "args": _args_para_historial(llamada["args"])})
                 resultado = self.herramientas.ejecutar(llamada["nombre"], llamada.get("args"))
+                if llamada["nombre"] in conocidas and not (isinstance(resultado, dict) and "error" in resultado):
+                    utiles.append(llamada["nombre"])
                 if isinstance(resultado, dict) and resultado.get("propuesta_id"):
                     propuestas.append(resultado["propuesta_id"])
                 resultados.append({"nombre": llamada["nombre"], "resultado": resultado})
             trabajo.append({"rol": "herramienta", "resultados": resultados})
-        if not propuestas and _AFIRMA_PROPUESTA.search(final):
+        if not propuestas and (_AFIRMA_PROPUESTA.search(final) or _AFIRMA_ESCRITURA.search(final)):
             final = MENSAJE_SIN_PROPUESTA
         entrada = {"rol": "modelo", "texto": final}
         if consultas:

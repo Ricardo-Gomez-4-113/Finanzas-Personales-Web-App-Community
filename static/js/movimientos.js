@@ -608,11 +608,14 @@ export function cerrarModalEditarTransaccion() {
 }
 
 
+let guardandoEdicion = false;
+
 export async function guardarEdicionTransaccion(e) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
     }
+    if (guardandoEdicion) return;   // un doble clic mandaba dos PUT: el segundo daba 409 y la alarma falsa «cambió en otra pestaña»
 
     const id = document.getElementById('modal-edit-trans-id').value;
     const fecha = document.getElementById('modal-edit-trans-fecha').value;
@@ -628,6 +631,9 @@ export async function guardarEdicionTransaccion(e) {
 
     const versionEsperada = Number(document.getElementById('modal-edit-trans-version').value);
 
+    guardandoEdicion = true;
+    const btnGuardar = document.querySelector('#modal-editar-transaccion [type="submit"]');
+    if (btnGuardar) btnGuardar.disabled = true;
     try {
         const res = await apiFetch(`/api/transacciones/${id}`, {
             method: 'PUT',
@@ -650,6 +656,9 @@ export async function guardarEdicionTransaccion(e) {
         }
     } catch (err) {
         toast("Error de red al intentar guardar los cambios.", 'error');
+    } finally {
+        guardandoEdicion = false;
+        if (btnGuardar) btnGuardar.disabled = false;
     }
 }
 

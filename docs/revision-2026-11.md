@@ -166,15 +166,20 @@ Hecho (Community primero, luego SaaS; cada uno con su prueba, que falla con el c
 
 | B10, B11, B13 | Depositar a una meta valida también las fechas posteriores (un gasto ya registrado para la semana próxima no queda sin fondos); el saldo de la meta y sus movimientos se calculan en centavos enteros (con 0.015 se desfasaban); un fijo ligado a una tarjeta del presupuesto inexistente da 422 en vez de 500. |
 
+| F3, F10, F11, F12 | F3 confirmado con una prueba (tras cerrar sesión quedaban en memoria 14 movimientos, 2 metas, 4 fijos y el resumen, y en pantalla la cinta, los fijos, los pagos del presupuesto y el «libre hasta tu cobro»): ahora se limpia todo y se cierran los modales abiertos. Los avisos `success`/`info` tienen estilo. Guardar una edición dos veces manda un solo PUT. El modal de Telegram y su sondeo se cierran con la sesión. |
+| A2, A7 | Una consulta cuenta como respaldo de una cifra solo si devolvió datos (una herramienta inexistente o con error ya no la respalda). «Listo, ya registré…», «Anoté…», «Se registró…» sin propuesta se descartan como si dijeran «preparé algo» que no existe. |
+| R5 | No era un bug de la app: con el equipo libre los 6 episodios que fallaban pasan; el arnés dejó de esperar el mensaje (15 s) cuando corría junto a la suite completa. R4 y R6 salieron de la misma corrida cargada: probable ruido igual, sin reconfirmar. |
+
+
 ## J. Lo que sigue abierto (18 nov 2026), con su confianza
 
 **Dinero y datos (todos de gravedad baja):** B12 (renombrar un fijo revalida la capacidad completa), B14 (saltar un cobro vencido sin materializar pierde ciclos, sin confirmar), B15 (carrera de dos gastos simultáneos, sin confirmar), B16 (el «disponible» incluye movimientos futuros, ¿intencional?, sin confirmar), B17 (montos extremos desbordan, sin confirmar). Resto de B13: un fijo manual ligado a una tarjeta pasa a ser «del presupuesto».
 
-**Pantallas, media:** F3 (al cerrar sesión no se limpia la caché de la cuenta anterior, sin confirmar), F10 (avisos de éxito sin estilo, confirmado), F11 (doble clic al guardar una edición, sin confirmar), F12 (el sondeo de Telegram sigue con la sesión vencida, sin confirmar). **Baja:** F14–F25 y V5–V8 (V5 y V6 confirmados: contrastes bajo AA y áreas táctiles de 32–36 px; V7 sin confirmar; V8 informativo).
+**Pantallas, baja:** F14–F25 y V5–V8 (V5 y V6 confirmados: contrastes bajo AA y áreas táctiles de 32–36 px; V7 sin confirmar; V8 informativo).
 
-**Asistente, media:** A2–A9; **baja:** A10–A15. Casi todos reportados por lectura de código, no ejecutados. G1 (Gemini falló ~55 % de las llamadas, causa sin determinar) y G3 (defensa contra inyección sin probar con el modelo real).
+**Asistente, media:** A3–A6, A8, A9; **baja:** A10–A15. Casi todos reportados por lectura de código, no ejecutados. G1 (Gemini falló ~55 % de las llamadas, causa sin determinar) y G3 (defensa contra inyección sin probar con el modelo real).
 
-**Casos del arnés sin confirmar:** R4 (crear una posición con ticker repetido no muestra mensaje), R5 (en celular un gasto fijo sin ingreso fijo se rechaza sin mensaje visible; reproduce 1/1), R6 (editar una posición no queda guardada tal cual).
+**Casos del arnés:** R4 (crear una posición con ticker repetido no muestra mensaje) y R6 (editar una posición no queda guardada tal cual), sin reconfirmar con el equipo libre.
 
 **Mantenimiento:** actualizar el oráculo de Admin del arnés (R1, 425 falsos positivos); T2–T8 (huecos de pruebas); rechazos nuevos sin código estable para `observabilidad`; cargadores de movimientos, metas, inversiones y fijos sin contador de generación; `CLAUDE.md` cita `~/bin/portar-a-saas.sh` (ahora es `~/Proyecto-finanzas/portar-a-saas.sh`) y dice que `mensualizar` y `_ingreso_principal` se quitaron (siguen usándose).
 

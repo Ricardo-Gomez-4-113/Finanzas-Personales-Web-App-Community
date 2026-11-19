@@ -265,8 +265,22 @@ export function cerrarSesionLimpia(errorMsg = '') {
     const tAdm = document.getElementById('tabla-usuarios-admin');
     if (tAdm) tAdm.innerHTML = '';
 
+    // La memoria de la pantalla y los bloques que dependen de la cuenta: si la siguiente carga fallara o tardara, esos restos
+    // se verían como suyos (movimientos, metas, fijos, el resumen y el encabezado de «libre hasta tu cobro» de la cuenta anterior)
+    estado.cache = { transacciones: {}, listaTransacciones: [], listaCanceladas: [], categorias: [], inversiones: {}, usuarios: {}, ventana: null, apartados: [], recurrentes: [] };
+    estado.resumen = null;
+    ['cinta-periodos', 'fijos-periodos', 'fijos-pausados', 'pres-pagos-lista', 'periodo-eventos', 'pres-ingreso-equivalentes',
+     'periodo-inicio', 'periodo-fin', 'periodo-cobro'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    ['periodo-libre', 'periodo-disponible'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '$0.00'; });
+    const diasFaltan = document.getElementById('periodo-dias');
+    if (diasFaltan) diasFaltan.textContent = '0 días';
+    const ingresoBase = document.getElementById('pres-ingreso-base');
+    if (ingresoBase) ingresoBase.value = '';
+    // Un modal abierto (con una contraseña escrita, un QR) se cierra con su propio botón, que limpia lo suyo
+    document.querySelectorAll('.modal-overlay[role="dialog"]:not(.hidden):not(#modal-confirmar)').forEach(m => m.querySelector('.btn-modal-close')?.click());
+
     // Restablecer etiquetas numéricas a cero
-    document.querySelectorAll('[id^="lbl-dash-"], [id^="lbl-inv-"], #lbl-apartados-total-acum').forEach(el => {
+    document.querySelectorAll('[id^="lbl-dash-"], [id^="lbl-inv-"], [id^="lbl-fijos-"], #lbl-apartados-total-acum').forEach(el => {
         el.textContent = '$0.00';
     });
 

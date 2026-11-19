@@ -21,6 +21,7 @@ function estiloGraficas() {
 // Últimos datos dibujados: permiten repintar al cambiar de tema sin volver a pedirlos.
 let ultimoMensual = null;
 let ultimasCategorias = null;
+document.addEventListener('sesion-cerrada', () => { ultimoMensual = null; ultimasCategorias = null; });   // sin restos de la cuenta anterior
 
 export function repintarGraficas() {
     ['barras', 'categorias'].forEach(k => {

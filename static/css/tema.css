@@ -1228,7 +1228,7 @@
 
 /* Avisos: sin barra de color a un lado; el estado va en el texto, con el tono de texto */
 :root .toast { border-left: 1px solid var(--border-color); }
-:root .toast-ok { color: var(--success-text); }
+:root .toast-ok, :root .toast-success { color: var(--success-text); }   /* movimientos.js avisa con «success» */
 :root .toast-error { color: var(--danger-text); }
 
 @media (max-width: 720px) {

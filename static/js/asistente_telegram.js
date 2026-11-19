@@ -158,6 +158,9 @@ export async function desvincularTelegram() {
     }
 }
 
+// El token ya no existe: el sondeo se detiene y el código de vinculación (QR) deja de verse
+document.addEventListener('sesion-cerrada', cerrarModalTelegram);
+
 Object.assign(window, {
     abrirModalTelegram,
     cerrarModalTelegram,

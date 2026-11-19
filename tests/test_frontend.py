@@ -2301,6 +2301,76 @@ def test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas(navegad
         ctx.close()
 
 
+def test_cerrar_sesion_no_deja_datos_de_la_cuenta_anterior(navegador, base):
+    """Al cerrar sesión no queda nada de la cuenta anterior: ni en la memoria de la pantalla ni en sus bloques. Si la carga de la
+    siguiente cuenta fallara o tardara, esos restos se verían como si fueran suyos."""
+    ctx, page, errores = _flujo_escenario(navegador, base)
+    try:
+        for pestana in ("tab-dashboard", "tab-movimientos", "tab-presupuesto", "tab-apartados", "tab-inversiones"):
+            _ir(page, pestana)
+        page.wait_for_load_state("networkidle")
+        antes = page.evaluate("""async () => {
+            const { estado } = await import('/static/js/core.js');
+            return { apartados: (estado.cache.apartados || []).length, recurrentes: (estado.cache.recurrentes || []).length,
+                     listaTransacciones: estado.cache.listaTransacciones.length, resumen: !!estado.resumen };
+        }""")
+        assert antes["listaTransacciones"] > 0 and antes["apartados"] > 0, f"la cuenta del escenario debía tener datos cargados: {antes}"
+        page.evaluate("document.getElementById('modal-telegram').classList.remove('hidden')")   # un modal abierto (QR de vinculación) también se cierra
+        page.evaluate("document.querySelector('.dropdown-btn-logout').click()")
+        _responder_confirmacion(page, aceptar=True)
+        page.wait_for_selector("#vista-login:not(.hidden)", timeout=10000)
+        assert page.evaluate("document.getElementById('modal-telegram').classList.contains('hidden')"), "el modal de Telegram sigue abierto tras cerrar sesión"
+        restos = page.evaluate("""async () => {
+            const { estado } = await import('/static/js/core.js');
+            const cuenta = (sel) => document.querySelectorAll(sel).length;
+            const texto = (id) => (document.getElementById(id) || {}).textContent || '';
+            return {
+                memoria: { listaTransacciones: estado.cache.listaTransacciones.length, listaCanceladas: estado.cache.listaCanceladas.length,
+                           apartados: (estado.cache.apartados || []).length, recurrentes: (estado.cache.recurrentes || []).length,
+                           resumen: !!estado.resumen, transacciones: Object.keys(estado.cache.transacciones).length,
+                           inversiones: Object.keys(estado.cache.inversiones).length, ventana: !!estado.cache.ventana },
+                pantalla: { cinta: cuenta('#cinta-periodos *'), fijos: cuenta('#fijos-periodos *'), presupuestoPagos: cuenta('#pres-pagos-lista *'),
+                            heroLibre: texto('periodo-libre'), heroEventos: cuenta('#periodo-eventos *'),
+                            ingresoBase: (document.getElementById('pres-ingreso-base') || {}).value || '' },
+            };
+        }""")
+        sucios = {zona: {k: v for k, v in datos.items() if v not in (0, False, '', '$0.00')} for zona, datos in restos.items()}
+        sucios = {z: d for z, d in sucios.items() if d}
+        assert not sucios, f"quedan restos de la cuenta anterior tras cerrar sesión: {sucios}"
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
+def test_los_avisos_de_exito_e_info_tienen_estilo_y_guardar_una_edicion_dos_veces_manda_un_solo_put(navegador, base):
+    """movimientos.js avisa con «success» e «info»: el CSS solo definía ok y error, y esos avisos salían sin el color de estado. Y un
+    doble clic en Guardar mandaba dos PUT, el segundo con la alarma falsa «cambió en otra pestaña»."""
+    usuario, clave = _usuario_nuevo("f10f11")
+    api = _api(base, usuario, clave)
+    api.post("/api/transacciones", json={"fecha": escenario.HOY, "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "base"})
+    api.post("/api/transacciones", json={"fecha": escenario.HOY, "monto": 50, "tipo": "gasto", "categoria_id": 2, "descripcion": "para-editar"})
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    puts = []
+    try:
+        _entrar(page, base, usuario, clave)
+        colores = page.evaluate("""() => { const c = {}; for (const tipo of ['ok', 'success', 'error', 'info']) {
+            const el = document.createElement('div'); el.className = 'toast toast-' + tipo; el.textContent = 'x'; document.body.appendChild(el);
+            c[tipo] = getComputedStyle(el).color; el.remove(); } return c; }""")
+        assert colores["success"] == colores["ok"] != colores["error"], colores
+        page.on("request", lambda r: puts.append(r.post_data) if r.method == "PUT" and "/api/transacciones/" in r.url else None)
+        _ir(page, "tab-movimientos")
+        page.locator("#tabla-movimientos tr", has_text="para-editar").locator(".btn-editar").first.click()
+        page.wait_for_selector("#modal-editar-transaccion:not(.hidden)")
+        page.evaluate("""() => { const f = document.querySelector('#modal-editar-transaccion form'); f.requestSubmit(); f.requestSubmit(); }""")
+        page.wait_for_selector("#modal-editar-transaccion.hidden", state="attached", timeout=10000)
+        page.wait_for_timeout(500)
+        assert len(puts) == 1, puts
+        assert not [t for t in page.evaluate("[...document.querySelectorAll('.toast')].map(t => t.innerText)") if "otra pestaña" in t]
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_sesion_vencida_a_mitad_de_uso_vuelve_al_login(navegador, base):
     usuario, clave = _usuario_nuevo("expira")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3211,6 +3281,8 @@ if __name__ == "__main__":
                 (test_error_de_javascript_llega_al_registro, lambda: test_error_de_javascript_llega_al_registro(navegador, base)),
                 (test_respuesta_500_de_la_api_se_reporta_con_su_id, lambda: test_respuesta_500_de_la_api_se_reporta_con_su_id(navegador, base)),
                 (test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga, lambda: test_si_el_resumen_falla_se_avisa_y_el_resto_de_la_pantalla_se_carga(navegador, base)),
+                (test_los_avisos_de_exito_e_info_tienen_estilo_y_guardar_una_edicion_dos_veces_manda_un_solo_put, lambda: test_los_avisos_de_exito_e_info_tienen_estilo_y_guardar_una_edicion_dos_veces_manda_un_solo_put(navegador, base)),
+                (test_cerrar_sesion_no_deja_datos_de_la_cuenta_anterior, lambda: test_cerrar_sesion_no_deja_datos_de_la_cuenta_anterior(navegador, base)),
                 (test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas, lambda: test_borrar_una_meta_con_dinero_y_un_fijo_ligado_avisa_las_dos_cosas(navegador, base)),
                 (test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas, lambda: test_inversiones_a_360px_titulo_entero_aviso_vacio_visible_y_espacio_en_las_etiquetas(navegador, base)),
                 (test_editar_una_posicion_permite_corregir_su_moneda, lambda: test_editar_una_posicion_permite_corregir_su_moneda(navegador, base)),

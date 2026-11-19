@@ -491,6 +491,11 @@ let usuariosAdmin = [];
 let filtroAdmin = { texto: '', estado: 'todos', orden: 'acceso' };
 let usuarioEnEliminacion = null;
 let controlesAdminListos = false;
+document.addEventListener('sesion-cerrada', () => {   // sin restos de la cuenta anterior (ni su contraseña en el aviso de eliminar)
+    usuariosAdmin = [];
+    filtroAdmin = { texto: '', estado: 'todos', orden: 'acceso' };
+    usuarioEnEliminacion = null;
+});
 
 const DIAS_TRAZA = 30;
 

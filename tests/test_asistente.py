@@ -607,6 +607,33 @@ def test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo(client):
     assert turno.texto == "Quedó pendiente de confirmación." and len(turno.propuestas) == 1
 
 
+def test_una_consulta_que_fallo_o_no_existe_no_respalda_una_cifra_y_no_se_dice_que_se_registro_algo(client):
+    """A2: la guardia de «cifras sin consulta» se saltaba con cualquier llamada, aunque fuera a una herramienta que no existe o que
+    devolvió un error. A7: «Listo, ya registré tu gasto» sin propuesta pasaba como confirmación."""
+    from asistente.motor import MENSAJE_SIN_CONSULTA, MENSAJE_SIN_PROPUESTA
+    uid, sesion = _cuenta(client, "asist_a2_a7")
+    _fondear(client, sesion)
+    # A2: una herramienta inexistente, y luego una cifra inventada: no pasa
+    motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "foo", "args": {}}]), Respuesta(texto="Tu saldo es $5,000."),
+                                    Respuesta(texto="Seguro, es $5,000.")])
+    assert motor.responder([], "¿Cuál es mi saldo?").texto == MENSAJE_SIN_CONSULTA
+    # Una herramienta conocida pero con argumentos inválidos (devuelve error), y luego una cifra: tampoco
+    motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "resumen", "args": {"moneda_base": "GBP"}}]), Respuesta(texto="Tienes $7,000.00."),
+                                    Respuesta(texto="Tienes $7,000.00.")])
+    assert motor.responder([], "¿Cuánto tengo?").texto == MENSAJE_SIN_CONSULTA
+    # Con una consulta que sí devolvió datos, la respuesta se respeta (y un error previo no la estorba)
+    motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "foo", "args": {}}, {"nombre": "categorias", "args": {}}]), Respuesta(texto="Tienes 3 categorías de ejemplo.")])
+    assert motor.responder([], "¿Qué categorías tengo?").texto == "Tienes 3 categorías de ejemplo."
+    # A7: decir que ya se registró, sin propuesta, se descarta; con consulta o sin ella
+    for frase in ("Listo, ya registré tu gasto de $230.", "Anoté tu ingreso.", "Ya quedó guardado.", "He registrado el movimiento.", "Se registró correctamente.", "Deposité 500 en tu meta."):
+        motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "categorias", "args": {}}]), Respuesta(texto=frase)])
+        assert motor.responder([], "registra un gasto de 230 en el súper").texto == MENSAJE_SIN_PROPUESTA, frase
+    # No estorba a las respuestas normales de consulta («Registraste 3 movimientos», «No guardé nada»... se diferencia por la persona gramatical)
+    for frase in ("Registraste 3 movimientos este mes.", "Tu último registro fue el 3 de noviembre.", "Puedes registrarlo desde la app."):
+        motor, _ = _motor(client, uid, [Respuesta(llamadas=[{"nombre": "categorias", "args": {}}]), Respuesta(texto=frase)])
+        assert motor.responder([], "¿cómo voy?").texto == frase, frase
+
+
 def test_el_resumen_neutraliza_el_texto_libre_pero_el_cuerpo_lo_conserva(client):
     uid, sesion = _cuenta(client, "asist_escr_neutraliza")
     _fondear(client, sesion)
@@ -768,6 +795,7 @@ if __name__ == "__main__":
             (test_mover_a_meta_y_saltar_fijo_se_proponen_con_nombres_y_se_ejecutan_al_confirmar, lambda: test_mover_a_meta_y_saltar_fijo_se_proponen_con_nombres_y_se_ejecutan_al_confirmar(client)),
             (test_el_modelo_no_puede_ejecutar_ni_confirmar_una_propuesta, lambda: test_el_modelo_no_puede_ejecutar_ni_confirmar_una_propuesta(client)),
             (test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo, lambda: test_el_modelo_no_puede_decir_que_preparo_algo_que_no_preparo(client)),
+            (test_una_consulta_que_fallo_o_no_existe_no_respalda_una_cifra_y_no_se_dice_que_se_registro_algo, lambda: test_una_consulta_que_fallo_o_no_existe_no_respalda_una_cifra_y_no_se_dice_que_se_registro_algo(client)),
             (test_el_resumen_neutraliza_el_texto_libre_pero_el_cuerpo_lo_conserva, lambda: test_el_resumen_neutraliza_el_texto_libre_pero_el_cuerpo_lo_conserva(client)),
             (test_propuestas_duplicadas_copias_y_resultado_incierto, lambda: test_propuestas_duplicadas_copias_y_resultado_incierto(client)),
             (test_buscar_movimientos_separa_las_metas_de_los_gastos_y_dice_el_origen, lambda: test_buscar_movimientos_separa_las_metas_de_los_gastos_y_dice_el_origen(client)),
