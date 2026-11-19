@@ -29,6 +29,8 @@ from asistente.herramientas import Herramientas  # noqa: E402
 from asistente.modelo_ollama import RECORDATORIO, ErrorDeOllama, ModeloOllama, SinSoporte, normalizar_url, revisar_cifrado  # noqa: E402
 from asistente.modelo_falso import ModeloFalso  # noqa: E402
 from asistente.modelos import ModeloConRespaldo, crear_modelo  # noqa: E402
+import asistente.modelo_openrouter as orr  # noqa: E402
+from asistente.modelo_openrouter import ErrorDeOpenRouter, ModeloOpenRouter, ModeloPorContenido  # noqa: E402
 from asistente.motor import INSTRUCCIONES, Motor, Respuesta  # noqa: E402
 
 DECLARACIONES = [{"nombre": "resumen", "descripcion": "Resumen", "parametros": {"type": "object", "properties": {}}},
@@ -322,6 +324,281 @@ def test_un_ollama_caido_no_tumba_el_turno_y_con_respaldo_responde_el_otro():
     con_respaldo = ModeloConRespaldo(caido, ModeloFalso([Respuesta(texto="Respondió el de respaldo.")]))
     turno = Motor(con_respaldo, Herramientas(lambda r, p: (200, {}), None, None, lambda: date(2026, 11, 9)), lambda: date(2026, 11, 9)).responder([], "hola")
     assert turno.texto == "Respondió el de respaldo." and not turno.error, turno
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------
+# OpenRouter: un transporte HTTP simulado (sin red ni costo) que guarda cada petición y responde lo que diga el guion
+# ---------------------------------------------------------------------------------------------------------------------------------------------
+class OpenRouterFalso:
+    def __init__(self, guion):
+        self.guion = list(guion)
+        self.peticiones = []
+
+        def manejar(peticion):
+            self.peticiones.append({"url": str(peticion.url), "cuerpo": json.loads(peticion.content or b"{}"), "cabeceras": dict(peticion.headers)})
+            codigo, datos = self.guion.pop(0) if self.guion else (200, _or_texto("(sin guion)"))
+            return httpx.Response(codigo, json=datos)
+
+        self.cliente = httpx.Client(transport=httpx.MockTransport(manejar))
+
+
+def _or_texto(texto, tokens=30, **extra):
+    return {"choices": [{"message": {"role": "assistant", "content": texto, **extra}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": tokens - 5, "completion_tokens": 5, "total_tokens": tokens}}
+
+
+def _or_llamada(nombre, args, id_="x1", **extra):
+    return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+        {"id": id_, "type": "function", "function": {"name": nombre, "arguments": json.dumps(args)}}], **extra}, "finish_reason": "tool_calls"}],
+        "usage": {"total_tokens": 80}}
+
+
+def _con_clave(f):
+    """Corre `f` con una clave de prueba en el entorno (y sin las demás variables de OpenRouter)."""
+    anterior = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENROUTER_MODEL_MULTIMEDIA", "OPENROUTER_URL",
+                                                     "OPENROUTER_TIMEOUT", "OPENROUTER_DATA_COLLECTION", "ASISTENTE_MODELO", "ASISTENTE_MODELO_RESPALDO")}
+    os.environ["OPENROUTER_API_KEY"] = '"sk-or-v1-clave-de-prueba"'   # con comillas, como en el .env
+    try:
+        return f()
+    finally:
+        for k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENROUTER_MODEL_MULTIMEDIA", "OPENROUTER_URL", "OPENROUTER_TIMEOUT", "OPENROUTER_DATA_COLLECTION"):
+            os.environ.pop(k, None)
+        for k, v in anterior.items():
+            if v is not None:
+                os.environ[k] = v
+
+
+def test_openrouter_manda_modelo_herramientas_clave_y_privacidad_y_lee_texto_y_tokens():
+    def prueba():
+        falso = OpenRouterFalso([(200, _or_texto("Tienes $100.", tokens=42))])
+        modelo = ModeloOpenRouter("anthropic/claude-haiku-5.5", cliente=falso.cliente)
+        r = modelo.generar("INSTRUCCIONES", [{"rol": "usuario", "texto": "¿cuánto tengo?"}], DECLARACIONES)
+        assert (r.texto, r.llamadas, r.tokens) == ("Tienes $100.", [], 42), r
+        p = falso.peticiones[0]
+        assert p["url"] == "https://openrouter.ai/api/v1/chat/completions", p["url"]
+        assert p["cabeceras"]["authorization"] == "Bearer sk-or-v1-clave-de-prueba", "la clave se usa sin las comillas del .env"
+        assert not any(c in p["cabeceras"] for c in ("http-referer", "x-title")), "no se manda ninguna cabecera que identifique la app"
+        c = p["cuerpo"]
+        assert c["model"] == "anthropic/claude-haiku-5.5" and c["provider"] == {"data_collection": "deny"} and c["stream"] is False
+        assert c["messages"] == [{"role": "system", "content": "INSTRUCCIONES"}, {"role": "user", "content": "¿cuánto tengo?"}]
+        assert [t["function"]["name"] for t in c["tools"]] == ["resumen", "categorias"] and c["tools"][0]["type"] == "function"
+        # Con OPENROUTER_DATA_COLLECTION=allow se quita la restricción de proveedores
+        os.environ["OPENROUTER_DATA_COLLECTION"] = "allow"
+        falso2 = OpenRouterFalso([])
+        ModeloOpenRouter("anthropic/claude-haiku-5.5", cliente=falso2.cliente).generar("i", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        assert "provider" not in falso2.peticiones[0]["cuerpo"]
+        os.environ["OPENROUTER_DATA_COLLECTION"] = "quizá"
+        try:
+            ModeloOpenRouter("m", cliente=falso2.cliente)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("un valor raro de privacidad debe rechazarse al arrancar")
+        # Sin herramientas no se manda la lista vacía
+        falso3 = OpenRouterFalso([])
+        os.environ["OPENROUTER_DATA_COLLECTION"] = "deny"
+        ModeloOpenRouter("m", cliente=falso3.cliente).generar("i", [{"rol": "usuario", "texto": "x"}], [])
+        assert "tools" not in falso3.peticiones[0]["cuerpo"]
+    _con_clave(prueba)
+
+
+def test_las_llamadas_a_herramientas_y_sus_resultados_van_con_el_mismo_id_y_el_razonamiento_vuelve():
+    def prueba():
+        falso = OpenRouterFalso([(200, _or_llamada("categorias", {"tipo": "gasto"}, reasoning_details=[{"type": "reasoning.encrypted", "data": "abc"}])),
+                                 (200, _or_texto("Tienes Comida y Renta."))])
+        modelo = ModeloOpenRouter("google/gemini-3.8-flash", cliente=falso.cliente)
+        r1 = modelo.generar("I", [{"rol": "usuario", "texto": "¿qué categorías?"}], DECLARACIONES)
+        assert r1.llamadas == [{"nombre": "categorias", "args": {"tipo": "gasto"}, "razonamiento": [{"type": "reasoning.encrypted", "data": "abc"}]}], r1
+        trabajo = [{"rol": "usuario", "texto": "¿qué categorías?"}, {"rol": "modelo", "texto": "", "llamadas": r1.llamadas},
+                   {"rol": "herramienta", "resultados": [{"nombre": "categorias", "resultado": {"categorias": ["Comida", "Renta"]}}]}]
+        r2 = modelo.generar("I", trabajo, DECLARACIONES)
+        assert r2.texto == "Tienes Comida y Renta."
+        m = falso.peticiones[1]["cuerpo"]["messages"]
+        asistente = m[2]
+        assert asistente["role"] == "assistant" and asistente["content"] is None and asistente["reasoning_details"] == [{"type": "reasoning.encrypted", "data": "abc"}]
+        llamada = asistente["tool_calls"][0]
+        assert llamada["type"] == "function" and llamada["function"] == {"name": "categorias", "arguments": json.dumps({"tipo": "gasto"})}
+        assert m[3] == {"role": "tool", "tool_call_id": llamada["id"], "content": json.dumps({"categorias": ["Comida", "Renta"]})}
+        # Varias llamadas en una ronda: cada resultado vuelve con el id de SU llamada, en orden
+        falso = OpenRouterFalso([])
+        trabajo = [{"rol": "usuario", "texto": "x"},
+                   {"rol": "modelo", "texto": "", "llamadas": [{"nombre": "resumen", "args": {}}, {"nombre": "categorias", "args": {}}]},
+                   {"rol": "herramienta", "resultados": [{"nombre": "resumen", "resultado": {"a": 1}}, {"nombre": "categorias", "resultado": {"b": 2}}]}]
+        ModeloOpenRouter("m", cliente=falso.cliente).generar("I", trabajo, DECLARACIONES)
+        m = falso.peticiones[0]["cuerpo"]["messages"]
+        ids = [c["id"] for c in m[2]["tool_calls"]]
+        assert len(set(ids)) == 2 and [x["tool_call_id"] for x in m[3:5]] == ids
+        assert all(ord(ch) < 128 and (ch.isalnum() or ch in "_-") for i in ids for ch in i), "los ids son seguros para Anthropic"
+        # Los turnos anteriores que consultaron se muestran con sus llamadas y una nota (y ids que se corresponden)
+        falso = OpenRouterFalso([])
+        hist = [{"rol": "usuario", "texto": "a"}, {"rol": "modelo", "texto": "Tienes 3.", "consultas": [{"nombre": "resumen", "args": {}}]}, {"rol": "usuario", "texto": "b"}]
+        ModeloOpenRouter("m", cliente=falso.cliente).generar("I", hist, DECLARACIONES)
+        m = falso.peticiones[0]["cuerpo"]["messages"]
+        assert [x["role"] for x in m] == ["system", "user", "assistant", "tool", "assistant", "user"], [x["role"] for x in m]
+        assert m[2]["tool_calls"][0]["id"] == m[3]["tool_call_id"] and "consulta anterior" in m[3]["content"]
+        # Una respuesta con argumentos rotos o una llamada sin nombre no revienta
+        falso = OpenRouterFalso([(200, {"choices": [{"message": {"content": "", "tool_calls": [
+            {"id": "a", "type": "function", "function": {"name": "resumen", "arguments": "{no es json"}}, {"id": "b", "type": "function", "function": {}}, "basura"]}}]})])
+        r = ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        assert r.llamadas == [{"nombre": "resumen", "args": {}}] and r.tokens >= 1
+    _con_clave(prueba)
+
+
+def test_las_fotos_y_los_audios_se_mandan_en_el_formato_de_openrouter_y_lo_que_no_se_lee_se_rechaza():
+    def prueba():
+        falso = OpenRouterFalso([])
+        modelo = ModeloOpenRouter("google/gemini-3.8-flash", cliente=falso.cliente)
+        adjuntos = [{"mime": "image/jpeg", "datos": b"\xff\xd8\xffjpg"}, {"mime": "audio/ogg", "datos": b"OggSaudio"}, {"mime": "audio/mp3", "datos": b"mp3"}]
+        modelo.generar("I", [{"rol": "usuario", "texto": "mira esto", "adjuntos": adjuntos}], DECLARACIONES)
+        partes = falso.peticiones[0]["cuerpo"]["messages"][1]["content"]
+        assert partes[0] == {"type": "text", "text": "mira esto"}
+        assert partes[1]["type"] == "image_url" and partes[1]["image_url"]["url"].startswith("data:image/jpeg;base64,/9j/")
+        assert partes[2] == {"type": "input_audio", "input_audio": {"data": "T2dnU2F1ZGlv", "format": "ogg"}}, "el audio va en base64 sin prefijo y con su formato"
+        assert partes[3]["input_audio"]["format"] == "mp3"
+        # Un archivo de otro tipo no se manda
+        try:
+            modelo.generar("I", [{"rol": "usuario", "texto": "x", "adjuntos": [{"mime": "application/pdf", "datos": b"%PDF"}]}], DECLARACIONES)
+        except SinSoporte:
+            pass
+        else:
+            raise AssertionError("un tipo de archivo sin soporte debe lanzar SinSoporte")
+    _con_clave(prueba)
+
+
+def test_el_modelo_barato_contesta_el_texto_y_el_multimedia_las_fotos_y_audios():
+    def prueba():
+        falso = OpenRouterFalso([])
+        modelo = orr.crear(cliente=falso.cliente)
+        assert isinstance(modelo, ModeloPorContenido) and modelo.texto.modelo == "anthropic/claude-haiku-5.5" and modelo.multimedia.modelo == "google/gemini-3.8-flash"
+        modelo.generar("I", [{"rol": "usuario", "texto": "hola"}], DECLARACIONES)
+        modelo.generar("I", [{"rol": "usuario", "texto": "una foto", "adjuntos": [{"mime": "image/png", "datos": b"\x89PNG"}]}], DECLARACIONES)
+        # Las rondas de un turno con herramientas conservan el archivo en el mensaje: siguen con el multimedia
+        modelo.generar("I", [{"rol": "usuario", "texto": "una nota", "adjuntos": [{"mime": "audio/wav", "datos": b"RIFF"}]},
+                             {"rol": "modelo", "texto": "", "llamadas": [{"nombre": "resumen", "args": {}}]},
+                             {"rol": "herramienta", "resultados": [{"nombre": "resumen", "resultado": {}}]}], DECLARACIONES)
+        modelo.generar("I", [{"rol": "usuario", "texto": "ya sin archivo"}], DECLARACIONES)
+        assert [p["cuerpo"]["model"] for p in falso.peticiones] == ["anthropic/claude-haiku-5.5", "google/gemini-3.8-flash", "google/gemini-3.8-flash", "anthropic/claude-haiku-5.5"]
+        # Los nombres se cambian por entorno; un multimedia vacío a propósito deja todo al de texto; igual al de texto, también
+        os.environ["OPENROUTER_MODEL"], os.environ["OPENROUTER_MODEL_MULTIMEDIA"] = "otro/modelo-de-texto", "otro/modelo-con-audio"
+        m = orr.crear(cliente=falso.cliente)
+        assert (m.texto.modelo, m.multimedia.modelo) == ("otro/modelo-de-texto", "otro/modelo-con-audio")
+        os.environ["OPENROUTER_MODEL_MULTIMEDIA"] = ""
+        assert isinstance(orr.crear(cliente=falso.cliente), ModeloOpenRouter)
+        os.environ["OPENROUTER_MODEL_MULTIMEDIA"] = "otro/modelo-de-texto"
+        assert isinstance(orr.crear(cliente=falso.cliente), ModeloOpenRouter)
+    _con_clave(prueba)
+
+
+def test_los_errores_de_openrouter_dicen_que_hacer_sin_filtrar_la_clave_ni_el_cuerpo_y_se_reintenta_una_vez():
+    def prueba():
+        orr.PAUSA_REINTENTO = 0
+        secreto = {"error": {"code": 401, "message": "User asked: mi saldo es 12345 sk-or-v1-clave-de-prueba"}}
+        for codigo, pista in ((401, "clave"), (402, "crédito"), (404, "política de datos"), (400, "herramientas")):
+            falso = OpenRouterFalso([(codigo, secreto)])
+            try:
+                ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+            except ErrorDeOpenRouter as e:
+                assert e.estado == codigo and pista in str(e), str(e)
+                assert "12345" not in str(e) and "clave-de-prueba" not in str(e) and "openrouter.ai" not in str(e), "el texto no lleva datos ni URL"
+                assert len(falso.peticiones) == 1, "un error de configuración no se reintenta"
+            else:
+                raise AssertionError(codigo)
+        # 429 y 503 se reintentan una vez; si se arregla, responde
+        falso = OpenRouterFalso([(429, {}), (200, _or_texto("ya"))])
+        assert ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES).texto == "ya" and len(falso.peticiones) == 2
+        falso = OpenRouterFalso([(503, {}), (503, {})])
+        try:
+            ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        except ErrorDeOpenRouter as e:
+            assert e.estado == 503 and len(falso.peticiones) == 2, "solo un reintento"
+        # Un 200 con un error dentro (el proveedor falló a mitad) también es un error; con 5xx dentro se reintenta
+        falso = OpenRouterFalso([(200, {"error": {"code": 502, "message": "x"}}), (200, _or_texto("bien"))])
+        assert ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES).texto == "bien"
+        for cuerpo in ({"error": {"code": 402, "message": "x"}}, {"choices": []}, {"choices": [{"message": "texto"}]}):
+            try:
+                ModeloOpenRouter("m", cliente=OpenRouterFalso([(200, cuerpo)]).cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+            except ErrorDeOpenRouter:
+                pass
+            else:
+                raise AssertionError(cuerpo)
+        # Una red caída no filtra nada
+        def caida(peticion):
+            raise httpx.ConnectError("no se pudo conectar a https://openrouter.ai con sk-or-v1-clave-de-prueba")
+        try:
+            ModeloOpenRouter("m", cliente=httpx.Client(transport=httpx.MockTransport(caida))).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
+        except ErrorDeOpenRouter as e:
+            assert "ConnectError" in str(e) and "sk-or" not in str(e) and "openrouter.ai" not in str(e)
+        orr.PAUSA_REINTENTO = 1.5
+    _con_clave(prueba)
+
+
+def test_la_configuracion_de_openrouter_falla_al_arrancar_si_falta_la_clave_o_la_url_no_es_https():
+    def prueba():
+        os.environ.pop("OPENROUTER_API_KEY")
+        try:
+            crear_modelo({"ASISTENTE_MODELO": "openrouter"})
+        except RuntimeError as e:
+            assert "OPENROUTER_API_KEY" in str(e)
+        else:
+            raise AssertionError("sin clave debe fallar al arrancar")
+        os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-x"
+        for url in ("http://openrouter.ai/api/v1", "ftp://x"):
+            try:
+                ModeloOpenRouter("m", url=url, cliente=OpenRouterFalso([]).cliente)
+            except ValueError as e:
+                assert "https" in str(e)
+            else:
+                raise AssertionError(url)
+        assert orr.normalizar_url("https://openrouter.ai/api/v1/chat/completions/") == "https://openrouter.ai/api/v1"
+        assert orr.normalizar_url("") == "https://openrouter.ai/api/v1"
+        # La fábrica lo elige por entorno y admite combinarlo con otro proveedor de respaldo (pero no consigo mismo)
+        modelo = crear_modelo({"ASISTENTE_MODELO": "openrouter"})
+        assert isinstance(modelo, ModeloPorContenido)
+        con_respaldo = crear_modelo({"ASISTENTE_MODELO": "openrouter", "ASISTENTE_MODELO_RESPALDO": "ollama", "OLLAMA_URL": "http://localhost:11434"})
+        assert isinstance(con_respaldo, ModeloConRespaldo) and isinstance(con_respaldo.principal, ModeloPorContenido)
+        try:
+            crear_modelo({"ASISTENTE_MODELO": "openrouter", "ASISTENTE_MODELO_RESPALDO": "openrouter"})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("el respaldo no puede ser el mismo proveedor")
+        # La clave puede venir de un .env (con comillas)
+        os.environ.pop("OPENROUTER_API_KEY")
+        with open(".env", "w", encoding="utf-8") as f:
+            f.write('OTRA=1\nOPENROUTER_API_KEY="sk-or-v1-del-env"\n')
+        try:
+            assert orr.leer_clave() == "sk-or-v1-del-env"
+        finally:
+            os.remove(".env")
+            os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-x"
+    _con_clave(prueba)
+
+
+def test_el_motor_resuelve_un_turno_completo_con_openrouter_y_una_foto_la_contesta_el_modelo_multimedia(client=None):
+    def prueba():
+        guion = [(200, _or_llamada("categorias", {})), (200, _or_texto("Tienes 2 categorías."))]
+        falso = OpenRouterFalso(guion)
+        modelo = orr.crear(cliente=falso.cliente)
+        motor = Motor(modelo, _HerramientasDePrueba(), lambda: date(2026, 10, 20))
+        turno = motor.responder([], "¿Qué categorías tengo?")
+        assert turno.texto == "Tienes 2 categorías." and turno.herramientas_usadas == ["categorias"], turno
+        assert [p["cuerpo"]["model"] for p in falso.peticiones] == ["anthropic/claude-haiku-5.5"] * 2
+        falso = OpenRouterFalso([(200, _or_llamada("categorias", {})), (200, _or_texto("Es un ticket de $50."))])
+        motor = Motor(orr.crear(cliente=falso.cliente), _HerramientasDePrueba(), lambda: date(2026, 10, 20))
+        turno = motor.responder([], "¿qué es esto?", adjuntos=[{"mime": "image/jpeg", "datos": b"\xff\xd8\xffjpg"}])
+        assert [p["cuerpo"]["model"] for p in falso.peticiones] == ["google/gemini-3.8-flash"] * 2, "las dos rondas del turno con foto van al multimedia"
+    _con_clave(prueba)
+
+
+class _HerramientasDePrueba:
+    escritura = False
+
+    def declaraciones(self):
+        return DECLARACIONES
+
+    def ejecutar(self, nombre, args):
+        return {"categorias": ["Comida", "Renta"]}
 
 
 if __name__ == "__main__":

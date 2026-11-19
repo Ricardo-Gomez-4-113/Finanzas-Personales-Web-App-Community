@@ -57,6 +57,13 @@ services:
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-}
       OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-}
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      # OpenRouter: una clave, dos modelos (texto barato; fotos y audios con uno que los lea). Ver .env.example
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-}
+      OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-}
+      OPENROUTER_TIMEOUT: ${OPENROUTER_TIMEOUT:-}
+      OPENROUTER_URL: ${OPENROUTER_URL:-}
       ASISTENTE_SECRETO_INTERNO: ${ASISTENTE_SECRETO_INTERNO}
       # Los módulos de la app que importa exigen una clave JWT para arrancar. Esta es de relleno y NO es la real: el bot no puede firmar nada válido.
       JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
@@ -104,6 +111,13 @@ services:
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-}
       OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-}
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      # OpenRouter: una clave, dos modelos (texto barato; fotos y audios con uno que los lea). Ver .env.example
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_MODEL_MULTIMEDIA: ${OPENROUTER_MODEL_MULTIMEDIA-}
+      OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-}
+      OPENROUTER_TIMEOUT: ${OPENROUTER_TIMEOUT:-}
+      OPENROUTER_URL: ${OPENROUTER_URL:-}
       ASISTENTE_WEB_SECRETO: ${ASISTENTE_WEB_SECRETO}   # otro valor que el del bot: este servicio no tiene el secreto de Telegram
       JWT_SECRET_KEY: relleno-del-bot-que-no-es-la-clave-real-0000000000
     read_only: true

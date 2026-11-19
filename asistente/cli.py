@@ -133,7 +133,7 @@ def _cargar_env_del_asistente(ruta=".env"):
     with open(ruta, encoding="utf-8") as archivo:
         for linea in archivo:
             nombre, _, valor = linea.strip().partition("=")
-            if nombre.startswith(("OLLAMA_", "ASISTENTE_MODELO")) and nombre not in os.environ:
+            if nombre.startswith(("OLLAMA_", "OPENROUTER_", "ASISTENTE_MODELO")) and nombre not in os.environ:
                 os.environ[nombre] = valor.strip().strip('"').strip("'")
 
 
@@ -142,7 +142,7 @@ def main():
     p.add_argument("--demo", action="store_true")
     p.add_argument("--usuario")
     p.add_argument("--falso", action="store_true")
-    p.add_argument("--modelo", choices=("gemini", "ollama"), help="proveedor del modelo (por defecto ASISTENTE_MODELO o gemini)")
+    p.add_argument("--modelo", choices=("gemini", "openrouter", "ollama"), help="proveedor del modelo (por defecto ASISTENTE_MODELO o gemini)")
     p.add_argument("--preguntas", action="store_true")
     args = p.parse_args()
     if not args.demo and not args.usuario:

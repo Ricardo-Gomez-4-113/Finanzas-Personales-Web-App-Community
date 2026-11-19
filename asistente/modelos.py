@@ -1,15 +1,16 @@
-"""asistente/modelos.py - Qué modelo usa el asistente: Gemini, Ollama o uno con el otro de respaldo.
+"""asistente/modelos.py - Qué modelo usa el asistente: Gemini, OpenRouter, Ollama o uno con otro de respaldo.
 
 Se elige por entorno, igual para el bot de Telegram, el servicio web y la línea de comandos:
-- `ASISTENTE_MODELO`: `gemini` (por defecto) u `ollama`.
-- `ASISTENTE_MODELO_RESPALDO` (opcional): el otro. Si el principal falla (red caída, tiempo agotado, error) o no puede con el mensaje (una
+- `ASISTENTE_MODELO`: `gemini` (por defecto), `openrouter` u `ollama`.
+- `ASISTENTE_MODELO_RESPALDO` (opcional): otro distinto. Si el principal falla (red caída, tiempo agotado, error) o no puede con el mensaje (una
   foto o un audio con un modelo de solo texto), se intenta una vez con el de respaldo.
-Gemini se configura con `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_MODEL_RESPALDO`; Ollama con `OLLAMA_URL`/`OLLAMA_MODEL` (ver `modelo_ollama.py`).
+Gemini se configura con `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_MODEL_RESPALDO`; OpenRouter con `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`/
+`OPENROUTER_MODEL_MULTIMEDIA` (ver `modelo_openrouter.py`); Ollama con `OLLAMA_URL`/`OLLAMA_MODEL` (ver `modelo_ollama.py`).
 """
 
 import os
 
-PROVEEDORES = ("gemini", "ollama")
+PROVEEDORES = ("gemini", "openrouter", "ollama")
 
 
 class ModeloConRespaldo:
@@ -44,6 +45,9 @@ def crear_uno(nombre, entorno=None):
     if nombre == "ollama":
         from asistente.modelo_ollama import ModeloOllama
         return ModeloOllama(url=entorno.get("OLLAMA_URL"), modelo=entorno.get("OLLAMA_MODEL"))
+    if nombre == "openrouter":
+        from asistente.modelo_openrouter import crear
+        return crear(entorno)
     from asistente.modelo_gemini import ModeloGemini
     return ModeloGemini()
 
