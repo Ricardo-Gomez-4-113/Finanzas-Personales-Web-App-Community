@@ -42,7 +42,7 @@ PISTAS = {
     401: "la clave OPENROUTER_API_KEY no es válida",
     402: "la cuenta de OpenRouter no tiene crédito",
     403: "la petición fue rechazada (moderación o clave sin permiso)",
-    404: "el modelo no existe o ningún proveedor cumple la política de datos: revisa el nombre o prueba OPENROUTER_DATA_COLLECTION=allow",
+    404: "ningún proveedor acepta lo que se pide: revisa el nombre del modelo, que no se mande un parámetro que ese modelo no soporte, o prueba OPENROUTER_DATA_COLLECTION=allow",
     408: "el proveedor tardó demasiado",
     429: "se superó un límite de uso; espera un momento",
     502: "el proveedor del modelo falló",
@@ -222,8 +222,7 @@ class ModeloOpenRouter:
         cuerpo = {
             "model": self.modelo,
             "messages": self._mensajes(instrucciones, mensajes),
-            "temperature": 0.2,
-            "stream": False,
+            "stream": False,   # sin `temperature`: Haiku 5.5 no la acepta y, con require_parameters, OpenRouter responde 404 (sin proveedor)
         }
         if declaraciones:   # una lista de herramientas vacía la rechazan algunos proveedores
             cuerpo["tools"] = [{"type": "function", "function": {"name": d["nombre"], "description": d["descripcion"], "parameters": d["parametros"]}}

@@ -381,6 +381,7 @@ def test_openrouter_manda_modelo_herramientas_clave_y_privacidad_y_lee_texto_y_t
         assert not any(c in p["cabeceras"] for c in ("http-referer", "x-title")), "no se manda ninguna cabecera que identifique la app"
         c = p["cuerpo"]
         assert c["model"] == "anthropic/claude-haiku-5.5" and c["provider"] == {"require_parameters": True, "data_collection": "deny"} and c["stream"] is False
+        assert "temperature" not in c, "Haiku 5.5 no soporta temperature: con require_parameters daría 404 (ningún proveedor)"
         assert c["messages"] == [{"role": "system", "content": "INSTRUCCIONES"}, {"role": "user", "content": "¿cuánto tengo?"}]
         assert [t["function"]["name"] for t in c["tools"]] == ["resumen", "categorias"] and c["tools"][0]["type"] == "function"
         # Con OPENROUTER_DATA_COLLECTION=allow se quita la restricción de proveedores
@@ -510,7 +511,7 @@ def test_los_errores_de_openrouter_dicen_que_hacer_sin_filtrar_la_clave_ni_el_cu
     def prueba():
         orr.PAUSA_REINTENTO = 0
         secreto = {"error": {"code": 401, "message": "User asked: mi saldo es 12345 sk-or-v1-clave-de-prueba"}}
-        for codigo, pista in ((401, "clave"), (402, "crédito"), (404, "política de datos"), (400, "herramientas")):
+        for codigo, pista in ((401, "clave"), (402, "crédito"), (404, "ningún proveedor acepta"), (400, "herramientas")):
             falso = OpenRouterFalso([(codigo, secreto)])
             try:
                 ModeloOpenRouter("m", cliente=falso.cliente).generar("I", [{"rol": "usuario", "texto": "x"}], DECLARACIONES)
