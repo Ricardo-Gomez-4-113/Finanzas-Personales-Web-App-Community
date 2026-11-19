@@ -2317,8 +2317,12 @@ def test_cerrar_sesion_no_deja_datos_de_la_cuenta_anterior(navegador, base):
         assert antes["listaTransacciones"] > 0 and antes["apartados"] > 0, f"la cuenta del escenario debía tener datos cargados: {antes}"
         page.evaluate("document.getElementById('modal-telegram').classList.remove('hidden')")   # un modal abierto (QR de vinculación) también se cierra
         page.evaluate("document.querySelector('.dropdown-btn-logout').click()")
-        _responder_confirmacion(page, aceptar=True)
-        page.wait_for_selector("#vista-login:not(.hidden)", timeout=10000)
+        page.wait_for_selector("#modal-confirmar:not(.hidden)")
+        page.click("#btn-confirmar-aceptar")   # en el SaaS la página navega a la landing: no se espera a que el cuadro se oculte
+        page.wait_for_timeout(1500)
+        if page.evaluate("!document.getElementById('vista-app')"):
+            return   # en el SaaS cerrar sesión recarga la landing y la memoria de la pantalla se descarta sola: no hay restos que revisar
+        page.wait_for_selector("#vista-app.hidden", state="attached", timeout=10000)
         assert page.evaluate("document.getElementById('modal-telegram').classList.contains('hidden')"), "el modal de Telegram sigue abierto tras cerrar sesión"
         restos = page.evaluate("""async () => {
             const { estado } = await import('/static/js/core.js');
