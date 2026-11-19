@@ -390,6 +390,43 @@ def reservar_intento_login_ip(ip: str) -> float:
 def devolver_intento_login_ip(ip: str, marca: float) -> None:
     devolver_intento_login(f"ip-login:{ip}", marca)
 
+# Tope por cuenta: sin importar desde cuántas IPs se pruebe. El tope por IP y usuario frena a quien insiste desde un lugar; este frena a
+# quien reparte las pruebas entre muchas IPs. Solo cuentan los fallos; una contraseña correcta los limpia.
+_VENTANA_CUENTA_SEG = 3600
+_MAX_FALLOS_CUENTA = 40
+_fallos_por_cuenta: Dict[str, List[float]] = {}
+
+
+def _clave_cuenta(nombre: str) -> str:
+    return (nombre or "").strip().lower()
+
+
+def cuenta_con_demasiados_fallos(nombre: str) -> bool:
+    ahora = time.time()
+    with _candado_login:
+        vivos = [t for t in _fallos_por_cuenta.get(_clave_cuenta(nombre), []) if ahora - t < _VENTANA_CUENTA_SEG]
+        return len(vivos) >= _MAX_FALLOS_CUENTA
+
+
+def anotar_fallo_de_cuenta(nombre: str) -> None:
+    """Se anota también para nombres que no existen, así el comportamiento no revela cuáles hay."""
+    ahora = time.time()
+    clave = _clave_cuenta(nombre)
+    with _candado_login:
+        if clave not in _fallos_por_cuenta and len(_fallos_por_cuenta) >= _MAX_CLAVES_LOGIN:
+            for k in [k for k, v in _fallos_por_cuenta.items() if not any(ahora - t < _VENTANA_CUENTA_SEG for t in v)]:
+                del _fallos_por_cuenta[k]
+            if len(_fallos_por_cuenta) >= _MAX_CLAVES_LOGIN:   # lleno de nombres vivos: se descartan los más viejos
+                for k in sorted(_fallos_por_cuenta, key=lambda k: max(_fallos_por_cuenta[k]))[: _MAX_CLAVES_LOGIN // 2]:
+                    del _fallos_por_cuenta[k]
+        _fallos_por_cuenta[clave] = [t for t in _fallos_por_cuenta.get(clave, []) if ahora - t < _VENTANA_CUENTA_SEG] + [ahora]
+
+
+def limpiar_fallos_de_cuenta(nombre: str) -> None:
+    with _candado_login:
+        _fallos_por_cuenta.pop(_clave_cuenta(nombre), None)
+
+
 def limpiar_fallos_login(clave: str):
     with _candado_login:
         _intentos_fallidos_login.pop(clave, None)

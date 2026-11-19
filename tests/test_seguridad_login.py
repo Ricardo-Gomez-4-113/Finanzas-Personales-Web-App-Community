@@ -54,6 +54,7 @@ def _intento(clave):
 
 def _vaciar_contadores():
     security._intentos_fallidos_login.clear()
+    security._fallos_por_cuenta.clear()
 
 
 @contextmanager
@@ -367,6 +368,54 @@ def test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_
     assert security.parsear_proxies("basura") == [] and not security.es_proxy_confiable("127.0.0.1", [])
 
 
+def test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips():
+    """40 fallos en una hora a una cuenta, desde las IPs que sean, la cierran un rato; la contraseña correcta limpia el contador."""
+    _crear_usuario("seg_por_cuenta")
+    _vaciar_contadores()
+    proxy = TestClient(app, client=("127.0.0.1", 50040))   # origen de proxy confiable: cada petición trae su propia IP
+    intento = lambda i, clave: proxy.post("/auth/login", json={"username": "seg_por_cuenta", "password": clave}, headers={"CF-Connecting-IP": f"198.51.100.{i % 250 + 1}", "X-Prueba": str(i)})
+    for i in range(security._MAX_FALLOS_CUENTA):
+        assert intento(i, "incorrecta1").status_code == 401, i
+    assert intento(99, PASS).status_code == 429, "con el tope alcanzado ni la clave correcta entra: seguiría la fuerza bruta"
+    assert "esta cuenta" in intento(100, "otra").json()["detail"]
+    # Otra cuenta no se ve afectada, y los nombres que no existen también cuentan (no se revela cuáles hay)
+    _crear_usuario("seg_por_cuenta_b")
+    assert proxy.post("/auth/login", json={"username": "seg_por_cuenta_b", "password": PASS}, headers={"CF-Connecting-IP": "203.0.113.50"}).status_code == 200
+    for i in range(security._MAX_FALLOS_CUENTA):
+        proxy.post("/auth/login", json={"username": "no_existe_nadie", "password": "x" * 9}, headers={"CF-Connecting-IP": f"198.51.101.{i % 250 + 1}"})
+    assert proxy.post("/auth/login", json={"username": "no_existe_nadie", "password": "x" * 9}, headers={"CF-Connecting-IP": "203.0.113.51"}).status_code == 429
+    _vaciar_contadores()
+    # Una clave correcta limpia los fallos acumulados
+    for i in range(10):
+        intento(i, "incorrecta1")
+    assert intento(300, PASS).status_code == 200
+    assert security._fallos_por_cuenta.get("seg_por_cuenta") is None
+    _vaciar_contadores()
+
+
+def test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas():
+    import email_service
+    _crear_usuario("seg_forgot_dia")
+    _vaciar_contadores()
+    enviados = []
+    proxy = TestClient(app, client=("127.0.0.1", 50041))
+    with _parchar(email_service, esta_configurado_servicio_correo=lambda: True, enviar_correo_codigo_recuperacion=lambda *a, **k: enviados.append(a[0])):
+        respuestas = []
+        for i in range(14):
+            _vaciar_contadores()   # los topes de 5 minutos no tapan el tope diario: aquí se prueba solo el de 24 horas
+            respuestas.append(proxy.post("/auth/forgot-password", json={"identifier": "seg_forgot_dia"}, headers={"CF-Connecting-IP": f"198.51.102.{i + 1}"}))
+    assert len(enviados) <= 10, f"{len(enviados)} códigos en un día a una sola cuenta"
+    assert all(r.status_code == 200 for r in respuestas) and len({r.json()["mensaje"] for r in respuestas}) == 1, "la respuesta no cambia al alcanzar el tope"
+    # Una sola IP no puede pedir códigos para muchas cuentas sin freno
+    _vaciar_contadores()
+    for i in range(12):
+        _crear_usuario(f"seg_forgot_ip_{i}")
+    with _parchar(email_service, esta_configurado_servicio_correo=lambda: True, enviar_correo_codigo_recuperacion=lambda *a, **k: None):
+        codigos = [proxy.post("/auth/forgot-password", json={"identifier": f"seg_forgot_ip_{i}"}, headers={"CF-Connecting-IP": "198.51.103.9"}).status_code for i in range(12)]
+    assert codigos[:10] == [200] * 10 and 429 in codigos[10:], codigos
+    _vaciar_contadores()
+
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ejecutor import ejecutar, verificar_cobertura
@@ -384,6 +433,8 @@ if __name__ == "__main__":
         (test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada, test_login_rechaza_campos_fuera_de_limite_sin_guardar_nada),
         (test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta, test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta),
         (test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza, test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza),
+        (test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips, test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips),
+        (test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas, test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas
         _crear_usuario("seg_ini")

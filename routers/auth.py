@@ -16,6 +16,9 @@ from security import (
     devolver_intento_login_ip,
     reservar_cupo_cuenta,
     limpiar_fallos_login,
+    cuenta_con_demasiados_fallos,
+    anotar_fallo_de_cuenta,
+    limpiar_fallos_de_cuenta,
     obtener_ip_cliente,
     hash_password,
     clave_aceptable,
@@ -74,6 +77,8 @@ class ResetPasswordRequest(BaseModel):
     new_password: ClaveNueva = Field(..., min_length=8, max_length=72, description="Nueva contraseña (mínimo 8 caracteres)")
 
 
+MAX_CODIGOS_POR_DIA = 10   # códigos de recuperación que se envían a una cuenta en 24 horas, vengan de donde vengan
+
 NOMBRE_RESERVADO = "admin"  # solo para la cuenta principal (id 1)
 
 
@@ -129,11 +134,17 @@ def login(credentials: LoginRequest, request: Request):
     reservar_intento_login(clave_tasa)
 
     username = credentials.username.strip()
+    if cuenta_con_demasiados_fallos(username):   # antes de gastar bcrypt: sin importar desde cuántas IPs se pruebe esta cuenta
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos para esta cuenta. Espera un rato, o recupera tu contraseña con tu correo."
+        )
     user = master_db.get_user_by_username(username)
     
     # Se verifica siempre (contra un hash señuelo si no hay usuario) para igualar el tiempo de respuesta
     clave_valida = verify_password(credentials.password, user["password_hash"] if user else hash_senuelo())
     if not user or not clave_valida:
+        anotar_fallo_de_cuenta(username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos."
@@ -142,6 +153,7 @@ def login(credentials: LoginRequest, request: Request):
     # Una contraseña correcta no cuenta para el tope por IP: una IP compartida no debe bloquearse por aciertos
     devolver_intento_login_ip(client_ip, marca_ip)
     limpiar_fallos_login(clave_tasa)
+    limpiar_fallos_de_cuenta(username)
 
     if not user["is_active"]:
         raise HTTPException(
@@ -277,13 +289,15 @@ def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTask
         )
 
     client_ip = obtener_ip_cliente(request)
+    reservar_intento_login(f"forgot-ip:{client_ip}", limite=10)   # una IP no puede pedir códigos para muchas cuentas sin freno (correo masivo)
     clave_tasa = f"forgot:{client_ip}:{req.identifier.strip().lower()}"
     # Cada solicitud cuenta igual, exista o no la cuenta: no hay oráculo ni bloqueo por tercero
     reservar_intento_login(clave_tasa)
 
     user = master_db.get_user_by_identifier(req.identifier)
     # El tope por cuenta no depende de la IP: sin cupo no se envía otro código, y la respuesta es la misma
-    if user and user.get("email") and user.get("is_active") and reservar_cupo_cuenta("solicitud", user["id"]):
+    if (user and user.get("email") and user.get("is_active") and master_db.count_recent_reset_requests(user["id"], 24) < MAX_CODIGOS_POR_DIA
+            and reservar_cupo_cuenta("solicitud", user["id"])):
         # La escritura del código va en segundo plano: el tiempo de respuesta no debe revelar si la cuenta existe
         background_tasks.add_task(_emitir_codigo_recuperacion, user["id"], user["email"], user["username"])
 

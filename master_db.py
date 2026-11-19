@@ -500,7 +500,7 @@ def liberar_tarea(nombre: str, ultima: Optional[float] = None) -> None:
 
 
 # Las mismas cuentas que la API deja entrar (security.verify_token): una activa que no esté suspendida ni cancelada
-_CUENTA_ACTIVA = "is_active = 1 AND db_name IS NOT NULL AND COALESCE(subscription_status, '') NOT IN ('suspended', 'cancelled')"
+_CUENTA_ACTIVA = "is_active = 1 AND db_name IS NOT NULL AND COALESCE(subscription_status, '') NOT IN ('suspended', 'cancelled', 'sin_plan')"
 
 
 def cuentas_activas() -> List[Dict[str, Any]]:

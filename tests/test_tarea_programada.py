@@ -169,10 +169,12 @@ def test_una_cuenta_suspendida_o_cancelada_no_se_toca_y_al_reactivarla_no_aparec
     activa, cab = _cuenta(client, "tarea_activa")
     suspendida, cab_s = _cuenta(client, "tarea_suspendida")
     cancelada, cab_c = _cuenta(client, "tarea_cancelada")
-    for cuenta, cabecera in ((activa, cab), (suspendida, cab_s), (cancelada, cab_c)):
+    sin_plan, cab_p = _cuenta(client, "tarea_sin_plan")
+    for cuenta, cabecera in ((activa, cab), (suspendida, cab_s), (cancelada, cab_c), (sin_plan, cab_p)):
         _armar(client, cabecera)
     master_db.update_subscription_status(suspendida["id"], "suspended")
     master_db.update_subscription_status(cancelada["id"], "cancelled")
+    master_db.update_subscription_status(sin_plan["id"], "sin_plan")   # solo lectura: las tareas de fondo tampoco escriben en su base
     _hoy("2026-12-20")
     abiertas = []
     original = tarea_programada.get_tenant_conn
@@ -182,6 +184,7 @@ def test_una_cuenta_suspendida_o_cancelada_no_se_toca_y_al_reactivarla_no_aparec
     finally:
         tarea_programada.get_tenant_conn = original
     assert activa["db_name"] in abiertas and suspendida["db_name"] not in abiertas and cancelada["db_name"] not in abiertas, abiertas
+    assert sin_plan["db_name"] not in abiertas and _en_la_base(sin_plan, "SELECT COUNT(*) FROM transacciones") == [(0,)], "una cuenta sin plan no recibe movimientos de la tarea"
     assert _en_la_base(suspendida, "SELECT COUNT(*) FROM transacciones") == [(0,)]
     assert _en_la_base(cancelada, "SELECT COUNT(*) FROM transacciones") == [(0,)]
     assert _en_la_base(activa, "SELECT COUNT(*) FROM transacciones")[0][0] >= 2
