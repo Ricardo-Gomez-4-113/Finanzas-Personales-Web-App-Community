@@ -23,12 +23,12 @@
     <!-- Tipografías alojadas en este servidor (static/fonts): Hanken Grotesk (interfaz) + Fraunces (cifras), sin peticiones a terceros -->
     <link rel="preload" href="/static/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/static/css/fuentes.css?v=a432bbb7fb">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=a432bbb7fb">
-    <link rel="stylesheet" href="/static/css/layout.css?v=a432bbb7fb">
-    <link rel="stylesheet" href="/static/css/componentes.css?v=a432bbb7fb">
-    <link rel="stylesheet" href="/static/css/vistas.css?v=a432bbb7fb">
-    <link rel="stylesheet" href="/static/css/tema.css?v=a432bbb7fb">
+    <link rel="stylesheet" href="/static/css/fuentes.css?v=496a31a61c">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=496a31a61c">
+    <link rel="stylesheet" href="/static/css/layout.css?v=496a31a61c">
+    <link rel="stylesheet" href="/static/css/componentes.css?v=496a31a61c">
+    <link rel="stylesheet" href="/static/css/vistas.css?v=496a31a61c">
+    <link rel="stylesheet" href="/static/css/tema.css?v=496a31a61c">
     <script src="/static/vendor/chart-4.4.1.umd.js"></script>
 
 </head>
@@ -422,6 +422,7 @@
                     </h2>
                     <div class="chart-container dato-sensible">
                         <canvas id="graficaFinanzas"></canvas>
+                        <div id="finanzas-sin-datos" class="hidden empty-state">Aún no hay movimientos para graficar.</div>
                     </div>
                 </div>
 
@@ -2154,7 +2155,7 @@
     </div>
 
     <!-- Script de lógica de la aplicación -->
-    <script type="module" src="/static/js/main.js?v=a432bbb7fb"></script>
+    <script type="module" src="/static/js/main.js?v=496a31a61c"></script>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
 </body>
 </html>

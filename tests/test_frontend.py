@@ -1507,6 +1507,28 @@ def test_una_contrasena_debil_obliga_a_cambiarla_antes_de_ver_datos(navegador, b
     _api(base, nombre, "Nueva#Clave99")
 
 
+def test_la_grafica_de_ingresos_y_gastos_no_dibuja_ejes_vacios_si_no_hay_movimientos(navegador, base):
+    usuario, clave = _usuario_nuevo("graf_vacia")
+    ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
+    try:
+        _entrar(page, base, usuario, clave)
+        _ir(page, "tab-dashboard")
+        page.wait_for_selector("#finanzas-sin-datos:not(.hidden)", timeout=10000)
+        assert "Aún no hay movimientos" in page.inner_text("#finanzas-sin-datos")
+        assert page.is_hidden("#graficaFinanzas"), "sin movimientos no se dibuja la gráfica con ejes en $0"
+        # Con un movimiento, la gráfica aparece y el aviso se va
+        import datetime as _dt
+        hoy = os.environ.get("FINANZAS_HOY", _dt.date.today().isoformat())[:10]
+        r = _api(base, usuario, clave).post("/api/transacciones", json={"fecha": hoy, "monto": 1000, "tipo": "ingreso", "categoria_id": 12, "descripcion": "Nómina"})
+        assert r.status_code in (200, 201), r.text
+        page.reload()
+        page.wait_for_selector("#graficaFinanzas:not(.hidden)", timeout=15000)
+        assert page.is_hidden("#finanzas-sin-datos")
+        assert not errores, errores
+    finally:
+        ctx.close()
+
+
 def test_eliminar_cuenta_exige_escribir_el_usuario(navegador, base):
     usuario, clave = _usuario_nuevo("del")
     ctx, page, errores = _contexto(navegador, VIEWPORTS["laptop"])
@@ -3341,6 +3363,7 @@ if __name__ == "__main__":
                 (test_modo_discrecion_cubre_todas_las_pestanas, lambda: test_modo_discrecion_cubre_todas_las_pestanas(navegador, base)),
                 (test_moneda_base_euro_se_aplica_y_persiste, lambda: test_moneda_base_euro_se_aplica_y_persiste(navegador, base)),
                 (test_moneda_base_convierte_las_listas_guardadas_en_mxn, lambda: test_moneda_base_convierte_las_listas_guardadas_en_mxn(navegador, base)),
+                (test_la_grafica_de_ingresos_y_gastos_no_dibuja_ejes_vacios_si_no_hay_movimientos, lambda: test_la_grafica_de_ingresos_y_gastos_no_dibuja_ejes_vacios_si_no_hay_movimientos(navegador, base)),
                 (test_comentario_se_envia_desde_el_menu_y_queda_en_la_base, lambda: test_comentario_se_envia_desde_el_menu_y_queda_en_la_base(navegador, base)),
                 (test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta, lambda: test_asistente_telegram_genera_el_qr_detecta_la_vinculacion_y_se_desconecta(navegador, base)),
                 (test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda, lambda: test_asistente_telegram_cerrar_el_modal_borra_el_codigo_y_en_movil_no_desborda(navegador, base)),

@@ -50,6 +50,19 @@ export function actualizarGrafica(dataMensual) {
     const ingresos = dataMensual.map(m => m.ingresos);
     const gastos = dataMensual.map(m => m.gastos);
 
+    // Sin movimientos no hay nada que graficar: unos ejes en $0 con barras invisibles se leen como un error, mejor decirlo
+    const vacio = document.getElementById('finanzas-sin-datos');
+    const sinDatos = ![...ingresos, ...gastos].some(v => Math.abs(v) > 0);
+    if (vacio) vacio.classList.toggle('hidden', !sinDatos);
+    canvas.classList.toggle('hidden', sinDatos);
+    if (sinDatos) {
+        if (estado.graficas.barras) {
+            estado.graficas.barras.destroy();
+            estado.graficas.barras = null;
+        }
+        return;
+    }
+
     if (estado.graficas.barras) {
         estado.graficas.barras.data.labels = meses;
         estado.graficas.barras.data.datasets[0].data = ingresos;
