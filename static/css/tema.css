@@ -1594,7 +1594,7 @@
 :root .admin-aviso p { margin: 0; flex: 1 1 260px; font-size: var(--fs-sm); color: var(--text-color); }
 
 :root .admin-aviso-detalle { flex: 1 1 100%; font-size: var(--fs-sm); }
-:root .admin-aviso-detalle summary { cursor: pointer; color: var(--gold-color); }
+:root .admin-aviso-detalle summary { cursor: pointer; color: color-mix(in srgb, var(--gold-color) 80%, var(--text-color)); text-decoration: underline; }   /* 4.44:1 con el oro solo */
 :root .admin-aviso-detalle p { margin: 6px 0 0; color: var(--text-muted); }
 
 /* Cifras en una sola franja, separadas por filetes: no son tarjetas */
@@ -2130,10 +2130,10 @@
 
 /* Login y utilidades que sustituyen estilos en línea */
 :root .login-options-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }
-:root .link-forgot-password { font-size: 0.8rem; color: var(--gold-color); text-decoration: none; font-weight: 500; }
+:root .link-forgot-password { font-size: 0.8rem; color: color-mix(in srgb, var(--gold-color) 80%, var(--text-color)); text-decoration: none; font-weight: 500; }
 :root .login-pie { text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
 :root .login-legal { font-size: 0.8125rem; color: var(--text-muted); margin: 12px 0 0; line-height: 1.4; }
-:root .login-legal a { color: var(--gold-color); text-decoration: underline; white-space: nowrap; }
+:root .login-legal a { color: color-mix(in srgb, var(--gold-color) 80%, var(--text-color)); text-decoration: underline; white-space: nowrap; }
 :root .col-chk { width: 44px; text-align: center; }
 :root .celda-centro { text-align: center; }
 :root .msg-ok { color: var(--success-text); }
@@ -2149,8 +2149,8 @@
 :root .texto-sm { font-size: 0.85rem; }
 
 /* Badge de moneda en el portafolio */
-:root .badge-peso--usd { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
-:root .badge-peso--otra { background: color-mix(in srgb, var(--accent-color) 15%, transparent); color: var(--accent-color); }
+:root .badge-peso--usd { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-text); }   /* texto: 4.5:1 como mínimo */
+:root .badge-peso--otra { background: color-mix(in srgb, var(--accent-color) 15%, transparent); color: color-mix(in srgb, var(--accent-color) 70%, var(--text-color)); }
 
 /* Inversiones en teléfonos (revisión visual de noviembre de 2026) */
 /* El h3 de las tarjetas es flex: sin separación se perdía el espacio antes de «(MXN)» */
@@ -2168,7 +2168,23 @@
 }
 
 @media (max-width: 900px) {
+    /* La columna «Moneda» se repite en la etiqueta del ticker: fuera, para que se vean Valor, ganancia y Acción. El degradado avisa que hay más a la derecha */
+    :root #tabla-inversiones th:nth-child(2), :root #tabla-inversiones td:nth-child(2):not(.empty-state) { display: none; }
+    :root .table-responsive:has(#tabla-inversiones) { -webkit-mask-image: linear-gradient(90deg, rgb(var(--sombra-rgb)) 90%, transparent); mask-image: linear-gradient(90deg, rgb(var(--sombra-rgb)) 90%, transparent); }
     /* La tabla de posiciones hace scroll a un lado: el aviso de «sin posiciones» y su botón se quedan en el ancho visible */
     :root .table-responsive:has(#tabla-inversiones) { container-type: inline-size; }
     :root #tabla-inversiones .empty-state-fija { position: sticky; left: 0; width: 100cqw; box-sizing: border-box; padding: 0 12px; white-space: normal; }
+}
+
+
+/* Revisión de UX previa a internet (noviembre de 2026) */
+:root .modal-actions .btn-primary { white-space: nowrap; }   /* «Guardar movimiento» no se parte en dos líneas en el celular */
+:root .monthly-card { flex-wrap: wrap; gap: 4px 12px; }
+:root .monthly-info span { white-space: nowrap; }            /* el «−» de un gasto no se separa de su importe */
+@media (max-width: 768px) {
+    /* Objetivos táctiles de al menos 44 px en lo que se toca seguido en el teléfono */
+    :root .btn-ver-clave { width: 44px; height: 44px; }
+    :root .btn-accion { min-width: 44px; min-height: 44px; }
+    :root #contenedor-apartados .btn-secondary { min-height: 44px; }
+    :root .admin-accion-icono { min-width: 44px; min-height: 44px; }
 }

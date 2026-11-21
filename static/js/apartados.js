@@ -26,7 +26,7 @@ export async function cargarApartados() {
         contenedor.innerHTML = '';
 
         if (!apartados || apartados.length === 0) {
-            contenedor.innerHTML = '<div class="empty-state">No hay apartados o metas aún. <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;abrirModalCrearApartado&quot;]]">+ Crear primer apartado</button></div>';
+            contenedor.innerHTML = '<div class="empty-state">Aún no tienes metas. Crea la primera para empezar a ahorrar. <br><button type="button" class="btn-primary btn-sm" data-on-click="[[&quot;abrirModalCrearApartado&quot;]]">Crear primera meta</button></div>';
             return;
         }
 
