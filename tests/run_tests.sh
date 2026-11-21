@@ -10,7 +10,7 @@ IMAGEN="${TEST_IMAGE:-python:3.11-slim}"
 rm -rf "$PWD/.logs_pruebas" && mkdir -p "$PWD/.logs_pruebas"
 estado_docker=0
 docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINANZAS_LOG_DIR=/logs_pruebas -e JWT_SECRET_KEY="$(printf 'k%.0s' {1..48})" "$IMAGEN" bash -c '
-  if ! pip install -q --no-cache-dir -r /src/requirements.txt httpx >/tmp/pip.log 2>&1; then
+  if ! pip install -q --no-cache-dir -r /src/requirements.txt httpx hypothesis >/tmp/pip.log 2>&1; then
     echo "ERROR: no se pudieron instalar las dependencias (pip)"; tail -5 /tmp/pip.log; exit 1
   fi
   cp -r /src /tmp/app && cd /tmp/app
@@ -38,6 +38,7 @@ docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINAN
   paso test_asistente_web   python3 tests/test_asistente_web.py
   paso test_modelos         python3 tests/test_modelos.py
   paso test_fijos_metas     python3 tests/test_fijos_metas.py
+  paso test_propiedades     python3 tests/test_propiedades.py
   paso test_notificaciones  python3 tests/test_notificaciones.py
   paso test_tarea_programada python3 tests/test_tarea_programada.py
   echo
