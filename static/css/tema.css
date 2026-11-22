@@ -2225,3 +2225,10 @@
     /* La lista de movimientos tampoco lleva su propio desplazamiento: la página es la que se desplaza */
     :root .table-responsive:has(#tabla-movimientos) { max-height: none; overflow-y: visible; }
 }
+
+/* En celular angosto el monto de una meta ocupa su propia fila (con 360 px quedaba en ~85 px y el texto cortado) y Depositar y Retirar se reparten el ancho debajo */
+@media (max-width: 480px) {
+    :root .acciones-apartado { flex-wrap: wrap; }
+    :root .acciones-apartado input { flex: 1 1 100%; }
+    :root .acciones-apartado button { flex: 1 1 0; }
+}
