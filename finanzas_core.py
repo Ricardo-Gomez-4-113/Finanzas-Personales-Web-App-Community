@@ -149,6 +149,8 @@ FECHA_MAX_OPERATIVA = date(2100, 12, 31)
 def validar_fecha_operativa(texto: str) -> str:
     """Acepta solo fechas ISO entre 2000 y 2100. Evita iteraciones enormes y desbordes en rendimientos."""
     fecha = date.fromisoformat(texto)
+    if fecha.isoformat() != texto:   # Python 3.11 acepta «20261003» o «2026-W40-1»: se guardarían tal cual y romperían el orden de las fechas
+        raise ValueError("La fecha debe tener el formato AAAA-MM-DD.")
     if not (FECHA_MIN_OPERATIVA <= fecha <= FECHA_MAX_OPERATIVA):
         raise ValueError("La fecha debe estar entre 2000-01-01 y 2100-12-31.")
     return texto

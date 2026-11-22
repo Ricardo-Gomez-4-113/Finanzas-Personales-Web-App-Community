@@ -39,6 +39,7 @@ docker run --rm -v "$PWD":/src:ro -v "$PWD/.logs_pruebas":/logs_pruebas -e FINAN
   paso test_modelos         python3 tests/test_modelos.py
   paso test_fijos_metas     python3 tests/test_fijos_metas.py
   paso test_propiedades     python3 tests/test_propiedades.py
+  paso test_core_casos      python3 tests/test_core_casos.py
   paso test_notificaciones  python3 tests/test_notificaciones.py
   paso test_tarea_programada python3 tests/test_tarea_programada.py
   echo

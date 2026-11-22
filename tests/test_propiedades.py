@@ -165,6 +165,167 @@ def propiedad_proxima_fecha_vigente_no_cobra_en_el_pasado_ni_se_salta_una_fecha(
         previa = sig
 
 
+# ---------- con base de datos (migraciones reales, en memoria) ----------
+
+import sqlite3  # noqa: E402
+
+from database import apply_lazy_migrations, configure_sqlite_pragmas  # noqa: E402
+from dinero import fabrica_filas  # noqa: E402
+
+FRECUENCIAS = ["semanal", "quincenal", "mensual"]
+
+
+def _bd():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = fabrica_filas
+    configure_sqlite_pragmas(conn)
+    apply_lazy_migrations(conn)
+    return conn
+
+
+def _alta_fijo(conn, tipo, c, frecuencia, dia, proxima, total=None, monto_total=None):
+    conn.execute(
+        "INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, total_cuotas, monto_total, categoria_id, activo) "
+        "VALUES ('f', ?, ?, ?, ?, ?, ?, ?, 1, 1)",
+        (tipo, c, frecuencia, dia, proxima.isoformat(), total, None if monto_total is None else monto_total))
+
+
+fijo = st.fixed_dictionaries({
+    "tipo": st.sampled_from(["ingreso", "gasto"]),
+    "c": st.integers(min_value=1, max_value=10**8),
+    "frecuencia": st.sampled_from(FRECUENCIAS),
+    "dia": st.integers(min_value=1, max_value=31),
+    "inicio": st.dates(min_value=date(2025, 1, 1), max_value=date(2026, 12, 31)),
+})
+
+
+@settings(parent=AJUSTES, max_examples=300)
+@given(st.lists(fijo, min_size=1, max_size=5), st.dates(min_value=date(2026, 1, 1), max_value=date(2026, 12, 31)))
+def propiedad_materializar_es_idempotente_exacto_y_nunca_toca_el_futuro(fijos, hoy):
+    conn = _bd()
+    for f in fijos:
+        inicio = f["inicio"]
+        if f["frecuencia"] == "mensual":
+            inicio = inicio.replace(day=min(f["dia"], calendar.monthrange(inicio.year, inicio.month)[1]))
+        _alta_fijo(conn, f["tipo"], f["c"], f["frecuencia"], f["dia"], inicio)
+    conn.commit()
+    creadas = core.materializar_recurrentes(conn, hoy)
+    conn.commit()
+    filas = conn.execute("SELECT fecha, recurrente_id FROM transacciones").fetchall()
+    assert creadas == len(filas)
+    assert all(fila["fecha"] <= hoy.isoformat() for fila in filas)
+    for rec in conn.execute("SELECT * FROM recurrentes").fetchall():
+        assert rec["proxima_fecha"] > hoy.isoformat(), dict(rec)
+    # segunda pasada: nada nuevo
+    assert core.materializar_recurrentes(conn, hoy) == 0
+    assert conn.execute("SELECT COUNT(*) FROM transacciones").fetchone()[0] == len(filas)
+    # nunca dos cargos del mismo fijo en la misma fecha
+    repetidos = conn.execute("SELECT recurrente_id, fecha, COUNT(*) n FROM transacciones GROUP BY recurrente_id, fecha HAVING n > 1").fetchall()
+    assert not repetidos, [dict(r) for r in repetidos]
+
+
+@settings(parent=AJUSTES, max_examples=300)
+@given(st.integers(min_value=2, max_value=24), st.integers(min_value=200, max_value=10**8), st.sampled_from(FRECUENCIAS),
+       st.dates(min_value=date(2025, 1, 1), max_value=date(2026, 1, 1)))
+def propiedad_una_compra_a_meses_cobra_exactamente_el_total(meses, total_c, frecuencia, inicio):
+    try:
+        core.validar_compra_msi(total_c / 100, meses)
+    except ValueError:
+        return
+    conn = _bd()
+    cuota_c = a_centavos(core.cuota_msi(total_c / 100, meses))
+    _alta_fijo(conn, "gasto", cuota_c, frecuencia, inicio.day, inicio, total=meses, monto_total=total_c)
+    conn.commit()
+    hoy = date(2100, 1, 1)
+    core.materializar_recurrentes(conn, hoy)
+    cobrado = conn.execute("SELECT COALESCE(SUM(monto), 0), COUNT(*) FROM transacciones").fetchone()
+    assert cobrado[1] == meses, cobrado[1]
+    assert cobrado[0] == total_c, (cobrado[0], total_c)
+
+
+@st.composite
+def movimientos_historia(draw):
+    n = draw(st.integers(min_value=0, max_value=40))
+    return [(draw(st.dates(min_value=date(2026, 1, 1), max_value=date(2026, 12, 31))),
+             draw(st.sampled_from(["ingreso", "gasto"])), draw(st.integers(min_value=1, max_value=10**7))) for _ in range(n)]
+
+
+@settings(parent=AJUSTES, max_examples=400)
+@given(movimientos_historia(), st.dates(min_value=date(2026, 1, 1), max_value=date(2026, 12, 31)),
+       st.one_of(st.none(), st.tuples(st.sampled_from(FRECUENCIAS), st.integers(min_value=1, max_value=31), st.dates(min_value=date(2026, 1, 1), max_value=date(2027, 3, 1)))))
+def propiedad_el_historial_cubre_el_tiempo_sin_huecos_y_suma_lo_mismo_que_los_movimientos(movs, hoy, ingreso_fijo):
+    conn = _bd()
+    for f, tipo, c in movs:
+        conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES (?, ?, ?, 1)", (f.isoformat(), c, tipo))
+    if ingreso_fijo:
+        frecuencia, dia, prox = ingreso_fijo
+        if frecuencia == "mensual":
+            prox = prox.replace(day=min(dia, calendar.monthrange(prox.year, prox.month)[1]))
+        _alta_fijo(conn, "ingreso", 100000, frecuencia, dia, prox)
+    conn.commit()
+    h = core.historial_por_periodos(conn, hoy, maximo=10**6)
+    periodos = list(reversed(h["periodos"]))                      # cronológico
+    if not movs:
+        assert periodos == []
+        return
+    for a, b in zip(periodos, periodos[1:]):                      # sin huecos ni traslapes
+        assert date.fromisoformat(b["inicio"]) == date.fromisoformat(a["fin"]) + timedelta(days=1), (a, b)
+    assert all(p["inicio"] <= p["fin"] for p in periodos)
+    assert sum(1 for p in periodos if p["en_curso"]) <= 1
+    for tipo, clave in (("ingreso", "ingresos"), ("gasto", "gastos")):
+        esperado = sum(c for _, t, c in movs if t == tipo) / 100
+        assert abs(sum(p[clave] for p in periodos) - esperado) < 0.005, (tipo, esperado, h)
+    for f, tipo, c in movs:                                       # cada movimiento cae en un periodo
+        assert any(p["inicio"] <= f.isoformat() <= p["fin"] for p in periodos), f
+
+
+@st.composite
+def operaciones(draw):
+    return draw(st.lists(st.tuples(
+        st.sampled_from(["ingreso", "gasto", "borrar", "editar"]),
+        st.integers(min_value=0, max_value=60),                    # dia (desplazamiento desde el 1 de octubre)
+        st.integers(min_value=1, max_value=500000),                 # centavos
+        st.integers(min_value=0, max_value=1000),                   # elige un movimiento existente
+        st.integers(min_value=0, max_value=60)), min_size=1, max_size=40))
+
+
+@settings(parent=AJUSTES, max_examples=400)
+@given(operaciones())
+def propiedad_ninguna_operacion_validada_deja_el_saldo_negativo_en_ninguna_fecha(ops):
+    conn = _bd()
+    cur = conn.cursor()
+    base = date(2026, 10, 1)
+
+    def revisar():
+        fechas = [r[0] for r in cur.execute("SELECT DISTINCT fecha FROM transacciones").fetchall()]
+        for f in fechas:
+            saldo = core.balance_disponible_a_fecha(cur, f) - core.obtener_total_apartados(cur, f)
+            assert saldo >= -0.005, f"saldo negativo el {f}: {saldo}"
+
+    for tipo, d, c, quien, d2 in ops:
+        fecha = (base + timedelta(days=d)).isoformat()
+        ids = [r[0] for r in cur.execute("SELECT id FROM transacciones ORDER BY id").fetchall()]
+        try:
+            if tipo == "ingreso":
+                cur.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES (?, ?, 'ingreso', 1)", (fecha, c))
+            elif tipo == "gasto":
+                core.validar_saldo_disponible_fecha(cur, fecha, c / 100, "gasto")
+                cur.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id) VALUES (?, ?, 'gasto', 1)", (fecha, c))
+            elif tipo == "borrar" and ids:
+                i = ids[quien % len(ids)]
+                core.validar_eliminacion_transaccion(cur, i)
+                cur.execute("DELETE FROM transacciones WHERE id = ?", (i,))
+            elif tipo == "editar" and ids:
+                i = ids[quien % len(ids)]
+                fila = cur.execute("SELECT tipo FROM transacciones WHERE id = ?", (i,)).fetchone()
+                nueva = (base + timedelta(days=d2)).isoformat()
+                core.validar_edicion_transaccion(cur, i, nueva, c / 100, fila["tipo"])
+                cur.execute("UPDATE transacciones SET fecha = ?, monto = ? WHERE id = ?", (nueva, c, i))
+        except ValueError:
+            pass                                                   # rechazada: el estado no cambia
+        revisar()
+
+
 def _todas():
     return [(n, f) for n, f in sorted(globals().items()) if n.startswith("propiedad_") and callable(f)]
 
