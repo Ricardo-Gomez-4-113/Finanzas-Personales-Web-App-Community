@@ -374,6 +374,16 @@ def test_valorar_posiciones_casos_borde():
     # Redondeo por posición y no solo al final
     r = core.valorar_posiciones([{"ticker": "R", "cantidad": 3, "precio_promedio": 0.333, "precio_actual": 0.337, "moneda": "USD"}], "USD", 20.0)
     assert r["posiciones"][0]["capital_invertido"] == 1.0 and r["posiciones"][0]["valor_actual"] == 1.01
+    assert r["posiciones"][0]["capital_invertido_orig"] == 1.0 and r["posiciones"][0]["valor_actual_orig"] == 1.01 and r["posiciones"][0]["pnl"] == 0.01
+    # Porcentajes a dos decimales y convertidos a centavos antes de restar
+    p = core.valorar_posiciones([{"ticker": "P", "cantidad": 1, "precio_promedio": 3.0, "precio_actual": 3.1, "moneda": "USD"}], "USD", 20.0)
+    assert (p["posiciones"][0]["pnl"], p["posiciones"][0]["pnl_porcentaje"], p["resumen"]["total_pnl_porcentaje"], p["posiciones"][0]["peso_porcentaje"]) == (0.1, 3.33, 3.33, 100.0)
+    m = core.valorar_posiciones([{"ticker": "P", "cantidad": 1, "precio_promedio": 3.0, "precio_actual": 3.1, "moneda": "USD"}], "MXN", 18.123)
+    assert (m["posiciones"][0]["capital_invertido"], m["posiciones"][0]["valor_actual"], m["posiciones"][0]["pnl"]) == (54.37, 56.18, 1.81)
+    assert m["resumen"]["total_invertido"] == 54.37 and m["resumen"]["total_valor_actual"] == 56.18 and m["resumen"]["total_pnl"] == 1.81
+    # Un portafolio de menos de un peso también tiene porcentajes y pesos
+    chico = core.valorar_posiciones([{"ticker": "C", "cantidad": 1, "precio_promedio": 0.5, "precio_actual": 1.0, "moneda": "USD"}], "USD", 20.0)
+    assert (chico["posiciones"][0]["pnl_porcentaje"], chico["resumen"]["total_pnl_porcentaje"], chico["posiciones"][0]["peso_porcentaje"]) == (100.0, 100.0, 100.0)
 
 
 def test_precio_en_la_moneda_de_la_posicion():
@@ -384,6 +394,8 @@ def test_precio_en_la_moneda_de_la_posicion():
     assert f(90.0, "EUR", "USD", 20.0, 0.9) == 100.0
     assert f(1.0, "USD", "MXN", 18.123456) == 18.1235                              # a 4 decimales
     assert f(None, "USD", "MXN", 20.0) is None and f(0, "USD", "MXN", 20.0) is None and f(-5.0, "USD", "MXN", 20.0) is None
+    assert f(0, "USD", "USD", 20.0) is None and f(-1.0, "MXN", "MXN", 20.0) is None   # un precio de cero nunca es un precio, ni en la misma moneda
+    assert f(1.0, "MXN", "USD", 20.0) == 0.05
     assert f(10.0, "JPY", "MXN", 20.0) is None and f(10.0, "USD", "JPY", 20.0) is None and f(10.0, None, "USD", 20.0) is None and f(10.0, "USD", None, 20.0) is None
     assert f(10.0, "EUR", "MXN", 20.0) is None                                      # sin tasa EUR no se usa el precio
     assert f(0.00000001, "MXN", "USD", 20.0) is None                               # se redondea a cero: no es un precio
@@ -397,6 +409,96 @@ def test_convertir_frecuencias_y_de_mensual():
     _falla(core.convertir_de_mensual, 1000.0, "anual", texto="anual")
     _falla(core.convertir_frecuencias, 1000.0, "anual", texto="anual")
     assert core.mensualizar(100.0, "semanal") == 433.33 and core.mensualizar(100.0, "quincenal") == 200.0 and core.mensualizar(100.0, "mensual") == 100.0
+
+
+def test_con_ingresos_activos_pero_ninguno_principal_la_ventana_es_el_mes_natural():
+    """Una base restaurada con un ingreso fijo ligado a una meta (la API ya no lo permite): sin ingreso principal no hay corte propio."""
+    conn = _bd()
+    cur = conn.cursor()
+    meta = _meta(conn, 1000, 0)
+    conn.execute("INSERT INTO recurrentes (descripcion, tipo, monto, frecuencia, dia, proxima_fecha, categoria_id, apartado_id, activo) "
+                 "VALUES ('Retiro', 'ingreso', ?, 'mensual', 10, '2026-12-10', 1, ?, 1)", (a_centavos(5000), meta))
+    conn.commit()
+    _mov(conn, "2026-11-12", "ingreso", 800)
+    v = core.obtener_ventana_corte_fecha(cur, "2026-11-15")
+    assert (v["inicio"], v["fin"], v["ingreso_ventana"]) == ("2026-11-01", "2026-11-30", 800.0)
+
+
+# ---------------------------------------------------------------- reparto, deuda y validación de saldo
+
+def test_repartir_en_centavos_da_el_centavo_sobrante_a_la_parte_con_mayor_residuo():
+    # 10.9 % de $1.00 son 10.9 centavos: la parte chica se queda con el centavo (residuo .9) y la grande con 89
+    assert core.repartir_en_centavos(1.00, [10.9, 89.1]) == [0.11, 0.89]
+    assert core.repartir_en_centavos(1.00, [89.1, 10.9]) == [0.89, 0.11]
+    assert core.repartir_en_centavos(100.00, [33.33, 33.33, 33.34]) == [33.33, 33.33, 33.34]
+    assert core.repartir_en_centavos(0.0, [50, 50]) == [0.0, 0.0] and core.repartir_en_centavos(10.0, []) == []
+    # Porcentajes que suman 100.01 (error de captura de un centavo de punto): se normalizan y siguen sumando el total exacto
+    partes = core.repartir_en_centavos(100.0, [50, 50.01])
+    assert round(sum(partes) * 100) == 10000, partes
+    # Porcentajes que no suman 100 (más de la tolerancia): cada parte es su porcentaje del total, sin forzar la suma
+    assert core.repartir_en_centavos(100.0, [30, 30]) == [30.0, 30.0]
+    assert core.repartir_en_centavos(100.0, [50, 50.02]) == [50.0, 50.02]
+
+
+def test_deuda_pendiente_de_una_compra_a_meses():
+    def fila(total_cuotas, monto_total, monto, generadas):
+        return {"total_cuotas": total_cuotas, "monto_total": monto_total, "monto": monto, "cuotas_generadas": generadas}
+    assert core.deuda_pendiente(fila(3, 300.0, 100.0, 1)) == 200.0
+    assert core.deuda_pendiente(fila(3, 100.0, 33.333, 1)) == 66.67                # a centavos
+    assert core.deuda_pendiente(fila(3, 300.0, 100.0, 3)) == 0.0                    # ya terminó
+    assert core.deuda_pendiente(fila(3, 300.0, 100.0, 4)) == 0.0
+    assert core.deuda_pendiente(fila(None, 300.0, 100.0, 0)) == 0.0                 # no es compra a meses
+    assert core.deuda_pendiente(fila(3, None, 100.0, 1)) == 0.0                     # sin total no hay deuda que calcular
+    assert core.deuda_pendiente(fila(3, 250.0, 100.0, 3 - 1 + 0)) == 50.0           # la última cuota absorbe el redondeo
+    assert core.deuda_pendiente(fila(12, 100.0, 50.0, 11)) == 0.0                   # nunca negativa
+
+
+def _meta_con_deposito(conn, fecha, monto):
+    meta = _meta(conn, 5000, monto, nombre=f"Meta {fecha}")
+    conn.execute("INSERT INTO transacciones (fecha, monto, tipo, categoria_id, apartado_id) VALUES (?, ?, 'gasto', 1, ?)", (fecha, a_centavos(monto), meta))
+    conn.commit()
+
+
+def test_validar_saldo_dice_si_el_dinero_que_falta_esta_en_las_metas_o_simplemente_no_hay():
+    conn = _bd()
+    cur = conn.cursor()
+    _mov(conn, "2026-11-01", "ingreso", 100)
+    # Sin metas: simplemente no alcanza
+    core.validar_saldo_disponible_fecha(cur, "2026-11-05", 100.0)
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-05", 100.01, texto="No puedes gastar antes de recibir")
+    # Con 80 en metas: lo gastable es 20 y el mensaje habla de las metas
+    _meta_con_deposito(conn, "2026-11-02", 80)
+    core.validar_saldo_disponible_fecha(cur, "2026-11-05", 20.0)
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-05", 30.0, texto="dinero que tienes en tus metas")
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-05", 100.01, texto="No puedes gastar antes de recibir")   # ni la cuenta alcanza
+    # El depósito cuenta desde su fecha, y un gasto anterior no puede dejarlo sin fondos: el 1 nov solo sobran 20 para gastar
+    core.validar_saldo_disponible_fecha(cur, "2026-11-01", 20.0)
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-01", 20.01, texto="2 nov 2026")
+    # Una meta de menos de un peso también cuenta como dinero apartado
+    conn2 = _bd()
+    _mov(conn2, "2026-11-01", "ingreso", 10)
+    _meta_con_deposito(conn2, "2026-11-01", 0.50)
+    core.validar_saldo_disponible_fecha(conn2.cursor(), "2026-11-05", 9.50)
+    _falla(core.validar_saldo_disponible_fecha, conn2.cursor(), "2026-11-05", 9.80, texto="metas")
+
+
+def test_validar_saldo_mira_las_fechas_posteriores_y_se_detiene_al_centavo():
+    conn = _bd()
+    cur = conn.cursor()
+    _mov(conn, "2026-11-01", "ingreso", 100)
+    _mov(conn, "2026-11-20", "gasto", 60)                                        # ya registrado a futuro
+    core.validar_saldo_disponible_fecha(cur, "2026-11-05", 40.0)                 # deja justo 0 el 20
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-05", 40.01, texto="20 nov 2026")
+    _falla(core.validar_saldo_disponible_fecha, cur, "2026-11-05", 50.0, texto="−$10.00 MXN")
+    # Con dinero en metas, el mensaje dice que se comprometerían
+    conn2 = _bd()
+    _mov(conn2, "2026-11-01", "ingreso", 10)
+    _meta_con_deposito(conn2, "2026-11-01", 0.50)
+    _mov(conn2, "2026-11-20", "gasto", 9.40)
+    core.validar_saldo_disponible_fecha(conn2.cursor(), "2026-11-05", 0.10)
+    _falla(core.validar_saldo_disponible_fecha, conn2.cursor(), "2026-11-05", 0.30, texto="comprometería dinero de tus metas")
+    # Un ingreso nunca se valida, y editar usa la validación de edición
+    core.validar_saldo_disponible_fecha(cur, "2026-11-05", 999999.0, tipo="ingreso")
 
 
 def _todas():

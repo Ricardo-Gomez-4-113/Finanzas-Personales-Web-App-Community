@@ -1009,58 +1009,11 @@ def obtener_ventana_corte_fecha(
             d_inicio, d_fin = periodo_de_cobro_que_contiene(principal, f_target)
             ingreso_ventana = sum(float(ing["monto"]) * _cobros_en_ventana(ing, d_inicio, d_fin) for ing in ingresos)
         else:
-            # Sin un ingreso principal (por ejemplo, solo cobros ligados a metas) se conserva el corte por días
-            dias_corte = set()
-            for ing in ingresos:
-                d = int(ing["dia"]) if ing["dia"] else 1
-                if ing["frecuencia"] == 'quincenal':
-                    if d == 15 or d >= 28:
-                        dias_corte.add(15)
-                        dias_corte.add(30)
-                    elif d == 1 or d == 16:
-                        dias_corte.add(1)
-                        dias_corte.add(16)
-                    else:
-                        dias_corte.add(d)
-                        dias_corte.add(d + 15 if d <= 15 else d - 15)
-                else:
-                    dias_corte.add(d)
-
-            dias_ordenados = sorted(list(dias_corte))
-
-            # Encontrar corte correspondiente para f_target
-            cortes_previos = [d for d in dias_ordenados if _safe_date(f_target.year, f_target.month, d) <= f_target]
-            if cortes_previos:
-                d1_dia = cortes_previos[-1]
-                idx = dias_ordenados.index(d1_dia)
-                d_inicio = _safe_date(f_target.year, f_target.month, d1_dia)
-                if idx + 1 < len(dias_ordenados):
-                    d2_dia = dias_ordenados[idx + 1]
-                    d_next = _safe_date(f_target.year, f_target.month, d2_dia)
-                else:
-                    d2_dia = dias_ordenados[0]
-                    m_next = 1 if f_target.month == 12 else f_target.month + 1
-                    y_next = f_target.year + 1 if f_target.month == 12 else f_target.year
-                    d_next = _safe_date(y_next, m_next, d2_dia)
-                d_fin = d_next - timedelta(days=1)
-            else:
-                d1_dia = dias_ordenados[-1]
-                d2_dia = dias_ordenados[0]
-                m_prev = 12 if f_target.month == 1 else f_target.month - 1
-                y_prev = f_target.year - 1 if f_target.month == 1 else f_target.year
-                d_inicio = _safe_date(y_prev, m_prev, d1_dia)
-                d_next = _safe_date(f_target.year, f_target.month, d2_dia)
-                d_fin = d_next - timedelta(days=1)
-
+            # Hay ingresos activos pero ninguno puede marcar el corte (la API ya no deja ligar un ingreso fijo a una meta, así que solo
+            # una base restaurada a mano llega aquí): se usa el mes natural y solo cuentan los cobros reales de la ventana
+            d_inicio = date(f_target.year, f_target.month, 1)
+            d_fin = date(f_target.year, f_target.month, calendar.monthrange(f_target.year, f_target.month)[1])
             ingreso_ventana = 0.0
-            for ing in ingresos:
-                m = float(ing["monto"])
-                if ing["frecuencia"] == 'quincenal':
-                    ingreso_ventana += m
-                elif ing["frecuencia"] == 'semanal':
-                    ingreso_ventana += m * 2
-                else:
-                    ingreso_ventana += m / max(1, len(dias_ordenados))
 
     # Reconocer ingresos reales registrados en transacciones durante la ventana
     query_ingresos_reales = """
