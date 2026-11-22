@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 import master_db
 from asistente import medios, pase
+from asistente.acceso import asistente_habilitado
 from asistente.servicio import HEADER_SECRETO
 from asistente.tokens import AsistenteDesactivado, emitir_token
 from security import verify_token
@@ -100,7 +101,7 @@ def _servicio_responde() -> bool:
 def _cuenta_con_asistente(usuario: Dict[str, Any]) -> Dict[str, Any]:
     """La cuenta de la sesión, leída de la base (no del token), con el asistente encendido. Si no: 403."""
     user = master_db.get_user_by_id(int(usuario["id"]))
-    if not user or not user.get("asistente_activo", 1):
+    if not user or not asistente_habilitado(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
     return user
 
@@ -143,7 +144,7 @@ def estado(usuario: Dict[str, Any] = Depends(verify_token)):
     user = master_db.get_user_by_id(int(usuario["id"]))
     if _config()[0] is None:
         return {"disponible": False, "motivo": "no_configurado"}
-    if not user or not user.get("asistente_activo", 1):
+    if not user or not asistente_habilitado(user):
         return {"disponible": False, "motivo": "desactivado"}
     if not _servicio_responde():
         return {"disponible": False, "motivo": "no_responde"}

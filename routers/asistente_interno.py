@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 import master_db
 from asistente import avisos, cupo, pase, vinculos
+from asistente.acceso import asistente_habilitado
 from asistente.permisos import plantilla_de_escritura
 from asistente.tokens import AsistenteDesactivado, emitir_token
 from security import clave_bloqueada, obtener_ip_cliente, reservar_intento_login
@@ -164,7 +165,7 @@ def _cuenta_del_pase(p: str) -> dict:
     user = master_db.get_user_by_id(user_id) if user_id else None
     if not user or not user.get("is_active") or user.get("subscription_status") in ("suspended", "cancelled"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pase inválido.")
-    if not user.get("asistente_activo", 1):
+    if not asistente_habilitado(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
     return user
 

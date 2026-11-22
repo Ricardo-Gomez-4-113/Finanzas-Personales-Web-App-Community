@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import master_db
 import security
+from asistente.acceso import asistente_habilitado
 from asistente.permisos import USO_ASISTENTE, USO_ESCRITURA
 
 class AsistenteDesactivado(Exception):
@@ -22,7 +23,7 @@ def emitir_token(user_id, segundos=None, escritura=False, metodo=None, ruta=None
     user = master_db.get_user_by_id(int(user_id))
     if not user or not user.get("is_active"):
         raise ValueError("cuenta inexistente o desactivada")
-    if not user.get("asistente_activo", 1):
+    if not asistente_habilitado(user):
         raise AsistenteDesactivado()
     claims = security.claims_sesion(user)
     claims["uso"] = USO_ESCRITURA if escritura else USO_ASISTENTE

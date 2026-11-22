@@ -25,6 +25,7 @@ from fastapi.security import OAuth2PasswordBearer
 from database import get_tenant_conn
 import master_db
 from asistente.permisos import USO_ESCRITURA, permitido
+from asistente.acceso import asistente_habilitado
 
 # Cargar variables de entorno desde .env si existe en el directorio base
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -249,7 +250,7 @@ def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu cuenta ha sido desactivada por el administrador."
         )
-    if uso is not None and not user.get("asistente_activo", 1):   # apagar el asistente mata también los tokens que ya se emitieron
+    if uso is not None and not asistente_habilitado(user):   # apagar el asistente mata también los tokens que ya se emitieron
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El asistente está desactivado para esta cuenta.")
 
     if user.get("clave_debil") and not _sirve_con_clave_debil(request, user_id_int):
