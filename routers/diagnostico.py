@@ -6,12 +6,14 @@ Los límites de tamaño acotan cada línea, y el archivo rotativo acota el disco
 """
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel, Field
 
 import observabilidad
+from security import obtener_ip_cliente, reservar_intento_login
 
 router = APIRouter()
+LIMITE_REPORTES_POR_IP = 60   # por ventana de 5 minutos
 
 
 class ReporteCliente(BaseModel):
@@ -24,7 +26,8 @@ class ReporteCliente(BaseModel):
 
 
 @router.post("/api/diagnostico/cliente", status_code=status.HTTP_204_NO_CONTENT, summary="Registrar un fallo del navegador")
-def registrar_fallo_cliente(reporte: ReporteCliente):
+def registrar_fallo_cliente(reporte: ReporteCliente, request: Request):
+    reservar_intento_login(f"diagnostico:{obtener_ip_cliente(request)}", limite=LIMITE_REPORTES_POR_IP)   # público: sin tope, cualquiera inunda el registro y desplaza los eventos reales
     observabilidad.registrar_reporte_cliente(
         reporte.tipo,
         reporte.mensaje,

@@ -211,6 +211,21 @@ def test_reporte_del_navegador_se_registra_y_valida_su_tamano(client):
     assert len(_registros("cliente")) == antes + 1, "un reporte inválido no debe registrarse"
 
 
+def test_el_reporte_publico_del_navegador_tiene_tope_por_ip(client):
+    """Sin autenticación y sin tope, cualquiera inunda app.log y desplaza los eventos reales por la rotación."""
+    import security
+    from routers import diagnostico
+    for clave in [k for k in security._intentos_fallidos_login if k.startswith("diagnostico:")]:
+        security._intentos_fallidos_login.pop(clave)
+    try:
+        codigos = [client.post("/api/diagnostico/cliente", json={"tipo": "js", "mensaje": f"inundacion {i}"}).status_code
+                   for i in range(diagnostico.LIMITE_REPORTES_POR_IP + 20)]
+        assert codigos.count(204) == diagnostico.LIMITE_REPORTES_POR_IP and set(codigos[diagnostico.LIMITE_REPORTES_POR_IP:]) == {429}, codigos
+    finally:
+        for clave in [k for k in security._intentos_fallidos_login if k.startswith("diagnostico:")]:
+            security._intentos_fallidos_login.pop(clave)
+
+
 def test_fallo_al_abrir_el_registro_no_rompe_la_app(client):
     archivo_bloqueante = tempfile.mkstemp()[1]
     try:
@@ -290,6 +305,7 @@ if __name__ == "__main__":
             (test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app, test_codigos_de_rechazo_reconocen_los_mensajes_de_la_app),
             (test_peticion_correcta_no_deja_linea, lambda: test_peticion_correcta_no_deja_linea(client)),
             (test_reporte_del_navegador_se_registra_y_valida_su_tamano, lambda: test_reporte_del_navegador_se_registra_y_valida_su_tamano(client)),
+            (test_el_reporte_publico_del_navegador_tiene_tope_por_ip, lambda: test_el_reporte_publico_del_navegador_tiene_tope_por_ip(client)),
             (test_fallo_al_abrir_el_registro_no_rompe_la_app, lambda: test_fallo_al_abrir_el_registro_no_rompe_la_app(client)),
             (test_rotacion_acota_el_disco, test_rotacion_acota_el_disco),
             (test_resumen_cuenta_fallos_y_salta_lineas_rotas, test_resumen_cuenta_fallos_y_salta_lineas_rotas),
