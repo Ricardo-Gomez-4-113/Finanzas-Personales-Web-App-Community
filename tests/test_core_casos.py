@@ -195,6 +195,18 @@ def test_cerrar_meta_si_cumplida():
     assert f1 != f2
 
 
+def test_el_patron_de_correo_acepta_correos_reales_y_rechaza_lo_que_no_sirve_de_destinatario():
+    import re
+    from routers.auth import PATRON_CORREO
+    ok = ["", "ana@example.com", "ana.perez+finanzas@mail.example.com.mx", "a_b-c%d@x-y.org", "A@B.io"]
+    mal = ["ana", "ana@", "@example.com", "ana@example", "ana@@example.com", "ana perez@example.com", "ana@example.c", 'ana"@example.com',
+           "<ana@example.com>", "ana@example.com,otra@example.com", "ana@example.com;x", "ana@exa(mple.com", "ana@-.com.", "ana@example.com\n", "ñandú@example.com"]
+    for correo in ok:
+        assert re.fullmatch(PATRON_CORREO, correo), correo
+    for correo in mal:
+        assert not re.fullmatch(PATRON_CORREO, correo), correo
+
+
 def _todas():
     return [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
 

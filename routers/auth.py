@@ -31,7 +31,8 @@ from finanzas_core import ahora_local
 
 # Un correo tiene forma de correo (o va vacío para quitarlo): si no, alguien podría poner como correo el nombre de
 # otra persona y la recuperación por nombre encontraría su cuenta en vez de la de ella
-PATRON_CORREO = r"^(|[^@\s]+@[^@\s]+\.[^@\s]+)$"
+# Solo caracteres de un correo real: sin «<>,;"» ni paréntesis, que no sirven como destinatario y abren la puerta a trucos en los correos que mandamos
+PATRON_CORREO = r"^(|[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,})$"
 
 # Contraseña que se va a guardar: 8 o más caracteres, cabe en los 72 bytes de bcrypt y no es de las más usadas
 ClaveNueva = Annotated[str, AfterValidator(clave_aceptable)]
