@@ -29,6 +29,8 @@ SUITES = [
     ["python3", "tests/test_core_casos.py"],
     ["python3", "tests/test_fijos_metas.py"],
     ["python3", "tests/test_propiedades.py"],
+    ["python3", "tests/test_escenario_api.py"],
+    ["python3", "tests/test_api_aislamiento.py"],
     ["python3", "test_finanzas.py"],
 ]
 
@@ -144,6 +146,7 @@ def main():
     ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--semilla", type=int, default=1)
     ap.add_argument("--funcion", default=None, help="expresión regular: solo mutar funciones con ese nombre")
+    ap.add_argument("--indices", default=None, help="archivo con un índice de mutante por línea (p. ej. los que sobrevivieron antes): solo esos")
     ap.add_argument("--trabajadores", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--salida", default=os.path.join(RAIZ, "auditoria", "mutacion", "informe.md"))
     args = ap.parse_args()
@@ -153,6 +156,9 @@ def main():
     candidatos = [i for i, (_, f, _) in enumerate(contador.sitios) if not args.funcion or re.search(args.funcion, f)]
     random.Random(args.semilla).shuffle(candidatos)
     elegidos = sorted(candidatos[: args.n])
+    if args.indices:
+        pedidos = {int(x) for x in open(args.indices).read().split() if x.isdigit()}
+        elegidos = sorted(i for i in range(len(contador.sitios)) if i in pedidos)
     print(f"{len(contador.sitios)} sitios de mutación; se prueban {len(elegidos)} (semilla {args.semilla}).", flush=True)
 
     tmp = tempfile.mkdtemp(prefix="mutar_")
@@ -202,7 +208,7 @@ def main():
     with open(args.salida, "w", encoding="utf-8") as f:
         f.write(f"# Mutación de {OBJETIVO}\n\n{total} mutantes probados (semilla {args.semilla}): "
                 f"{total - len(sobreviven)} detectados, {len(sobreviven)} sobreviven ({puntaje:.1f} % detectado).\n\n")
-        f.write("Línea de la fuente original donde se aplicó el cambio (el número es de `ast.unparse`, puede diferir unas líneas).\n\n")
+        f.write("Línea de `finanzas_core.py` donde se aplicó el cambio.\n\n")
         for indice, linea, funcion, desc, _ in sobreviven:
             f.write(f"- `{funcion}` L{linea}: **{desc}**\n")
     print(f"\n{total - len(sobreviven)}/{total} detectados ({puntaje:.1f} %). Informe: {args.salida}")
