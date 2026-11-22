@@ -19,6 +19,7 @@ from security import (
     cuenta_con_demasiados_fallos,
     anotar_fallo_de_cuenta,
     limpiar_fallos_de_cuenta,
+    huella_ip,
     obtener_ip_cliente,
     hash_password,
     clave_aceptable,
@@ -135,12 +136,16 @@ def login(credentials: LoginRequest, request: Request):
     reservar_intento_login(clave_tasa)
 
     username = credentials.username.strip()
-    if cuenta_con_demasiados_fallos(username):   # antes de gastar bcrypt: sin importar desde cuántas IPs se pruebe esta cuenta
+    user = master_db.get_user_by_username(username)
+    huella = huella_ip(client_ip)
+    # Con el tope por cuenta alcanzado se cierra la puerta, también a la clave correcta (seguiría la fuerza bruta), salvo a quien ya ha
+    # entrado antes desde esta misma dirección: así nadie deja fuera a otra persona escribiendo contraseñas incorrectas a propósito.
+    # Quien lo intenta desde un lugar nuevo puede recuperar su contraseña con el correo (esa vía no se bloquea).
+    if cuenta_con_demasiados_fallos(username) and not (user and master_db.ip_conocida(user["id"], huella)):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos fallidos para esta cuenta. Espera un rato, o recupera tu contraseña con tu correo."
         )
-    user = master_db.get_user_by_username(username)
     
     # Se verifica siempre (contra un hash señuelo si no hay usuario) para igualar el tiempo de respuesta
     clave_valida = verify_password(credentials.password, user["password_hash"] if user else hash_senuelo())
@@ -170,6 +175,10 @@ def login(credentials: LoginRequest, request: Request):
     # Actualizar métricas de auditoría
     timestamp_hoy = ahora_local().strftime("%Y-%m-%d %H:%M:%S")
     master_db.update_login_activity(user["id"], timestamp_hoy)
+    try:
+        master_db.recordar_ip(user["id"], huella, timestamp_hoy)
+    except Exception as error:   # recordar el lugar es un extra: un fallo de la base no debe tumbar un acceso correcto
+        print(f"[SEGURIDAD AVISO] No se pudo recordar la IP de la cuenta {user['id']}: {type(error).__name__}", flush=True)
     
     # Generar token JWT
     token = create_access_token(claims_sesion(user))

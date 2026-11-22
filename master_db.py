@@ -235,6 +235,17 @@ def init_master_db() -> None:
             )
         """)
 
+        # Desde qué direcciones (su huella, no la IP) ha entrado bien cada cuenta: si alguien le bloquea el acceso a propósito a base de
+        # contraseñas incorrectas, quien entra desde un lugar conocido no se queda fuera
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ips_conocidas (
+                user_id INTEGER NOT NULL,
+                huella TEXT NOT NULL,
+                visto_en TEXT NOT NULL,
+                PRIMARY KEY (user_id, huella)
+            )
+        """)
+
         # Índices optimizados
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
@@ -669,6 +680,30 @@ def contar_comentarios_recientes(user_id: int, horas: int = 1) -> int:
         conn.close()
 
 
+IPS_CONOCIDAS_POR_CUENTA = 5
+
+
+def ip_conocida(user_id: int, huella: str) -> bool:
+    conn = get_master_conn()
+    try:
+        return conn.execute("SELECT 1 FROM ips_conocidas WHERE user_id = ? AND huella = ?", (user_id, huella)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+def recordar_ip(user_id: int, huella: str, ahora: str) -> None:
+    """Anota que la cuenta entró bien desde esta dirección; se guardan las últimas IPS_CONOCIDAS_POR_CUENTA."""
+    conn = get_master_conn()
+    try:
+        conn.execute("INSERT OR REPLACE INTO ips_conocidas (user_id, huella, visto_en) VALUES (?, ?, ?)", (user_id, huella, ahora))
+        conn.execute("DELETE FROM ips_conocidas WHERE user_id = ? AND huella NOT IN "
+                     "(SELECT huella FROM ips_conocidas WHERE user_id = ? ORDER BY visto_en DESC, rowid DESC LIMIT ?)",
+                     (user_id, user_id, IPS_CONOCIDAS_POR_CUENTA))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def delete_user_and_tenant(user_id: int) -> bool:
     """
     Elimina permanentemente a un usuario de 'auth_master.db' y borra
@@ -697,6 +732,7 @@ def delete_user_and_tenant(user_id: int) -> bool:
         cursor.execute("DELETE FROM telegram_vinculos WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM telegram_codigos WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM asistente_uso WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM ips_conocidas WHERE user_id = ?", (user_id,))
         cursor.execute("UPDATE comentarios SET user_id = NULL WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()

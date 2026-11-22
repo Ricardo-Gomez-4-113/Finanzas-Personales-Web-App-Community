@@ -29,6 +29,7 @@ os.chdir(TMP)
 sys.path.insert(0, TMP)
 os.environ.setdefault("JWT_SECRET_KEY", "k" * 48)
 os.environ["DEFAULT_ADMIN_PASSWORD"] = "AdminTest#12345"
+os.environ["IP_CABECERA_CLIENTE"] = "CF-Connecting-IP"   # estas pruebas simulan un despliegue detrás de Cloudflare
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -393,6 +394,73 @@ def test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips():
     _vaciar_contadores()
 
 
+def test_quien_ya_entro_desde_su_lugar_no_se_queda_fuera_cuando_otro_bloquea_su_cuenta_a_proposito():
+    """El tope por cuenta cierra la puerta a quien llegue de un lugar nuevo, pero no a quien ya entró bien desde esa misma IP."""
+    _crear_usuario("seg_conocida")
+    _vaciar_contadores()
+    casa = TestClient(app, client=("127.0.0.1", 50060), headers={"CF-Connecting-IP": "198.51.100.200"})
+    assert casa.post("/auth/login", json={"username": "seg_conocida", "password": PASS}).status_code == 200   # la cuenta recuerda esta IP
+    atacante = TestClient(app, client=("127.0.0.1", 50061))
+    for i in range(security._MAX_FALLOS_CUENTA):
+        assert atacante.post("/auth/login", json={"username": "seg_conocida", "password": "incorrecta1"}, headers={"CF-Connecting-IP": f"203.0.113.{i % 250 + 1}"}).status_code == 401
+    assert security.cuenta_con_demasiados_fallos("seg_conocida")
+    otro_lugar = {"CF-Connecting-IP": "198.51.100.201"}
+    assert atacante.post("/auth/login", json={"username": "seg_conocida", "password": PASS}, headers=otro_lugar).status_code == 429   # lugar nuevo: cerrada
+    assert casa.post("/auth/login", json={"username": "seg_conocida", "password": PASS}).status_code == 200                             # su lugar de siempre: entra
+    assert not security.cuenta_con_demasiados_fallos("seg_conocida"), "entrar bien limpia el contador"
+    # Desde su IP conocida una clave equivocada sigue siendo un fallo normal y no abre nada
+    assert casa.post("/auth/login", json={"username": "seg_conocida", "password": "incorrecta1"}).status_code == 401
+    # Solo se guardan las últimas 5 direcciones, y guardan su huella, no la IP
+    for i in range(7):
+        TestClient(app, client=("127.0.0.1", 50070 + i), headers={"CF-Connecting-IP": f"192.0.2.{i + 1}"}).post("/auth/login", json={"username": "seg_conocida", "password": PASS})
+    conn = master_db.get_master_conn()
+    try:
+        filas = conn.execute("SELECT huella FROM ips_conocidas WHERE user_id = (SELECT id FROM users WHERE username = 'seg_conocida')").fetchall()
+    finally:
+        conn.close()
+    assert len(filas) == master_db.IPS_CONOCIDAS_POR_CUENTA and all("192.0.2" not in f["huella"] and "198.51" not in f["huella"] for f in filas)
+    _vaciar_contadores()
+
+
+def test_la_ip_real_solo_se_lee_de_la_cabecera_elegida_y_sin_ella_no_se_cree_a_nadie():
+    from starlette.datastructures import Headers
+    from types import SimpleNamespace as NS
+    pedir = lambda directa, *lineas: NS(client=NS(host=directa), headers=Headers(raw=[(k.lower().encode(), v.encode()) for k, v in lineas]))
+    anterior = os.environ.get("IP_CABECERA_CLIENTE")
+    try:
+        # Sin IP_CABECERA_CLIENTE no se lee ninguna cabecera: un proxy que no borra la del visitante no le deja escoger su IP
+        os.environ.pop("IP_CABECERA_CLIENTE", None)
+        for cab in ("CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"):
+            assert security.obtener_ip_cliente(pedir("172.21.0.1", (cab, "203.0.113.7"))) == "172.21.0.1", cab
+        os.environ["IP_CABECERA_CLIENTE"] = "X-Real-IP"
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Real-IP", "203.0.113.7"))) == "203.0.113.7"
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("CF-Connecting-IP", "203.0.113.8"))) == "172.21.0.1", "una cabecera que no es la elegida se ignora"
+        assert security.obtener_ip_cliente(pedir("8.8.8.8", ("X-Real-IP", "203.0.113.7"))) == "8.8.8.8", "de internet directo no se confía en ninguna"
+        os.environ["IP_CABECERA_CLIENTE"] = "X-Forwarded-For"
+        # Lo que el visitante escribió va a la izquierda; vale lo último, que añadió nuestro proxy
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 203.0.113.7"))) == "203.0.113.7"
+        # Si el proxy añade su línea aparte en vez de concatenar, la línea del visitante tampoco gana
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "9.9.9.9"), ("X-Forwarded-For", "203.0.113.7"))) == "203.0.113.7"
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "1.2.3.4, basura"))) == "172.21.0.1"
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "1.2.3.4,"))) == "172.21.0.1"
+        # La IP queda en una forma única
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "2001:DB8:0:0:0:0:0:5"))) == "2001:db8::5"
+        assert security.obtener_ip_cliente(pedir("172.21.0.1", ("X-Forwarded-For", "::ffff:203.0.113.7"))) == "203.0.113.7"
+    finally:
+        if anterior is None:
+            os.environ.pop("IP_CABECERA_CLIENTE", None)
+        else:
+            os.environ["IP_CABECERA_CLIENTE"] = anterior
+
+
+def test_la_huella_de_una_ip_no_la_revela_y_las_ipv6_de_una_misma_red_comparten_huella():
+    assert security.huella_ip("203.0.113.7") == security.huella_ip("203.0.113.7") != security.huella_ip("203.0.113.8")
+    assert "203" not in security.huella_ip("203.0.113.7") and len(security.huella_ip("203.0.113.7")) == 32
+    assert security.huella_ip("2001:db8:1:2::1") == security.huella_ip("2001:DB8:1:2:aaaa:bbbb:cccc:dddd")   # misma /64: sus direcciones temporales cambian solas
+    assert security.huella_ip("2001:db8:1:2::1") != security.huella_ip("2001:db8:1:3::1")
+    assert security.huella_ip("::ffff:203.0.113.7") == security.huella_ip("203.0.113.7")
+
+
 def test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas():
     import email_service
     _crear_usuario("seg_forgot_dia")
@@ -434,6 +502,9 @@ if __name__ == "__main__":
         (test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta, test_tiempo_de_la_solicitud_de_codigo_no_revela_la_cuenta),
         (test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza, test_la_ip_real_se_toma_de_cloudflare_solo_si_la_conexion_viene_de_un_proxy_de_confianza),
         (test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips, test_un_tope_por_cuenta_frena_las_pruebas_repartidas_entre_muchas_ips),
+        (test_quien_ya_entro_desde_su_lugar_no_se_queda_fuera_cuando_otro_bloquea_su_cuenta_a_proposito, test_quien_ya_entro_desde_su_lugar_no_se_queda_fuera_cuando_otro_bloquea_su_cuenta_a_proposito),
+        (test_la_ip_real_solo_se_lee_de_la_cabecera_elegida_y_sin_ella_no_se_cree_a_nadie, test_la_ip_real_solo_se_lee_de_la_cabecera_elegida_y_sin_ella_no_se_cree_a_nadie),
+        (test_la_huella_de_una_ip_no_la_revela_y_las_ipv6_de_una_misma_red_comparten_huella, test_la_huella_de_una_ip_no_la_revela_y_las_ipv6_de_una_misma_red_comparten_huella),
         (test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas, test_la_recuperacion_no_manda_mas_de_10_codigos_al_dia_a_una_cuenta_ni_deja_a_una_ip_pedirlos_para_muchas),
     ]
     with TestClient(app):  # arranque de la app: crea la base maestra antes de las pruebas

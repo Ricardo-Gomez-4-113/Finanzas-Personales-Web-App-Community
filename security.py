@@ -14,6 +14,7 @@ import os
 import threading
 import time
 import hashlib
+import hmac
 import ipaddress
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Generator, List
@@ -471,24 +472,52 @@ def es_proxy_confiable(direct_ip: str, redes=None) -> bool:
         return False
     return any(direccion in red for red in (_PROXIES_CONFIABLES if redes is None else redes))
 
+_AVISADO_SIN_CABECERA = False
+
+
+def _ip_normalizada(texto: str) -> Optional[str]:
+    """La IP en su forma única (mayúsculas, ceros y `::ffff:1.2.3.4` dan lo mismo), o None si no es una IP."""
+    try:
+        ip = ipaddress.ip_address((texto or "").strip())
+    except ValueError:
+        return None
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return str(ip)
+
+
 def obtener_ip_cliente(request: Request) -> str:
     """
-    Resuelve la dirección IP real del cliente detrás de Cloudflare y proxies reversos confiables.
-    
-    1. Si la conexión TCP directa (request.client.host) proviene de un proxy confiable
-       (loopback 127.0.0.1/::1 o redes privadas/Docker), inspecciona la cabecera 'CF-Connecting-IP'
-       inyectada y autenticada por el borde de Cloudflare.
-    2. Si 'CF-Connecting-IP' contiene una IP válida, se adopta como IP verídica del visitante.
-    3. Si no hay proxy confiable o no existe la cabecera, recurre a request.client.host o 'unknown'.
+    Resuelve la dirección IP real del cliente detrás de un proxy reverso de confianza.
+
+    1. Si la conexión TCP directa (request.client.host) viene de un proxy confiable (loopback o redes privadas/Docker) Y se definió
+       IP_CABECERA_CLIENTE, se lee esa cabecera: `CF-Connecting-IP` si hay Cloudflare delante, `X-Real-IP` o `X-Forwarded-For` con un
+       nginx o Caddy propio. Sin esa variable no se lee ninguna cabecera: un proxy que no borra la del visitante dejaría que escogiera su IP.
+    2. En `X-Forwarded-For` (y si la cabecera viene repetida) vale la ÚLTIMA dirección: la que añadió nuestro proxy.
+    3. Si no hay proxy confiable, o la cabecera falta o no es una IP, se usa la conexión directa.
     """
+    global _AVISADO_SIN_CABECERA
     direct_ip = request.client.host if request.client else "unknown"
     if es_proxy_confiable(direct_ip):
-        cf_ip = request.headers.get("CF-Connecting-IP")
-        if cf_ip:
-            cf_ip_clean = cf_ip.strip()
-            try:
-                ipaddress.ip_address(cf_ip_clean)
-                return cf_ip_clean
-            except ValueError:
-                pass
+        nombre = (os.environ.get("IP_CABECERA_CLIENTE") or "").strip()
+        if nombre:
+            lineas = request.headers.getlist(nombre) if hasattr(request.headers, "getlist") else [request.headers.get(nombre) or ""]
+            valor = ",".join(x for x in lineas if x)
+            ip = _ip_normalizada(valor.split(",")[-1]) if valor else None
+            if ip:
+                return ip
+            if not _AVISADO_SIN_CABECERA:   # una vez por proceso: con un proxy mal configurado todos los visitantes comparten una sola IP
+                _AVISADO_SIN_CABECERA = True
+                print(f"[SEGURIDAD AVISO] La conexión viene de un proxy de confianza pero la cabecera {nombre} falta o no trae una IP válida: "
+                      "se usa la IP del proxy y los topes por IP se vuelven globales. Revisa la configuración del proxy.", flush=True)
     return direct_ip
+
+
+def huella_ip(ip: str) -> str:
+    """Una IP no se guarda tal cual: se guarda su huella (HMAC con una clave derivada de la del servidor). Las IPv6 de una misma red /64
+    (un hogar, un móvil) comparten huella: sus direcciones temporales cambian solas."""
+    normal = _ip_normalizada(ip)
+    if normal and ":" in normal:
+        normal = str(ipaddress.ip_network(f"{normal}/64", strict=False))
+    clave = hashlib.sha256(b"huella-ip:" + SECRET_KEY.encode("utf-8")).digest()
+    return hmac.new(clave, (normal or ip or "").encode("utf-8"), hashlib.sha256).hexdigest()[:32]
