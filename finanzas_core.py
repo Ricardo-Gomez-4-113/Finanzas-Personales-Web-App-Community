@@ -630,8 +630,8 @@ def validar_sustentabilidad_gasto_fijo(
     capacidad_fija = ingresos_fijos_total - compromisos_previos_total
     nuevo_compromiso_mensual = mensualizar(float(monto), frecuencia)
 
-    # Tolerancia numérica por redondeo (0.01)
-    if nuevo_compromiso_mensual - capacidad_fija > 0.01:
+    # Tolerancia de un centavo por redondeo, comparada en centavos enteros (con flotantes, 5000.01 - 5000 da 0.0100000000002)
+    if a_centavos(nuevo_compromiso_mensual) - a_centavos(capacidad_fija) > 1:
         raise ValueError(
             "No es posible registrar este compromiso como Gasto Fijo. Aunque cuentas con saldo disponible gracias al remanente de periodos pasados, tus ingresos fijos recurrentes no son suficientes para cubrirlo a largo plazo. Regístralo como un gasto normal puntual o incrementa tus ingresos fijos."
         )
@@ -656,7 +656,7 @@ def validar_capacidad_al_cambiar_ingreso(cursor: sqlite3.Cursor, ingreso_id: int
         if g["total_cuotas"] is not None and int(g["cuotas_generadas"] or 0) >= int(g["total_cuotas"]):
             continue
         compromisos += mensualizar(float(g["monto"]), g["frecuencia"])
-    if compromisos - capacidad > 0.01:
+    if a_centavos(compromisos) - a_centavos(capacidad) > 1:   # un centavo de tolerancia, en centavos enteros
         raise ValueError(
             "No es posible modificar este ingreso fijo porque los gastos fijos activos superarían la capacidad recurrente."
         )
@@ -1120,7 +1120,8 @@ def validar_limite_cargos_ventana(
 
     v = obtener_ventana_corte_fecha(cursor, fecha_str, transaccion_id=transaccion_id)
     if v["capacidad_total"] > 0:
-        if v["cargos_actuales"] + monto - v["capacidad_total"] > 0.01:
+        # En centavos enteros: con flotantes, «4000 + 6000.01 - 10000» da 0.0100000000002 y el centavo de tolerancia a veces no se concedía
+        if a_centavos(v["cargos_actuales"]) + a_centavos(monto) - a_centavos(v["capacidad_total"]) > 1:
             total_proyectado = v["cargos_actuales"] + monto
             raise ValueError(
                 f"El presupuesto del período ({v['inicio']} al {v['fin']}) ha sido superado. "
