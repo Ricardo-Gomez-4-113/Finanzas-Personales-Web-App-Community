@@ -183,6 +183,6 @@ Hecho (cada uno con su prueba, que falla con el código anterior salvo T1):
 
 **Casos del arnés:** R4 (crear una posición con ticker repetido no muestra mensaje) y R6 (editar una posición no queda guardada tal cual), sin reconfirmar con el equipo libre.
 
-**Mantenimiento:** actualizar el oráculo de Admin del arnés (R1, 425 falsos positivos); T2–T8 (huecos de pruebas); rechazos nuevos sin código estable para `observabilidad`; cargadores de movimientos, metas, inversiones y fijos sin contador de generación; `CLAUDE.md` cita `~/bin/portar-a-saas.sh` (ahora es `~/Proyecto-finanzas/portar-a-saas.sh`) y dice que `mensualizar` y `_ingreso_principal` se quitaron (siguen usándose).
+**Mantenimiento:** actualizar el oráculo de Admin del arnés (R1, 425 falsos positivos); T2–T8 (huecos de pruebas); rechazos nuevos sin código estable para `observabilidad`; cargadores de movimientos, metas, inversiones y fijos sin contador de generación; `CLAUDE.md` dice que `mensualizar` y `_ingreso_principal` se quitaron (siguen usándose).
 
 **Decisión tuya pendiente:** el servicio `finanzas-asistente` y el bot no corren en ninguno de los dos entornos, y a Community le falta `ASISTENTE_WEB_SECRETO` en el `.env`.
