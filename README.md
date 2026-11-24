@@ -215,7 +215,7 @@ La versión comunitaria incluye soporte para el envío de códigos de recuperaci
    * **Opción A: Vía API de Correo**
      ```env
      RESEND_API_KEY=tu_api_key_aqui
-     RESEND_FROM=Finanzas Cloud <notificaciones@finanzas.rgmlabs.org>
+     RESEND_FROM=Finanzas Cloud <notificaciones@tu-dominio.com>
      ```
    * **Opción B: Vía Servidor SMTP**
      ```env

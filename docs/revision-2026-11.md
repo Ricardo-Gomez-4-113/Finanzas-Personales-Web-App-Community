@@ -145,7 +145,7 @@ Comprobaciones automáticas por captura: desborde horizontal, elementos fuera de
 
 ## I. Estado de los arreglos (actualizado 18 nov 2026)
 
-Hecho (Community primero, luego SaaS; cada uno con su prueba, que falla con el código anterior salvo T1):
+Hecho (cada uno con su prueba, que falla con el código anterior salvo T1):
 
 | Hallazgo | Arreglo |
 |---|---|

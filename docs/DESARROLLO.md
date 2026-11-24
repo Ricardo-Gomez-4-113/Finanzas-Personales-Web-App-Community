@@ -141,7 +141,6 @@ Muchos usuarios a la vez contra una instancia **temporal** con datos sembrados (
 ```bash
 tests/auditoria/run_estres.sh --humo                              # comprobación corta (1 min)
 tests/auditoria/run_estres.sh --etiqueta community                # escalones de 10, 25, 50, 100 y 200 sesiones (~20 min)
-tests/auditoria/run_estres.sh --fuente ~/finanzas-app --etiqueta saas   # el SaaS, que arranca con --reload
 tests/auditoria/run_estres.sh --etiqueta pi --cpus 4              # con menos núcleos
 ```
 - Fase A: sesiones por API con lecturas, escrituras y descargas pesadas; algunas cuentas se abren en dos sesiones a la vez.
@@ -149,17 +148,7 @@ tests/auditoria/run_estres.sh --etiqueta pi --cpus 4              # con menos n�
   JavaScript, 5xx, desbordes, empalmes y pestañas lentas. Al final, con SQL propio, comprueba integridad, saldos de metas,
   sobregiros y duplicados. El informe queda en `auditoria/corridas/estres-<etiqueta>-<fecha>/informe_estres.md`.
 - Cliente y servidor comparten la máquina: los números son **relativos** (comparar, encontrar errores), no la capacidad exacta.
-- El servidor se lanza con el `CMD` del `Dockerfile` de la copia probada: Community sin `--reload`, el SaaS con él.
+- El servidor se lanza con el `CMD` del `Dockerfile` de la copia probada.
 - Control: antes de fiarte de un resultado limpio, inyecta un 500, un error de JavaScript y un descuadre de meta en una copia
   (`git archive HEAD`) y corre con `--fuente`: los tres deben aparecer en el informe.
 - Los inicios de sesión fallidos y el asistente con IA y Telegram quedan fuera de la prueba.
-
-## Sincronizar SaaS y Community (mantenedores)
-
-La edición Community comparte el núcleo con una edición privada (SaaS). El flujo es:
-
-1. Implementar y probar en Community; commit y push a `main`.
-2. Pasar el mismo commit al SaaS con `~/bin/portar-a-saas.sh <commit> --probar`: aplica el resto de archivos con `git apply`, mezcla `static/index.html` a tres bandas (conserva la landing) y corre las suites del SaaS. Si hay conflicto no toca nada.
-3. Revisar y hacer el commit y el push del SaaS.
-
-Nunca se copian la landing, `main.py`, `auth.js`, `docker-compose.yml`, `Dockerfile`, README, LICENSE ni `.env`: difieren a propósito. El script y `scripts/sync.sh` no se versionan.

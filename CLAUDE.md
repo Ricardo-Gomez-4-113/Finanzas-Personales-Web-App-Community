@@ -17,7 +17,6 @@ Rules:
 
 1. Todo cambio se implementa y prueba primero en este repositorio (Community).
 2. Si las suites pasan, se hace commit y push a `main`.
-3. El mismo cambio se pasa después a la edición privada (SaaS) con `~/bin/portar-a-saas.sh <commit> --probar` (mezcla `index.html` sin tocar la landing y corre las suites del SaaS); luego su propio commit y push.
 
 Convenciones:
 - Commits en español con formato `tipo(area): descripción`, sin líneas `Co-Authored-By` ni atribución a asistentes.
@@ -57,7 +56,6 @@ Carpeta local (excluida de git en `.git/info/exclude`); parte de su formato vien
 |---|---|---|
 | Skill `verificar` | `.claude/skills/verificar/` | Antes de cada commit: reglas, cache-busting, suites en paralelo y la prueba que falla con el código anterior |
 | Skill `auditoria-uso-real` | `.claude/skills/auditoria-uso-real/` | Correr o repetir episodios del arnés (`tests/auditoria/`), controles con `--fuente`, clasificar arnés frente a app |
-| Skill `portar-saas` | `.claude/skills/portar-saas/` | Solo cuando el usuario pide pasar commits al SaaS |
 | Agente `revisor-backend` | `.claude/agents/` | Revisar cambios en `routers/`, `finanzas_core.py`, `database.py`, `dinero.py` |
 | Agente `revisor-seguridad` | `.claude/agents/` | Cambios en auth, admin, respaldo, `security.py`, `main.py` o `innerHTML` |
 | Agente `cazador-fallos-silenciosos` | `.claude/agents/` | Errores tragados y valores de respaldo que pasan por dato real |
@@ -88,7 +86,6 @@ Un cambio está terminado cuando:
 - Las suites de backend y de navegador pasan en Community (`./tests/run_todo.sh` antes de publicar).
 - Hay una prueba que falla con el código anterior: el cambio tiene su caso, no solo verde.
 - Si toca frontend, `python3 scripts/cache_bust.py` está ejecutado y el cambio se ve bien en móvil y escritorio.
-- Antes de publicar en el SaaS: `~/bin/portar-a-saas.sh <commit> --probar`, y solo después su propio commit y push.
 
 ## Directivas de trabajo
 

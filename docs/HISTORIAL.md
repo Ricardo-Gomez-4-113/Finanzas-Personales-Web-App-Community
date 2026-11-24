@@ -36,11 +36,10 @@ Fases 1 a 6 cerradas.
   - Revisión: `python3 scripts/resumen_logs.py [carpeta]` resume fallos por evento, método, ruta y estado, y muestra los últimos con su id. `./tests/run_tests.sh` deja el registro de todas sus suites en `.logs_pruebas/app.log`, que es ignorado por git.
   - Pruebas: `tests/test_observabilidad.py` (7 pruebas) y dos pruebas de navegador (`test_error_de_javascript_llega_al_registro`, `test_respuesta_500_de_la_api_se_reporta_con_su_id`).
   - Límites conocidos: el registro asume un solo proceso de uvicorn (como el Dockerfile). Las pruebas de 401 generan líneas a propósito, así que `.logs_pruebas` no es un registro limpio de producción.
-  - Flujo habitual: Community primero, luego `portar-a-saas.sh --probar`.
 
 ## Plan de auditoría de interfaz (completado)
 
-Estado de los seis puntos (cada uno con su prueba, publicado en Community y en el SaaS):
+Estado de los seis puntos (cada uno con su prueba):
 1. **Sidebar colapsado:** no se reprodujo compresión del icono en ningún ancho ni estado. Sí se corrigió el desplazamiento del icono con el cursor encima (`d35807d`). Si el icono que se ve mal es otro, falta una captura.
 2. **Modo privacidad:** clase única `.dato-sensible` con `montoHTML()`. Las gráficas y los tooltips no siempre cubren todo: los `title` y las opciones de selector siguen en texto plano.
 3. **Euro como moneda base:** selectores, gastos por categoría (antes 500 con base EUR) y exportación a Excel.
@@ -52,7 +51,7 @@ Prueba intermitente: `test_botones_de_fila_y_pestanas_tienen_area_tactil_de_44px
 
 ## Auditoría de mejoras (puntos 1 a 11, noviembre de 2026)
 
-Los mismos cambios existen en el SaaS con sus propios hashes. Hashes de Community:
+Hashes:
 
 | # | Qué | Estado |
 |---|---|---|
@@ -97,9 +96,9 @@ Tanda visual (`2857cfd`):
 - De 44 declaraciones `!important` quedan 15, cada una con su motivo escrito junto a la regla: el bloque de reducir movimiento, `.hidden`, el tamaño del canvas de Chart.js (que fija estilos en línea), el `display` que el JS pone en línea a la app, y los colores de estado (`.pnl-*`, `.networth-sin`, `.card-deficit`), que deben ganar a los colores que cada contexto fija. El resto se resolvió con una regla `:root` aparte para esas declaraciones, y bajando la especificidad de la regla de campos de `tema.css` con `:where()`.
 - Las 57 sombras y tintes neutros con `rgba` literal usan `rgb(var(--sombra-rgb) / alfa)` y `rgb(var(--luz-rgb) / alfa)` (definidos en `tokens.css`); el valor calculado es idéntico.
 - Prueba: se volcaron los estilos calculados de 200 640 elementos en 110 pantallas (login, siete pestañas, tres modales; claro y oscuro; cinco anchos de 390 a 1500 px) antes y después. Sin diferencias reales; las únicas, de menos de 3 px en títulos, aparecen también entre dos corridas de la versión anterior (carga de tipografía). El volcado no cubre hover, foco ni estados que dependen de datos (déficit).
-- `scripts/verificar_reglas.sh` falla si reaparece un `rgba` neutro literal fuera de `tokens.css` o si hay más de 15 declaraciones `!important` (la landing, solo del SaaS, queda fuera).
+- `scripts/verificar_reglas.sh` falla si reaparece un `rgba` neutro literal fuera de `tokens.css` o si hay más de 15 declaraciones `!important`.
 
-Visual abierto: consolidar las 5 hojas (180 KB) y los `rgba` de colores de marca de la landing (SaaS); los estilos en línea que quedan son anchos dinámicos por dato. En `tema.css` queda un `#000` en una máscara de degradado, donde solo cuenta la transparencia.
+Visual abierto: consolidar las 5 hojas (180 KB); los estilos en línea que quedan son anchos dinámicos por dato. En `tema.css` queda un `#000` en una máscara de degradado, donde solo cuenta la transparencia.
 
 Abierto:
 - Monedas del portafolio (cerrado): solo USD, MXN y EUR. Una cotización en otra moneda se rechaza al registrar o cotizar (422), la sincronización la deja sin actualizar y `convertir` no valúa a valor nominal.
