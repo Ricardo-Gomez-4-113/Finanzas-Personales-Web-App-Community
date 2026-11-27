@@ -549,6 +549,15 @@
 :root .cinta-seg-msi { background: var(--warning-color); }
 :root .cinta-seg-libre { background: var(--success-color); }
 
+:root .cinta-periodo-arrastre {
+    display: block;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border-color);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
 :root .cinta-periodo-ingreso,
 :root .cinta-periodo-sin-ingreso {
     font-size: var(--fs-xs);

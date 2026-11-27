@@ -793,9 +793,9 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
             document.body.appendChild(raiz);
             const periodos = [
                 { inicio: '2026-10-15', fin: '2026-10-30', en_curso: true,
-                  totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 20000 } },
+                  totales: { ingresos: 14000, fijos: 299, msi: 500, libre: 13201, saldo_al_cierre: 20000, saldo_inicial: 6799 } },
                 { inicio: '2026-10-31', fin: '2026-11-14', en_curso: false,
-                  totales: { ingresos: 0, fijos: 14000, msi: 0, libre: -14000, saldo_al_cierre: 5000 } },
+                  totales: { ingresos: 0, fijos: 14000, msi: 0, libre: -14000, saldo_al_cierre: 5000, saldo_inicial: 19000 } },
             ];
             let elegido = -1;
             renderCintaPeriodos(raiz, periodos, { onSeleccionar: i => { elegido = i; } });
@@ -810,6 +810,8 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
                 elegido,
                 dias: botones[0].style.getPropertyValue('--dias'),
                 presionado: botones[0].getAttribute('aria-pressed'),
+                arrastre: (botones[0].querySelector('.cinta-periodo-arrastre') || {}).textContent || '',
+                arrastreFuturo: !!botones[1].querySelector('.cinta-periodo-arrastre'),
             };
         }""")
         assert resultado["n"] == 2, resultado
@@ -818,6 +820,9 @@ def test_cinta_periodos_pinta_libre_y_selecciona(navegador, base):
         assert resultado["libre"] == "$13,201.00", resultado
         assert resultado["elegido"] == 1, resultado          # el clic avisa el índice elegido
         assert resultado["dias"] == "16" and resultado["presionado"] == "true", resultado
+        # Solo el periodo en curso explica lo que se traía, para que cuadre con el efectivo del tablero (libre + traía = saldo)
+        assert resultado["arrastre"].replace("\u00a0", " ") == "+ $6,799.00 que traías = $20,000.00", resultado
+        assert not resultado["arrastreFuturo"], resultado
         assert not errores, errores
     finally:
         ctx.close()

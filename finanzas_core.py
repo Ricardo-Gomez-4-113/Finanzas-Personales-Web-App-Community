@@ -2194,6 +2194,7 @@ def fijos_por_periodo(conn: sqlite3.Connection, hoy: date, n: int = 3) -> Dict[s
     for grupo, resumen in zip(grupos, calcular_periodos(conn, hoy, max(1, n))["periodos"]):
         grupo["totales"]["libre"] = resumen["remanente"]
         grupo["totales"]["saldo_al_cierre"] = resumen["saldo_final"]
+        grupo["totales"]["saldo_inicial"] = resumen["saldo_inicial"]   # lo que se traía al abrir el periodo (el libre no lo cuenta)
 
     pausados = []
     for r in conn.execute("SELECT * FROM recurrentes WHERE activo = 0").fetchall():

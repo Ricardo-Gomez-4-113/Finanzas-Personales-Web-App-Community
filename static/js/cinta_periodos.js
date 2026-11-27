@@ -62,6 +62,13 @@ function celda(p, indice, seleccionado, onSeleccionar) {
         boton.append(el('span', 'cinta-periodo-sin-ingreso', 'Sin cobro en este periodo'));
     }
     boton.append(Object.assign(el('span', 'cinta-periodo-ingreso'), { innerHTML: t.ingresos > 0 ? `Ingreso ${montoMxnHTML(t.ingresos)}` : '' }));
+    // El libre del periodo no cuenta lo que ya se traía; el tablero sí. En el periodo en curso se muestra la suma para que las dos cifras cuadren a la vista.
+    const traia = Number(t.saldo_inicial || 0);
+    if (p.en_curso && Math.abs(traia) >= 0.005 && t.saldo_al_cierre !== undefined) {
+        boton.append(Object.assign(el('span', 'cinta-periodo-arrastre'), {
+            innerHTML: `${traia < 0 ? '−' : '+'} ${montoMxnHTML(Math.abs(traia))} que traías = ${montoMxnHTML(t.saldo_al_cierre)}`,
+        }));
+    }
 
     boton.addEventListener('click', () => onSeleccionar(indice));
     return boton;
