@@ -2095,8 +2095,9 @@
 /* Historial: las cifras se alinean en columna */
 :root .monthly-info { font-variant-numeric: tabular-nums; }
 
-/* La dona de un solo bloque ocupa el ancho; la gráfica no se estira más de lo necesario */
-:root .dashboard-grid > .panel:only-child { grid-column: 1 / -1; }
+/* La dona de un solo bloque ocupa una columna, igual que las tarjetas de la fila de arriba: a todo el ancho quedaba una
+   dona pequeña pegada a la izquierda y media tarjeta vacía. En pantallas angostas la cuadrícula ya es de una columna. */
+:root .dashboard-grid > .panel:only-child { grid-column: 1 / 2; }
 :root .dashboard-grid > .panel:only-child .chart-container-dona { max-width: 460px; }
 
 /* Estado vacío: una sola invitación, sin el «sin cobro» repetido en cada periodo */

@@ -1667,9 +1667,9 @@ def test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base):
     finally:
         ctx.close()
 
-def test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base):
+def test_resumen_leyenda_hero_plano_y_dona_del_ancho_de_una_columna(navegador, base):
     """El Resumen explica los colores de la cinta, el hero no lleva degradado y la dona
-    de un solo bloque ocupa el ancho del contenido."""
+    de un solo bloque mide lo mismo que una tarjeta de la fila de arriba (una columna), no todo el ancho."""
     ctx, page, errores = _flujo_escenario(navegador, base)
     try:
         page.wait_for_selector("#cinta-periodos .cinta-periodo")
@@ -1677,8 +1677,11 @@ def test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base):
         fondo = page.evaluate("getComputedStyle(document.getElementById('periodo-hero')).backgroundImage")
         assert fondo == "none", f"el hero aún tiene degradado: {fondo[:60]}"
         ancho = page.evaluate("document.querySelector('.dashboard-grid > .panel:only-child')?.getBoundingClientRect().width || 0")
+        arriba = page.evaluate("document.querySelector('.dashboard-grid .panel:not(:only-child)')?.getBoundingClientRect().width || 0")
         contenido = page.evaluate("document.querySelector('#tab-dashboard').getBoundingClientRect().width")
-        assert ancho > contenido * 0.9, f"la dona no ocupa el ancho: {ancho} de {contenido}"
+        assert ancho > 0 and arriba > 0, f"faltan las tarjetas: dona {ancho}, vecina {arriba}"
+        assert abs(ancho - arriba) < 2, f"la dona no mide lo de una columna: {ancho} frente a {arriba} de la tarjeta de arriba"
+        assert ancho <= contenido + 1, f"la dona desborda: {ancho} de {contenido}"
         assert not errores, errores
     finally:
         ctx.close()
@@ -3320,7 +3323,7 @@ if __name__ == "__main__":
                 (test_titulo_de_la_barra_no_se_corta_en_movil, lambda: test_titulo_de_la_barra_no_se_corta_en_movil(navegador, base)),
                 (test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico, lambda: test_componentes_cero_en_tinta_neutra_y_signo_menos_tipografico(navegador, base)),
                 (test_moneda_una_vez_y_pestanas_internas_cortas_en_movil, lambda: test_moneda_una_vez_y_pestanas_internas_cortas_en_movil(navegador, base)),
-                (test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho, lambda: test_resumen_leyenda_hero_plano_y_dona_a_todo_el_ancho(navegador, base)),
+                (test_resumen_leyenda_hero_plano_y_dona_del_ancho_de_una_columna, lambda: test_resumen_leyenda_hero_plano_y_dona_del_ancho_de_una_columna(navegador, base)),
                 (test_movimientos_en_movil_sin_deslizar_y_con_papelera, lambda: test_movimientos_en_movil_sin_deslizar_y_con_papelera(navegador, base)),
                 (test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador, lambda: test_fijos_msi_con_barra_y_filtro_de_mes_con_marcador(navegador, base)),
                 (test_presupuesto_panel_sin_borde_y_textos_sencillos, lambda: test_presupuesto_panel_sin_borde_y_textos_sencillos(navegador, base)),
